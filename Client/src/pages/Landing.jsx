@@ -95,7 +95,7 @@ const Landing = () => {
               </div>
               <div className="flex flex-col">
                 <span className="text-xl font-bold bg-gradient-to-r from-slate-800 to-blue-600 bg-clip-text text-transparent">
-                  IUTCode
+                  0Point
                 </span>
                 <span className="text-xs text-slate-500 -mt-1">by Islamic University of Technology</span>
               </div>
