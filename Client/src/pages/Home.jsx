@@ -380,11 +380,11 @@ const Home = () => {
                     className="p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors duration-200"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-start gap-4">
+                      <div className="flex items-start gap-4 flex-1">
                         <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
                           <Calendar className="w-6 h-6" />
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <h3 className="font-semibold text-gray-900">
                             {contest.title}
                           </h3>
@@ -397,39 +397,43 @@ const Home = () => {
                               <Users className="w-4 h-4" />
                               {contest.participants}
                             </span>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              contest.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
-                              contest.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                            }`}>
-                              {contest.difficulty}
-                            </span>
                           </div>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-3">
-                        {contest.registered && (
-                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                            Registered
-                          </span>
-                        )}
-                        <button className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
-                          contest.registered 
-                            ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:shadow-lg hover:shadow-blue-500/25' 
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      {/* Difficulty Tag Column */}
+                      <div className="flex flex-col items-end gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          contest.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
+                          contest.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                         }`}>
-                          {contest.registered ? (
-                            <>
-                              <Play className="w-4 h-4" />
-                              Participate
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="w-4 h-4" />
-                              View
-                            </>
+                          {contest.difficulty}
+                        </span>
+                        
+                        <div className="flex items-center gap-3">
+                          {contest.registered && (
+                            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                              Registered
+                            </span>
                           )}
-                        </button>
+                          <button className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+                            contest.registered 
+                              ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:shadow-lg hover:shadow-blue-500/25' 
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}>
+                            {contest.registered ? (
+                              <>
+                                <Play className="w-4 h-4" />
+                                Participate
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-4 h-4" />
+                                View
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
