@@ -633,10 +633,13 @@ const Home = () => {
                     <Bell className="w-3.5 h-3.5 text-gray-700" />
                     <h2 className="text-xs font-semibold text-gray-900">All Announcements</h2>
                   </div>
-                  <button className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs">
+                  <Link 
+                    to="/blog" 
+                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                  >
                     View All
                     <ChevronRight className="w-2.5 h-2.5" />
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="space-y-2">
