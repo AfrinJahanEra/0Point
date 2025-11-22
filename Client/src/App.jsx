@@ -12,6 +12,7 @@ import Practice from './pages/Practice';
 import Visualizer from './pages/Visualizer';
 import Leaderboard from './pages/Leaderboard';
 import Blog from './pages/Blog';
+import Dashboard from './pages/Dashboard';
 
 // Layout component that includes Header and Footer
 const Layout = ({ children }) => (
@@ -72,6 +73,11 @@ function App() {
             <Route path="/blog" element={
               <Layout>
                 <Blog />
+              </Layout>
+            } />
+            <Route path="/dashboard" element={
+              <Layout>
+                <Dashboard />
               </Layout>
             } />
           </Routes>
