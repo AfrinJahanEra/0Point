@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Code2, LogOut, LogIn, UserPlus, Home, User } from 'lucide-react';
+import { Code2, LogOut, LogIn, UserPlus, Home, User, BarChart2 } from 'lucide-react';
 
 const Header = () => {
   const { user, logout } = useApp();
@@ -86,8 +86,9 @@ const Header = () => {
           {/* Avatar and Era Text with Profile Dropdown */}
           <div className="flex gap-3 items-center">
             {/* Dashboard Link */}
-            <Link to="/dashboard" className="text-xl text-gray-900 hover:text-blue-800 transition-all duration-300 transform hover:scale-105">
-              era97
+            <Link to="/dashboard" className="flex items-center gap-2 text-gray-900 hover:text-blue-800 transition-all duration-300 transform hover:scale-105">
+              <BarChart2 className="w-5 h-5" />
+              <span className="font-medium">{user ? user.name : 'era97'}</span>
             </Link>
             
             {/* Round Avatar with Profile Dropdown */}

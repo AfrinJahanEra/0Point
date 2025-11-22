@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import NavigationBar from './components/NavigationBar';
 import Home from './pages/Home';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
@@ -13,11 +14,26 @@ import Visualizer from './pages/Visualizer';
 import Leaderboard from './pages/Leaderboard';
 import Blog from './pages/Blog';
 import Dashboard from './pages/Dashboard';
+import CreateBlog from './pages/CreateBlog';
+import Submissions from './pages/Submissions';
+import Problems from './pages/Problems';
 
-// Layout component that includes Header and Footer
+// Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
     <Header />
+    <main className="flex-grow">
+      {children}
+    </main>
+    <Footer />
+  </>
+);
+
+// Layout component that includes Header, NavigationBar and Footer
+const NavLayout = ({ children }) => (
+  <>
+    <Header />
+    <NavigationBar />
     <main className="flex-grow">
       {children}
     </main>
@@ -38,7 +54,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             
-            {/* All other pages with Header and Footer */}
+            {/* Pages with Header and Footer only */}
             <Route path="/home" element={
               <Layout>
                 <Home />
@@ -64,15 +80,32 @@ function App() {
                 <Leaderboard />
               </Layout>
             } />
+            
+            {/* Pages with Header, NavigationBar and Footer */}
             <Route path="/blog" element={
-              <Layout>
+              <NavLayout>
                 <Blog />
-              </Layout>
+              </NavLayout>
             } />
             <Route path="/dashboard" element={
-              <Layout>
+              <NavLayout>
                 <Dashboard />
-              </Layout>
+              </NavLayout>
+            } />
+            <Route path="/create-blog" element={
+              <NavLayout>
+                <CreateBlog />
+              </NavLayout>
+            } />
+            <Route path="/submissions" element={
+              <NavLayout>
+                <Submissions />
+              </NavLayout>
+            } />
+            <Route path="/problems" element={
+              <NavLayout>
+                <Problems />
+              </NavLayout>
             } />
           </Routes>
         </div>
