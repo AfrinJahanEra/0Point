@@ -9,10 +9,7 @@ const Practice = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Main Content */}
           <div className="lg:col-span-9">
-            <div className="container mx-auto px-4">
-              <h1 className="text-2xl font-bold text-gray-900 mb-6">Practice Problems</h1>
-              <p className="text-gray-600">Practice problems will be available here.</p>
-            </div>
+
           </div>
           
           {/* Sidebar */}

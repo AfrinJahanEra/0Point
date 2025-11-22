@@ -18,7 +18,7 @@ const ContestCard = ({ contest }) => {
   const handleRegister = () => {
     setIsRegistered(true);
     setShowPopup(true);
-    // In a real app, you would make an API call here to register the user
+
   };
 
   const closePopup = () => {
@@ -53,7 +53,7 @@ const ContestCard = ({ contest }) => {
         </button>
       );
     } else {
-      // Assuming 'finished' or any other status
+
       return (
         <button className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors duration-300">
           Practice

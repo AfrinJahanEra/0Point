@@ -1,8 +1,7 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 
-const Leaderboard = () => {
+const Community = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -10,7 +9,7 @@ const Leaderboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Main Content */}
           <div className="lg:col-span-9">
-
+            
           </div>
           
           {/* Sidebar */}
@@ -23,4 +22,4 @@ const Leaderboard = () => {
   );
 };
 
-export default Leaderboard;
+export default Community;

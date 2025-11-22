@@ -6,19 +6,17 @@ const NavigationBar = () => {
   const location = useLocation();
   const currentPath = location.pathname;
 
-  // Determine which tab is active based on the current path
   const getActiveTab = () => {
     if (currentPath === '/submissions') return 'submissions';
     if (currentPath === '/blog') return 'blog';
-    if (currentPath === '/problems') return 'problems';
-    return 'overview'; // default to overview
+    return 'era97'; 
   };
 
   const activeTab = getActiveTab();
 
   const handleTabChange = (tab) => {
     switch (tab) {
-      case 'overview':
+      case 'era97':
         navigate('/dashboard');
         break;
       case 'submissions':
@@ -26,9 +24,6 @@ const NavigationBar = () => {
         break;
       case 'blog':
         navigate('/blog');
-        break;
-      case 'problems':
-        navigate('/problems');
         break;
       default:
         navigate('/dashboard');
@@ -39,14 +34,14 @@ const NavigationBar = () => {
     <div className="mb-4 px-10">
       <div className="flex space-x-10">
         <button
-          onClick={() => handleTabChange('overview')}
+          onClick={() => handleTabChange('era97')}
           className={`pb-2 text-sm font-medium ${
-            activeTab === 'overview'
+            activeTab === 'era97'
               ? 'text-blue-800 border-b-2 border-blue-800'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Overview
+          era97
         </button>
         <button
           onClick={() => handleTabChange('submissions')}
@@ -67,16 +62,6 @@ const NavigationBar = () => {
           }`}
         >
           Blogs
-        </button>
-        <button
-          onClick={() => handleTabChange('problems')}
-          className={`pb-2 text-sm font-medium ${
-            activeTab === 'problems'
-              ? 'text-blue-800 border-b-2 border-blue-800'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Problems
         </button>
       </div>
     </div>

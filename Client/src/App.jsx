@@ -13,10 +13,11 @@ import Practice from './pages/Practice';
 import Visualizer from './pages/Visualizer';
 import Leaderboard from './pages/Leaderboard';
 import Blog from './pages/Blog';
+import Community from './pages/Community';
 import Dashboard from './pages/Dashboard';
 import CreateBlog from './pages/CreateBlog';
 import Submissions from './pages/Submissions';
-import Problems from './pages/Problems';
+
 
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
@@ -80,6 +81,11 @@ function App() {
                 <Leaderboard />
               </Layout>
             } />
+            <Route path="/community" element={
+              <Layout>
+                <Community />
+              </Layout>
+            } />
             
             {/* Pages with Header, NavigationBar and Footer */}
             <Route path="/blog" element={
@@ -100,11 +106,6 @@ function App() {
             <Route path="/submissions" element={
               <NavLayout>
                 <Submissions />
-              </NavLayout>
-            } />
-            <Route path="/problems" element={
-              <NavLayout>
-                <Problems />
               </NavLayout>
             } />
           </Routes>

@@ -10,10 +10,9 @@ const Header = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef(null);
 
-  // Check if we're on a public page (landing, login, register)
   const isPublicPage = ['/', '/login', '/register'].includes(location.pathname);
 
-  // Close profile dropdown when clicking outside or pressing Escape
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
@@ -38,7 +37,7 @@ const Header = () => {
   const handleLogout = () => {
     logout();
     setIsProfileOpen(false);
-    // Navigate to home page after logout
+    // Navigate to landing page after logout
     navigate('/');
   };
 
@@ -68,10 +67,10 @@ const Header = () => {
           {(!isPublicPage || location.pathname === '/home') && (
             <nav className="flex-1 flex justify-center">
               <ul className="flex flex-wrap justify-center gap-6 md:gap-8">
-                {['Home', 'Contests', 'Practice', 'Community', 'Visualizer', 'Leaderboard'].map((item) => (
+                {['Home', 'Contests', 'Practice', 'Community', 'Leaderboard'].map((item) => (
                   <li key={item}>
                     <Link 
-                      to={item === 'Community' ? '/blog' : `/${item.toLowerCase()}`} 
+                      to={`/${item.toLowerCase()}`} 
                       className="text-gray-700 font-medium hover:text-blue-800 transition-all duration-300 relative py-2 group"
                     >
                       {item}
@@ -79,6 +78,18 @@ const Header = () => {
                     </Link>
                   </li>
                 ))}
+                {/* Visualizer link opens in new tab */}
+                <li>
+                  <a 
+                    href="/visualizer" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-gray-700 font-medium hover:text-blue-800 transition-all duration-300 relative py-2 group"
+                  >
+                    Visualizer
+                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-blue-800 transition-all duration-300 group-hover:w-full"></span>
+                  </a>
+                </li>
               </ul>
             </nav>
           )}
@@ -106,45 +117,16 @@ const Header = () => {
                 )}
               </button>
               
-              {(user || (!user && isPublicPage)) && isProfileOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-3 transform transition-all duration-300 ease-out origin-top-right z-50"
-                     style={{ display: isProfileOpen ? 'block' : 'none' }}>
-                  {user ? (
-                    <>
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                      </div>
-                      <button 
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors duration-200 rounded-b-xl"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span>Logout</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <Link 
-                        to="/login" 
-                        className="block w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200 rounded-t-xl"
-                      >
-                        <div className="flex items-center gap-3">
-                          <LogIn className="w-4 h-4" />
-                          <span>Login</span>
-                        </div>
-                      </Link>
-                      <Link 
-                        to="/register" 
-                        className="block w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 border-t border-gray-100 transition-colors duration-200 rounded-b-xl"
-                      >
-                        <div className="flex items-center gap-3">
-                          <UserPlus className="w-4 h-4" />
-                          <span>Register</span>
-                        </div>
-                      </Link>
-                    </>
-                  )}
+              {/* Always show logout button in the popup */}
+              {isProfileOpen && (
+                <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-md border border-gray-200 py-2 transform transition-all duration-300 ease-out origin-top-right z-50">
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors duration-200"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    <span>Logout</span>
+                  </button>
                 </div>
               )}
             </div>
