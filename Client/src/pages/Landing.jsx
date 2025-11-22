@@ -102,7 +102,7 @@ const Landing = () => {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
+            {/* <div className="hidden md:flex items-center space-x-8">
               {[
                 { name: 'Contests', icon: <Trophy className="w-4 h-4" /> },
                 { name: 'Practice', icon: <Code2 className="w-4 h-4" /> },
@@ -119,7 +119,7 @@ const Landing = () => {
                   <div className="w-0 group-hover:w-4 h-0.5 bg-blue-700 rounded transition-all duration-300"></div>
                 </button>
               ))}
-            </div>
+            </div> */}
 
             {/* Auth Buttons */}
             <div className="flex items-center space-x-4">
