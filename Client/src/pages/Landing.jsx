@@ -83,18 +83,18 @@ const Landing = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100/30 overflow-hidden">
       {/* Navigation Header */}
-      <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-50 transition-all duration-300">
+      <nav className="bg-white/80 backdrop-blur-md border-b border-blue-200/80 sticky top-0 z-50 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-3 group">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/30 transition-all duration-300">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-700 to-blue-900 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/30 transition-all duration-300">
                 <Code2 className="w-6 h-6 text-white" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-bold bg-gradient-to-r from-slate-800 to-blue-600 bg-clip-text text-transparent">
+                <span className="text-xl font-bold bg-gradient-to-r from-slate-800 to-blue-700 bg-clip-text text-transparent">
                   0Point
                 </span>
                 <span className="text-xs text-slate-500 -mt-1">by Islamic University of Technology</span>
@@ -112,21 +112,21 @@ const Landing = () => {
               ].map((item) => (
                 <button
                   key={item.name}
-                  className="flex items-center space-x-2 text-slate-700 hover:text-blue-600 font-medium text-sm transition-colors duration-200 group"
+                  className="flex items-center space-x-2 text-slate-700 hover:text-blue-700 font-medium text-sm transition-colors duration-200 group"
                 >
                   {item.icon}
                   <span>{item.name}</span>
-                  <div className="w-0 group-hover:w-4 h-0.5 bg-blue-600 rounded transition-all duration-300"></div>
+                  <div className="w-0 group-hover:w-4 h-0.5 bg-blue-700 rounded transition-all duration-300"></div>
                 </button>
               ))}
             </div>
 
             {/* Auth Buttons */}
             <div className="flex items-center space-x-4">
-              <Link to="/login" className="text-slate-700 hover:text-blue-600 font-medium text-sm transition-colors duration-200">
+              <Link to="/login" className="text-slate-700 hover:text-blue-700 font-medium text-sm transition-colors duration-200">
                 Sign In
               </Link>
-              <Link to="/register" className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105 transition-all duration-300 flex items-center space-x-2">
+              <Link to="/register" className="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105 transition-all duration-300 flex items-center space-x-2">
                 <Rocket className="w-4 h-4" />
                 <span>Get Started</span>
               </Link>
@@ -136,18 +136,18 @@ const Landing = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/50 to-cyan-50/30">
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/50 to-blue-100/30">
         {/* Background Elements */}
         <div className="absolute inset-0 bg-grid-slate-200/50 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]"></div>
-        <div className="absolute top-0 left-1/4 w-72 h-72 bg-blue-200/20 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-200/20 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 left-1/4 w-72 h-72 bg-blue-300/20 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl"></div>
         
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Left Content */}
             <div className="space-y-8">
               {/* Badge */}
-              <div className="inline-flex items-center space-x-2 bg-white/80 backdrop-blur-sm border border-slate-200/80 rounded-2xl px-4 py-2.5 shadow-sm">
+              <div className="inline-flex items-center space-x-2 bg-white/80 backdrop-blur-sm border border-blue-200/80 rounded-2xl px-4 py-2.5 shadow-sm">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-sm font-medium text-slate-700">Live platform with 2,000+ active coders</span>
               </div>
@@ -159,7 +159,7 @@ const Landing = () => {
                     Code. Compete.
                   </span>
                   <br />
-                  <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent">
                     Conquer.
                   </span>
                 </h1>
@@ -178,7 +178,7 @@ const Landing = () => {
                   { number: '100+', label: 'Success Stories' }
                 ].map((stat, index) => (
                   <div key={index} className="text-center">
-                    <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+                    <div className="text-2xl font-bold bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent">
                       {stat.number}
                     </div>
                     <div className="text-sm text-slate-500 font-medium">{stat.label}</div>
@@ -188,11 +188,11 @@ const Landing = () => {
 
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Link to="/register" className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105 transition-all duration-300 flex items-center justify-center space-x-3 group">
+                <Link to="/register" className="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105 transition-all duration-300 flex items-center justify-center space-x-3 group">
                   <span>Start Coding Now</span>
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
                 </Link>
-                <button className="border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-2xl font-semibold hover:border-blue-500 hover:text-blue-600 transition-all duration-300 flex items-center justify-center space-x-3">
+                <button className="border-2 border-blue-300 text-slate-700 px-8 py-4 rounded-2xl font-semibold hover:border-blue-700 hover:text-blue-700 transition-all duration-300 flex items-center justify-center space-x-3">
                   <Play className="w-5 h-5" />
                   <span>Watch Demo</span>
                 </button>
@@ -208,7 +208,7 @@ const Landing = () => {
             {/* Right Content - Interactive Preview */}
             <div className="relative">
               {/* Main Platform Preview */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-slate-200/80 shadow-2xl shadow-slate-500/10 p-8 space-y-6 transform hover:scale-105 transition-all duration-500">
+              <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-blue-200/80 shadow-2xl shadow-blue-500/10 p-8 space-y-6 transform hover:scale-105 transition-all duration-500">
                 {/* Code Editor Preview */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -230,23 +230,23 @@ const Landing = () => {
 
                 {/* Live Stats */}
                 <div className="grid grid-cols-3 gap-4 pt-4">
-                  <div className="text-center p-4 bg-blue-50/50 rounded-2xl border border-blue-200/50">
-                    <div className="text-2xl font-bold text-blue-600">2450</div>
-                    <div className="text-xs text-blue-500 font-medium">Your Rating</div>
+                  <div className="text-center p-4 bg-blue-50/50 rounded-2xl border border-blue-300/50">
+                    <div className="text-2xl font-bold text-blue-700">2450</div>
+                    <div className="text-xs text-blue-600 font-medium">Your Rating</div>
                   </div>
                   <div className="text-center p-4 bg-green-50/50 rounded-2xl border border-green-200/50">
                     <div className="text-2xl font-bold text-green-600">87%</div>
                     <div className="text-xs text-green-500 font-medium">Accuracy</div>
                   </div>
-                  <div className="text-center p-4 bg-purple-50/50 rounded-2xl border border-purple-200/50">
-                    <div className="text-2xl font-bold text-purple-600">#15</div>
-                    <div className="text-xs text-purple-500 font-medium">IUT Rank</div>
+                  <div className="text-center p-4 bg-blue-50/50 rounded-2xl border border-blue-300/50">
+                    <div className="text-2xl font-bold text-blue-700">#15</div>
+                    <div className="text-xs text-blue-600 font-medium">IUT Rank</div>
                   </div>
                 </div>
               </div>
 
               {/* Floating Elements */}
-              <div className="absolute -top-4 -left-4 bg-white rounded-2xl border border-slate-200/80 shadow-lg shadow-slate-500/10 p-4 animate-float">
+              <div className="absolute -top-4 -left-4 bg-white rounded-2xl border border-blue-200/80 shadow-lg shadow-blue-500/10 p-4 animate-float">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-400 rounded-xl flex items-center justify-center">
                     <Trophy className="w-5 h-5 text-white" />
@@ -258,7 +258,7 @@ const Landing = () => {
                 </div>
               </div>
 
-              <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl border border-slate-200/80 shadow-lg shadow-slate-500/10 p-4 animate-float-delayed">
+              <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl border border-blue-200/80 shadow-lg shadow-blue-500/10 p-4 animate-float-delayed">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-400 rounded-xl flex items-center justify-center">
                     <TrendingUp className="w-5 h-5 text-white" />
@@ -293,26 +293,26 @@ const Landing = () => {
                 title: "Structured Learning",
                 description: "Step-by-step curriculum from basics to advanced topics",
                 features: ["Topic-wise Practice", "Video Solutions", "Progress Tracking"],
-                gradient: "from-blue-500 to-cyan-500"
+                gradient: "from-blue-600 to-blue-800"
               },
               {
                 icon: <Users className="w-8 h-8" />,
                 title: "Peer Community",
                 description: "Learn and compete with IUT peers",
                 features: ["Live Discussions", "Code Reviews", "Mentor Support"],
-                gradient: "from-cyan-500 to-blue-500"
+                gradient: "from-blue-700 to-blue-900"
               },
               {
                 icon: <Award className="w-8 h-8" />,
                 title: "Regular Contests",
                 description: "Weekly coding contests with real-time ranking",
                 features: ["IUT Leaderboard", "Performance Analytics", "Certificates"],
-                gradient: "from-purple-500 to-pink-500"
+                gradient: "from-blue-500 to-blue-700"
               }
             ].map((feature, index) => (
               <div 
                 key={index}
-                className="group relative bg-white rounded-3xl border border-slate-200/80 p-8 hover:shadow-2xl hover:shadow-slate-500/10 hover:border-blue-200/50 transition-all duration-500 hover:-translate-y-2"
+                className="group relative bg-white rounded-3xl border border-blue-200/80 p-8 hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-300/50 transition-all duration-500 hover:-translate-y-2"
               >
                 <div className={`w-16 h-16 bg-gradient-to-r ${feature.gradient} rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
                   {feature.icon}
@@ -334,9 +334,9 @@ const Landing = () => {
       </section>
 
       {/* Live Contests Section */}
-      <section className="py-24 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/50 via-slate-900 to-slate-900"></div>
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+      <section className="py-24 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-800/50 via-blue-900 to-blue-900"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
         
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center space-y-4 mb-16">
@@ -356,8 +356,8 @@ const Landing = () => {
                 onClick={() => setActiveTab(tab)}
                 className={`px-6 py-3 rounded-2xl font-semibold text-sm capitalize transition-all duration-300 ${
                   activeTab === tab 
-                    ? 'bg-white text-slate-900 shadow-lg' 
-                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+                    ? 'bg-blue-700 text-white shadow-lg' 
+                    : 'text-blue-200 hover:text-white hover:bg-blue-700/30'
                 }`}
               >
                 {tab}
@@ -405,7 +405,7 @@ const Landing = () => {
                   </div>
                 </div>
 
-                <button className="w-full bg-white text-slate-900 py-3.5 rounded-2xl font-semibold hover:bg-slate-100 transition-all duration-300 group-hover:scale-105 flex items-center justify-center space-x-2 shadow-lg shadow-white/10">
+                <button className="w-full bg-blue-700 text-white py-3.5 rounded-2xl font-semibold hover:bg-blue-600 transition-all duration-300 group-hover:scale-105 flex items-center justify-center space-x-2 shadow-lg shadow-blue-700/10">
                   <Play className="w-4 h-4" />
                   <span>Register Now</span>
                 </button>
@@ -414,7 +414,7 @@ const Landing = () => {
           </div>
 
           <div className="text-center">
-            <button className="border-2 border-white/30 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-white hover:text-slate-900 transition-all duration-300 transform hover:scale-105">
+            <button className="border-2 border-white/30 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-blue-700 hover:text-white transition-all duration-300 transform hover:scale-105">
               View All Contests
             </button>
           </div>
@@ -441,7 +441,7 @@ const Landing = () => {
                 {topCoders.slice(0, 3).map((coder, index) => (
                   <div 
                     key={coder.rank}
-                    className="flex items-center space-x-4 p-6 bg-slate-50/50 rounded-2xl border border-slate-200/80 hover:border-blue-200/50 hover:bg-blue-50/30 transition-all duration-300 group"
+                    className="flex items-center space-x-4 p-6 bg-blue-50/50 rounded-2xl border border-blue-200/80 hover:border-blue-300/50 hover:bg-blue-100/30 transition-all duration-300 group"
                   >
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg ${
                       coder.rank === 1 ? 'bg-gradient-to-br from-yellow-500 to-orange-500 text-white shadow-lg shadow-yellow-500/25' :
@@ -462,7 +462,7 @@ const Landing = () => {
                 ))}
               </div>
 
-              <button className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105 transition-all duration-300 flex items-center space-x-3">
+              <button className="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105 transition-all duration-300 flex items-center space-x-3">
                 <Medal className="w-5 h-5" />
                 <span>View Full Leaderboard</span>
               </button>
@@ -472,18 +472,17 @@ const Landing = () => {
             <div className="grid grid-cols-2 gap-6">
               {[
                 { icon: <Cpu className="w-8 h-8" />, value: '500+', label: 'Problems Solved', color: 'blue' },
-                { icon: <GitBranch className="w-8 h-8" />, value: '50+', label: 'Contests Joined', color: 'cyan' },
+                { icon: <GitBranch className="w-8 h-8" />, value: '50+', label: 'Contests Joined', color: 'blue' },
                 { icon: <BarChart3 className="w-8 h-8" />, value: '87%', label: 'Accuracy Rate', color: 'green' },
-                { icon: <Crown className="w-8 h-8" />, value: '#15', label: 'Average Rank', color: 'purple' }
+                { icon: <Crown className="w-8 h-8" />, value: '#15', label: 'Average Rank', color: 'blue' }
               ].map((stat, index) => (
                 <div 
                   key={index}
-                  className="bg-slate-50/50 rounded-3xl border border-slate-200/80 p-8 text-center hover:shadow-lg hover:shadow-slate-500/10 hover:border-blue-200/50 transition-all duration-300 group hover:-translate-y-2"
+                  className="bg-blue-50/50 rounded-3xl border border-blue-200/80 p-8 text-center hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-300/50 transition-all duration-300 group hover:-translate-y-2"
                 >
                   <div className={`w-16 h-16 bg-gradient-to-br ${
-                    stat.color === 'blue' ? 'from-blue-500 to-cyan-500' :
-                    stat.color === 'cyan' ? 'from-cyan-500 to-blue-500' :
-                    stat.color === 'green' ? 'from-green-500 to-emerald-500' : 'from-purple-500 to-pink-500'
+                    stat.color === 'blue' ? 'from-blue-600 to-blue-800' :
+                    stat.color === 'green' ? 'from-green-500 to-green-700' : 'from-blue-500 to-blue-700'
                   } rounded-2xl flex items-center justify-center text-white mb-4 mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
                     {stat.icon}
                   </div>
@@ -497,15 +496,15 @@ const Landing = () => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-24 bg-gradient-to-br from-slate-900 to-blue-900 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-600/20 via-slate-900/50 to-slate-900"></div>
-        <div className="absolute top-0 left-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+      <section className="py-24 bg-gradient-to-br from-blue-900 to-blue-800 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-700/20 via-blue-900/50 to-blue-900"></div>
+        <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl"></div>
         
         <div className="relative max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8 space-y-8">
           <h2 className="text-4xl lg:text-6xl font-bold">
             Ready to Start Your
-            <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent"> Coding Journey</span>?
+            <span className="bg-gradient-to-r from-blue-300 to-blue-100 bg-clip-text text-transparent"> Coding Journey</span>?
           </h2>
           <p className="text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
             Join thousands of IUT students who are mastering competitive programming 
@@ -513,11 +512,11 @@ const Landing = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-8">
-            <Link to="/register" className="bg-white text-slate-900 px-8 py-4 rounded-2xl font-bold hover:bg-slate-100 transition-all duration-300 transform hover:scale-105 shadow-2xl shadow-white/10 flex items-center space-x-3">
+            <Link to="/register" className="bg-blue-700 text-white px-8 py-4 rounded-2xl font-bold hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 shadow-2xl shadow-blue-700/10 flex items-center space-x-3">
               <Rocket className="w-5 h-5" />
               <span>Start Coding for Free</span>
             </Link>
-            <button className="border-2 border-white/30 text-white px-8 py-4 rounded-2xl font-bold hover:bg-white hover:text-slate-900 transition-all duration-300 transform hover:scale-105 flex items-center space-x-3">
+            <button className="border-2 border-white/30 text-white px-8 py-4 rounded-2xl font-bold hover:bg-blue-700 hover:text-white transition-all duration-300 transform hover:scale-105 flex items-center space-x-3">
               <Play className="w-5 h-5" />
               <span>Watch Platform Tour</span>
             </button>
@@ -530,16 +529,16 @@ const Landing = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-16 border-t border-slate-800">
+      <footer className="bg-blue-900 text-blue-200 py-16 border-t border-blue-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
             {/* Brand */}
             <div className="space-y-4">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-700 to-blue-900 rounded-lg flex items-center justify-center">
                   <Code2 className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-xl font-bold text-white">IUTCode</span>
+                <span className="text-xl font-bold text-white">0Point</span>
               </div>
               <p className="text-sm leading-relaxed">
                 IUT's premier platform for competitive programming and interview preparation.
@@ -576,9 +575,9 @@ const Landing = () => {
             ))}
           </div>
 
-          <div className="border-t border-slate-800 pt-8 text-center">
+          <div className="border-t border-blue-800 pt-8 text-center">
             <p className="text-sm">
-              © 2024 IUTCode. All rights reserved. | Built with ❤️ for IUT students
+              © 2024 0Point. All rights reserved. | Built with ❤️ for IUT students
             </p>
           </div>
         </div>
