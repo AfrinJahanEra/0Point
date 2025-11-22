@@ -234,9 +234,9 @@ const Home = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Main Content */}
       <div className="max-w-[1920px] mx-auto px-4 py-6">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Sidebar - Contest Section */}
-          <div class="lg:col-span-3 space-y-4">
+          <div className="lg:col-span-3 space-y-4">
             {/* Upcoming Contests */}
             <div className="bg-white">
               <div className="p-3 border-b border-gray-200">
@@ -467,7 +467,7 @@ const Home = () => {
           </div>
 
           {/* Middle Column - Main Content (Wider) */}
-          <div class="lg:col-span-6 space-y-4">
+          <div className="lg:col-span-6 space-y-4">
             {/* Full Contest Announcement */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
@@ -624,7 +624,7 @@ const Home = () => {
           </div>
 
           {/* Right Sidebar - Additional Content */}
-          <div class="lg:col-span-3 space-y-4">
+          <div className="lg:col-span-3 space-y-4">
             {/* All Announcements */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">

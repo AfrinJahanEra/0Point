@@ -34,20 +34,14 @@ function App() {
             {/* Landing page without Header and Footer */}
             <Route path="/" element={<Landing />} />
             
+            {/* Login and Register pages without Header and Footer */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            
             {/* All other pages with Header and Footer */}
             <Route path="/home" element={
               <Layout>
                 <Home />
-              </Layout>
-            } />
-            <Route path="/login" element={
-              <Layout>
-                <Login />
-              </Layout>
-            } />
-            <Route path="/register" element={
-              <Layout>
-                <Register />
               </Layout>
             } />
             <Route path="/contests" element={
