@@ -71,11 +71,8 @@ function App() {
                 <Practice />
               </Layout>
             } />
-            <Route path="/visualizer" element={
-              <Layout>
-                <Visualizer />
-              </Layout>
-            } />
+            {/* Visualizer takes full screen without Header and Footer */}
+            <Route path="/visualizer" element={<Visualizer />} />
             <Route path="/leaderboard" element={
               <Layout>
                 <Leaderboard />

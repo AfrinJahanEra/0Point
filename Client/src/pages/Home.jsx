@@ -570,33 +570,7 @@ const Home = () => {
                     <h2 className="text-xs font-semibold text-gray-900">Practice of the Day</h2>
                   </div>
                 </div>
-                <div className="mb-2">
-                  <h3 className="text-xs font-semibold text-gray-900 mb-1.5">Binary Search Tree Validation</h3>
-                  <p className="text-xs text-gray-600 mb-2">
-                    Given the root of a binary tree, determine if it is a valid binary search tree (BST). A valid BST is defined as follows:
-                    - The left subtree of a node contains only nodes with keys less than the node's key.
-                    - The right subtree of a node contains only nodes with keys greater than the node's key.
-                    - Both the left and right subtrees must also be binary search trees.
-                  </p>
-                  <div className="flex justify-end mb-2">
-                    <span className="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full text-xs font-semibold border border-blue-200">
-                      Binary Trees
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-gray-600">
-                    <span>1250 solved • 580 attempts</span>
-                    <span>+20 points</span>
-                  </div>
-                </div>
-                <div className="flex gap-1.5">
-                  <button className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200 flex items-center gap-1">
-                    <Play className="w-2.5 h-2.5" />
-                    Solve Now
-                  </button>
-                  <button className="text-xs border border-gray-300 text-gray-700 px-2.5 py-1 rounded hover:bg-gray-50 transition-colors duration-200">
-                    View Solutions
-                  </button>
-                </div>
+
               </div>
             </div>
 
@@ -688,22 +662,20 @@ const Home = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        { id: 1, title: "Two Sum", difficulty: "Easy", topic: "Arrays" },
-                        { id: 2, title: "Binary Tree Traversal", difficulty: "Medium", topic: "Trees" },
-                        { id: 3, title: "Dynamic Range Sum", difficulty: "Hard", topic: "Segment Trees" },
-                        { id: 4, title: "Graph Connectivity", difficulty: "Medium", topic: "Graphs" },
-                        { id: 5, title: "String Matching", difficulty: "Easy", topic: "Strings" },
-                        { id: 6, title: "Dynamic Programming Basics", difficulty: "Medium", topic: "DP" },
-                        { id: 7, title: "Binary Search Advanced", difficulty: "Hard", topic: "Searching" },
-                        { id: 8, title: "Linked List Operations", difficulty: "Easy", topic: "LinkedList" },
-                        { id: 9, title: "Backtracking Patterns", difficulty: "Medium", topic: "Recursion" },
-                        { id: 10, title: "Graph Algorithms", difficulty: "Hard", topic: "Graphs" },
-                        { id: 11, title: "Sliding Window Technique", difficulty: "Medium", topic: "Arrays" },
-                        { id: 12, title: "Heap Operations", difficulty: "Medium", topic: "Data Structures" },
-                        { id: 13, title: "Bit Manipulation", difficulty: "Easy", topic: "Bits" },
-                        { id: 14, title: "Greedy Algorithms", difficulty: "Medium", topic: "Algorithms" }
-                      ].map((problem) => (
+                      {
+                        [
+                          { id: 1, title: "Two Sum", difficulty: "Easy", topic: "Arrays" },
+                          { id: 2, title: "Binary Tree Traversal", difficulty: "Medium", topic: "Trees" },
+                          { id: 3, title: "Dynamic Range Sum", difficulty: "Hard", topic: "Segment Trees" },
+                          { id: 5, title: "String Matching", difficulty: "Easy", topic: "Strings" },
+                          { id: 6, title: "Dynamic Programming Basics", difficulty: "Medium", topic: "DP" },
+                          { id: 8, title: "Linked List Operations", difficulty: "Easy", topic: "LinkedList" },
+                          { id: 9, title: "Backtracking Patterns", difficulty: "Medium", topic: "Recursion" },
+                          { id: 11, title: "Sliding Window Technique", difficulty: "Medium", topic: "Arrays" },
+                          { id: 12, title: "Heap Operations", difficulty: "Medium", topic: "Data Structures" },
+                          { id: 13, title: "Bit Manipulation", difficulty: "Easy", topic: "Bits" },
+                          { id: 14, title: "Greedy Algorithms", difficulty: "Medium", topic: "Algorithms" }
+                        ].map((problem) => (
                         <tr key={problem.id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-2">
                             <Link to={`/problem/${problem.id}`} className="text-blue-900 font-bold hover:text-blue-800 hover:underline">
