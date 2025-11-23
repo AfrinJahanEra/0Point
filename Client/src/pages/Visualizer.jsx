@@ -328,15 +328,15 @@ const Visualizer = () => {
     <div className="flex flex-col h-screen">
       <div className="flex-grow flex flex-col">
         <div className="text-center py-4 bg-white border-b border-gray-200">
-          <h1 className="text-3xl font-bold text-black mb-1">0Point Visualizer</h1>
-          <p className="text-black text-base">Watch algorithms come to life with interactive visualizations</p>
+          <h1 className="text-3xl font-bold text-blue-800 mb-1">0Point Visualizer</h1>
+          <p className="text-blue-800 text-base">Watch algorithms come to life with interactive visualizations</p>
         </div>
         
         <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-0" style={{ height: 'calc(100vh - 120px)' }}>
           {/* Left Column - Input and Code */}
           <div className="bg-white border-r border-sky-200 flex flex-col h-full">
             <div className="p-6 overflow-y-auto flex-grow h-full">
-              <h2 className="text-xl font-bold text-black mb-3">Algorithm & Input</h2>
+              <h2 className="text-xl text-blue-800 mb-3">Algorithm & Input</h2>
               
               <div className="mb-6">
                 <AlgorithmSelector
@@ -362,7 +362,7 @@ const Visualizer = () => {
               {/* Code Display */}
               {selectedAlgorithm && (
                 <div className="mt-6 flex-grow flex flex-col">
-                  <h3 className="text-lg font-bold text-black mb-2">Algorithm Code</h3>
+                  <h3 className="text-lg text-blue-800 mb-2">Algorithm Code</h3>
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto font-mono text-sm flex-grow">
                     {algorithmCodes[selectedAlgorithm]?.split('\n').map((line, index) => (
                       <div 
@@ -382,7 +382,7 @@ const Visualizer = () => {
           {/* Right Column - Visualization */}
           <div className="bg-white flex flex-col h-full">
             <div className="p-6 overflow-y-auto flex-grow h-full">
-              <h2 className="text-xl font-bold text-black mb-3">Visualization</h2>
+              <h2 className="text-xl text-blue-800 mb-3">Visualization</h2>
               {renderVisualization()}
               
               {!selectedAlgorithm && (
@@ -396,19 +396,19 @@ const Visualizer = () => {
                       </div>
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-black mb-2">How to Use This Visualizer</h3>
+                      <h3 className="text-lg text-black mb-2">How to Use This Visualizer</h3>
                       <div className="grid grid-cols-1 gap-4 text-black">
-                        <p><span className="font-bold">1. Select an algorithm</span> from the dropdown menu</p>
-                        <p><span className="font-bold">2. Enter the required inputs</span> as comma-separated values</p>
-                        <p><span className="font-bold">3. Click "Start Visualization"</span> to see the algorithm in action</p>
-                        <p><span className="font-bold">4. Observe</span> how the algorithm works step by step</p>
+                        <p><span>1. Select an algorithm</span> from the dropdown menu</p>
+                        <p><span>2. Enter the required inputs</span> as comma-separated values</p>
+                        <p><span>3. Click "Start Visualization"</span> to see the algorithm in action</p>
+                        <p><span>4. Observe</span> how the algorithm works step by step</p>
                       </div>
                     </div>
                   </div>
                   
                   {/* Tips for new users */}
                   <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg">
-                    <h3 className="font-bold text-black mb-1">Quick Tips</h3>
+                    <h3 className="text-black mb-1">Quick Tips</h3>
                     <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
                       <li>Try the "Example" buttons to quickly load sample data</li>
                       <li>Sorting algorithms work best with 5-10 numbers</li>
@@ -423,7 +423,7 @@ const Visualizer = () => {
                 <div className="text-center py-6 text-black">
                   <p className="mb-4">Click "Start Visualization" to begin</p>
                   <div className="inline-block p-3 bg-white border border-gray-200 rounded-lg max-w-md">
-                    <h3 className="font-bold text-black mb-1">Visualization Tips</h3>
+                    <h3 className="text-black mb-1">Visualization Tips</h3>
                     <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1 text-left">
                       <li>Animations will show each step of the algorithm</li>
                       <li>Use controls to pause, stop, or navigate steps</li>
@@ -436,7 +436,7 @@ const Visualizer = () => {
               {/* Tips for using the visualizer */}
               {selectedAlgorithm && (
                 <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg">
-                  <h3 className="font-bold text-black mb-1">Tips for Using the Visualizer</h3>
+                  <h3 className="text-black mb-1">Tips for Using the Visualizer</h3>
                   <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
                     <li>Click "Start Visualization" to begin the animation</li>
                     <li>Use the Next/Previous buttons to navigate through steps</li>

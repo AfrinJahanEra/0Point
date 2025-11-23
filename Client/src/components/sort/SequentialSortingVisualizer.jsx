@@ -117,7 +117,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
   return (
     <div className="mt-2">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-bold text-black">Sorting Visualization</h3>
+        <h3 className="text-lg text-blue-800">Sorting Visualization</h3>
         <div className="flex gap-2">
           {isPlaying && (
             <button 
@@ -130,7 +130,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
           <button 
             onClick={onPrev}
             disabled={currentStep === 0}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors flex items-center disabled:opacity-50"
+            className="px-3 py-1 bg-white text-blue-800 border border-blue-800 rounded text-sm font-medium hover:bg-blue-50 transition-colors flex items-center disabled:opacity-50"
           >
             Prev
           </button>
