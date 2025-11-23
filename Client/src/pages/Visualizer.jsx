@@ -328,7 +328,7 @@ const Visualizer = () => {
     <div className="flex flex-col h-screen">
       <div className="flex-grow flex flex-col">
         <div className="text-center py-4 bg-white border-b border-gray-200">
-          <h1 className="text-3xl font-bold text-black mb-1">Algorithm Visualizer</h1>
+          <h1 className="text-3xl font-bold text-black mb-1">0Point Visualizer</h1>
           <p className="text-black text-base">Watch algorithms come to life with interactive visualizations</p>
         </div>
         

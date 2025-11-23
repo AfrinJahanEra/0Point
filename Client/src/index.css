@@ -82,6 +82,55 @@ body {
   animation: gentle-pulse 1s ease-in-out infinite;
 }
 
+/* Custom animations for sorting visualizer */
+@keyframes swap-big-to-small {
+  0% {
+    transform: translateX(0);
+    background-color: #9ca3af;
+    z-index: 20;
+  }
+  50% {
+    transform: translateX(-50px) scale(1.1);
+    background-color: #4b5563;
+    z-index: 20;
+  }
+  100% {
+    transform: translateX(0);
+    background-color: #9ca3af;
+    z-index: 10;
+  }
+}
+
+@keyframes swap-small-to-big {
+  0% {
+    transform: translateX(0);
+    background-color: #9ca3af;
+    z-index: 20;
+  }
+  50% {
+    transform: translateX(50px) scale(1.1);
+    background-color: #4b5563;
+    z-index: 20;
+  }
+  100% {
+    transform: translateX(0);
+    background-color: #9ca3af;
+    z-index: 10;
+  }
+}
+
+.swap-animation-big {
+  animation: swap-big-to-small 1s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  position: relative;
+  z-index: 20;
+}
+
+.swap-animation-small {
+  animation: swap-small-to-big 1s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  position: relative;
+  z-index: 20;
+}
+
 /* Code highlighting */
 .code-line-highlight {
   background-color: rgba(255, 255, 0, 0.3);

@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'react-hot-toast';
 
 const InputPanel = ({ algorithm, inputValues, onInputChange, onLoadExample, onStart, isVisualizing, selectedAlgorithm }) => {
   if (!algorithm) return null;
@@ -40,7 +41,15 @@ const InputPanel = ({ algorithm, inputValues, onInputChange, onLoadExample, onSt
                     ? 'bg-blue-800 hover:bg-blue-900' 
                     : 'bg-blue-400 cursor-not-allowed'
                 }`}
-                onClick={onStart}
+                onClick={() => {
+                  // Validate inputs before starting visualization
+                  const hasEmptyInput = algorithm.inputs.some((_, idx) => !inputValues[idx] || inputValues[idx].trim() === '');
+                  if (hasEmptyInput) {
+                    toast.error('Please provide input for all fields before starting visualization');
+                    return;
+                  }
+                  onStart();
+                }}
                 disabled={!selectedAlgorithm || isVisualizing}
               >
                 {isVisualizing ? (

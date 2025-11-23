@@ -20,7 +20,22 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
     if (stepData.comparing && stepData.comparing.includes(index)) {
       baseStyle += "animate-pulse scale-110 ";
     } else if (stepData.swapping && stepData.swapping.includes(index)) {
-      baseStyle += "animate-bounce ";
+      // Determine which swap animation to use based on value comparison
+      if (stepData.swapping.length === 2) {
+        const [firstIndex, secondIndex] = stepData.swapping;
+        const firstValue = stepData.array[firstIndex];
+        const secondValue = stepData.array[secondIndex];
+        
+        if (index === firstIndex) {
+          // First element - if bigger, move to small position
+          baseStyle += firstValue > secondValue ? "swap-animation-big " : "swap-animation-small ";
+        } else if (index === secondIndex) {
+          // Second element - if smaller, move to big position
+          baseStyle += secondValue < firstValue ? "swap-animation-small " : "swap-animation-big ";
+        }
+      } else {
+        baseStyle += "swap-animation-big ";
+      }
     } else if (stepData.operation === 'place' || stepData.operation === 'place_remaining') {
       if (stepData.swapping && stepData.swapping.includes(index)) {
         baseStyle += "animate-ping ";
@@ -152,7 +167,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
               <div className="flex gap-1.5 min-w-max">
                 {stepData.array.map((value, index) => (
                   <div 
-                    key={`${stepIndex}-${index}`} 
+                    key={`${stepIndex}-${index}-${stepData.swapping?.includes(index) ? 'swapping' : 'normal'}`} 
                     className="flex flex-col items-center"
                     onMouseEnter={() => setHoveredIndex(index)}
                     onMouseLeave={() => setHoveredIndex(null)}

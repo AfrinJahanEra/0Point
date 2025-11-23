@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AppProvider } from './context/AppContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -47,6 +48,18 @@ function App() {
     <AppProvider>
       <Router>
         <div className="flex flex-col min-h-screen">
+          <Toaster 
+            toastOptions={{
+              style: {
+                background: '#1e40af', // Dark blue color
+                color: '#ffffff',
+              },
+              iconTheme: {
+                primary: '#ffffff',
+                secondary: '#1e40af',
+              },
+            }}
+          />
           <Routes>
             {/* Landing page without Header and Footer */}
             <Route path="/" element={<Landing />} />
