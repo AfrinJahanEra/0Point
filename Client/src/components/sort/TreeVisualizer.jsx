@@ -214,38 +214,42 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     doc.setFontSize(22);
     doc.text('Tree Visualization Steps', 105, 15, null, null, 'center');
     
-    // Add steps with visual representations
-    let currentPageY = 30;
-    const pageHeight = 280; // A4 height minus margins
-    
+    // Add steps with visual representations - one step per page
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index];
       
-      // Check if we need a new page
-      if (currentPageY > pageHeight - 120) {
+      // Add a new page for each step (except the first one)
+      if (index > 0) {
         doc.addPage();
-        currentPageY = 20;
       }
       
       // Add step header
-      doc.setFontSize(14);
-      doc.text(`Step ${index + 1}`, 20, currentPageY);
+      doc.setFontSize(16);
+      doc.text(`Step ${index + 1} of ${steps.length}`, 105, 25, null, null, 'center');
       
-      doc.setFontSize(10);
-      doc.text(getOperationDescription(step), 20, currentPageY + 7);
+      doc.setFontSize(12);
+      doc.text(getOperationDescription(step), 105, 35, null, null, 'center');
       
       // Add a visual representation of the tree
-      if (step.tree) {
+      if (step.tree || step.operation) {
         // Draw tree visualization based on algorithm type
-        if (step.operation && step.operation.includes('trie')) {
-          drawTrieInPDF(doc, step.tree, '', 105, currentPageY + 25);
+        if (step.operation && (
+          step.operation.includes('trie') || 
+          step.operation === 'start' || 
+          step.operation === 'insert_start' || 
+          step.operation === 'create_node' || 
+          step.operation === 'traverse' || 
+          step.operation === 'mark_end' || 
+          step.operation === 'complete'
+        )) {
+          // For Trie, center it better on the page
+          drawTrieInPDF(doc, step.tree || { children: {}, isEnd: false }, '', 105, 60);
         } else {
-          drawTreeInPDF(doc, step.tree, 105, currentPageY + 25);
+          // For other trees, center it better on the page
+          drawTreeInPDF(doc, step.tree, 105, 60);
         }
-        currentPageY += 100;
       } else {
-        doc.text('Empty tree', 20, currentPageY + 14);
-        currentPageY += 25;
+        doc.text('Empty tree', 105, 60, null, null, 'center');
       }
       
       // Add a small delay to prevent UI blocking
@@ -306,9 +310,12 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
   const drawTrieInPDF = (doc, node, prefix = '', x = 105, y = 45, level = 0) => {
     if (!node) return;
     
-    const nodeSize = 3;
-    const verticalSpacing = 30;
-    const horizontalSpacing = Math.max(40 / (level + 1), 15);
+    const nodeSize = 5; // Increased node size
+    const verticalSpacing = 40; // Increased spacing
+    const horizontalSpacing = Math.max(60 / (level + 1), 25); // Increased horizontal spacing
+    
+    // Get the character for this node (last character of prefix, or 'root' for root)
+    const nodeLabel = prefix ? prefix.slice(-1) : 'root';
     
     // Draw node circle
     if (node.isEnd) {
@@ -317,16 +324,23 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       doc.setFillColor(255, 255, 255); // white
     }
     doc.setDrawColor(156, 163, 175); // gray-400
-    doc.setLineWidth(0.5);
+    doc.setLineWidth(0.7); // Slightly thicker lines
     doc.circle(x, y, nodeSize, 'FD');
     
     // Draw node value
-    doc.setFontSize(6);
+    doc.setFontSize(8); // Larger font
     doc.setTextColor(0, 0, 0); // black
-    doc.text(prefix || 'root', x, y + 2, null, null, 'center');
+    doc.text(nodeLabel, x, y + 2, null, null, 'center');
+    
+    // Draw end marker for end nodes
+    if (node.isEnd) {
+      doc.setFontSize(6);
+      doc.setTextColor(16, 185, 129); // green-500
+      doc.text('END', x, y - 10, null, null, 'center'); // Moved further up
+    }
     
     // Draw children
-    const children = Object.keys(node.children);
+    const children = node.children ? Object.keys(node.children) : [];
     children.forEach((char, index) => {
       const child = node.children[char];
       const childX = x + (index - (children.length - 1) / 2) * horizontalSpacing;
@@ -334,13 +348,13 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       
       // Connection line
       doc.setDrawColor(156, 163, 175); // gray-400
-      doc.setLineWidth(0.5);
-      doc.line(x, y, childX, childY);
+      doc.setLineWidth(0.7);
+      doc.line(x, y + nodeSize, childX, childY - nodeSize); // Adjusted line endpoints
       
       // Character label on the line
-      doc.setFontSize(5);
+      doc.setFontSize(7);
       doc.setTextColor(59, 130, 246); // blue-600
-      doc.text(char, (x + childX) / 2, (y + childY) / 2 - 1, null, null, 'center');
+      doc.text(char, (x + childX) / 2, (y + childY) / 2 - 3, null, null, 'center'); // Moved up slightly
       
       // Child node
       drawTrieInPDF(doc, child, prefix + char, childX, childY, level + 1);
@@ -532,9 +546,12 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     if (!node) return null;
     
     const nodeId = `${prefix}-${level}`;
-    const nodeSize = 25; // Increased from 15 to 25
-    const verticalSpacing = 50;
-    const horizontalSpacing = Math.max(120 / (level + 1), 50);
+    const nodeSize = 30; // Increased node size for better visibility
+    const verticalSpacing = 70; // Increased vertical spacing
+    const horizontalSpacing = Math.max(200 / (level + 1), 80); // Increased horizontal spacing
+    
+    // Get the character for this node (last character of prefix, or 'root' for root)
+    const nodeLabel = prefix ? prefix.slice(-1) : 'root';
     
     return (
       <g key={nodeId}>
@@ -546,45 +563,59 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           fill={node.isEnd ? "#10B981" : "#FFFFFF"} // Green for end nodes
           stroke="#9CA3AF"
           strokeWidth="2"
-          className="cursor-pointer hover:stroke-blue-500"
-          onMouseEnter={() => setHoveredNode(prefix)}
+          className="cursor-pointer hover:stroke-blue-500 transition-all duration-300 drop-shadow-sm"
+          onMouseEnter={() => setHoveredNode(prefix || 'root')}
           onMouseLeave={() => setHoveredNode(null)}
         />
         
-        {/* Render node value (prefix) */}
+        {/* Render node value (character) */}
         <text
           x={x}
           y={y + 5}
           textAnchor="middle"
-          className="font-bold text-black text-sm"
+          className="font-bold text-black text-base drop-shadow-sm"
         >
-          {prefix || 'root'}
+          {nodeLabel}
         </text>
         
+        {/* Render end marker for end nodes */}
+        {node.isEnd && (
+          <text
+            x={x}
+            y={y - 25}
+            textAnchor="middle"
+            className="text-xs text-green-600 font-bold drop-shadow-sm"
+          >
+            END
+          </text>
+        )}
+        
         {/* Render children */}
-        {Object.keys(node.children).map((char, index) => {
+        {node.children && Object.keys(node.children).map((char, index) => {
           const child = node.children[char];
+          // Calculate child position with better spacing
           const childX = x + (index - (Object.keys(node.children).length - 1) / 2) * horizontalSpacing;
           const childY = y + verticalSpacing;
           
           return (
             <g key={`${nodeId}-${char}`}>
-              {/* Connection line */}
+              {/* Connection line with arrow marker */}
               <line
                 x1={x}
-                y1={y}
+                y1={y + nodeSize / 2}
                 x2={childX}
-                y2={childY}
+                y2={childY - nodeSize / 2}
                 stroke="#9CA3AF"
                 strokeWidth="2"
+                markerEnd="url(#arrowhead)"
               />
               
               {/* Character label on the line */}
               <text
                 x={(x + childX) / 2}
-                y={(y + childY) / 2 - 5}
+                y={(y + childY) / 2 - 10}
                 textAnchor="middle"
-                className="text-xs text-blue-600 font-bold"
+                className="text-sm text-blue-600 font-bold bg-white px-1 rounded"
               >
                 {char}
               </text>
@@ -648,11 +679,32 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           </h4>
           
           <div className="flex justify-center items-center mb-3 overflow-auto py-2 max-h-[500px]">
-            {currentStepData && currentStepData.tree ? (
+            {currentStepData ? (
               <div className="w-full min-h-[400px] flex items-center justify-center overflow-auto">
                 <svg width="100%" height="500" className="border border-gray-200 rounded min-w-[600px]" viewBox="0 0 600 500">
-                  {currentStepData.tree && currentStepData.operation && currentStepData.operation.includes('trie') 
-                    ? renderTrieNode(currentStepData.tree, '', 350, 80) 
+                  {/* Define arrow marker for connection lines */}
+                  <defs>
+                    <marker 
+                      id="arrowhead" 
+                      markerWidth="10" 
+                      markerHeight="7" 
+                      refX="9" 
+                      refY="3.5" 
+                      orient="auto"
+                    >
+                      <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
+                    </marker>
+                  </defs>
+                  {currentStepData.operation && (
+                    currentStepData.operation.includes('trie') || 
+                    currentStepData.operation === 'start' || 
+                    currentStepData.operation === 'insert_start' || 
+                    currentStepData.operation === 'create_node' || 
+                    currentStepData.operation === 'traverse' || 
+                    currentStepData.operation === 'mark_end' || 
+                    currentStepData.operation === 'complete'
+                  )
+                    ? renderTrieNode(currentStepData.tree || { children: {}, isEnd: false }, '', 350, 80) 
                     : renderTreeNode(currentStepData.tree, 300, 100)}
                 </svg>
               </div>
@@ -688,11 +740,32 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                   
                   {/* Visual representation of this step */}
                   <div className="mt-3 min-h-[200px] flex items-center justify-center overflow-auto">
-                    {step.tree ? (
+                    {step.tree || step.operation ? (
                       <div className="w-full min-h-[200px] overflow-auto">
                         <svg width="100%" height="400" className="border border-gray-200 rounded min-w-[400px]" viewBox="0 0 400 400">
-                          {step.tree && step.operation && step.operation.includes('trie') 
-                            ? renderTrieNode(step.tree, '', 250, 50) 
+                          {/* Define arrow marker for connection lines */}
+                          <defs>
+                            <marker 
+                              id="arrowhead" 
+                              markerWidth="10" 
+                              markerHeight="7" 
+                              refX="9" 
+                              refY="3.5" 
+                              orient="auto"
+                            >
+                              <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
+                            </marker>
+                          </defs>
+                          {step.operation && (
+                            step.operation.includes('trie') || 
+                            step.operation === 'start' || 
+                            step.operation === 'insert_start' || 
+                            step.operation === 'create_node' || 
+                            step.operation === 'traverse' || 
+                            step.operation === 'mark_end' || 
+                            step.operation === 'complete'
+                          )
+                            ? renderTrieNode(step.tree || { children: {}, isEnd: false }, '', 250, 50) 
                             : renderTreeNode(step.tree, 200, 80)}
                         </svg>
                       </div>

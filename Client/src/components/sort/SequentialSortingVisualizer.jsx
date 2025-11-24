@@ -203,32 +203,28 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
     doc.setFontSize(22);
     doc.text('Sorting Visualization Steps', 105, 15, null, null, 'center');
     
-    // Add steps with visual representations
-    let currentPageY = 30;
-    const pageHeight = 280; // A4 height minus margins
-    
+    // Add steps with visual representations - one step per page
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index];
       
-      // Check if we need a new page
-      if (currentPageY > pageHeight - 120) {
+      // Add a new page for each step (except the first one)
+      if (index > 0) {
         doc.addPage();
-        currentPageY = 20;
       }
       
       // Add step header
-      doc.setFontSize(14);
-      doc.text(`Step ${index + 1}`, 20, currentPageY);
+      doc.setFontSize(16);
+      doc.text(`Step ${index + 1} of ${steps.length}`, 105, 25, null, null, 'center');
       
-      doc.setFontSize(10);
-      doc.text(getOperationDescription(step), 20, currentPageY + 7);
+      doc.setFontSize(12);
+      doc.text(getOperationDescription(step), 105, 35, null, null, 'center');
       
       // Add array representation
       const arrayStr = `Array: [${step.array ? step.array.join(', ') : 'N/A'}]`;
-      doc.text(arrayStr, 20, currentPageY + 14);
+      doc.text(arrayStr, 105, 45, null, null, 'center');
       
-      // Skip html2canvas and go directly to fallback for better performance
-      currentPageY = drawArrayRepresentation(doc, step, 20, currentPageY + 18);
+      // Draw array representation centered on page
+      drawArrayRepresentation(doc, step, 105, 60);
       
       // Add a small delay to prevent UI blocking
       await new Promise(resolve => setTimeout(resolve, 10));
