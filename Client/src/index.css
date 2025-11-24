@@ -86,17 +86,17 @@ body {
 @keyframes swap-big-to-small {
   0% {
     transform: translateX(0);
-    background-color: #9ca3af;
+    background-color: #9ca3af; /* gray-400 */
     z-index: 20;
   }
   50% {
     transform: translateX(-50px) scale(1.1);
-    background-color: #4b5563;
+    background-color: #4b5563; /* gray-600 */
     z-index: 20;
   }
   100% {
     transform: translateX(0);
-    background-color: #9ca3af;
+    background-color: #9ca3af; /* gray-400 */
     z-index: 10;
   }
 }
@@ -104,17 +104,17 @@ body {
 @keyframes swap-small-to-big {
   0% {
     transform: translateX(0);
-    background-color: #9ca3af;
+    background-color: #9ca3af; /* gray-400 */
     z-index: 20;
   }
   50% {
     transform: translateX(50px) scale(1.1);
-    background-color: #4b5563;
+    background-color: #4b5563; /* gray-600 */
     z-index: 20;
   }
   100% {
     transform: translateX(0);
-    background-color: #9ca3af;
+    background-color: #9ca3af; /* gray-400 */
     z-index: 10;
   }
 }

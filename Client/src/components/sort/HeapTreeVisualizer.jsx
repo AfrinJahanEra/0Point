@@ -167,6 +167,9 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       // Add visual tree representation using jsPDF drawing functions
       drawTreeVisualization(doc, step, 20, currentPageY + 20);
       
+      // Add a line separator
+      doc.line(15, currentPageY + 100, 195, currentPageY + 100);
+      
       // Move to next position
       currentPageY += 110;
       

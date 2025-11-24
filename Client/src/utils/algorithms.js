@@ -8,7 +8,15 @@ export const algorithms = [
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
-      steps.push({ array: [...array], comparing: [], swapping: [], sorted: [] });
+      
+      // Add initial state
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        swapping: [], 
+        sorted: [],
+        operation: 'start'
+      });
       
       for (let i = 0; i < array.length; i++) {
         for (let j = 0; j < array.length - i - 1; j++) {
@@ -16,7 +24,8 @@ export const algorithms = [
             array: [...array], 
             comparing: [j, j + 1], 
             swapping: [], 
-            sorted: Array.from({length: i}, (_, idx) => array.length - 1 - idx) 
+            sorted: Array.from({length: i}, (_, idx) => array.length - 1 - idx),
+            operation: 'compare'
           });
           
           if (array[j] > array[j + 1]) {
@@ -25,7 +34,8 @@ export const algorithms = [
               array: [...array], 
               comparing: [], 
               swapping: [j, j + 1], 
-              sorted: Array.from({length: i}, (_, idx) => array.length - 1 - idx) 
+              sorted: Array.from({length: i}, (_, idx) => array.length - 1 - idx),
+              operation: 'swap'
             });
           }
         }
@@ -33,9 +43,19 @@ export const algorithms = [
           array: [...array], 
           comparing: [], 
           swapping: [], 
-          sorted: Array.from({length: i + 1}, (_, idx) => array.length - 1 - idx) 
+          sorted: Array.from({length: i + 1}, (_, idx) => array.length - 1 - idx),
+          operation: 'pass_complete'
         });
       }
+      
+      // Final sorted state
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        swapping: [], 
+        sorted: Array.from({length: array.length}, (_, idx) => idx),
+        operation: 'complete'
+      });
       
       return steps;
     }
@@ -50,6 +70,15 @@ export const algorithms = [
       const steps = [];
       const array = [...data.array];
       
+      // Add initial state
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        swapping: [], 
+        sorted: [],
+        operation: 'start'
+      });
+      
       const partitionSteps = (arr, low, high, depth = 0) => {
         if (low < high) {
           // Add current state
@@ -59,7 +88,8 @@ export const algorithms = [
             swapping: [], 
             sorted: [],
             pivot: high,
-            range: [low, high]
+            range: [low, high],
+            operation: 'partition_start'
           });
           
           let pivotIndex = low - 1;
@@ -72,7 +102,8 @@ export const algorithms = [
               swapping: [], 
               sorted: [],
               pivot: high,
-              range: [low, high]
+              range: [low, high],
+              operation: 'compare_pivot'
             });
             
             if (arr[j] < pivot) {
@@ -85,7 +116,8 @@ export const algorithms = [
                 swapping: [pivotIndex, j], 
                 sorted: [],
                 pivot: high,
-                range: [low, high]
+                range: [low, high],
+                operation: 'swap'
               });
             }
           }
@@ -99,7 +131,8 @@ export const algorithms = [
             swapping: [pivotIndex, high], 
             sorted: [],
             pivot: pivotIndex,
-            range: [low, high]
+            range: [low, high],
+            operation: 'place_pivot'
           });
           
           partitionSteps(arr, low, pivotIndex - 1, depth + 1);
@@ -110,7 +143,8 @@ export const algorithms = [
             comparing: [], 
             swapping: [], 
             sorted: [low],
-            range: [low, high]
+            range: [low, high],
+            operation: 'single_element_sorted'
           });
         }
       };
@@ -123,7 +157,8 @@ export const algorithms = [
           array: [...array], 
           comparing: [], 
           swapping: [], 
-          sorted: Array.from({length: array.length}, (_, i) => i)
+          sorted: Array.from({length: array.length}, (_, i) => i),
+          operation: 'complete'
         });
       }
       
@@ -140,7 +175,14 @@ export const algorithms = [
       const steps = [];
       const array = [...data.array];
       
-      steps.push({ array: [...array], comparing: [], swapping: [], sorted: [0] });
+      // Add initial state
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        swapping: [], 
+        sorted: [0],
+        operation: 'start'
+      });
       
       for (let i = 1; i < array.length; i++) {
         let key = array[i];
@@ -150,7 +192,8 @@ export const algorithms = [
           array: [...array], 
           comparing: [i], 
           swapping: [], 
-          sorted: Array.from({length: i}, (_, idx) => idx)
+          sorted: Array.from({length: i}, (_, idx) => idx),
+          operation: 'select_key'
         });
         
         while (j >= 0 && array[j] > key) {
@@ -158,7 +201,8 @@ export const algorithms = [
             array: [...array], 
             comparing: [j, j+1], 
             swapping: [], 
-            sorted: Array.from({length: i}, (_, idx) => idx)
+            sorted: Array.from({length: i}, (_, idx) => idx),
+            operation: 'compare_key'
           });
           
           array[j + 1] = array[j];
@@ -167,7 +211,8 @@ export const algorithms = [
             array: [...array], 
             comparing: [], 
             swapping: [j, j+1], 
-            sorted: Array.from({length: i}, (_, idx) => idx)
+            sorted: Array.from({length: i}, (_, idx) => idx),
+            operation: 'shift_element'
           });
           
           j = j - 1;
@@ -178,9 +223,19 @@ export const algorithms = [
           array: [...array], 
           comparing: [], 
           swapping: [], 
-          sorted: Array.from({length: i+1}, (_, idx) => idx)
+          sorted: Array.from({length: i+1}, (_, idx) => idx),
+          operation: 'insert_key'
         });
       }
+      
+      // Final sorted state
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        swapping: [], 
+        sorted: Array.from({length: array.length}, (_, idx) => idx),
+        operation: 'complete'
+      });
       
       return steps;
     }
@@ -195,6 +250,15 @@ export const algorithms = [
       const steps = [];
       const array = [...data.array];
       
+      // Add initial state
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        swapping: [], 
+        sorted: [],
+        operation: 'start'
+      });
+      
       for (let i = 0; i < array.length - 1; i++) {
         let minIdx = i;
         
@@ -202,7 +266,8 @@ export const algorithms = [
           array: [...array], 
           comparing: [i], 
           swapping: [], 
-          sorted: Array.from({length: i}, (_, idx) => idx)
+          sorted: Array.from({length: i}, (_, idx) => idx),
+          operation: 'select_min_candidate'
         });
         
         for (let j = i + 1; j < array.length; j++) {
@@ -210,11 +275,19 @@ export const algorithms = [
             array: [...array], 
             comparing: [minIdx, j], 
             swapping: [], 
-            sorted: Array.from({length: i}, (_, idx) => idx)
+            sorted: Array.from({length: i}, (_, idx) => idx),
+            operation: 'compare_elements'
           });
           
           if (array[j] < array[minIdx]) {
             minIdx = j;
+            steps.push({ 
+              array: [...array], 
+              comparing: [minIdx], 
+              swapping: [], 
+              sorted: Array.from({length: i}, (_, idx) => idx),
+              operation: 'update_min'
+            });
           }
         }
         
@@ -225,7 +298,8 @@ export const algorithms = [
             array: [...array], 
             comparing: [], 
             swapping: [i, minIdx], 
-            sorted: Array.from({length: i}, (_, idx) => idx)
+            sorted: Array.from({length: i}, (_, idx) => idx),
+            operation: 'swap_min'
           });
         }
         
@@ -233,7 +307,8 @@ export const algorithms = [
           array: [...array], 
           comparing: [], 
           swapping: [], 
-          sorted: Array.from({length: i+1}, (_, idx) => idx)
+          sorted: Array.from({length: i+1}, (_, idx) => idx),
+          operation: 'element_sorted'
         });
       }
       
@@ -242,7 +317,8 @@ export const algorithms = [
         array: [...array], 
         comparing: [], 
         swapping: [], 
-        sorted: Array.from({length: array.length}, (_, idx) => idx)
+        sorted: Array.from({length: array.length}, (_, idx) => idx),
+        operation: 'complete'
       });
       
       return steps;
@@ -276,7 +352,7 @@ export const algorithms = [
             comparing: [], 
             swapping: [], 
             sorted: [start],
-            operation: 'single_element',
+            operation: 'single_element_sorted',
             range: [start, end]
           });
           return;
@@ -330,7 +406,7 @@ export const algorithms = [
             comparing: [start + i, mid + 1 + j], 
             swapping: [], 
             sorted: [],
-            operation: 'compare',
+            operation: 'compare_merge',
             range: [start, end]
           });
           
@@ -348,7 +424,7 @@ export const algorithms = [
             comparing: [], 
             swapping: [k], 
             sorted: [],
-            operation: 'place',
+            operation: 'place_element',
             range: [start, end]
           });
           

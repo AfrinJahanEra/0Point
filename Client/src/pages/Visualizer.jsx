@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-hot-toast';
 import AlgorithmSelector from '../components/AlgorithmSelector';
 import InputPanel from '../components/InputPanel';
 
@@ -195,6 +196,24 @@ const Visualizer = () => {
     };
   }, []);
 
+  // Ref to track if we should auto-start visualization
+  const shouldAutoStartRef = useRef(false);
+  
+  // Auto-start visualization when algorithm is selected and inputs are provided
+  useEffect(() => {
+    if (selectedAlgorithm && inputValues.length > 0 && inputValues[0] && !isVisualizing && steps.length === 0) {
+      // Only auto-start if we have valid input data
+      const parsedData = parseInputs(selectedAlgorithm, inputValues);
+      if (parsedData && parsedData.array && parsedData.array.length > 0) {
+        // Auto-start after a short delay to allow UI to update
+        const timer = setTimeout(() => {
+          startVisualization();
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [selectedAlgorithm, inputValues, isVisualizing, steps.length]);
+
   const handleAlgorithmChange = (algId) => {
     setSelectedAlgorithm(algId);
     setInputValues([]);
@@ -227,6 +246,16 @@ const Visualizer = () => {
   const startVisualization = () => {
     if (!selectedAlgorithm) return;
     
+    // Validate inputs
+    const algorithm = algorithms.find(alg => alg.id === selectedAlgorithm);
+    if (!algorithm) return;
+    
+    const hasEmptyInput = algorithm.inputs.some((_, idx) => !inputValues[idx] || inputValues[idx].trim() === '');
+    if (hasEmptyInput) {
+      toast.error('Please provide input for all fields before starting visualization');
+      return;
+    }
+    
     // Resume audio context if suspended
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume();
@@ -235,30 +264,15 @@ const Visualizer = () => {
     setIsVisualizing(true);
     setCurrentStep(0);
     
-    const algorithm = algorithms.find(alg => alg.id === selectedAlgorithm);
     const parsedData = parseInputs(selectedAlgorithm, inputValues);
     
     if (algorithm.generateSteps) {
       const algorithmSteps = algorithm.generateSteps(parsedData);
       setSteps(algorithmSteps);
       setVisualizationData(algorithmSteps[0]);
-      animateSteps();
+      // Animation will be handled by the SequentialSortingVisualizer auto-advance
     } else {
       setVisualizationData(parsedData);
-    }
-  };
-
-  const animateSteps = () => {
-    if (currentStep < steps.length - 1) {
-      animationRef.current = setTimeout(() => {
-        setCurrentStep(prev => prev + 1);
-        setVisualizationData(steps[currentStep + 1]);
-        animateSteps();
-      }, 800);
-    } else {
-      setTimeout(() => {
-        setIsVisualizing(false);
-      }, 1000);
     }
   };
 
@@ -282,6 +296,12 @@ const Visualizer = () => {
       setVisualizationData(steps[currentStep - 1]);
     }
   };
+  
+  const restartVisualization = () => {
+    setCurrentStep(0);
+    setVisualizationData(steps[0]);
+    setIsVisualizing(true); // Start playing automatically
+  };
 
   const renderVisualization = () => {
     if (!selectedAlgorithm || !visualizationData) return null;
@@ -294,7 +314,8 @@ const Visualizer = () => {
       totalSteps: steps.length,
       onStop: stopVisualization,
       onNext: nextStep,
-      onPrev: prevStep
+      onPrev: prevStep,
+      onRestart: restartVisualization
     };
 
     // Check if it's a sorting algorithm
