@@ -552,7 +552,7 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       // We rely on the parent component to manage isPlaying state
     }
   }, [steps.length]);
-  
+
   return (
     <div className="mt-2">
       <div className="flex justify-between items-center mb-4">

@@ -400,21 +400,6 @@ const Visualizer = () => {
   // Ref to track if we should auto-start visualization
   const shouldAutoStartRef = useRef(false);
   
-  // Auto-start visualization when algorithm is selected and inputs are provided
-  useEffect(() => {
-    if (selectedAlgorithm && inputValues.length > 0 && inputValues[0] && !isVisualizing && steps.length === 0) {
-      // Only auto-start if we have valid input data
-      const parsedData = parseInputs(selectedAlgorithm, inputValues);
-      if (parsedData && parsedData.array && parsedData.array.length > 0) {
-        // Auto-start after a short delay to allow UI to update
-        const timer = setTimeout(() => {
-          startVisualization();
-        }, 500);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [selectedAlgorithm, inputValues, isVisualizing, steps.length]);
-
   const handleAlgorithmChange = (algId) => {
     setSelectedAlgorithm(algId);
     setInputValues([]);
@@ -462,18 +447,20 @@ const Visualizer = () => {
       audioContextRef.current.resume();
     }
     
-    setIsVisualizing(true);
-    setCurrentStep(0);
-    
     const parsedData = parseInputs(selectedAlgorithm, inputValues);
     
     if (algorithm.generateSteps) {
       const algorithmSteps = algorithm.generateSteps(parsedData);
       setSteps(algorithmSteps);
       setVisualizationData(algorithmSteps[0]);
+      // Set isVisualizing to true after steps are set
+      setIsVisualizing(true);
+      setCurrentStep(0);
       // Animation will be handled by the SequentialSortingVisualizer auto-advance
     } else {
       setVisualizationData(parsedData);
+      setIsVisualizing(true);
+      setCurrentStep(0);
     }
   };
 
