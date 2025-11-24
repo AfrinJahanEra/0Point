@@ -352,7 +352,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     if (!node) return null;
     
     const nodeId = `${level}-${x}-${y}`;
-    const nodeSize = 20;
+    const nodeSize = 30; // Increased from 20 to 30
     const horizontalSpacing = Math.max(150 / (level + 1), 60);
     const verticalSpacing = 80;
     
@@ -532,7 +532,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     if (!node) return null;
     
     const nodeId = `${prefix}-${level}`;
-    const nodeSize = 15;
+    const nodeSize = 25; // Increased from 15 to 25
     const verticalSpacing = 50;
     const horizontalSpacing = Math.max(120 / (level + 1), 50);
     
