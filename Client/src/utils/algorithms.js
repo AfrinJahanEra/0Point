@@ -410,6 +410,188 @@ export const algorithms = [
       return steps;
     }
   },
-
-
+  { 
+    id: 'heap-sort', 
+    name: 'Heap Sort', 
+    description: 'Comparison-based sorting algorithm that uses binary heap data structure',
+    inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
+    examples: ['5,2,8,1,9', '3,7,1,4,6'],
+    generateSteps: (data) => {
+      const steps = [];
+      const array = [...data.array];
+      
+      // Add initial state
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        swapping: [], 
+        sorted: [],
+        operation: 'start'
+      });
+      
+      // Function to heapify a subtree rooted at index i
+      const heapify = (arr, n, i) => {
+        let largest = i; // Initialize largest as root
+        const left = 2 * i + 1; // left child
+        const right = 2 * i + 2; // right child
+        
+        // Show current node and children
+        const indicesToShow = [i];
+        if (left < n) indicesToShow.push(left);
+        if (right < n) indicesToShow.push(right);
+        
+        steps.push({ 
+          array: [...arr], 
+          comparing: [], 
+          swapping: [], 
+          sorted: [],
+          operation: 'heapify_start',
+          range: indicesToShow,
+          heapRoot: i
+        });
+        
+        // If left child is larger than root
+        if (left < n) {
+          steps.push({ 
+            array: [...arr], 
+            comparing: [i, left], 
+            swapping: [], 
+            sorted: [],
+            operation: 'compare_children',
+            range: [i, left],
+            heapRoot: i
+          });
+          
+          if (arr[left] > arr[largest]) {
+            largest = left;
+          }
+        }
+        
+        // If right child is larger than largest so far
+        if (right < n) {
+          steps.push({ 
+            array: [...arr], 
+            comparing: [largest, right], 
+            swapping: [], 
+            sorted: [],
+            operation: 'compare_children',
+            range: [largest, right],
+            heapRoot: i
+          });
+          
+          if (arr[right] > arr[largest]) {
+            largest = right;
+          }
+        }
+        
+        // If largest is not root
+        if (largest !== i) {
+          // Show swap
+          steps.push({ 
+            array: [...arr], 
+            comparing: [], 
+            swapping: [i, largest], 
+            sorted: [],
+            operation: 'swap_heap',
+            range: [i, largest],
+            heapRoot: i
+          });
+          
+          // Swap
+          [arr[i], arr[largest]] = [arr[largest], arr[i]];
+          
+          // Show after swap
+          steps.push({ 
+            array: [...arr], 
+            comparing: [], 
+            swapping: [], 
+            sorted: [],
+            operation: 'after_swap',
+            range: [i, largest],
+            heapRoot: i
+          });
+          
+          // Recursively heapify the affected sub-tree
+          heapify(arr, n, largest);
+        } else {
+          // No swap needed
+          steps.push({ 
+            array: [...arr], 
+            comparing: [], 
+            swapping: [], 
+            sorted: [],
+            operation: 'no_swap_needed',
+            range: indicesToShow,
+            heapRoot: i
+          });
+        }
+      };
+      
+      const n = array.length;
+      
+      // Build max heap (rearrange array)
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        swapping: [], 
+        sorted: [],
+        operation: 'build_heap_start'
+      });
+      
+      for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
+        heapify(array, n, i);
+      }
+      
+      // Show heap built
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        swapping: [], 
+        sorted: [],
+        operation: 'heap_built'
+      });
+      
+      // Extract elements from heap one by one
+      for (let i = n - 1; i > 0; i--) {
+        // Move current root to end
+        steps.push({ 
+          array: [...array], 
+          comparing: [], 
+          swapping: [0, i], 
+          sorted: Array.from({length: n - i - 1}, (_, idx) => n - 1 - idx),
+          operation: 'extract_max',
+          range: [0, i],
+          heapSize: i
+        });
+        
+        // Swap
+        [array[0], array[i]] = [array[i], array[0]];
+        
+        // Show after extraction
+        steps.push({ 
+          array: [...array], 
+          comparing: [], 
+          swapping: [], 
+          sorted: Array.from({length: n - i}, (_, idx) => n - 1 - idx),
+          operation: 'after_extract',
+          range: [0, i],
+          heapSize: i
+        });
+        
+        // Call heapify on the reduced heap
+        heapify(array, i, 0);
+      }
+      
+      // Final sorted state
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        swapping: [], 
+        sorted: Array.from({length: array.length}, (_, idx) => idx),
+        operation: 'complete'
+      });
+      
+      return steps;
+    }
+  }
 ];

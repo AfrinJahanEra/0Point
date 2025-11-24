@@ -45,6 +45,8 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
     // Handle different algorithm states based on operation
     if (stepData.pivot !== undefined && index === stepData.pivot) {
       baseStyle += "bg-black text-white border-black";
+    } else if (stepData.heapRoot !== undefined && index === stepData.heapRoot) {
+      baseStyle += "bg-blue-800 text-white border-blue-900"; // Highlight heap root
     } else if (stepData.comparing && stepData.comparing.includes(index)) {
       baseStyle += "bg-gray-300 text-black border-gray-700";
     } else if (stepData.swapping && stepData.swapping.includes(index)) {
@@ -67,6 +69,9 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
       } else {
         baseStyle += "bg-white text-black border-gray-400";
       }
+    } else if (stepData.operation && stepData.operation.includes('heap') && stepData.range && stepData.range.includes(index)) {
+      // Highlight nodes involved in heap operations
+      baseStyle += "bg-blue-400 text-white border-blue-600";
     } else if (stepData.sorted && stepData.sorted.includes(index)) {
       baseStyle += "bg-gray-200 text-black border-gray-700";
     } else {
@@ -84,7 +89,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
   // Function to get operation description
   const getOperationDescription = (stepData) => {
     if (stepData.operation === 'start') {
-      return 'Starting merge sort visualization...';
+      return 'Starting sorting visualization...';
     } else if (stepData.operation === 'single_element') {
       return `Single element at position ${stepData.range[0]} is already sorted`;
     } else if (stepData.operation === 'divide') {
@@ -97,6 +102,24 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
       return `Placing element at position ${stepData.swapping[0]}`;
     } else if (stepData.operation === 'merge_complete') {
       return `Merged subarray from positions ${stepData.range[0]} to ${stepData.range[1]}`;
+    } else if (stepData.operation === 'build_heap_start') {
+      return 'Building max heap from array';
+    } else if (stepData.operation === 'heapify_start') {
+      return `Heapifying subtree rooted at position ${stepData.heapRoot}`;
+    } else if (stepData.operation === 'compare_children') {
+      return `Comparing elements at positions ${stepData.comparing.join(' and ')}`;
+    } else if (stepData.operation === 'swap_heap') {
+      return `Swapping elements at positions ${stepData.swapping.join(' and ')} to maintain heap property`;
+    } else if (stepData.operation === 'after_swap') {
+      return `Heap property restored after swap`;
+    } else if (stepData.operation === 'no_swap_needed') {
+      return `No swap needed, heap property maintained`;
+    } else if (stepData.operation === 'heap_built') {
+      return 'Max heap successfully built';
+    } else if (stepData.operation === 'extract_max') {
+      return `Extracting maximum element from heap`;
+    } else if (stepData.operation === 'after_extract') {
+      return `Maximum element moved to sorted portion`;
     } else if (stepData.operation === 'complete') {
       return 'Array is fully sorted!';
     } else if (stepData.comparing?.length > 0) {

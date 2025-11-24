@@ -1,0 +1,249 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev }) => {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const svgRef = useRef(null);
+  const currentStepRef = useRef(null);
+
+  // Scroll to the current step whenever it changes
+  useEffect(() => {
+    if (currentStepRef.current) {
+      currentStepRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [currentStep]);
+
+  // Function to get node styling based on state
+  const getNodeStyle = (stepData, index) => {
+    let baseStyle = "transition-all duration-500 ";
+    
+    // Handle different algorithm states based on operation
+    if (stepData.heapRoot !== undefined && index === stepData.heapRoot) {
+      baseStyle += "fill-blue-800 stroke-blue-900"; // Highlight heap root
+    } else if (stepData.comparing && stepData.comparing.includes(index)) {
+      baseStyle += "fill-gray-300 stroke-gray-700";
+    } else if (stepData.swapping && stepData.swapping.includes(index)) {
+      baseStyle += "fill-gray-400 stroke-black";
+    } else if (stepData.operation && stepData.operation.includes('heap') && stepData.range && stepData.range.includes(index)) {
+      // Highlight nodes involved in heap operations
+      baseStyle += "fill-blue-400 stroke-blue-600";
+    } else if (stepData.sorted && stepData.sorted.includes(index)) {
+      baseStyle += "fill-gray-200 stroke-gray-700";
+    } else {
+      baseStyle += "fill-white stroke-gray-400";
+    }
+    
+    // Add hover effect
+    if (hoveredIndex === index) {
+      baseStyle += " transform scale-110";
+    }
+    
+    return baseStyle;
+  };
+
+  // Function to get text color based on background color
+  const getNodeTextColor = (stepData, index) => {
+    // White text for dark blue backgrounds
+    if ((stepData.heapRoot !== undefined && index === stepData.heapRoot) || 
+        (stepData.operation && stepData.operation.includes('heap') && stepData.range && stepData.range.includes(index))) {
+      return "white";
+    }
+    // Black text for light backgrounds
+    return "black";
+  };
+
+
+  // Function to get operation description
+  const getOperationDescription = (stepData) => {
+    if (stepData.operation === 'start') {
+      return 'Starting heap sort visualization...';
+    } else if (stepData.operation === 'build_heap_start') {
+      return 'Building max heap from array';
+    } else if (stepData.operation === 'heapify_start') {
+      return `Heapifying subtree rooted at position ${stepData.heapRoot}`;
+    } else if (stepData.operation === 'compare_children') {
+      return `Comparing elements at positions ${stepData.comparing.join(' and ')}`;
+    } else if (stepData.operation === 'swap_heap') {
+      return `Swapping elements at positions ${stepData.swapping.join(' and ')} to maintain heap property`;
+    } else if (stepData.operation === 'after_swap') {
+      return `Heap property restored after swap`;
+    } else if (stepData.operation === 'no_swap_needed') {
+      return `No swap needed, heap property maintained`;
+    } else if (stepData.operation === 'heap_built') {
+      return 'Max heap successfully built';
+    } else if (stepData.operation === 'extract_max') {
+      return `Extracting maximum element from heap`;
+    } else if (stepData.operation === 'after_extract') {
+      return `Maximum element moved to sorted portion`;
+    } else if (stepData.operation === 'complete') {
+      return 'Array is fully sorted!';
+    } else if (stepData.comparing?.length > 0) {
+      return `Comparing elements at positions ${stepData.comparing.join(' and ')}`;
+    } else if (stepData.swapping?.length > 0) {
+      return `Swapping elements at positions ${stepData.swapping.join(' and ')}`;
+    } else if (stepData.sorted?.length > 0) {
+      return `${stepData.sorted.length} elements sorted`;
+    } else {
+      return 'Processing...';
+    }
+  };
+
+  // Function to calculate tree positions
+  const calculateTreePositions = (array) => {
+    const positions = [];
+    const levelHeight = 80;
+    const nodeWidth = 50;
+    
+    // Calculate positions for a complete binary tree
+    for (let i = 0; i < array.length; i++) {
+      const level = Math.floor(Math.log2(i + 1));
+      const levelNodes = Math.pow(2, level);
+      const levelWidth = Math.max(400, levelNodes * nodeWidth * 1.5);
+      const x = (levelWidth / (levelNodes + 1)) * ((i - levelNodes + 1) + 1);
+      const y = level * levelHeight + 50;
+      
+      positions.push({ x, y, value: array[i], index: i });
+    }
+    
+    return positions;
+  };
+
+  // Function to get connections between nodes
+  const getConnections = (array) => {
+    const connections = [];
+    for (let i = 0; i < array.length; i++) {
+      const leftChild = 2 * i + 1;
+      const rightChild = 2 * i + 2;
+      
+      if (leftChild < array.length) {
+        connections.push({ from: i, to: leftChild });
+      }
+      
+      if (rightChild < array.length) {
+        connections.push({ from: i, to: rightChild });
+      }
+    }
+    
+    return connections;
+  };
+
+  if (!data || !data.array || !steps || steps.length === 0) return null;
+
+  return (
+    <div className="mt-2">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg text-blue-800">Heap Tree Visualization</h3>
+        <div className="flex gap-2">
+          {isPlaying && (
+            <button 
+              onClick={onStop}
+              className="px-3 py-1 bg-blue-800 text-white rounded text-sm font-medium hover:bg-blue-900 transition-colors flex items-center"
+            >
+              Stop
+            </button>
+          )}
+          <button 
+            onClick={onPrev}
+            disabled={currentStep === 0}
+            className="px-3 py-1 bg-white text-blue-800 border border-blue-800 rounded text-sm font-medium hover:bg-blue-50 transition-colors flex items-center disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <button 
+            onClick={onNext}
+            disabled={currentStep === steps.length - 1}
+            className="px-3 py-1 bg-blue-800 text-white rounded text-sm font-medium hover:bg-blue-900 transition-colors flex items-center disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+      
+      <div className="bg-white p-4 border border-gray-200 mb-4 max-h-[70vh] overflow-y-auto">
+        {/* Show all steps up to current step */}
+        {steps.slice(0, currentStep + 1).map((stepData, stepIndex) => {
+          const positions = calculateTreePositions(stepData.array);
+          const connections = getConnections(stepData.array);
+          
+          return (
+            <div 
+              key={stepIndex} 
+              ref={stepIndex === currentStep ? currentStepRef : null}
+              className={`mb-6 ${stepIndex === currentStep ? 'bg-white p-3 border-2 border-gray-300' : ''}`}
+            >
+              <h4 className="text-sm font-bold text-black mb-2 flex items-center">
+                <span className={`w-5 h-5 ${stepIndex === currentStep ? 'bg-black' : 'bg-gray-600'} text-white rounded-full flex items-center justify-center text-xs mr-2`}>
+                  {stepIndex + 1}
+                </span>
+                Step {stepIndex + 1} of {steps.length}
+                {stepIndex === currentStep && (
+                  <span className="ml-2 px-2 py-0.5 bg-gray-200 text-black text-xs font-medium rounded">
+                    Current
+                  </span>
+                )}
+              </h4>
+              
+              <div className="flex justify-center items-center mb-3 overflow-x-auto py-2">
+                <div className="min-w-max">
+                  <svg width="500" height="300" ref={svgRef}>
+                    {/* Draw connections */}
+                    {connections.map((conn, idx) => {
+                      const fromPos = positions[conn.from];
+                      const toPos = positions[conn.to];
+                      if (fromPos && toPos) {
+                        return (
+                          <line
+                            key={idx}
+                            x1={fromPos.x}
+                            y1={fromPos.y}
+                            x2={toPos.x}
+                            y2={toPos.y}
+                            stroke="#9ca3af"
+                            strokeWidth="2"
+                          />
+                        );
+                      }
+                      return null;
+                    })}
+                    
+                    {/* Draw nodes */}
+                    {positions.map((pos, idx) => (
+                      <g key={idx}>
+                        <circle
+                          cx={pos.x}
+                          cy={pos.y}
+                          r="20"
+                          className={getNodeStyle(stepData, idx)}
+                          onMouseEnter={() => setHoveredIndex(idx)}
+                          onMouseLeave={() => setHoveredIndex(null)}
+                        />
+                        <text
+                          x={pos.x}
+                          y={pos.y}
+                          textAnchor="middle"
+                          dy=".3em"
+                          fontSize="12"
+                          fontWeight="bold"
+                          fill={getNodeTextColor(stepData, idx)}
+                        >
+                          {pos.value}
+                        </text>
+                      </g>
+                    ))}
+                  </svg>
+                </div>
+              </div>
+              
+              <div className="text-center p-2 bg-white border border-gray-200">
+                <p className="font-semibold text-black text-sm">
+                  {getOperationDescription(stepData)}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default HeapTreeVisualizer;

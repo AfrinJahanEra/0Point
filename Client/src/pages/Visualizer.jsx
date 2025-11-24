@@ -4,6 +4,7 @@ import InputPanel from '../components/InputPanel';
 
 
 import SequentialSortingVisualizer from '../components/sort/SequentialSortingVisualizer';
+import HeapTreeVisualizer from '../components/sort/HeapTreeVisualizer';
 import { algorithms } from '../utils/algorithms';
 import { parseInputs } from '../utils/inputParser';
 
@@ -108,6 +109,51 @@ function selectionSort(arr) {
     }
   }
   return arr;
+}`,
+
+  'heap-sort': `
+function heapSort(arr) {
+  const n = arr.length;
+  
+  // Build max heap
+  for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
+    heapify(arr, n, i);
+  }
+  
+  // Extract elements from heap one by one
+  for (let i = n - 1; i > 0; i--) {
+    // Move current root to end
+    [arr[0], arr[i]] = [arr[i], arr[0]];
+    
+    // Call heapify on the reduced heap
+    heapify(arr, i, 0);
+  }
+  
+  return arr;
+}
+
+function heapify(arr, n, i) {
+  let largest = i; // Initialize largest as root
+  const left = 2 * i + 1; // left child
+  const right = 2 * i + 2; // right child
+  
+  // If left child is larger than root
+  if (left < n && arr[left] > arr[largest]) {
+    largest = left;
+  }
+  
+  // If right child is larger than largest so far
+  if (right < n && arr[right] > arr[largest]) {
+    largest = right;
+  }
+  
+  // If largest is not root
+  if (largest !== i) {
+    [arr[i], arr[largest]] = [arr[largest], arr[i]];
+    
+    // Recursively heapify the affected sub-tree
+    heapify(arr, n, largest);
+  }
 }`
 };
 
@@ -118,6 +164,7 @@ const Visualizer = () => {
   const [visualizationData, setVisualizationData] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState([]);
+  const [heapViewMode, setHeapViewMode] = useState('array'); // 'array' or 'tree'
   const animationRef = useRef(null);
   const audioContextRef = useRef(null);
 
@@ -251,9 +298,47 @@ const Visualizer = () => {
     };
 
     // Check if it's a sorting algorithm
-    const sortingAlgorithms = ['bubble-sort', 'quick-sort', 'merge-sort', 'insertion-sort', 'selection-sort'];
+    const sortingAlgorithms = ['bubble-sort', 'quick-sort', 'merge-sort', 'insertion-sort', 'selection-sort', 'heap-sort'];
     
     if (sortingAlgorithms.includes(selectedAlgorithm)) {
+      // Special handling for heap sort with toggle between array and tree view
+      if (selectedAlgorithm === 'heap-sort') {
+        return (
+          <div>
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex rounded-md shadow-sm" role="group">
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium rounded-l-lg border ${
+                    heapViewMode === 'array'
+                      ? 'bg-blue-800 text-white border-blue-800'
+                      : 'bg-white text-blue-800 border-blue-200 hover:bg-blue-50'
+                  }`}
+                  onClick={() => setHeapViewMode('array')}
+                >
+                  Array View
+                </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium rounded-r-md border ${
+                    heapViewMode === 'tree'
+                      ? 'bg-blue-800 text-white border-blue-800'
+                      : 'bg-white text-blue-800 border-blue-200 hover:bg-blue-50'
+                  }`}
+                  onClick={() => setHeapViewMode('tree')}
+                >
+                  Tree View
+                </button>
+              </div>
+            </div>
+            {heapViewMode === 'array' ? (
+              <SequentialSortingVisualizer {...visualizerProps} />
+            ) : (
+              <HeapTreeVisualizer {...visualizerProps} />
+            )}
+          </div>
+        );
+      }
       return <SequentialSortingVisualizer {...visualizerProps} />;
     }
 
@@ -314,6 +399,18 @@ const Visualizer = () => {
           return 7; // Finding minimum
         } else if (stepData.swapping && stepData.swapping.length > 0) {
           return 13; // Swapping elements
+        }
+        return -1;
+        
+      case 'heap-sort':
+        if (stepData.operation === 'build_heap_start') {
+          return 4; // Building heap
+        } else if (stepData.operation === 'heapify_start' || stepData.operation === 'compare_children') {
+          return 20; // Heapifying
+        } else if (stepData.operation === 'swap_heap') {
+          return 22; // Swapping in heap
+        } else if (stepData.operation === 'extract_max') {
+          return 12; // Extracting max
         }
         return -1;
         
