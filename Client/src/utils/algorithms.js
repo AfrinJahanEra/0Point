@@ -4,7 +4,7 @@ export const algorithms = [
     name: 'Bubble Sort', 
     description: 'Simple sorting algorithm that repeatedly steps through the list',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9', '3,7,1,4,6'],
+    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -65,7 +65,7 @@ export const algorithms = [
     name: 'Quick Sort', 
     description: 'Divide-and-conquer algorithm that picks an element as pivot and partitions the array around it',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9', '3,7,1,4,6'],
+    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -170,7 +170,7 @@ export const algorithms = [
     name: 'Insertion Sort', 
     description: 'Simple sorting algorithm that builds the final sorted array one item at a time',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9', '3,7,1,4,6'],
+    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -245,7 +245,7 @@ export const algorithms = [
     name: 'Selection Sort', 
     description: 'In-place comparison sorting algorithm that divides the input list into sorted and unsorted regions',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9', '3,7,1,4,6'],
+    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -329,7 +329,7 @@ export const algorithms = [
     name: 'Merge Sort', 
     description: 'Divide-and-conquer algorithm that divides the array into halves, sorts each half, and merges them back together',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9', '3,7,1,4,6'],
+    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -491,7 +491,7 @@ export const algorithms = [
     name: 'Heap Sort', 
     description: 'Comparison-based sorting algorithm that uses binary heap data structure',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9', '3,7,1,4,6'],
+    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -679,8 +679,8 @@ export const algorithms = [
       { label: 'Target Element', placeholder: 'Enter the number to search for, e.g., 8' }
     ],
     examples: [
-      ['5,2,8,1,9', '8'], 
-      ['3,7,1,4,6', '1']
+      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15', '8'], 
+      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15', '1']
     ],
     generateSteps: (data) => {
       const steps = [];
@@ -740,8 +740,8 @@ export const algorithms = [
       { label: 'Target Element', placeholder: 'Enter the number to search for, e.g., 5' }
     ],
     examples: [
-      ['1,2,5,8,9', '5'], 
-      ['1,3,4,6,7,8,10', '6']
+      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15', '5'], 
+      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15', '6']
     ],
     generateSteps: (data) => {
       const steps = [];
@@ -825,6 +825,400 @@ export const algorithms = [
           operation: 'not_found'
         });
       }
+      
+      return steps;
+    }
+  },
+  { 
+    id: 'bst', 
+    name: 'Binary Search Tree', 
+    description: 'A binary tree where each node has a value greater than all values in its left subtree and less than all values in its right subtree',
+    inputs: [
+      { label: 'Values to Insert', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }
+    ],
+    examples: [
+      ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15'], 
+      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const values = [...data.array];
+      
+      // Initialize empty tree
+      steps.push({ 
+        tree: null,
+        operation: 'start',
+        insertedValue: null,
+        comparing: null,
+        found: null
+      });
+      
+      let tree = null;
+      
+      // Simple tree node structure
+      const createNode = (value) => ({
+        value: value,
+        left: null,
+        right: null
+      });
+      
+      // Insert each value
+      for (let i = 0; i < values.length; i++) {
+        const value = values[i];
+        
+        if (tree === null) {
+          tree = createNode(value);
+          steps.push({ 
+            tree: JSON.parse(JSON.stringify(tree)),
+            operation: 'insert_root',
+            insertedValue: value,
+            comparing: null,
+            found: null
+          });
+        } else {
+          // Insert into existing tree
+          let current = tree;
+          let parent = null;
+          let isLeftChild = false;
+          
+          // Find insertion point
+          while (current !== null) {
+            parent = current;
+            steps.push({ 
+              tree: JSON.parse(JSON.stringify(tree)),
+              operation: 'traverse',
+              insertedValue: value,
+              comparing: current.value,
+              found: null
+            });
+            
+            if (value < current.value) {
+              current = current.left;
+              isLeftChild = true;
+            } else if (value > current.value) {
+              current = current.right;
+              isLeftChild = false;
+            } else {
+              // Value already exists, skip
+              break;
+            }
+          }
+          
+          // Insert new node
+          if (parent) {
+            if (isLeftChild) {
+              parent.left = createNode(value);
+            } else {
+              parent.right = createNode(value);
+            }
+            
+            steps.push({ 
+              tree: JSON.parse(JSON.stringify(tree)),
+              operation: 'insert',
+              insertedValue: value,
+              comparing: parent.value,
+              found: null
+            });
+          }
+        }
+      }
+      
+      // Final state
+      steps.push({ 
+        tree: JSON.parse(JSON.stringify(tree)),
+        operation: 'complete',
+        insertedValue: null,
+        comparing: null,
+        found: null
+      });
+      
+      return steps;
+    }
+  },
+  { 
+    id: 'avl-tree', 
+    name: 'AVL Tree', 
+    description: 'A self-balancing binary search tree where the heights of the two child subtrees of any node differ by at most one',
+    inputs: [
+      { label: 'Values to Insert', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }
+    ],
+    examples: [
+      ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15'], 
+      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const values = [...data.array];
+      
+      // Initialize empty tree
+      steps.push({ 
+        tree: null,
+        operation: 'start',
+        insertedValue: null,
+        comparing: null,
+        found: null,
+        rotation: null
+      });
+      
+      let tree = null;
+      
+      // Simple AVL tree node structure
+      const createNode = (value) => ({
+        value: value,
+        left: null,
+        right: null,
+        height: 1
+      });
+      
+      // Get height of node
+      const getHeight = (node) => node ? node.height : 0;
+      
+      // Get balance factor
+      const getBalance = (node) => node ? getHeight(node.left) - getHeight(node.right) : 0;
+      
+      // Update height
+      const updateHeight = (node) => {
+        if (node) {
+          node.height = Math.max(getHeight(node.left), getHeight(node.right)) + 1;
+        }
+      };
+      
+      // Right rotate
+      const rightRotate = (y) => {
+        const x = y.left;
+        const T2 = x.right;
+        
+        // Perform rotation
+        x.right = y;
+        y.left = T2;
+        
+        // Update heights
+        updateHeight(y);
+        updateHeight(x);
+        
+        return x;
+      };
+      
+      // Left rotate
+      const leftRotate = (x) => {
+        const y = x.right;
+        const T2 = y.left;
+        
+        // Perform rotation
+        y.left = x;
+        x.right = T2;
+        
+        // Update heights
+        updateHeight(x);
+        updateHeight(y);
+        
+        return y;
+      };
+      
+      // Insert node
+      const insertNode = (node, value) => {
+        // Standard BST insertion
+        if (node === null) {
+          return createNode(value);
+        }
+        
+        steps.push({ 
+          tree: JSON.parse(JSON.stringify(tree)),
+          operation: 'traverse',
+          insertedValue: value,
+          comparing: node.value,
+          found: null,
+          rotation: null
+        });
+        
+        if (value < node.value) {
+          node.left = insertNode(node.left, value);
+        } else if (value > node.value) {
+          node.right = insertNode(node.right, value);
+        } else {
+          // Equal values not allowed
+          return node;
+        }
+        
+        // Update height of current node
+        updateHeight(node);
+        
+        // Get balance factor
+        const balance = getBalance(node);
+        
+        // If unbalanced, there are 4 cases
+        
+        // Left Left Case
+        if (balance > 1 && value < node.left.value) {
+          steps.push({ 
+            tree: JSON.parse(JSON.stringify(tree)),
+            operation: 'rotate',
+            insertedValue: value,
+            comparing: node.value,
+            found: null,
+            rotation: 'right'
+          });
+          return rightRotate(node);
+        }
+        
+        // Right Right Case
+        if (balance < -1 && value > node.right.value) {
+          steps.push({ 
+            tree: JSON.parse(JSON.stringify(tree)),
+            operation: 'rotate',
+            insertedValue: value,
+            comparing: node.value,
+            found: null,
+            rotation: 'left'
+          });
+          return leftRotate(node);
+        }
+        
+        // Left Right Case
+        if (balance > 1 && value > node.left.value) {
+          node.left = leftRotate(node.left);
+          steps.push({ 
+            tree: JSON.parse(JSON.stringify(tree)),
+            operation: 'rotate',
+            insertedValue: value,
+            comparing: node.value,
+            found: null,
+            rotation: 'leftright'
+          });
+          return rightRotate(node);
+        }
+        
+        // Right Left Case
+        if (balance < -1 && value < node.right.value) {
+          node.right = rightRotate(node.right);
+          steps.push({ 
+            tree: JSON.parse(JSON.stringify(tree)),
+            operation: 'rotate',
+            insertedValue: value,
+            comparing: node.value,
+            found: null,
+            rotation: 'rightleft'
+          });
+          return leftRotate(node);
+        }
+        
+        // Return unchanged node
+        return node;
+      };
+      
+      // Insert each value
+      for (let i = 0; i < values.length; i++) {
+        const value = values[i];
+        tree = insertNode(tree, value);
+        
+        steps.push({ 
+          tree: JSON.parse(JSON.stringify(tree)),
+          operation: 'insert',
+          insertedValue: value,
+          comparing: null,
+          found: null,
+          rotation: null
+        });
+      }
+      
+      // Final state
+      steps.push({ 
+        tree: JSON.parse(JSON.stringify(tree)),
+        operation: 'complete',
+        insertedValue: null,
+        comparing: null,
+        found: null,
+        rotation: null
+      });
+      
+      return steps;
+    }
+  },
+  { 
+    id: 'trie', 
+    name: 'Trie', 
+    description: 'A tree-like data structure that stores strings in a way that allows for efficient retrieval',
+    inputs: [
+      { label: 'Words to Insert', placeholder: 'Enter words separated by commas, e.g., cat,dog,car' }
+    ],
+    examples: [
+      ['cat,dog,car,bird,fish,elephant,giraffe,hippo,iguana,jaguar,kangaroo,lion,monkey,narwhal,octopus'], 
+      ['apple,banana,cherry,date,elderberry,fig,grape,kiwi,lemon,mango,orange,peach,quince,raspberry,strawberry']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const words = [...data.array].map(String);
+      
+      // Initialize empty trie
+      steps.push({ 
+        tree: null,
+        operation: 'start',
+        insertedWord: null,
+        currentChar: null,
+        path: []
+      });
+      
+      let tree = { children: {}, isEnd: false };
+      
+      // Insert each word
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        let current = tree;
+        
+        steps.push({ 
+          tree: JSON.parse(JSON.stringify(tree)),
+          operation: 'insert_start',
+          insertedWord: word,
+          currentChar: null,
+          path: []
+        });
+        
+        // Insert each character
+        for (let j = 0; j < word.length; j++) {
+          const char = word[j];
+          
+          if (!current.children[char]) {
+            current.children[char] = { children: {}, isEnd: false };
+            steps.push({ 
+              tree: JSON.parse(JSON.stringify(tree)),
+              operation: 'create_node',
+              insertedWord: word,
+              currentChar: char,
+              path: word.substring(0, j + 1)
+            });
+          }
+          
+          current = current.children[char];
+          
+          steps.push({ 
+            tree: JSON.parse(JSON.stringify(tree)),
+            operation: 'traverse',
+            insertedWord: word,
+            currentChar: char,
+            path: word.substring(0, j + 1)
+          });
+        }
+        
+        // Mark end of word
+        current.isEnd = true;
+        
+        steps.push({ 
+          tree: JSON.parse(JSON.stringify(tree)),
+          operation: 'mark_end',
+          insertedWord: word,
+          currentChar: word[word.length - 1],
+          path: word
+        });
+      }
+      
+      // Final state
+      steps.push({ 
+        tree: JSON.parse(JSON.stringify(tree)),
+        operation: 'complete',
+        insertedWord: null,
+        currentChar: null,
+        path: []
+      });
       
       return steps;
     }

@@ -7,6 +7,7 @@ import InputPanel from '../components/InputPanel';
 import SequentialSortingVisualizer from '../components/sort/SequentialSortingVisualizer';
 import HeapTreeVisualizer from '../components/sort/HeapTreeVisualizer';
 import SearchVisualizer from '../components/sort/SearchVisualizer';
+import TreeVisualizer from '../components/sort/TreeVisualizer';
 import { algorithms } from '../utils/algorithms';
 import { parseInputs } from '../utils/inputParser';
 
@@ -186,6 +187,175 @@ function binarySearch(arr, target) {
   }
   
   return -1; // Return -1 if not found
+}`,
+
+  'bst': `
+class TreeNode {
+  constructor(value) {
+    this.value = value;
+    this.left = null;
+    this.right = null;
+  }
+}
+
+class BST {
+  constructor() {
+    this.root = null;
+  }
+  
+  insert(value) {
+    this.root = this.insertNode(this.root, value);
+  }
+  
+  insertNode(node, value) {
+    if (node === null) {
+      return new TreeNode(value);
+    }
+    
+    if (value < node.value) {
+      node.left = this.insertNode(node.left, value);
+    } else if (value > node.value) {
+      node.right = this.insertNode(node.right, value);
+    }
+    
+    return node;
+  }
+}`,
+
+  'avl-tree': `
+class AVLNode {
+  constructor(value) {
+    this.value = value;
+    this.left = null;
+    this.right = null;
+    this.height = 1;
+  }
+}
+
+class AVLTree {
+  constructor() {
+    this.root = null;
+  }
+  
+  getHeight(node) {
+    return node ? node.height : 0;
+  }
+  
+  getBalance(node) {
+    return node ? this.getHeight(node.left) - this.getHeight(node.right) : 0;
+  }
+  
+  rotateRight(y) {
+    const x = y.left;
+    const T2 = x.right;
+    
+    x.right = y;
+    y.left = T2;
+    
+    y.height = Math.max(this.getHeight(y.left), this.getHeight(y.right)) + 1;
+    x.height = Math.max(this.getHeight(x.left), this.getHeight(x.right)) + 1;
+    
+    return x;
+  }
+  
+  rotateLeft(x) {
+    const y = x.right;
+    const T2 = y.left;
+    
+    y.left = x;
+    x.right = T2;
+    
+    x.height = Math.max(this.getHeight(x.left), this.getHeight(x.right)) + 1;
+    y.height = Math.max(this.getHeight(y.left), this.getHeight(y.right)) + 1;
+    
+    return y;
+  }
+  
+  insert(value) {
+    this.root = this.insertNode(this.root, value);
+  }
+  
+  insertNode(node, value) {
+    if (node === null) {
+      return new AVLNode(value);
+    }
+    
+    if (value < node.value) {
+      node.left = this.insertNode(node.left, value);
+    } else if (value > node.value) {
+      node.right = this.insertNode(node.right, value);
+    } else {
+      return node; // Duplicate values not allowed
+    }
+    
+    node.height = 1 + Math.max(this.getHeight(node.left), this.getHeight(node.right));
+    
+    const balance = this.getBalance(node);
+    
+    // Left Left Case
+    if (balance > 1 && value < node.left.value) {
+      return this.rotateRight(node);
+    }
+    
+    // Right Right Case
+    if (balance < -1 && value > node.right.value) {
+      return this.rotateLeft(node);
+    }
+    
+    // Left Right Case
+    if (balance > 1 && value > node.left.value) {
+      node.left = this.rotateLeft(node.left);
+      return this.rotateRight(node);
+    }
+    
+    // Right Left Case
+    if (balance < -1 && value < node.right.value) {
+      node.right = this.rotateRight(node.right);
+      return this.rotateLeft(node);
+    }
+    
+    return node;
+  }
+}`,
+
+  'trie': `
+class TrieNode {
+  constructor() {
+    this.children = {};
+    this.isEnd = false;
+  }
+}
+
+class Trie {
+  constructor() {
+    this.root = new TrieNode();
+  }
+  
+  insert(word) {
+    let current = this.root;
+    
+    for (let char of word) {
+      if (!current.children[char]) {
+        current.children[char] = new TrieNode();
+      }
+      current = current.children[char];
+    }
+    
+    current.isEnd = true;
+  }
+  
+  search(word) {
+    let current = this.root;
+    
+    for (let char of word) {
+      if (!current.children[char]) {
+        return false;
+      }
+      current = current.children[char];
+    }
+    
+    return current.isEnd;
+  }
 }`
 };
 
@@ -353,6 +523,8 @@ const Visualizer = () => {
     const sortingAlgorithms = ['bubble-sort', 'quick-sort', 'merge-sort', 'insertion-sort', 'selection-sort', 'heap-sort'];
     // Check if it's a search algorithm
     const searchAlgorithms = ['linear-search', 'binary-search'];
+    // Check if it's a tree algorithm
+    const treeAlgorithms = ['bst', 'avl-tree', 'trie'];
     
     if (sortingAlgorithms.includes(selectedAlgorithm)) {
       // Special handling for heap sort with toggle between array and tree view
@@ -398,6 +570,10 @@ const Visualizer = () => {
     
     if (searchAlgorithms.includes(selectedAlgorithm)) {
       return <SearchVisualizer {...visualizerProps} />;
+    }
+    
+    if (treeAlgorithms.includes(selectedAlgorithm)) {
+      return <TreeVisualizer {...visualizerProps} />;
     }
 
     switch (selectedAlgorithm) {
@@ -493,6 +669,46 @@ const Visualizer = () => {
           return 11; // Move left
         } else if (stepData.operation === 'not_found') {
           return 16; // Return -1
+        }
+        return -1;
+        
+      case 'bst':
+        if (stepData.operation === 'insert_root') {
+          return 17; // Insert root
+        } else if (stepData.operation === 'traverse') {
+          return 24; // Traverse
+        } else if (stepData.operation === 'insert') {
+          return 27; // Insert node
+        }
+        return -1;
+        
+      case 'avl-tree':
+        if (stepData.operation === 'traverse') {
+          return 37; // Traverse
+        } else if (stepData.operation === 'rotate') {
+          if (stepData.rotation === 'left') {
+            return 60; // Left rotate
+          } else if (stepData.rotation === 'right') {
+            return 44; // Right rotate
+          } else if (stepData.rotation === 'leftright') {
+            return 70; // Left-right rotate
+          } else if (stepData.rotation === 'rightleft') {
+            return 80; // Right-left rotate
+          }
+        } else if (stepData.operation === 'insert') {
+          return 34; // Insert node
+        }
+        return -1;
+        
+      case 'trie':
+        if (stepData.operation === 'insert_start') {
+          return 13; // Insert start
+        } else if (stepData.operation === 'create_node') {
+          return 18; // Create node
+        } else if (stepData.operation === 'traverse') {
+          return 24; // Traverse
+        } else if (stepData.operation === 'mark_end') {
+          return 28; // Mark end
         }
         return -1;
         

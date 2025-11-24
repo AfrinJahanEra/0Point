@@ -16,6 +16,21 @@ export const parseInputs = (algorithmId, inputValues) => {
     return { array, target };
   }
   
+  // Handle tree algorithms
+  const treeAlgorithms = ['bst', 'avl-tree', 'trie'];
+  
+  if (treeAlgorithms.includes(algorithmId)) {
+    if (algorithmId === 'trie') {
+      // For trie, we handle strings
+      const array = inputValues[0]?.split(',').filter(s => s && s.trim() !== '') || ['cat', 'dog', 'car'];
+      return { array };
+    } else {
+      // For BST and AVL, we handle numbers
+      const array = inputValues[0]?.split(',').map(Number).filter(n => !isNaN(n)) || [5, 2, 8, 1, 9];
+      return { array };
+    }
+  }
+  
   switch (algorithmId) {
 
     
