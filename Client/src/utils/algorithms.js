@@ -669,5 +669,164 @@ export const algorithms = [
       
       return steps;
     }
+  },
+  { 
+    id: 'linear-search', 
+    name: 'Linear Search', 
+    description: 'Simple search algorithm that checks each element in sequence until the target is found',
+    inputs: [
+      { label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' },
+      { label: 'Target Element', placeholder: 'Enter the number to search for, e.g., 8' }
+    ],
+    examples: [
+      ['5,2,8,1,9', '8'], 
+      ['3,7,1,4,6', '1']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const array = [...data.array];
+      const target = data.target;
+      
+      // Add initial state
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        found: -1,
+        currentIndex: -1,
+        operation: 'start'
+      });
+      
+      for (let i = 0; i < array.length; i++) {
+        steps.push({ 
+          array: [...array], 
+          comparing: [i], 
+          found: -1,
+          currentIndex: i,
+          operation: 'compare'
+        });
+        
+        if (array[i] === target) {
+          steps.push({ 
+            array: [...array], 
+            comparing: [i], 
+            found: i,
+            currentIndex: i,
+            operation: 'found'
+          });
+          break;
+        }
+      }
+      
+      // If not found
+      if (steps.length > 0 && steps[steps.length - 1].found === -1) {
+        steps.push({ 
+          array: [...array], 
+          comparing: [], 
+          found: -1,
+          currentIndex: array.length - 1,
+          operation: 'not_found'
+        });
+      }
+      
+      return steps;
+    }
+  },
+  { 
+    id: 'binary-search', 
+    name: 'Binary Search', 
+    description: 'Efficient search algorithm that works on sorted arrays by repeatedly dividing the search interval in half',
+    inputs: [
+      { label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 1,2,5,8,9' },
+      { label: 'Target Element', placeholder: 'Enter the number to search for, e.g., 5' }
+    ],
+    examples: [
+      ['1,2,5,8,9', '5'], 
+      ['1,3,4,6,7,8,10', '6']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const array = [...data.array];
+      const target = data.target;
+      
+      // Add initial state
+      steps.push({ 
+        array: [...array], 
+        comparing: [], 
+        found: -1,
+        low: 0,
+        high: array.length - 1,
+        mid: -1,
+        operation: 'start'
+      });
+      
+      let low = 0;
+      let high = array.length - 1;
+      let found = false;
+      
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        
+        steps.push({ 
+          array: [...array], 
+          comparing: [mid], 
+          found: -1,
+          low: low,
+          high: high,
+          mid: mid,
+          operation: 'compare'
+        });
+        
+        if (array[mid] === target) {
+          steps.push({ 
+            array: [...array], 
+            comparing: [mid], 
+            found: mid,
+            low: low,
+            high: high,
+            mid: mid,
+            operation: 'found'
+          });
+          found = true;
+          break;
+        } else if (array[mid] < target) {
+          steps.push({ 
+            array: [...array], 
+            comparing: [mid], 
+            found: -1,
+            low: mid + 1,
+            high: high,
+            mid: mid,
+            operation: 'move_right'
+          });
+          low = mid + 1;
+        } else {
+          steps.push({ 
+            array: [...array], 
+            comparing: [mid], 
+            found: -1,
+            low: low,
+            high: mid - 1,
+            mid: mid,
+            operation: 'move_left'
+          });
+          high = mid - 1;
+        }
+      }
+      
+      // If not found
+      if (steps.length > 0 && !found) {
+        steps.push({ 
+          array: [...array], 
+          comparing: [], 
+          found: -1,
+          low: low,
+          high: high,
+          mid: Math.floor((low + high) / 2),
+          operation: 'not_found'
+        });
+      }
+      
+      return steps;
+    }
   }
 ];

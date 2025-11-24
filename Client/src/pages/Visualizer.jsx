@@ -6,6 +6,7 @@ import InputPanel from '../components/InputPanel';
 
 import SequentialSortingVisualizer from '../components/sort/SequentialSortingVisualizer';
 import HeapTreeVisualizer from '../components/sort/HeapTreeVisualizer';
+import SearchVisualizer from '../components/sort/SearchVisualizer';
 import { algorithms } from '../utils/algorithms';
 import { parseInputs } from '../utils/inputParser';
 
@@ -155,6 +156,36 @@ function heapify(arr, n, i) {
     // Recursively heapify the affected sub-tree
     heapify(arr, n, largest);
   }
+}`,
+
+  'linear-search': `
+function linearSearch(arr, target) {
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] === target) {
+      return i; // Return index if found
+    }
+  }
+  return -1; // Return -1 if not found
+}`,
+
+  'binary-search': `
+function binarySearch(arr, target) {
+  let low = 0;
+  let high = arr.length - 1;
+  
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    
+    if (arr[mid] === target) {
+      return mid; // Return index if found
+    } else if (arr[mid] < target) {
+      low = mid + 1; // Search right half
+    } else {
+      high = mid - 1; // Search left half
+    }
+  }
+  
+  return -1; // Return -1 if not found
 }`
 };
 
@@ -320,6 +351,8 @@ const Visualizer = () => {
 
     // Check if it's a sorting algorithm
     const sortingAlgorithms = ['bubble-sort', 'quick-sort', 'merge-sort', 'insertion-sort', 'selection-sort', 'heap-sort'];
+    // Check if it's a search algorithm
+    const searchAlgorithms = ['linear-search', 'binary-search'];
     
     if (sortingAlgorithms.includes(selectedAlgorithm)) {
       // Special handling for heap sort with toggle between array and tree view
@@ -361,6 +394,10 @@ const Visualizer = () => {
         );
       }
       return <SequentialSortingVisualizer {...visualizerProps} />;
+    }
+    
+    if (searchAlgorithms.includes(selectedAlgorithm)) {
+      return <SearchVisualizer {...visualizerProps} />;
     }
 
     switch (selectedAlgorithm) {
@@ -432,6 +469,30 @@ const Visualizer = () => {
           return 22; // Swapping in heap
         } else if (stepData.operation === 'extract_max') {
           return 12; // Extracting max
+        }
+        return -1;
+        
+      case 'linear-search':
+        if (stepData.operation === 'compare') {
+          return 3; // Comparing elements
+        } else if (stepData.operation === 'found') {
+          return 4; // Element found
+        } else if (stepData.operation === 'not_found') {
+          return 9; // Return -1
+        }
+        return -1;
+        
+      case 'binary-search':
+        if (stepData.operation === 'compare') {
+          return 6; // Comparing elements
+        } else if (stepData.operation === 'found') {
+          return 7; // Element found
+        } else if (stepData.operation === 'move_right') {
+          return 9; // Move right
+        } else if (stepData.operation === 'move_left') {
+          return 11; // Move left
+        } else if (stepData.operation === 'not_found') {
+          return 16; // Return -1
         }
         return -1;
         
