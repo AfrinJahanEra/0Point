@@ -194,14 +194,14 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
     
     // Add title
     doc.setFontSize(22);
-    doc.text('Sorting Visualization Steps', 105, 15, null, null, 'center');
+    doc.text('Sorting Visualization Steps', 148.5, 15, null, null, 'center');
     
     // Add steps with visual representations - one step per page
     for (let index = 0; index < steps.length; index++) {
@@ -214,17 +214,17 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
       
       // Add step header
       doc.setFontSize(16);
-      doc.text(`Step ${index + 1} of ${steps.length}`, 105, 25, null, null, 'center');
+      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
       
       doc.setFontSize(12);
-      doc.text(getOperationDescription(step), 105, 35, null, null, 'center');
+      doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
       
       // Add array representation
       const arrayStr = `Array: [${step.array ? step.array.join(', ') : 'N/A'}]`;
-      doc.text(arrayStr, 105, 45, null, null, 'center');
+      doc.text(arrayStr, 148.5, 45, null, null, 'center');
       
       // Draw array representation centered on page
-      drawArrayRepresentation(doc, step, 105, 60);
+      drawArrayRepresentation(doc, step, 148.5, 60);
       
       // Add a small delay to prevent UI blocking
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -237,17 +237,36 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
   // Helper function to draw array representation in PDF with table-like format
   const drawArrayRepresentation = (doc, step, x, y) => {
     if (step.array) {
+      // Calculate bounding box for scaling
       const cellWidth = 10;
       const cellHeight = 10;
-      const startX = x;
-      const startY = y;
       const maxElementsPerLine = 15; // Limit elements per line
       
       // If too many elements, split into multiple lines
       const linesNeeded = Math.ceil(step.array.length / maxElementsPerLine);
       
+      // Calculate dimensions
+      const totalWidth = Math.min(step.array.length, maxElementsPerLine) * cellWidth;
+      const totalHeight = linesNeeded * (cellHeight + 15);
+      
+      // Calculate scaling to fit page
+      const pageWidth = 297; // A4 landscape width in mm
+      const pageHeight = 210; // A4 landscape height in mm
+      const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
+      const availableHeight = pageHeight - 80; // Leave space for header and footer
+      
+      const scaleX = availableWidth / totalWidth;
+      const scaleY = availableHeight / totalHeight;
+      const scale = Math.min(scaleX, scaleY, 1); // Don't upscale
+      
+      // Calculate position to center
+      const scaledWidth = totalWidth * scale;
+      const scaledHeight = totalHeight * scale;
+      const startX = (pageWidth - scaledWidth) / 2;
+      const startY = (availableHeight - scaledHeight) / 2 + 50; // +50 for header space
+      
       // Draw header with indices
-      doc.setFontSize(8);
+      doc.setFontSize(8 * scale);
       doc.setTextColor(0, 0, 0);
       
       for (let line = 0; line < linesNeeded; line++) {
@@ -257,19 +276,19 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
         // Draw index headers
         for (let i = startIndex; i < endIndex; i++) {
           const arrIdx = i;
-          const x = startX + ((i - startIndex) * cellWidth);
-          const y = startY + (line * (cellHeight + 15));
+          const cellX = startX + ((i - startIndex) * cellWidth * scale);
+          const cellY = startY + (line * (cellHeight + 15) * scale);
           
           // Draw index
-          doc.text(`[${arrIdx}]`, x + cellWidth/2, y + 4, null, null, 'center');
+          doc.text(`[${arrIdx}]`, cellX + (cellWidth * scale)/2, cellY + (4 * scale), null, null, 'center');
         }
         
         // Draw array elements for this line
         for (let i = startIndex; i < endIndex; i++) {
           const arrIdx = i;
           const value = step.array[arrIdx];
-          const x = startX + ((i - startIndex) * cellWidth);
-          const y = startY + (line * (cellHeight + 15)) + 6;
+          const cellX = startX + ((i - startIndex) * cellWidth * scale);
+          const cellY = startY + (line * (cellHeight + 15) * scale) + (6 * scale);
           
           const isSorted = step.sorted && step.sorted.includes(arrIdx);
           const isComparing = step.comparing && step.comparing.includes(arrIdx);
@@ -293,16 +312,16 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
           }
           
           doc.setDrawColor(156, 163, 175); // gray-400 border
-          doc.rect(x, y, cellWidth, cellHeight, 'FD');
+          doc.rect(cellX, cellY, cellWidth * scale, cellHeight * scale, 'FD');
           
           // Add text (white for dark backgrounds, black for light)
-          doc.setFontSize(8);
+          doc.setFontSize(8 * scale);
           if (isPivot || isHeapRoot) {
             doc.setTextColor(255, 255, 255); // white
           } else {
             doc.setTextColor(0, 0, 0); // black
           }
-          doc.text(String(value), x + cellWidth/2, y + cellHeight/2 + 3, null, null, 'center');
+          doc.text(String(value), cellX + (cellWidth * scale)/2, cellY + (cellHeight * scale)/2 + (3 * scale), null, null, 'center');
         }
       }
       
@@ -310,10 +329,10 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
       doc.setTextColor(0, 0, 0);
       
       // Return new Y position
-      return startY + (linesNeeded * (cellHeight + 15)) + 20;
+      return startY + (linesNeeded * (cellHeight + 15) * scale) + (20 * scale);
     } else {
       // Simple fallback
-      doc.line(15, y, 195, y);
+      doc.line(20, y, 277, y);
       return y + 15;
     }
   };
@@ -334,7 +353,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
             onClick={downloadStepsAsPDF}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
           >
-            Download PDF
+            Export PDF
           </button>
           {isPlaying ? null : isCompleted ? (
             <button 

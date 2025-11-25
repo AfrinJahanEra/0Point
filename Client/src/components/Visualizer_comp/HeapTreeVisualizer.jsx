@@ -27,18 +27,18 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
     
     // Add title
     doc.setFontSize(22);
-    doc.text('Heap Sort Visualization Steps', 105, 15, null, null, 'center');
+    doc.text('Heap Sort Visualization Steps', 148.5, 15, null, null, 'center');
     
     // Add steps with visual representations
     let currentPageY = 30;
-    const pageHeight = 280; // A4 height minus margins
+    const pageHeight = 200; // A4 landscape height minus margins
     
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index];
@@ -71,7 +71,7 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
           });
           
           const imgData = canvas.toDataURL('image/png');
-          const imgWidth = 80;
+          const imgWidth = 120;
           const imgHeight = (canvas.height * imgWidth) / canvas.width;
           
           // Check if image fits on current page
@@ -84,13 +84,13 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
           currentPageY += 25 + imgHeight;
         } else {
           // Fallback if element not found
-          doc.line(15, currentPageY + 18, 195, currentPageY + 18);
+          doc.line(20, currentPageY + 18, 277, currentPageY + 18);
           currentPageY += 25;
         }
       } catch (error) {
         console.error('Error capturing step visualization:', error);
         // Fallback if capture fails
-        doc.line(15, currentPageY + 18, 195, currentPageY + 18);
+        doc.line(20, currentPageY + 18, 277, currentPageY + 18);
         currentPageY += 25;
       }
       
@@ -131,14 +131,14 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
   // Function to download all steps as PDF with visual representations (screenshot version)
   const downloadStepsAsPDFWithScreenshots = async () => {
     const doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
     
     // Add title
     doc.setFontSize(22);
-    doc.text('Heap Sort Visualization Steps', 105, 15, null, null, 'center');
+    doc.text('Heap Sort Visualization Steps', 148.5, 15, null, null, 'center');
     
     // Add steps with visual representations - one step per page
     for (let index = 0; index < steps.length; index++) {
@@ -151,17 +151,17 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       
       // Add step header
       doc.setFontSize(16);
-      doc.text(`Step ${index + 1} of ${steps.length}`, 105, 25, null, null, 'center');
+      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
       
       doc.setFontSize(12);
-      doc.text(getOperationDescription(step), 105, 35, null, null, 'center');
+      doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
       
       // Add array representation
       const arrayStr = `Array: [${step.array.join(', ')}]`;
-      doc.text(arrayStr, 105, 45, null, null, 'center');
+      doc.text(arrayStr, 148.5, 45, null, null, 'center');
       
       // Add visual tree representation using jsPDF drawing functions
-      drawTreeVisualization(doc, step, 105, 60);
+      drawTreeVisualization(doc, step, 148.5, 60);
       
       // Add a small delay to prevent UI blocking
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -176,10 +176,41 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     const positions = calculateTreePositions(step.array);
     const connections = getConnections(step.array);
     
-    // Scale factor for the PDF visualization
-    const scale = 0.4;
-    const xOffset = x;
-    const yOffset = y;
+    // Calculate bounding box for scaling
+    if (positions.length === 0) {
+      doc.text('Empty tree', x, y, null, null, 'center');
+      return;
+    }
+    
+    const minX = Math.min(...positions.map(p => p.x));
+    const maxX = Math.max(...positions.map(p => p.x));
+    const minY = Math.min(...positions.map(p => p.y));
+    const maxY = Math.max(...positions.map(p => p.y));
+    
+    const bbox = {
+      minX: minX,
+      maxX: maxX,
+      minY: minY,
+      maxY: maxY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
+    
+    // Calculate scaling to fit page
+    const pageWidth = 297; // A4 landscape width in mm
+    const pageHeight = 210; // A4 landscape height in mm
+    const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
+    const availableHeight = pageHeight - 80; // Leave space for header and footer
+    
+    const scaleX = availableWidth / bbox.width;
+    const scaleY = availableHeight / bbox.height;
+    const scale = Math.min(scaleX, scaleY, 1); // Don't upscale
+    
+    // Calculate position to center
+    const treeWidth = bbox.width * scale;
+    const treeHeight = bbox.height * scale;
+    const xOffset = (pageWidth - treeWidth) / 2 - bbox.minX * scale;
+    const yOffset = (availableHeight - treeHeight) / 2 + 50 - bbox.minY * scale; // +50 for header space
     
     // Draw connections
     connections.forEach(conn => {
@@ -218,12 +249,12 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       doc.circle(
         xOffset + pos.x * scale,
         yOffset + pos.y * scale,
-        4, // radius
+        4 * scale, // radius
         'FD' // Fill and Draw
       );
       
       // Draw value
-      doc.setFontSize(6);
+      doc.setFontSize(6 * scale);
       doc.setTextColor(0, 0, 0); // black text
       doc.text(
         String(pos.value),
@@ -235,11 +266,11 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       );
       
       // Draw index
-      doc.setFontSize(4);
+      doc.setFontSize(4 * scale);
       doc.text(
         `[${idx}]`,
         xOffset + pos.x * scale,
-        yOffset + pos.y * scale + 6,
+        yOffset + pos.y * scale + (6 * scale),
         null,
         null,
         'center'
@@ -551,7 +582,7 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
           onClick={downloadStepsAsPDFWithScreenshots}
           className="px-4 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors"
         >
-          Download PDF with Visual Trees
+          Export PDF
         </button>
       </div>
       

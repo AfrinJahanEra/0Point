@@ -25,14 +25,14 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
     
     // Add title
     doc.setFontSize(22);
-    doc.text('Trie Visualization Steps', 105, 15, null, null, 'center');
+    doc.text('Trie Visualization Steps', 148.5, 15, null, null, 'center');
     
     // Add steps with visual representations - one step per page
     for (let index = 0; index < steps.length; index++) {
@@ -45,16 +45,34 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       
       // Add step header
       doc.setFontSize(16);
-      doc.text(`Step ${index + 1} of ${steps.length}`, 105, 25, null, null, 'center');
+      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
       
       doc.setFontSize(12);
-      doc.text(getOperationDescription(step), 105, 35, null, null, 'center');
+      doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
       
       // Add a visual representation of the trie
       if (step.tree || step.operation) {
-        drawTrieInPDF(doc, step.tree || { children: {}, isEnd: false }, '', 105, 60);
+        // Calculate bounding box for scaling
+        const bbox = calculateTrieBoundingBox(step.tree || { children: {}, isEnd: false });
+        const pageWidth = 297; // A4 landscape width in mm
+        const pageHeight = 210; // A4 landscape height in mm
+        const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
+        const availableHeight = pageHeight - 60; // Leave space for header and footer
+        
+        // Calculate scale to fit
+        const scaleX = availableWidth / bbox.width;
+        const scaleY = availableHeight / bbox.height;
+        const scale = Math.min(scaleX, scaleY, 1); // Don't upscale
+        
+        // Calculate position to center
+        const treeWidth = bbox.width * scale;
+        const treeHeight = bbox.height * scale;
+        const x = (pageWidth - treeWidth) / 2 - bbox.minX * scale;
+        const y = (availableHeight - treeHeight) / 2 + 50 - bbox.minY * scale; // +50 for header space
+        
+        drawTrieInPDF(doc, step.tree || { children: {}, isEnd: false }, '', x, y, 0, scale);
       } else {
-        doc.text('Empty trie', 105, 60, null, null, 'center');
+        doc.text('Empty trie', 148.5, 105, null, null, 'center');
       }
       
       // Add a small delay to prevent UI blocking
@@ -65,13 +83,43 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     doc.save('trie-steps.pdf');
   };
   
+  // Helper function to calculate trie bounding box
+  const calculateTrieBoundingBox = (node, prefix = '', level = 0, x = 0, y = 0, bbox = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }) => {
+    if (!node) return bbox;
+    
+    const nodeSize = 10; // Diameter of node circle
+    const verticalSpacing = 40;
+    const horizontalSpacing = Math.max(60 / (level + 1), 25);
+    
+    // Update bounding box
+    bbox.minX = Math.min(bbox.minX, x - nodeSize/2);
+    bbox.maxX = Math.max(bbox.maxX, x + nodeSize/2);
+    bbox.minY = Math.min(bbox.minY, y - nodeSize/2);
+    bbox.maxY = Math.max(bbox.maxY, y + nodeSize/2);
+    
+    // Process children
+    const children = node.children ? Object.keys(node.children) : [];
+    children.forEach((char, index) => {
+      const child = node.children[char];
+      const childX = x + (index - (children.length - 1) / 2) * horizontalSpacing;
+      const childY = y + verticalSpacing;
+      calculateTrieBoundingBox(child, prefix + char, level + 1, childX, childY, bbox);
+    });
+    
+    // Add some padding
+    bbox.width = bbox.maxX - bbox.minX + 20;
+    bbox.height = bbox.maxY - bbox.minY + 20;
+    
+    return bbox;
+  };
+  
   // Helper function to draw trie in PDF
-  const drawTrieInPDF = (doc, node, prefix = '', x = 105, y = 45, level = 0) => {
+  const drawTrieInPDF = (doc, node, prefix = '', x = 105, y = 45, level = 0, scale = 1) => {
     if (!node) return;
     
-    const nodeSize = 5; // Increased node size
-    const verticalSpacing = 40; // Increased spacing
-    const horizontalSpacing = Math.max(60 / (level + 1), 25); // Increased horizontal spacing
+    const nodeSize = 5 * scale; // Increased node size
+    const verticalSpacing = 40 * scale; // Increased spacing
+    const horizontalSpacing = Math.max(60 / (level + 1), 25) * scale; // Increased horizontal spacing
     
     // Get the character for this node (last character of prefix, or 'root' for root)
     const nodeLabel = prefix ? prefix.slice(-1) : 'root';
@@ -83,19 +131,19 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       doc.setFillColor(255, 255, 255); // white
     }
     doc.setDrawColor(156, 163, 175); // gray-400
-    doc.setLineWidth(0.7); // Slightly thicker lines
+    doc.setLineWidth(0.7 * scale); // Slightly thicker lines
     doc.circle(x, y, nodeSize, 'FD');
     
     // Draw node value
-    doc.setFontSize(8); // Larger font
+    doc.setFontSize(8 * scale); // Larger font
     doc.setTextColor(0, 0, 0); // black
-    doc.text(nodeLabel, x, y + 2, null, null, 'center');
+    doc.text(nodeLabel, x, y + 2 * scale, null, null, 'center');
     
     // Draw end marker for end nodes
     if (node.isEnd) {
-      doc.setFontSize(6);
+      doc.setFontSize(6 * scale);
       doc.setTextColor(16, 185, 129); // green-500
-      doc.text('END', x, y - 10, null, null, 'center'); // Moved further up
+      doc.text('END', x, y - 10 * scale, null, null, 'center'); // Moved further up
     }
     
     // Draw children
@@ -107,16 +155,16 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       
       // Connection line
       doc.setDrawColor(156, 163, 175); // gray-400
-      doc.setLineWidth(0.7);
+      doc.setLineWidth(0.7 * scale);
       doc.line(x, y + nodeSize, childX, childY - nodeSize); // Adjusted line endpoints
       
       // Character label on the line
-      doc.setFontSize(7);
+      doc.setFontSize(7 * scale);
       doc.setTextColor(59, 130, 246); // blue-600
-      doc.text(char, (x + childX) / 2, (y + childY) / 2 - 3, null, null, 'center'); // Moved up slightly
+      doc.text(char, (x + childX) / 2, (y + childY) / 2 - 3 * scale, null, null, 'center'); // Moved up slightly
       
       // Child node
-      drawTrieInPDF(doc, child, prefix + char, childX, childY, level + 1);
+      drawTrieInPDF(doc, child, prefix + char, childX, childY, level + 1, scale);
     });
   };
 

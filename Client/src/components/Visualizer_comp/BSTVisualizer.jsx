@@ -25,14 +25,14 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
     
     // Add title
     doc.setFontSize(22);
-    doc.text('BST Visualization Steps', 105, 15, null, null, 'center');
+    doc.text('BST Visualization Steps', 148.5, 15, null, null, 'center');
     
     // Add steps with visual representations - one step per page
     for (let index = 0; index < steps.length; index++) {
@@ -45,16 +45,34 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
       
       // Add step header
       doc.setFontSize(16);
-      doc.text(`Step ${index + 1} of ${steps.length}`, 105, 25, null, null, 'center');
+      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
       
       doc.setFontSize(12);
-      doc.text(getOperationDescription(step), 105, 35, null, null, 'center');
+      doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
       
       // Add a visual representation of the tree
       if (step.tree || step.operation) {
-        drawTreeInPDF(doc, step.tree, 105, 60);
+        // Calculate bounding box for scaling
+        const bbox = calculateTreeBoundingBox(step.tree);
+        const pageWidth = 297; // A4 landscape width in mm
+        const pageHeight = 210; // A4 landscape height in mm
+        const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
+        const availableHeight = pageHeight - 60; // Leave space for header and footer
+        
+        // Calculate scale to fit
+        const scaleX = availableWidth / bbox.width;
+        const scaleY = availableHeight / bbox.height;
+        const scale = Math.min(scaleX, scaleY, 1); // Don't upscale
+        
+        // Calculate position to center
+        const treeWidth = bbox.width * scale;
+        const treeHeight = bbox.height * scale;
+        const x = (pageWidth - treeWidth) / 2 - bbox.minX * scale;
+        const y = (availableHeight - treeHeight) / 2 + 50 - bbox.minY * scale; // +50 for header space
+        
+        drawTreeInPDF(doc, step.tree, x, y, 0, null, null, scale);
       } else {
-        doc.text('Empty tree', 105, 60, null, null, 'center');
+        doc.text('Empty tree', 148.5, 105, null, null, 'center');
       }
       
       // Add a small delay to prevent UI blocking
@@ -65,39 +83,68 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     doc.save('bst-steps.pdf');
   };
   
-  // Helper function to draw tree in PDF
-  const drawTreeInPDF = (doc, node, x, y, level = 0, parentX = null, parentY = null) => {
-    if (!node) return;
+  // Helper function to calculate tree bounding box
+  const calculateTreeBoundingBox = (node, level = 0, x = 0, y = 0, bbox = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }) => {
+    if (!node) return bbox;
     
-    const nodeSize = 3;
+    const nodeSize = 6; // Diameter of node circle
     const horizontalSpacing = Math.max(50 / (level + 1), 20);
     const verticalSpacing = 25;
     
-    // Draw connections to children
+    // Update bounding box
+    bbox.minX = Math.min(bbox.minX, x - nodeSize/2);
+    bbox.maxX = Math.max(bbox.maxX, x + nodeSize/2);
+    bbox.minY = Math.min(bbox.minY, y - nodeSize/2);
+    bbox.maxY = Math.max(bbox.maxY, y + nodeSize/2);
+    
+    // Process children
     if (node.left) {
-      drawTreeInPDF(doc, node.left, x - horizontalSpacing, y + verticalSpacing, level + 1, x, y);
+      calculateTreeBoundingBox(node.left, level + 1, x - horizontalSpacing, y + verticalSpacing, bbox);
     }
     if (node.right) {
-      drawTreeInPDF(doc, node.right, x + horizontalSpacing, y + verticalSpacing, level + 1, x, y);
+      calculateTreeBoundingBox(node.right, level + 1, x + horizontalSpacing, y + verticalSpacing, bbox);
+    }
+    
+    // Add some padding
+    bbox.width = bbox.maxX - bbox.minX + 20;
+    bbox.height = bbox.maxY - bbox.minY + 20;
+    
+    return bbox;
+  };
+  
+  // Helper function to draw tree in PDF
+  const drawTreeInPDF = (doc, node, x, y, level = 0, parentX = null, parentY = null, scale = 1) => {
+    if (!node) return;
+    
+    const nodeSize = 3 * scale;
+    const horizontalSpacing = Math.max(50 / (level + 1), 20) * scale;
+    const verticalSpacing = 25 * scale;
+    
+    // Draw connections to children
+    if (node.left) {
+      drawTreeInPDF(doc, node.left, x - horizontalSpacing, y + verticalSpacing, level + 1, x, y, scale);
+    }
+    if (node.right) {
+      drawTreeInPDF(doc, node.right, x + horizontalSpacing, y + verticalSpacing, level + 1, x, y, scale);
     }
     
     // Draw connection line to parent
     if (parentX !== null && parentY !== null) {
       doc.setDrawColor(156, 163, 175); // gray-400
-      doc.setLineWidth(0.5);
+      doc.setLineWidth(0.5 * scale);
       doc.line(x, y, parentX, parentY);
     }
     
     // Draw node circle
     doc.setFillColor(255, 255, 255); // white
     doc.setDrawColor(156, 163, 175); // gray-400
-    doc.setLineWidth(0.5);
+    doc.setLineWidth(0.5 * scale);
     doc.circle(x, y, nodeSize, 'FD');
     
     // Draw node value
-    doc.setFontSize(6);
+    doc.setFontSize(6 * scale);
     doc.setTextColor(0, 0, 0); // black
-    doc.text(String(node.value), x, y + 2, null, null, 'center');
+    doc.text(String(node.value), x, y + 2 * scale, null, null, 'center');
   };
 
   // Function to get node styling based on state
