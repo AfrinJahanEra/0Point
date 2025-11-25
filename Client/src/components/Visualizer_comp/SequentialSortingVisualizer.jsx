@@ -191,7 +191,6 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
     }
   };
 
-  // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
       orientation: 'landscape',
@@ -238,31 +237,31 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
   const drawArrayRepresentation = (doc, step, x, y) => {
     if (step.array) {
       // Calculate bounding box for scaling
-      const cellWidth = 10;
-      const cellHeight = 10;
-      const maxElementsPerLine = 15; // Limit elements per line
+      const cellWidth = 12;  // Increased from 10 for better spacing
+      const cellHeight = 12; // Increased from 10 for better spacing
+      const maxElementsPerLine = 12; // Reduced from 15 for better spacing
       
       // If too many elements, split into multiple lines
       const linesNeeded = Math.ceil(step.array.length / maxElementsPerLine);
       
       // Calculate dimensions
       const totalWidth = Math.min(step.array.length, maxElementsPerLine) * cellWidth;
-      const totalHeight = linesNeeded * (cellHeight + 15);
+      const totalHeight = linesNeeded * (cellHeight + 18); // Increased from 15 to 18 for better spacing
       
       // Calculate scaling to fit page
       const pageWidth = 297; // A4 landscape width in mm
       const pageHeight = 210; // A4 landscape height in mm
-      const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
-      const availableHeight = pageHeight - 80; // Leave space for header and footer
+      const availableWidth = pageWidth - 50; // Increase margin to 25mm on each side for better visibility
+      const availableHeight = pageHeight - 90; // Increase space for header and footer
       
       const scaleX = availableWidth / totalWidth;
       const scaleY = availableHeight / totalHeight;
       const scale = Math.min(scaleX, scaleY, 1); // Don't upscale
       
-      // Calculate position to center
+      // Calculate position to center with padding to ensure first element visibility
       const scaledWidth = totalWidth * scale;
       const scaledHeight = totalHeight * scale;
-      const startX = (pageWidth - scaledWidth) / 2;
+      const startX = (pageWidth - scaledWidth) / 2 + (2 * scale); // Add padding to ensure first element visibility
       const startY = (availableHeight - scaledHeight) / 2 + 50; // +50 for header space
       
       // Draw header with indices
@@ -273,22 +272,22 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
         const startIndex = line * maxElementsPerLine;
         const endIndex = Math.min(startIndex + maxElementsPerLine, step.array.length);
         
-        // Draw index headers
+        // Draw index headers with padding
         for (let i = startIndex; i < endIndex; i++) {
           const arrIdx = i;
           const cellX = startX + ((i - startIndex) * cellWidth * scale);
-          const cellY = startY + (line * (cellHeight + 15) * scale);
+          const cellY = startY + (line * (cellHeight + 18) * scale); // Increased spacing
           
           // Draw index
           doc.text(`[${arrIdx}]`, cellX + (cellWidth * scale)/2, cellY + (4 * scale), null, null, 'center');
         }
         
-        // Draw array elements for this line
+        // Draw array elements for this line with padding
         for (let i = startIndex; i < endIndex; i++) {
           const arrIdx = i;
           const value = step.array[arrIdx];
           const cellX = startX + ((i - startIndex) * cellWidth * scale);
-          const cellY = startY + (line * (cellHeight + 15) * scale) + (6 * scale);
+          const cellY = startY + (line * (cellHeight + 18) * scale) + (6 * scale); // Increased spacing
           
           const isSorted = step.sorted && step.sorted.includes(arrIdx);
           const isComparing = step.comparing && step.comparing.includes(arrIdx);
@@ -329,7 +328,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
       doc.setTextColor(0, 0, 0);
       
       // Return new Y position
-      return startY + (linesNeeded * (cellHeight + 15) * scale) + (20 * scale);
+      return startY + (linesNeeded * (cellHeight + 18) * scale) + (20 * scale); // Increased spacing
     } else {
       // Simple fallback
       doc.line(20, y, 277, y);
@@ -370,7 +369,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
         </div>
       </div>
       
-      <div className="bg-white p-4 border border-gray-200 mb-4 max-h-[70vh] overflow-hidden">
+      <div className="bg-white p-4 border border-gray-200 mb-4">
         {/* Single animated frame showing current step */}
         <div className="mb-6 bg-white p-3 border-2 border-gray-300">
           <h4 className="text-sm font-bold text-black mb-2 flex items-center">
@@ -383,8 +382,8 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
             </span>
           </h4>
           
-          <div className="flex justify-center items-center mb-3 overflow-x-auto py-2">
-            <div className="flex gap-1.5 min-w-max">
+          <div className="flex justify-center items-center mb-3 py-2">
+            <div className="flex gap-2 min-w-max px-2">
               {steps[safeCurrentStep] && steps[safeCurrentStep].array ? steps[safeCurrentStep].array.map((value, index) => {
                 const stepData = steps[safeCurrentStep];
                 return (
@@ -417,7 +416,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
       {/* Show all steps in a separate frame with visualizations */}
       <div className="mt-6 border border-gray-200 p-4 bg-white">
         <h4 className="text-md font-bold text-blue-800 mb-3">All Steps:</h4>
-        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           {steps.map((step, index) => (
             <div 
               key={index}
@@ -432,11 +431,11 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
                   {/* Visual representation of this step with indices */}
                   <div className="mt-3">
                     {/* Indices row */}
-                    <div className="flex flex-wrap gap-0 justify-center mb-1">
+                    <div className="flex flex-wrap gap-1 justify-center mb-1 px-1">
                       {step.array && step.array.map((_, arrIdx) => (
                         <div 
                           key={`index-${index}-${arrIdx}`}
-                          className="w-8 h-4 flex items-center justify-center text-xs font-medium"
+                          className="w-10 h-5 flex items-center justify-center text-xs font-medium"
                         >
                           [{arrIdx}]
                         </div>
@@ -444,11 +443,11 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
                     </div>
                     
                     {/* Values row */}
-                    <div className="flex flex-wrap gap-0 justify-center">
+                    <div className="flex flex-wrap gap-1 justify-center px-1">
                       {step.array && step.array.map((value, arrIdx) => (
                         <div 
                           key={`value-${index}-${arrIdx}`}
-                          className={`w-8 h-8 flex items-center justify-center text-xs font-medium border rounded-t-none ${getElementStyle(step, arrIdx)}`}
+                          className={`w-10 h-10 flex items-center justify-center text-xs font-medium border rounded ${getElementStyle(step, arrIdx)}`}
                         >
                           {value}
                         </div>

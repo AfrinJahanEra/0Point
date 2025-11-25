@@ -110,14 +110,14 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
     
     // Add title
     doc.setFontSize(22);
-    doc.text('Search Visualization Steps', 105, 15, null, null, 'center');
+    doc.text('Search Visualization Steps', 148.5, 15, null, null, 'center');
     
     // Add steps with visual representations - one step per page
     for (let index = 0; index < steps.length; index++) {
@@ -130,17 +130,17 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
       
       // Add step header
       doc.setFontSize(16);
-      doc.text(`Step ${index + 1} of ${steps.length}`, 105, 25, null, null, 'center');
+      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
       
       doc.setFontSize(12);
-      doc.text(getOperationDescription(step), 105, 35, null, null, 'center');
+      doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
       
       // Add array representation
       const arrayStr = `Array: [${step.array ? step.array.join(', ') : 'N/A'}]`;
-      doc.text(arrayStr, 105, 45, null, null, 'center');
+      doc.text(arrayStr, 148.5, 45, null, null, 'center');
       
       // Draw array representation centered on page
-      drawArrayRepresentation(doc, step, 105, 60);
+      drawArrayRepresentation(doc, step, 148.5, 60);
       
       // Add a small delay to prevent UI blocking
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -153,39 +153,58 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
   // Helper function to draw array representation in PDF with table-like format
   const drawArrayRepresentation = (doc, step, x, y) => {
     if (step.array) {
-      const cellWidth = 10;
-      const cellHeight = 10;
-      const startX = x;
-      const startY = y;
-      const maxElementsPerLine = 15; // Limit elements per line
+      // Calculate bounding box for scaling
+      const cellWidth = 12;  // Increased from 10 for better spacing
+      const cellHeight = 12; // Increased from 10 for better spacing
+      const maxElementsPerLine = 12; // Reduced from 15 for better spacing
       
       // If too many elements, split into multiple lines
       const linesNeeded = Math.ceil(step.array.length / maxElementsPerLine);
       
+      // Calculate dimensions
+      const totalWidth = Math.min(step.array.length, maxElementsPerLine) * cellWidth;
+      const totalHeight = linesNeeded * (cellHeight + 18); // Increased from 15 to 18 for better spacing
+      
+      // Calculate scaling to fit page
+      const pageWidth = 297; // A4 landscape width in mm
+      const pageHeight = 210; // A4 landscape height in mm
+      const availableWidth = pageWidth - 50; // Increase margin to 25mm on each side for better visibility
+      const availableHeight = pageHeight - 90; // Increase space for header and footer
+      
+      const scaleX = availableWidth / totalWidth;
+      const scaleY = availableHeight / totalHeight;
+      const scale = Math.min(scaleX, scaleY, 1); // Don't upscale
+      
+      // Calculate position to center with padding to ensure first element visibility
+      const scaledWidth = totalWidth * scale;
+      const scaledHeight = totalHeight * scale;
+      const startX = (pageWidth - scaledWidth) / 2 + (2 * scale); // Add padding to ensure first element visibility
+      const startY = (availableHeight - scaledHeight) / 2 + 50; // +50 for header space
+      
       // Draw header with indices
-      doc.setFontSize(8);
+      doc.setFontSize(8 * scale);
       doc.setTextColor(0, 0, 0);
       
       for (let line = 0; line < linesNeeded; line++) {
         const startIndex = line * maxElementsPerLine;
         const endIndex = Math.min(startIndex + maxElementsPerLine, step.array.length);
         
-        // Draw index headers
+        // Draw index headers with padding
         for (let i = startIndex; i < endIndex; i++) {
           const arrIdx = i;
-          const x = startX + ((i - startIndex) * cellWidth);
-          const y = startY + (line * (cellHeight + 15));
+          const cellX = startX + ((i - startIndex) * cellWidth * scale);
+          const cellY = startY + (line * (cellHeight + 18) * scale); // Increased spacing
           
           // Draw index
-          doc.text(`[${arrIdx}]`, x + cellWidth/2, y + 4, null, null, 'center');
+          doc.text(`[${arrIdx}]`, cellX + (cellWidth * scale)/2, cellY + (4 * scale), null, null, 'center');
         }
         
-        // Draw array elements for this line
+        // Draw array elements for this line with padding
         for (let i = startIndex; i < endIndex; i++) {
           const arrIdx = i;
           const value = step.array[arrIdx];
-          const x = startX + ((i - startIndex) * cellWidth);
-          const y = startY + (line * (cellHeight + 15)) + 6;
+          const cellX = startX + ((i - startIndex) * cellWidth * scale);
+          const cellY = startY + (line * (cellHeight + 18) * scale) + (6 * scale); // Increased spacing
           
           const isComparing = step.comparing && step.comparing.includes(arrIdx);
           const isFound = step.found !== undefined && arrIdx === step.found;
@@ -209,16 +228,16 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
           }
           
           doc.setDrawColor(156, 163, 175); // gray-400 border
-          doc.rect(x, y, cellWidth, cellHeight, 'FD');
+          doc.rect(cellX, cellY, cellWidth * scale, cellHeight * scale, 'FD');
           
           // Add text (white for dark backgrounds, black for light)
-          doc.setFontSize(8);
+          doc.setFontSize(8 * scale);
           if (isFound) {
             doc.setTextColor(255, 255, 255); // white
           } else {
             doc.setTextColor(0, 0, 0); // black
           }
-          doc.text(String(value), x + cellWidth/2, y + cellHeight/2 + 3, null, null, 'center');
+          doc.text(String(value), cellX + (cellWidth * scale)/2, cellY + (cellHeight * scale)/2 + (3 * scale), null, null, 'center');
         }
       }
       
@@ -226,10 +245,10 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
       doc.setTextColor(0, 0, 0);
       
       // Return new Y position
-      return startY + (linesNeeded * (cellHeight + 15)) + 20;
+      return startY + (linesNeeded * (cellHeight + 18) * scale) + (20 * scale); // Increased spacing
     } else {
       // Simple fallback
-      doc.line(15, y, 195, y);
+      doc.line(20, y, 277, y);
       return y + 15;
     }
   };
@@ -250,7 +269,7 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
             onClick={downloadStepsAsPDF}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
           >
-            Download PDF
+            Export PDF
           </button>
           {isPlaying ? null : isCompleted ? (
             <button 
@@ -267,7 +286,7 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
         </div>
       </div>
       
-      <div className="bg-white p-4 border border-gray-200 mb-4 max-h-[70vh] overflow-hidden">
+      <div className="bg-white p-4 border border-gray-200 mb-4">
         {/* Single animated frame showing current step */}
         <div className="mb-6 bg-white p-3 border-2 border-gray-300">
           <h4 className="text-sm font-bold text-black mb-2 flex items-center">
@@ -280,8 +299,8 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
             </span>
           </h4>
           
-          <div className="flex justify-center items-center mb-3 overflow-x-auto py-2">
-            <div className="flex gap-1.5 min-w-max">
+          <div className="flex justify-center items-center mb-3 py-2">
+            <div className="flex gap-2 min-w-max px-2">
               {steps[safeCurrentStep] && steps[safeCurrentStep].array ? steps[safeCurrentStep].array.map((value, index) => {
                 const stepData = steps[safeCurrentStep];
                 return (
@@ -314,7 +333,7 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
       {/* Show all steps in a separate frame with visualizations */}
       <div className="mt-6 border border-gray-200 p-4 bg-white">
         <h4 className="text-md font-bold text-blue-800 mb-3">All Steps:</h4>
-        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           {steps.map((step, index) => (
             <div 
               key={index}
@@ -330,11 +349,11 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
                   {/* Visual representation of this step with indices */}
                   <div className="mt-3">
                     {/* Indices row */}
-                    <div className="flex flex-wrap gap-0 justify-center mb-1">
+                    <div className="flex flex-wrap gap-1 justify-center mb-1 px-1">
                       {step.array && step.array.map((_, arrIdx) => (
                         <div 
                           key={`index-${index}-${arrIdx}`}
-                          className="w-8 h-4 flex items-center justify-center text-xs font-medium"
+                          className="w-10 h-5 flex items-center justify-center text-xs font-medium"
                         >
                           [{arrIdx}]
                         </div>
@@ -342,11 +361,11 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
                     </div>
                     
                     {/* Values row */}
-                    <div className="flex flex-wrap gap-0 justify-center">
+                    <div className="flex flex-wrap gap-1 justify-center px-1">
                       {step.array && step.array.map((value, arrIdx) => (
                         <div 
                           key={`value-${index}-${arrIdx}`}
-                          className={`w-8 h-8 flex items-center justify-center text-xs font-medium border rounded-t-none ${getElementStyle(step, arrIdx)}`}
+                          className={`w-10 h-10 flex items-center justify-center text-xs font-medium border rounded ${getElementStyle(step, arrIdx)}`}
                         >
                           {value}
                         </div>
