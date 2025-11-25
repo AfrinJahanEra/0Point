@@ -13,7 +13,12 @@ const InputPanel = ({ algorithm, inputValues, onInputChange, onLoadExample, onSt
             <button
               key={index}
               onClick={() => onLoadExample(index)}
-              className="text-xs bg-gray-200 hover:bg-gray-300 text-black px-2 py-1 border border-gray-400"
+              disabled={isVisualizing}
+              className={`text-xs px-2 py-1 border ${
+                isVisualizing 
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed border-gray-400' 
+                  : 'bg-gray-200 hover:bg-gray-300 text-black border-gray-400'
+              }`}
             >
               Example {index + 1}
             </button>
@@ -29,10 +34,15 @@ const InputPanel = ({ algorithm, inputValues, onInputChange, onLoadExample, onSt
           <div className="flex gap-2">
             <input
               type="text"
-              className="flex-grow p-3 border border-gray-400 focus:outline-none"
+              className={`flex-grow p-3 border focus:outline-none ${
+                isVisualizing 
+                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-300' 
+                  : 'bg-white text-black border-gray-400'
+              }`}
               placeholder={input.placeholder}
               value={inputValues[index] || ''}
               onChange={(e) => onInputChange(index, e.target.value)}
+              disabled={isVisualizing}
             />
             {index === algorithm.inputs.length - 1 && (
               <button

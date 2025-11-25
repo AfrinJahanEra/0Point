@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-hot-toast';
 import AlgorithmSelector from '../components/AlgorithmSelector';
 import InputPanel from '../components/InputPanel';
 
 
-import SequentialSortingVisualizer from '../components/sort/SequentialSortingVisualizer';
+import SequentialSortingVisualizer from '../components/Visualizer_comp/SequentialSortingVisualizer';
+import HeapTreeVisualizer from '../components/Visualizer_comp/HeapTreeVisualizer';
+import SearchVisualizer from '../components/Visualizer_comp/SearchVisualizer';
+import BSTVisualizer from '../components/Visualizer_comp/BSTVisualizer';
+import AVLVisualizer from '../components/Visualizer_comp/AVLVisualizer';
+import TrieVisualizer from '../components/Visualizer_comp/TrieVisualizer';
+import TreeVisualizer from '../components/Visualizer_comp/TreeVisualizer';
 import { algorithms } from '../utils/algorithms';
 import { parseInputs } from '../utils/inputParser';
 
@@ -108,6 +115,250 @@ function selectionSort(arr) {
     }
   }
   return arr;
+}`,
+
+  'heap-sort': `
+function heapSort(arr) {
+  const n = arr.length;
+  
+  // Build max heap
+  for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
+    heapify(arr, n, i);
+  }
+  
+  // Extract elements from heap one by one
+  for (let i = n - 1; i > 0; i--) {
+    // Move current root to end
+    [arr[0], arr[i]] = [arr[i], arr[0]];
+    
+    // Call heapify on the reduced heap
+    heapify(arr, i, 0);
+  }
+  
+  return arr;
+}
+
+function heapify(arr, n, i) {
+  let largest = i; // Initialize largest as root
+  const left = 2 * i + 1; // left child
+  const right = 2 * i + 2; // right child
+  
+  // If left child is larger than root
+  if (left < n && arr[left] > arr[largest]) {
+    largest = left;
+  }
+  
+  // If right child is larger than largest so far
+  if (right < n && arr[right] > arr[largest]) {
+    largest = right;
+  }
+  
+  // If largest is not root
+  if (largest !== i) {
+    [arr[i], arr[largest]] = [arr[largest], arr[i]];
+    
+    // Recursively heapify the affected sub-tree
+    heapify(arr, n, largest);
+  }
+}`,
+
+  'linear-search': `
+function linearSearch(arr, target) {
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] === target) {
+      return i; // Return index if found
+    }
+  }
+  return -1; // Return -1 if not found
+}`,
+
+  'binary-search': `
+function binarySearch(arr, target) {
+  let low = 0;
+  let high = arr.length - 1;
+  
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    
+    if (arr[mid] === target) {
+      return mid; // Return index if found
+    } else if (arr[mid] < target) {
+      low = mid + 1; // Search right half
+    } else {
+      high = mid - 1; // Search left half
+    }
+  }
+  
+  return -1; // Return -1 if not found
+}`,
+
+  'bst': `
+class TreeNode {
+  constructor(value) {
+    this.value = value;
+    this.left = null;
+    this.right = null;
+  }
+}
+
+class BST {
+  constructor() {
+    this.root = null;
+  }
+  
+  insert(value) {
+    this.root = this.insertNode(this.root, value);
+  }
+  
+  insertNode(node, value) {
+    if (node === null) {
+      return new TreeNode(value);
+    }
+    
+    if (value < node.value) {
+      node.left = this.insertNode(node.left, value);
+    } else if (value > node.value) {
+      node.right = this.insertNode(node.right, value);
+    }
+    
+    return node;
+  }
+}`,
+
+  'avl-tree': `
+class AVLNode {
+  constructor(value) {
+    this.value = value;
+    this.left = null;
+    this.right = null;
+    this.height = 1;
+  }
+}
+
+class AVLTree {
+  constructor() {
+    this.root = null;
+  }
+  
+  getHeight(node) {
+    return node ? node.height : 0;
+  }
+  
+  getBalance(node) {
+    return node ? this.getHeight(node.left) - this.getHeight(node.right) : 0;
+  }
+  
+  rotateRight(y) {
+    const x = y.left;
+    const T2 = x.right;
+    
+    x.right = y;
+    y.left = T2;
+    
+    y.height = Math.max(this.getHeight(y.left), this.getHeight(y.right)) + 1;
+    x.height = Math.max(this.getHeight(x.left), this.getHeight(x.right)) + 1;
+    
+    return x;
+  }
+  
+  rotateLeft(x) {
+    const y = x.right;
+    const T2 = y.left;
+    
+    y.left = x;
+    x.right = T2;
+    
+    x.height = Math.max(this.getHeight(x.left), this.getHeight(x.right)) + 1;
+    y.height = Math.max(this.getHeight(y.left), this.getHeight(y.right)) + 1;
+    
+    return y;
+  }
+  
+  insert(value) {
+    this.root = this.insertNode(this.root, value);
+  }
+  
+  insertNode(node, value) {
+    if (node === null) {
+      return new AVLNode(value);
+    }
+    
+    if (value < node.value) {
+      node.left = this.insertNode(node.left, value);
+    } else if (value > node.value) {
+      node.right = this.insertNode(node.right, value);
+    } else {
+      return node; // Duplicate values not allowed
+    }
+    
+    node.height = 1 + Math.max(this.getHeight(node.left), this.getHeight(node.right));
+    
+    const balance = this.getBalance(node);
+    
+    // Left Left Case
+    if (balance > 1 && value < node.left.value) {
+      return this.rotateRight(node);
+    }
+    
+    // Right Right Case
+    if (balance < -1 && value > node.right.value) {
+      return this.rotateLeft(node);
+    }
+    
+    // Left Right Case
+    if (balance > 1 && value > node.left.value) {
+      node.left = this.rotateLeft(node.left);
+      return this.rotateRight(node);
+    }
+    
+    // Right Left Case
+    if (balance < -1 && value < node.right.value) {
+      node.right = this.rotateRight(node.right);
+      return this.rotateLeft(node);
+    }
+    
+    return node;
+  }
+}`,
+
+  'trie': `
+class TrieNode {
+  constructor() {
+    this.children = {};
+    this.isEnd = false;
+  }
+}
+
+class Trie {
+  constructor() {
+    this.root = new TrieNode();
+  }
+  
+  insert(word) {
+    let current = this.root;
+    
+    for (let char of word) {
+      if (!current.children[char]) {
+        current.children[char] = new TrieNode();
+      }
+      current = current.children[char];
+    }
+    
+    current.isEnd = true;
+  }
+  
+  search(word) {
+    let current = this.root;
+    
+    for (let char of word) {
+      if (!current.children[char]) {
+        return false;
+      }
+      current = current.children[char];
+    }
+    
+    return current.isEnd;
+  }
 }`
 };
 
@@ -118,6 +369,7 @@ const Visualizer = () => {
   const [visualizationData, setVisualizationData] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState([]);
+  const [heapViewMode, setHeapViewMode] = useState('array'); // 'array' or 'tree'
   const animationRef = useRef(null);
   const audioContextRef = useRef(null);
 
@@ -148,6 +400,9 @@ const Visualizer = () => {
     };
   }, []);
 
+  // Ref to track if we should auto-start visualization
+  const shouldAutoStartRef = useRef(false);
+  
   const handleAlgorithmChange = (algId) => {
     setSelectedAlgorithm(algId);
     setInputValues([]);
@@ -180,38 +435,35 @@ const Visualizer = () => {
   const startVisualization = () => {
     if (!selectedAlgorithm) return;
     
+    // Validate inputs
+    const algorithm = algorithms.find(alg => alg.id === selectedAlgorithm);
+    if (!algorithm) return;
+    
+    const hasEmptyInput = algorithm.inputs.some((_, idx) => !inputValues[idx] || inputValues[idx].trim() === '');
+    if (hasEmptyInput) {
+      toast.error('Please provide input for all fields before starting visualization');
+      return;
+    }
+    
     // Resume audio context if suspended
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume();
     }
     
-    setIsVisualizing(true);
-    setCurrentStep(0);
-    
-    const algorithm = algorithms.find(alg => alg.id === selectedAlgorithm);
     const parsedData = parseInputs(selectedAlgorithm, inputValues);
     
     if (algorithm.generateSteps) {
       const algorithmSteps = algorithm.generateSteps(parsedData);
       setSteps(algorithmSteps);
       setVisualizationData(algorithmSteps[0]);
-      animateSteps();
+      // Set isVisualizing to true after steps are set
+      setIsVisualizing(true);
+      setCurrentStep(0);
+      // Animation will be handled by the SequentialSortingVisualizer auto-advance
     } else {
       setVisualizationData(parsedData);
-    }
-  };
-
-  const animateSteps = () => {
-    if (currentStep < steps.length - 1) {
-      animationRef.current = setTimeout(() => {
-        setCurrentStep(prev => prev + 1);
-        setVisualizationData(steps[currentStep + 1]);
-        animateSteps();
-      }, 800);
-    } else {
-      setTimeout(() => {
-        setIsVisualizing(false);
-      }, 1000);
+      setIsVisualizing(true);
+      setCurrentStep(0);
     }
   };
 
@@ -235,26 +487,99 @@ const Visualizer = () => {
       setVisualizationData(steps[currentStep - 1]);
     }
   };
+  
+  const restartVisualization = () => {
+    setCurrentStep(0);
+    setVisualizationData(steps[0]);
+    setIsVisualizing(true); // Start playing automatically
+  };
 
   const renderVisualization = () => {
-    if (!selectedAlgorithm || !visualizationData) return null;
-
+    // For tree algorithms, we can render even without initial visualizationData if we have steps
+    const treeAlgorithmTypes = ['bst', 'avl-tree', 'trie'];
+    const isTreeAlgorithm = selectedAlgorithm && treeAlgorithmTypes.includes(selectedAlgorithm);
+    
+    if (!selectedAlgorithm || (!visualizationData && !isTreeAlgorithm) || (isTreeAlgorithm && steps.length === 0)) return null;
+    
+    // If it's a tree algorithm and we don't have visualizationData yet, use the first step
+    const effectiveVisualizationData = visualizationData || (isTreeAlgorithm && steps.length > 0 ? steps[0] : null);
+    
     const visualizerProps = {
-      data: visualizationData,
+      data: effectiveVisualizationData,
       steps: steps,
       isPlaying: isVisualizing,
       currentStep,
       totalSteps: steps.length,
       onStop: stopVisualization,
       onNext: nextStep,
-      onPrev: prevStep
+      onPrev: prevStep,
+      onRestart: restartVisualization
     };
 
     // Check if it's a sorting algorithm
-    const sortingAlgorithms = ['bubble-sort', 'quick-sort', 'merge-sort', 'insertion-sort', 'selection-sort'];
+    const sortingAlgorithms = ['bubble-sort', 'quick-sort', 'merge-sort', 'insertion-sort', 'selection-sort', 'heap-sort'];
+    // Check if it's a search algorithm
+    const searchAlgorithms = ['linear-search', 'binary-search'];
+    // Check if it's a tree algorithm
+    const treeAlgorithms = ['bst', 'avl-tree', 'trie'];
     
     if (sortingAlgorithms.includes(selectedAlgorithm)) {
+      // Special handling for heap sort with toggle between array and tree view
+      if (selectedAlgorithm === 'heap-sort') {
+        return (
+          <div>
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex rounded-md shadow-sm" role="group">
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium rounded-l-lg border ${
+                    heapViewMode === 'array'
+                      ? 'bg-blue-800 text-white border-blue-800'
+                      : 'bg-white text-blue-800 border-blue-200 hover:bg-blue-50'
+                  }`}
+                  onClick={() => setHeapViewMode('array')}
+                >
+                  Array View
+                </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium rounded-r-md border ${
+                    heapViewMode === 'tree'
+                      ? 'bg-blue-800 text-white border-blue-800'
+                      : 'bg-white text-blue-800 border-blue-200 hover:bg-blue-50'
+                  }`}
+                  onClick={() => setHeapViewMode('tree')}
+                >
+                  Tree View
+                </button>
+              </div>
+            </div>
+            {heapViewMode === 'array' ? (
+              <SequentialSortingVisualizer {...visualizerProps} />
+            ) : (
+              <HeapTreeVisualizer {...visualizerProps} />
+            )}
+          </div>
+        );
+      }
       return <SequentialSortingVisualizer {...visualizerProps} />;
+    }
+    
+    if (searchAlgorithms.includes(selectedAlgorithm)) {
+      return <SearchVisualizer {...visualizerProps} />;
+    }
+    
+    if (treeAlgorithms.includes(selectedAlgorithm)) {
+      // Render specific tree visualizer based on algorithm type
+      if (selectedAlgorithm === 'bst') {
+        return <BSTVisualizer {...visualizerProps} />;
+      } else if (selectedAlgorithm === 'avl-tree') {
+        return <AVLVisualizer {...visualizerProps} />;
+      } else if (selectedAlgorithm === 'trie') {
+        return <TrieVisualizer {...visualizerProps} />;
+      }
+      // Fallback to generic TreeVisualizer if needed
+      return <TreeVisualizer {...visualizerProps} />;
     }
 
     switch (selectedAlgorithm) {
@@ -314,6 +639,82 @@ const Visualizer = () => {
           return 7; // Finding minimum
         } else if (stepData.swapping && stepData.swapping.length > 0) {
           return 13; // Swapping elements
+        }
+        return -1;
+        
+      case 'heap-sort':
+        if (stepData.operation === 'build_heap_start') {
+          return 4; // Building heap
+        } else if (stepData.operation === 'heapify_start' || stepData.operation === 'compare_children') {
+          return 20; // Heapifying
+        } else if (stepData.operation === 'swap_heap') {
+          return 22; // Swapping in heap
+        } else if (stepData.operation === 'extract_max') {
+          return 12; // Extracting max
+        }
+        return -1;
+        
+      case 'linear-search':
+        if (stepData.operation === 'compare') {
+          return 3; // Comparing elements
+        } else if (stepData.operation === 'found') {
+          return 4; // Element found
+        } else if (stepData.operation === 'not_found') {
+          return 9; // Return -1
+        }
+        return -1;
+        
+      case 'binary-search':
+        if (stepData.operation === 'compare') {
+          return 6; // Comparing elements
+        } else if (stepData.operation === 'found') {
+          return 7; // Element found
+        } else if (stepData.operation === 'move_right') {
+          return 9; // Move right
+        } else if (stepData.operation === 'move_left') {
+          return 11; // Move left
+        } else if (stepData.operation === 'not_found') {
+          return 16; // Return -1
+        }
+        return -1;
+        
+      case 'bst':
+        if (stepData.operation === 'insert_root') {
+          return 17; // Insert root
+        } else if (stepData.operation === 'traverse') {
+          return 24; // Traverse
+        } else if (stepData.operation === 'insert') {
+          return 27; // Insert node
+        }
+        return -1;
+        
+      case 'avl-tree':
+        if (stepData.operation === 'traverse') {
+          return 37; // Traverse
+        } else if (stepData.operation === 'rotate') {
+          if (stepData.rotation === 'left') {
+            return 60; // Left rotate
+          } else if (stepData.rotation === 'right') {
+            return 44; // Right rotate
+          } else if (stepData.rotation === 'leftright') {
+            return 70; // Left-right rotate
+          } else if (stepData.rotation === 'rightleft') {
+            return 80; // Right-left rotate
+          }
+        } else if (stepData.operation === 'insert') {
+          return 34; // Insert node
+        }
+        return -1;
+        
+      case 'trie':
+        if (stepData.operation === 'insert_start') {
+          return 13; // Insert start
+        } else if (stepData.operation === 'create_node') {
+          return 18; // Create node
+        } else if (stepData.operation === 'traverse') {
+          return 24; // Traverse
+        } else if (stepData.operation === 'mark_end') {
+          return 28; // Mark end
         }
         return -1;
         
