@@ -829,311 +829,451 @@ export const algorithms = [
       return steps;
     }
   },
-  { 
-    id: 'bst', 
-    name: 'Binary Search Tree', 
-    description: 'A binary tree where each node has a value greater than all values in its left subtree and less than all values in its right subtree',
-    inputs: [
-      { label: 'Values to Insert', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }
-    ],
-    examples: [
-      ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15'], 
-      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15']
-    ],
-    generateSteps: (data) => {
-      const steps = [];
-      const values = [...data.array];
-      
-      // Initialize empty tree
-      steps.push({ 
-        tree: null,
-        operation: 'start',
-        insertedValue: null,
-        comparing: null,
-        found: null
-      });
-      
-      let tree = null;
-      
-      // Simple tree node structure
-      const createNode = (value) => ({
-        value: value,
-        left: null,
-        right: null
-      });
-      
-      // Insert each value
-      for (let i = 0; i < values.length; i++) {
-        const value = values[i];
-        
-        if (tree === null) {
-          tree = createNode(value);
-          steps.push({ 
-            tree: JSON.parse(JSON.stringify(tree)),
-            operation: 'insert_root',
-            insertedValue: value,
-            comparing: null,
-            found: null
-          });
-        } else {
-          // Insert into existing tree
-          let current = tree;
-          let parent = null;
-          let isLeftChild = false;
-          
-          // Find insertion point
-          while (current !== null) {
-            parent = current;
-            steps.push({ 
-              tree: JSON.parse(JSON.stringify(tree)),
-              operation: 'traverse',
-              insertedValue: value,
-              comparing: current.value,
-              found: null
-            });
-            
-            if (value < current.value) {
-              current = current.left;
-              isLeftChild = true;
-            } else if (value > current.value) {
-              current = current.right;
-              isLeftChild = false;
-            } else {
-              // Value already exists, skip
-              break;
-            }
-          }
-          
-          // Insert new node
-          if (parent) {
-            if (isLeftChild) {
-              parent.left = createNode(value);
-            } else {
-              parent.right = createNode(value);
-            }
-            
-            steps.push({ 
-              tree: JSON.parse(JSON.stringify(tree)),
-              operation: 'insert',
-              insertedValue: value,
-              comparing: parent.value,
-              found: null
-            });
-          }
-        }
-      }
-      
-      // Final state
-      steps.push({ 
-        tree: JSON.parse(JSON.stringify(tree)),
-        operation: 'complete',
-        insertedValue: null,
-        comparing: null,
-        found: null
-      });
-      
-      return steps;
-    }
-  },
-  { 
-    id: 'avl-tree', 
-    name: 'AVL Tree', 
-    description: 'A self-balancing binary search tree where the heights of the two child subtrees of any node differ by at most one',
-    inputs: [
-      { label: 'Values to Insert', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }
-    ],
-    examples: [
-      ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15'], 
-      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15']
-    ],
-    generateSteps: (data) => {
-      const steps = [];
-      const values = [...data.array];
-      
-      // Initialize empty tree
-      steps.push({ 
-        tree: null,
-        operation: 'start',
-        insertedValue: null,
-        comparing: null,
-        found: null,
-        rotation: null
-      });
-      
-      let tree = null;
-      
-      // Simple AVL tree node structure
-      const createNode = (value) => ({
-        value: value,
-        left: null,
-        right: null,
-        height: 1
-      });
-      
-      // Get height of node
-      const getHeight = (node) => node ? node.height : 0;
-      
-      // Get balance factor
-      const getBalance = (node) => node ? getHeight(node.left) - getHeight(node.right) : 0;
-      
-      // Update height
-      const updateHeight = (node) => {
-        if (node) {
-          node.height = Math.max(getHeight(node.left), getHeight(node.right)) + 1;
-        }
+{ 
+  id: 'bst', 
+  name: 'Binary Search Tree', 
+  description: 'A binary tree where each node has a value greater than all values in its left subtree and less than all values in its right subtree',
+  inputs: [
+    { label: 'Values to Insert', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }
+  ],
+  examples: [
+    ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15'], 
+    ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15']
+  ],
+  generateSteps: (data) => {
+    const steps = [];
+    const values = [...data.array];
+    
+    // Initialize empty tree
+    steps.push({ 
+      tree: null,
+      operation: 'start',
+      insertedValue: null,
+      comparing: null,
+      found: null,
+      traversalPath: []
+    });
+    
+    let tree = null;
+    
+    // Simple tree node structure
+    const createNode = (value) => ({
+      value: value,
+      left: null,
+      right: null
+    });
+    
+    // Helper function to deep copy tree
+    const deepCopyTree = (node) => {
+      if (!node) return null;
+      return {
+        value: node.value,
+        left: deepCopyTree(node.left),
+        right: deepCopyTree(node.right)
       };
+    };
+    
+    // Insert each value
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i];
       
-      // Right rotate
-      const rightRotate = (y) => {
-        const x = y.left;
-        const T2 = x.right;
-        
-        // Perform rotation
-        x.right = y;
-        y.left = T2;
-        
-        // Update heights
-        updateHeight(y);
-        updateHeight(x);
-        
-        return x;
-      };
-      
-      // Left rotate
-      const leftRotate = (x) => {
-        const y = x.right;
-        const T2 = y.left;
-        
-        // Perform rotation
-        y.left = x;
-        x.right = T2;
-        
-        // Update heights
-        updateHeight(x);
-        updateHeight(y);
-        
-        return y;
-      };
-      
-      // Insert node
-      const insertNode = (node, value) => {
-        // Standard BST insertion
-        if (node === null) {
-          return createNode(value);
-        }
-        
+      if (tree === null) {
+        tree = createNode(value);
         steps.push({ 
-          tree: JSON.parse(JSON.stringify(tree)),
-          operation: 'traverse',
-          insertedValue: value,
-          comparing: node.value,
-          found: null,
-          rotation: null
-        });
-        
-        if (value < node.value) {
-          node.left = insertNode(node.left, value);
-        } else if (value > node.value) {
-          node.right = insertNode(node.right, value);
-        } else {
-          // Equal values not allowed
-          return node;
-        }
-        
-        // Update height of current node
-        updateHeight(node);
-        
-        // Get balance factor
-        const balance = getBalance(node);
-        
-        // If unbalanced, there are 4 cases
-        
-        // Left Left Case
-        if (balance > 1 && value < node.left.value) {
-          steps.push({ 
-            tree: JSON.parse(JSON.stringify(tree)),
-            operation: 'rotate',
-            insertedValue: value,
-            comparing: node.value,
-            found: null,
-            rotation: 'right'
-          });
-          return rightRotate(node);
-        }
-        
-        // Right Right Case
-        if (balance < -1 && value > node.right.value) {
-          steps.push({ 
-            tree: JSON.parse(JSON.stringify(tree)),
-            operation: 'rotate',
-            insertedValue: value,
-            comparing: node.value,
-            found: null,
-            rotation: 'left'
-          });
-          return leftRotate(node);
-        }
-        
-        // Left Right Case
-        if (balance > 1 && value > node.left.value) {
-          node.left = leftRotate(node.left);
-          steps.push({ 
-            tree: JSON.parse(JSON.stringify(tree)),
-            operation: 'rotate',
-            insertedValue: value,
-            comparing: node.value,
-            found: null,
-            rotation: 'leftright'
-          });
-          return rightRotate(node);
-        }
-        
-        // Right Left Case
-        if (balance < -1 && value < node.right.value) {
-          node.right = rightRotate(node.right);
-          steps.push({ 
-            tree: JSON.parse(JSON.stringify(tree)),
-            operation: 'rotate',
-            insertedValue: value,
-            comparing: node.value,
-            found: null,
-            rotation: 'rightleft'
-          });
-          return leftRotate(node);
-        }
-        
-        // Return unchanged node
-        return node;
-      };
-      
-      // Insert each value
-      for (let i = 0; i < values.length; i++) {
-        const value = values[i];
-        tree = insertNode(tree, value);
-        
-        steps.push({ 
-          tree: JSON.parse(JSON.stringify(tree)),
-          operation: 'insert',
+          tree: deepCopyTree(tree),
+          operation: 'insert_root',
           insertedValue: value,
           comparing: null,
           found: null,
-          rotation: null
+          traversalPath: []
+        });
+      } else {
+        // Insert into existing tree
+        let current = tree;
+        const traversalPath = [];
+        let inserted = false;
+        
+        // Show start of insertion for this value
+        steps.push({ 
+          tree: deepCopyTree(tree),
+          operation: 'insert_start',
+          insertedValue: value,
+          comparing: null,
+          found: null,
+          traversalPath: []
+        });
+        
+        // Find insertion point
+        while (!inserted) {
+          traversalPath.push(current.value);
+          
+          // Show traversal step
+          steps.push({ 
+            tree: deepCopyTree(tree),
+            operation: 'traverse',
+            insertedValue: value,
+            comparing: current.value,
+            found: null,
+            traversalPath: [...traversalPath]
+          });
+          
+          if (value < current.value) {
+            if (current.left === null) {
+              // Insert as left child
+              current.left = createNode(value);
+              steps.push({ 
+                tree: deepCopyTree(tree),
+                operation: 'insert',
+                insertedValue: value,
+                comparing: current.value,
+                found: null,
+                traversalPath: [...traversalPath, value]
+              });
+              inserted = true;
+            } else {
+              current = current.left;
+            }
+          } else if (value > current.value) {
+            if (current.right === null) {
+              // Insert as right child
+              current.right = createNode(value);
+              steps.push({ 
+                tree: deepCopyTree(tree),
+                operation: 'insert',
+                insertedValue: value,
+                comparing: current.value,
+                found: null,
+                traversalPath: [...traversalPath, value]
+              });
+              inserted = true;
+            } else {
+              current = current.right;
+            }
+          } else {
+            // Value already exists, skip
+            steps.push({ 
+              tree: deepCopyTree(tree),
+              operation: 'duplicate',
+              insertedValue: value,
+              comparing: current.value,
+              found: null,
+              traversalPath: [...traversalPath]
+            });
+            inserted = true;
+          }
+        }
+        
+        // Show the tree after insertion
+        steps.push({ 
+          tree: deepCopyTree(tree),
+          operation: 'after_insert',
+          insertedValue: value,
+          comparing: null,
+          found: null,
+          traversalPath: []
         });
       }
+    }
+    
+    // Final state
+    steps.push({ 
+      tree: deepCopyTree(tree),
+      operation: 'complete',
+      insertedValue: null,
+      comparing: null,
+      found: null,
+      traversalPath: []
+    });
+    
+    return steps;
+  }
+},
+  { 
+  id: 'avl-tree', 
+  name: 'AVL Tree', 
+  description: 'A self-balancing binary search tree where the heights of the two child subtrees of any node differ by at most one',
+  inputs: [
+    { label: 'Values to Insert', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }
+  ],
+  examples: [
+    ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15'], 
+    ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15']
+  ],
+  generateSteps: (data) => {
+    const steps = [];
+    const values = [...data.array];
+    
+    // Initialize empty tree
+    steps.push({ 
+      tree: null,
+      operation: 'start',
+      insertedValue: null,
+      comparing: null,
+      found: null,
+      rotation: null,
+      traversalPath: []
+    });
+    
+    let tree = null;
+    
+    // Simple AVL tree node structure
+    const createNode = (value) => ({
+      value: value,
+      left: null,
+      right: null,
+      height: 1
+    });
+    
+    // Get height of node
+    const getHeight = (node) => node ? node.height : 0;
+    
+    // Get balance factor
+    const getBalance = (node) => node ? getHeight(node.left) - getHeight(node.right) : 0;
+    
+    // Update height
+    const updateHeight = (node) => {
+      if (node) {
+        node.height = Math.max(getHeight(node.left), getHeight(node.right)) + 1;
+      }
+    };
+    
+    // Right rotate
+    const rightRotate = (y) => {
+      const x = y.left;
+      const T2 = x.right;
       
-      // Final state
+      // Perform rotation
+      x.right = y;
+      y.left = T2;
+      
+      // Update heights
+      updateHeight(y);
+      updateHeight(x);
+      
+      return x;
+    };
+    
+    // Left rotate
+    const leftRotate = (x) => {
+      const y = x.right;
+      const T2 = y.left;
+      
+      // Perform rotation
+      y.left = x;
+      x.right = T2;
+      
+      // Update heights
+      updateHeight(x);
+      updateHeight(y);
+      
+      return y;
+    };
+    
+    // Insert node with proper step tracking - FIXED VERSION
+    const insertNode = (node, value, traversalPath = []) => {
+      // Standard BST insertion
+      if (node === null) {
+        return createNode(value);
+      }
+      
+      // Add current traversal step
+      const currentTraversalPath = [...traversalPath, node.value];
+      
+      // Show traversal step with complete tree
       steps.push({ 
-        tree: JSON.parse(JSON.stringify(tree)),
-        operation: 'complete',
-        insertedValue: null,
-        comparing: null,
+        tree: deepCopyTree(tree), // Show the complete current tree
+        operation: 'traverse',
+        insertedValue: value,
+        comparing: node.value,
         found: null,
-        rotation: null
+        rotation: null,
+        traversalPath: currentTraversalPath
       });
       
-      return steps;
+      if (value < node.value) {
+        node.left = insertNode(node.left, value, currentTraversalPath);
+      } else if (value > node.value) {
+        node.right = insertNode(node.right, value, currentTraversalPath);
+      } else {
+        // Equal values not allowed
+        return node;
+      }
+      
+      // Update height of current node
+      updateHeight(node);
+      
+      // Get balance factor
+      const balance = getBalance(node);
+      
+      // If unbalanced, there are 4 cases
+      
+      // Left Left Case
+      if (balance > 1 && value < node.left.value) {
+        steps.push({ 
+          tree: deepCopyTree(tree),
+          operation: 'rotate',
+          insertedValue: value,
+          comparing: node.value,
+          found: null,
+          rotation: 'right',
+          traversalPath: currentTraversalPath
+        });
+        const newRoot = rightRotate(node);
+        // Update the tree structure
+        updateTreeStructure(tree, node, newRoot);
+        return newRoot;
+      }
+      
+      // Right Right Case
+      if (balance < -1 && value > node.right.value) {
+        steps.push({ 
+          tree: deepCopyTree(tree),
+          operation: 'rotate',
+          insertedValue: value,
+          comparing: node.value,
+          found: null,
+          rotation: 'left',
+          traversalPath: currentTraversalPath
+        });
+        const newRoot = leftRotate(node);
+        // Update the tree structure
+        updateTreeStructure(tree, node, newRoot);
+        return newRoot;
+      }
+      
+      // Left Right Case
+      if (balance > 1 && value > node.left.value) {
+        steps.push({ 
+          tree: deepCopyTree(tree),
+          operation: 'rotate',
+          insertedValue: value,
+          comparing: node.value,
+          found: null,
+          rotation: 'leftright',
+          traversalPath: currentTraversalPath
+        });
+        node.left = leftRotate(node.left);
+        const newRoot = rightRotate(node);
+        // Update the tree structure
+        updateTreeStructure(tree, node, newRoot);
+        return newRoot;
+      }
+      
+      // Right Left Case
+      if (balance < -1 && value < node.right.value) {
+        steps.push({ 
+          tree: deepCopyTree(tree),
+          operation: 'rotate',
+          insertedValue: value,
+          comparing: node.value,
+          found: null,
+          rotation: 'rightleft',
+          traversalPath: currentTraversalPath
+        });
+        node.right = rightRotate(node.right);
+        const newRoot = leftRotate(node);
+        // Update the tree structure
+        updateTreeStructure(tree, node, newRoot);
+        return newRoot;
+      }
+      
+      // Return unchanged node
+      return node;
+    };
+    
+    // Helper function to deep copy tree
+    const deepCopyTree = (node) => {
+      if (!node) return null;
+      return {
+        value: node.value,
+        left: deepCopyTree(node.left),
+        right: deepCopyTree(node.right),
+        height: node.height
+      };
+    };
+    
+    // Helper function to update tree structure after rotation
+    const updateTreeStructure = (root, oldNode, newNode) => {
+      if (!root) return;
+      
+      if (root === oldNode) {
+        // If we're replacing the root
+        Object.assign(root, newNode);
+        return;
+      }
+      
+      if (root.left === oldNode) {
+        root.left = newNode;
+        return;
+      }
+      
+      if (root.right === oldNode) {
+        root.right = newNode;
+        return;
+      }
+      
+      updateTreeStructure(root.left, oldNode, newNode);
+      updateTreeStructure(root.right, oldNode, newNode);
+    };
+    
+    // Insert each value with proper step tracking
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i];
+      
+      if (tree === null) {
+        // First insertion - create root
+        tree = createNode(value);
+        steps.push({ 
+          tree: deepCopyTree(tree),
+          operation: 'insert_root',
+          insertedValue: value,
+          comparing: null,
+          found: null,
+          rotation: null,
+          traversalPath: []
+        });
+      } else {
+        // Show start of insertion for this value
+        steps.push({ 
+          tree: deepCopyTree(tree),
+          operation: 'insert_start',
+          insertedValue: value,
+          comparing: null,
+          found: null,
+          rotation: null,
+          traversalPath: []
+        });
+        
+        // Use the recursive insert function which will generate all traversal steps
+        tree = insertNode(tree, value, []);
+        
+        // Show the tree after insertion and balancing
+        steps.push({ 
+          tree: deepCopyTree(tree),
+          operation: 'after_insert',
+          insertedValue: value,
+          comparing: null,
+          found: null,
+          rotation: null,
+          traversalPath: []
+        });
+      }
     }
-  },
+    
+    // Final state
+    steps.push({ 
+      tree: deepCopyTree(tree),
+      operation: 'complete',
+      insertedValue: null,
+      comparing: null,
+      found: null,
+      rotation: null,
+      traversalPath: []
+    });
+    
+    return steps;
+  }
+},
   { 
     id: 'trie', 
     name: 'Trie', 

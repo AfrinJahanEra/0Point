@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 
 const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
   const [hoveredNode, setHoveredNode] = useState(null);
-  const [rotationPhase, setRotationPhase] = useState(null); // 'breaking', 'rotating', 'attaching'
+  const [rotationPhase, setRotationPhase] = useState(null);
   const visualizationRef = useRef(null);
   const currentStepRef = useRef(null);
   const hasCompletedRef = useRef(false);
@@ -15,50 +15,31 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         if (currentStep < steps.length - 1) {
           if (onNext) onNext();
         } else {
-          // Stop automatically when we reach the end
           if (onStop) onStop();
         }
-      }, 2000); // Advance every 2 seconds
+      }, 2000);
       
       return () => clearInterval(interval);
     }
   }, [steps, currentStep, onNext, isPlaying, onStop]);
 
-  // Ensure currentStep doesn't exceed steps length
-  useEffect(() => {
-    if (steps && steps.length > 0 && currentStep >= steps.length) {
-      // Reset to last valid step
-      // This should be handled by the parent component, but we add this as a safety check
-    }
-  }, [steps, currentStep]);
-
-  // Reset completion status when steps change
-  useEffect(() => {
-    hasCompletedRef.current = false;
-  }, [steps]);
-  
   // Handle rotation phases for AVL trees
   useEffect(() => {
-    const currentStepData = steps[currentStep];
+    const currentStepData = steps && steps[currentStep];
     if (isRotationStep(currentStepData)) {
-      // Clear any existing timeouts
       if (window.rotationTimeouts) {
         window.rotationTimeouts.forEach(timeout => clearTimeout(timeout));
       }
       window.rotationTimeouts = [];
       
-      // Start rotation sequence
       setRotationPhase('breaking');
       
-      // After a delay, move to rotating phase
       const rotatingTimer = setTimeout(() => {
         setRotationPhase('rotating');
         
-        // After another delay, move to attaching phase
         const attachingTimer = setTimeout(() => {
           setRotationPhase('attaching');
           
-          // After final delay, reset phase
           const resetTimer = setTimeout(() => {
             setRotationPhase(null);
           }, 1000);
@@ -71,7 +52,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       
       window.rotationTimeouts.push(rotatingTimer);
     } else {
-      // Clear any existing timeouts when not in rotation step
       if (window.rotationTimeouts) {
         window.rotationTimeouts.forEach(timeout => clearTimeout(timeout));
         window.rotationTimeouts = [];
@@ -79,7 +59,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       setRotationPhase(null);
     }
     
-    // Cleanup function
     return () => {
       if (window.rotationTimeouts) {
         window.rotationTimeouts.forEach(timeout => clearTimeout(timeout));
@@ -87,120 +66,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       }
     };
   }, [currentStep, steps]);
-
-  // Function to get node styling based on state
-  const getNodeStyle = (stepData, nodeValue) => {
-    // Add null check for stepData
-    if (!stepData) {
-      return "w-10 h-10 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-white text-black border-gray-400";
-    }
-    
-    let baseStyle = "w-10 h-10 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 ";
-    
-    // Add animation classes based on state
-    if (stepData.insertedValue !== undefined && stepData.insertedValue === nodeValue) {
-      baseStyle += "animate-pulse scale-110 ";
-    }
-    
-    // Handle different algorithm states based on operation
-    if (stepData.insertedValue !== undefined && stepData.insertedValue === nodeValue) {
-      baseStyle += "bg-blue-500 text-white border-blue-600"; // Inserted node
-    } else if (stepData.comparing !== undefined && stepData.comparing === nodeValue) {
-      baseStyle += "bg-gray-300 text-black border-gray-700"; // Comparing node
-    } else if (stepData.found !== undefined && stepData.found === nodeValue) {
-      baseStyle += "bg-green-500 text-white border-green-600"; // Found node
-    } else if (isRotationStep(stepData) && getRotationNodeValue(stepData) === nodeValue) {
-      // Use rotation phase to determine animation
-      if (rotationPhase === 'breaking') {
-        baseStyle += "bg-yellow-500 text-white border-yellow-600 animate-pulse opacity-70"; // Breaking phase
-      } else if (rotationPhase === 'rotating') {
-        const rotationType = getRotationType(stepData);
-        if (rotationType === 'left' || rotationType === 'right') {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-spin"; // Single rotation with spin
-        } else {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-pulse"; // Double rotation with pulse
-        }
-      } else if (rotationPhase === 'attaching') {
-        baseStyle += "bg-green-500 text-white border-green-600 animate-bounce"; // Attaching phase
-      } else {
-        // Default rotation styling
-        const rotationType = getRotationType(stepData);
-        if (rotationType === 'left' || rotationType === 'right') {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-spin"; // Single rotation with spin
-        } else {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-pulse"; // Double rotation with pulse
-        }
-      }
-    } else {
-      baseStyle += "bg-white text-black border-gray-400";
-    }
-    
-    // Add hover effect
-    if (hoveredNode === nodeValue) {
-      baseStyle += " transform scale-110 shadow-lg ";
-    }
-    
-    return baseStyle;
-  };
-
-  // Function to get operation description
-  const getOperationDescription = (stepData) => {
-    // Add null check for stepData and operation
-    if (!stepData) return 'Processing...';
-    
-    const operation = stepData.operation;
-    
-    if (operation === 'start') {
-      return 'Starting tree visualization...';
-    } else if (operation === 'insert_root') {
-      return `Inserting root node with value ${stepData.insertedValue}`;
-    } else if (operation === 'traverse') {
-      return `Traversing to insert ${stepData.insertedValue}, currently at node ${stepData.comparing}`;
-    } else if (operation === 'insert') {
-      return `Inserting node with value ${stepData.insertedValue} as child of ${stepData.comparing}`;
-    } else if (operation === 'rotate') {
-      // Add rotation phase information
-      const phaseDescription = rotationPhase ? 
-        `Phase: ${rotationPhase.charAt(0).toUpperCase() + rotationPhase.slice(1)}` : 
-        'Starting rotation';
-        
-      if (stepData.rotation === 'left') {
-        return `Left rotation at node ${stepData.comparing} - Right subtree is heavier. ${phaseDescription}`;
-      } else if (stepData.rotation === 'right') {
-        return `Right rotation at node ${stepData.comparing} - Left subtree is heavier. ${phaseDescription}`;
-      } else if (stepData.rotation === 'leftright') {
-        return `Left-right rotation at node ${stepData.comparing} - Left-right imbalance. ${phaseDescription}`;
-      } else if (stepData.rotation === 'rightleft') {
-        return `Right-left rotation at node ${stepData.comparing} - Right-left imbalance. ${phaseDescription}`;
-      }
-      return `Balancing tree at node ${stepData.comparing}. ${phaseDescription}`;
-    } else if (operation === 'insert_start') {
-      return `Starting insertion of word "${stepData.insertedWord}"`;
-    } else if (operation === 'create_node') {
-      return `Creating node for character '${stepData.currentChar}' in path "${stepData.path}"`;
-    } else if (operation === 'mark_end') {
-      return `Marking end of word "${stepData.insertedWord}" at character '${stepData.currentChar}'`;
-    } else if (operation === 'complete') {
-      return 'Tree construction complete!';
-    } else {
-      return 'Processing...';
-    }
-  };
-  
-  // Function to check if current step is a rotation
-  const isRotationStep = (stepData) => {
-    return stepData && stepData.operation === 'rotate';
-  };
-  
-  // Function to get rotation type
-  const getRotationType = (stepData) => {
-    return stepData && stepData.rotation ? stepData.rotation : null;
-  };
-  
-  // Function to get rotation node value
-  const getRotationNodeValue = (stepData) => {
-    return stepData && stepData.comparing ? stepData.comparing : null;
-  };
 
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
@@ -233,15 +98,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       // Add a visual representation of the tree
       if (step.tree || step.operation) {
         // Draw tree visualization based on algorithm type
-        if (step.operation && (
-          step.operation.includes('trie') || 
-          step.operation === 'start' || 
-          step.operation === 'insert_start' || 
-          step.operation === 'create_node' || 
-          step.operation === 'traverse' || 
-          step.operation === 'mark_end' || 
-          step.operation === 'complete'
-        )) {
+        if (isTrieVisualization(step)) {
           // For Trie, center it better on the page
           drawTrieInPDF(doc, step.tree || { children: {}, isEnd: false }, '', 105, 60);
         } else {
@@ -300,10 +157,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       doc.setTextColor(107, 114, 128); // gray-500
       doc.text(`h:${node.height}`, x, y - 8, null, null, 'center');
     }
-    
-    // Draw rotation indicator for AVL trees
-    // Note: In PDF we can't show animations, but we can show a text indicator
-    // This would require passing the current step data to know if this node is being rotated
   };
   
   // Helper function to draw trie in PDF
@@ -361,36 +214,178 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     });
   };
 
-  // Recursive function to render tree nodes
-  const renderTreeNode = (node, x, y, level = 0, isLeft = false, parentX = null, parentY = null) => {
+  // Function to get node styling based on state
+  const getNodeStyle = (stepData, nodeValue) => {
+    if (!stepData) {
+      return "w-10 h-10 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-white text-black border-gray-400";
+    }
+    
+    let baseStyle = "w-10 h-10 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 ";
+    
+    if (stepData.insertedValue !== undefined && stepData.insertedValue === nodeValue) {
+      baseStyle += "animate-pulse scale-110 ";
+    }
+    
+    if (stepData.insertedValue !== undefined && stepData.insertedValue === nodeValue) {
+      baseStyle += "bg-blue-500 text-white border-blue-600";
+    } else if (stepData.comparing !== undefined && stepData.comparing === nodeValue) {
+      baseStyle += "bg-gray-300 text-black border-gray-700";
+    } else if (stepData.found !== undefined && stepData.found === nodeValue) {
+      baseStyle += "bg-green-500 text-white border-green-600";
+    } else if (isRotationStep(stepData) && getRotationNodeValue(stepData) === nodeValue) {
+      if (rotationPhase === 'breaking') {
+        baseStyle += "bg-yellow-500 text-white border-yellow-600 animate-pulse opacity-70";
+      } else if (rotationPhase === 'rotating') {
+        const rotationType = getRotationType(stepData);
+        if (rotationType === 'left' || rotationType === 'right') {
+          baseStyle += "bg-purple-500 text-white border-purple-600 animate-spin";
+        } else {
+          baseStyle += "bg-purple-500 text-white border-purple-600 animate-pulse";
+        }
+      } else if (rotationPhase === 'attaching') {
+        baseStyle += "bg-green-500 text-white border-green-600 animate-bounce";
+      } else {
+        const rotationType = getRotationType(stepData);
+        if (rotationType === 'left' || rotationType === 'right') {
+          baseStyle += "bg-purple-500 text-white border-purple-600 animate-spin";
+        } else {
+          baseStyle += "bg-purple-500 text-white border-purple-600 animate-pulse";
+        }
+      }
+    } else {
+      baseStyle += "bg-white text-black border-gray-400";
+    }
+    
+    if (hoveredNode === nodeValue) {
+      baseStyle += " transform scale-110 shadow-lg ";
+    }
+    
+    return baseStyle;
+  };
+
+  // Function to get operation description
+  const getOperationDescription = (stepData) => {
+    if (!stepData) return 'Processing...';
+    
+    const operation = stepData.operation;
+    
+    if (operation === 'start') {
+      return 'Starting tree visualization...';
+    } else if (operation === 'insert_root') {
+      return `Inserting root node with value ${stepData.insertedValue}`;
+    } else if (operation === 'insert_start') {
+      return `Starting insertion of value ${stepData.insertedValue}`;
+    } else if (operation === 'traverse') {
+      return `Traversing to insert ${stepData.insertedValue}, currently at node ${stepData.comparing}`;
+    } else if (operation === 'insert') {
+      return `Inserting node with value ${stepData.insertedValue} as child of ${stepData.comparing}`;
+    } else if (operation === 'after_insert') {
+      return `Value ${stepData.insertedValue} inserted successfully`;
+    } else if (operation === 'duplicate') {
+      return `Value ${stepData.insertedValue} already exists in tree`;
+    } else if (operation === 'rotate') {
+      const phaseDescription = rotationPhase ? 
+        `Phase: ${rotationPhase.charAt(0).toUpperCase() + rotationPhase.slice(1)}` : 
+        'Starting rotation';
+        
+      if (stepData.rotation === 'left') {
+        return `Left rotation at node ${stepData.comparing} - Right subtree is heavier. ${phaseDescription}`;
+      } else if (stepData.rotation === 'right') {
+        return `Right rotation at node ${stepData.comparing} - Left subtree is heavier. ${phaseDescription}`;
+      } else if (stepData.rotation === 'leftright') {
+        return `Left-right rotation at node ${stepData.comparing} - Left-right imbalance. ${phaseDescription}`;
+      } else if (stepData.rotation === 'rightleft') {
+        return `Right-left rotation at node ${stepData.comparing} - Right-left imbalance. ${phaseDescription}`;
+      }
+      return `Balancing tree at node ${stepData.comparing}. ${phaseDescription}`;
+    } else if (operation === 'insert_start') {
+      return `Starting insertion of word "${stepData.insertedWord}"`;
+    } else if (operation === 'create_node') {
+      return `Creating node for character '${stepData.currentChar}' in path "${stepData.path}"`;
+    } else if (operation === 'mark_end') {
+      return `Marking end of word "${stepData.insertedWord}" at character '${stepData.currentChar}'`;
+    } else if (operation === 'complete') {
+      return 'Tree construction complete!';
+    } else {
+      return 'Processing...';
+    }
+  };
+  
+  // Function to check if current step is a rotation
+  const isRotationStep = (stepData) => {
+    return stepData && stepData.operation === 'rotate';
+  };
+  
+  // Function to get rotation type
+  const getRotationType = (stepData) => {
+    return stepData && stepData.rotation ? stepData.rotation : null;
+  };
+  
+  // Function to get rotation node value
+  const getRotationNodeValue = (stepData) => {
+    return stepData && stepData.comparing ? stepData.comparing : null;
+  };
+
+  // Function to check if this is a Trie visualization
+  const isTrieVisualization = (stepData) => {
+    // Since we now have separate components for each tree type, 
+    // this component should only handle BST and AVL trees
+    return false;
+  };
+
+  // Recursive function to find path from root to target node
+  const findPathToNode = (node, targetValue, path = []) => {
     if (!node) return null;
     
+    const currentPath = [...path, node.value];
+    
+    if (node.value === targetValue) {
+      return currentPath;
+    }
+    
+    const leftPath = findPathToNode(node.left, targetValue, currentPath);
+    if (leftPath) return leftPath;
+    
+    const rightPath = findPathToNode(node.right, targetValue, currentPath);
+    if (rightPath) return rightPath;
+    
+    return null;
+  };
+
+  // Recursive function to render BST/AVL tree nodes
+  const renderTreeNode = (node, x, y, level = 0, isLeft = false, parentX = null, parentY = null, traversalPath = []) => {
+    if (!node) {
+      return null;
+    }
+    
     const nodeId = `${level}-${x}-${y}`;
-    const nodeSize = 30; // Increased from 20 to 30
+    const nodeSize = 30;
     const horizontalSpacing = Math.max(150 / (level + 1), 60);
     const verticalSpacing = 80;
     
-    // Check if this node is involved in a rotation
+    const currentStepData = steps && steps[currentStep];
     const isRotation = isRotationStep(currentStepData);
     const rotationType = getRotationType(currentStepData);
     const rotationNodeValue = getRotationNodeValue(currentStepData);
     
-    // Determine if this node is the rotation node or related to it
     const isRotationNode = node.value === rotationNodeValue;
     const isRotationRelated = isRotation && (isRotationNode || 
       (node.left && node.left.value === rotationNodeValue) || 
       (node.right && node.right.value === rotationNodeValue));
     
-    // Apply rotation animation classes
+    const isInTraversalPath = traversalPath.includes(node.value);
+    const isComparingNode = currentStepData && currentStepData.comparing === node.value;
+    const isInsertedNode = currentStepData && currentStepData.insertedValue === node.value;
+    
     let nodeClass = "cursor-pointer hover:stroke-blue-500 transition-all duration-500";
     
-    // Special styling for rotation phases
-    if (isRotation && isRotationNode) {
+    if (isInTraversalPath) {
+      nodeClass += " fill-blue-200 stroke-blue-500 traversal-highlight";
+    } else if (isRotation && isRotationNode) {
       if (rotationPhase === 'breaking') {
         nodeClass += " fill-yellow-500 stroke-yellow-600 animate-pulse opacity-70";
       } else if (rotationPhase === 'rotating') {
         nodeClass += " fill-purple-500 stroke-purple-600";
-        // Add spin or pulse based on rotation type
         if (rotationType === 'left' || rotationType === 'right') {
           nodeClass += " animate-spin";
         } else {
@@ -399,7 +394,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       } else if (rotationPhase === 'attaching') {
         nodeClass += " fill-green-500 stroke-green-600 animate-bounce";
       } else {
-        // Default rotation animation
         nodeClass += " fill-purple-500 stroke-purple-600";
         if (rotationType === 'left' || rotationType === 'right') {
           nodeClass += " animate-spin";
@@ -407,9 +401,14 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           nodeClass += " animate-pulse";
         }
       }
+    } else if (isComparingNode) {
+      nodeClass += " fill-gray-300 stroke-gray-700 animate-pulse";
+    } else if (isInsertedNode) {
+      nodeClass += " fill-blue-500 stroke-blue-600";
+    } else {
+      nodeClass += " fill-white stroke-gray-400";
     }
     
-    // Special styling for related nodes during rotation
     if (isRotation && isRotationRelated && !isRotationNode) {
       if (rotationPhase === 'breaking') {
         nodeClass += " opacity-50";
@@ -422,7 +421,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     
     return (
       <g key={nodeId}>
-        {/* Render connections to children */}
+        {/* Render connections to children first */}
         {node.left && renderTreeNode(
           node.left, 
           x - horizontalSpacing, 
@@ -430,7 +429,8 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           level + 1, 
           true, 
           x, 
-          y
+          y,
+          traversalPath
         )}
         {node.right && renderTreeNode(
           node.right, 
@@ -439,7 +439,8 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           level + 1, 
           false, 
           x, 
-          y
+          y,
+          traversalPath
         )}
         
         {/* Render connection line to parent */}
@@ -449,9 +450,9 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             y1={y}
             x2={parentX}
             y2={parentY}
-            stroke="#9CA3AF"
-            strokeWidth="2"
-            className={isRotationRelated ? "transition-all duration-500 " + (rotationPhase === 'breaking' ? 'stroke-dashed stroke-yellow-500 opacity-50' : rotationPhase === 'attaching' ? 'stroke-green-500 animate-pulse' : 'stroke-purple-500') : 'stroke-gray-400'}
+            stroke={isInTraversalPath ? "#3B82F6" : "#9CA3AF"}
+            strokeWidth={isInTraversalPath ? "3" : "2"}
+            className={isRotationRelated ? "transition-all duration-500 " + (rotationPhase === 'breaking' ? 'stroke-dashed stroke-yellow-500 opacity-50' : rotationPhase === 'attaching' ? 'stroke-green-500 animate-pulse' : 'stroke-purple-500') : (isInTraversalPath ? 'path-connection' : 'stroke-gray-400')}
           />
         )}
         
@@ -460,22 +461,20 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           cx={x}
           cy={y}
           r={nodeSize / 2}
-          fill="#FFFFFF"
-          stroke="#9CA3AF"
+          fill={isInTraversalPath ? "#BFDBFE" : (isInsertedNode ? "#3B82F6" : (isComparingNode ? "#D1D5DB" : "#FFFFFF"))}
+          stroke={isInTraversalPath ? "#3B82F6" : (isInsertedNode ? "#2563EB" : (isComparingNode ? "#374151" : "#9CA3AF"))}
           strokeWidth="2"
           className={nodeClass}
           onMouseEnter={() => setHoveredNode(node.value)}
           onMouseLeave={() => setHoveredNode(null)}
         />
         
-
-        
         {/* Render node value */}
         <text
           x={x}
           y={y + 5}
           textAnchor="middle"
-          className="font-bold text-black"
+          className={`font-bold ${isInTraversalPath ? 'text-blue-800' : (isInsertedNode ? 'text-white' : (isComparingNode ? 'text-black' : 'text-black'))}`}
         >
           {node.value}
         </text>
@@ -492,7 +491,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           </text>
         )}
         
-        {/* Render rotation indicator with phase */}
+        {/* Render rotation indicator */}
         {isRotation && isRotationNode && (
           <g>
             <rect
@@ -533,7 +532,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
               textAnchor="middle"
               className="text-xs font-bold fill-white"
             >
-              {rotationType.toUpperCase()}
+              {rotationType ? rotationType.toUpperCase() : 'ROTATE'}
             </text>
           </g>
         )}
@@ -546,21 +545,19 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     if (!node) return null;
     
     const nodeId = `${prefix}-${level}`;
-    const nodeSize = 30; // Increased node size for better visibility
-    const verticalSpacing = 70; // Increased vertical spacing
-    const horizontalSpacing = Math.max(200 / (level + 1), 80); // Increased horizontal spacing
+    const nodeSize = 30;
+    const verticalSpacing = 70;
+    const horizontalSpacing = Math.max(200 / (level + 1), 80);
     
-    // Get the character for this node (last character of prefix, or 'root' for root)
     const nodeLabel = prefix ? prefix.slice(-1) : 'root';
     
     return (
       <g key={nodeId}>
-        {/* Render node circle */}
         <circle
           cx={x}
           cy={y}
           r={nodeSize / 2}
-          fill={node.isEnd ? "#10B981" : "#FFFFFF"} // Green for end nodes
+          fill={node.isEnd ? "#10B981" : "#FFFFFF"}
           stroke="#9CA3AF"
           strokeWidth="2"
           className="cursor-pointer hover:stroke-blue-500 transition-all duration-300 drop-shadow-sm"
@@ -568,7 +565,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           onMouseLeave={() => setHoveredNode(null)}
         />
         
-        {/* Render node value (character) */}
         <text
           x={x}
           y={y + 5}
@@ -578,7 +574,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           {nodeLabel}
         </text>
         
-        {/* Render end marker for end nodes */}
         {node.isEnd && (
           <text
             x={x}
@@ -590,16 +585,13 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           </text>
         )}
         
-        {/* Render children */}
         {node.children && Object.keys(node.children).map((char, index) => {
           const child = node.children[char];
-          // Calculate child position with better spacing
           const childX = x + (index - (Object.keys(node.children).length - 1) / 2) * horizontalSpacing;
           const childY = y + verticalSpacing;
           
           return (
             <g key={`${nodeId}-${char}`}>
-              {/* Connection line with arrow marker */}
               <line
                 x1={x}
                 y1={y + nodeSize / 2}
@@ -610,7 +602,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                 markerEnd="url(#arrowhead)"
               />
               
-              {/* Character label on the line */}
               <text
                 x={(x + childX) / 2}
                 y={(y + childY) / 2 - 10}
@@ -620,7 +611,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                 {char}
               </text>
               
-              {/* Child node */}
               {renderTrieNode(child, prefix + char, childX, childY, level + 1)}
             </g>
           );
@@ -631,19 +621,55 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
 
   if (!data || !steps || steps.length === 0) return null;
 
-  // Check if visualization has completed (safety check)
   const isCompleted = steps.length > 0 && currentStep === steps.length - 1 && !isPlaying;
-  // Ensure currentStep doesn't exceed steps length
   const safeCurrentStep = Math.min(currentStep, Math.max(0, steps.length - 1));
-
-  // Get current step data
   const currentStepData = steps[safeCurrentStep];
+  
+  // Build traversal path for current step
+  const traversalPath = [];
+  if (currentStepData && currentStepData.traversalPath) {
+    traversalPath.push(...currentStepData.traversalPath);
+  } else if (currentStepData && currentStepData.path) {
+    traversalPath.push(...currentStepData.path);
+  } else if (currentStepData && currentStepData.operation === 'traverse' && currentStepData.comparing && currentStepData.tree) {
+    const fullPath = findPathToNode(currentStepData.tree, currentStepData.comparing);
+    if (fullPath) {
+      traversalPath.push(...fullPath);
+    }
+  }
+
+  // Determine if we should render Trie or BST/AVL
+  const shouldRenderTrie = isTrieVisualization(currentStepData);
 
   return (
     <div className="mt-2">
+      <style jsx>{`
+        .traversal-highlight {
+          animation: traversal-pulse 1s ease-in-out;
+        }
+        
+        @keyframes traversal-pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+          100% { transform: scale(1); }
+        }
+        
+        .path-connection {
+          stroke-dasharray: 5,5;
+          animation: path-dash 2s linear infinite;
+        }
+        
+        @keyframes path-dash {
+          to {
+            stroke-dashoffset: -10;
+          }
+        }
+      `}</style>
+      
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">Tree Visualization</h3>
         <div className="flex gap-2">
+          {/* ADDED: Download PDF Button */}
           <button 
             onClick={downloadStepsAsPDF}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
@@ -666,7 +692,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       </div>
       
       <div className="bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto">
-        {/* Single animated frame showing current step */}
         <div className="mb-6 bg-white p-3 border-2 border-gray-300">
           <h4 className="text-sm font-bold text-black mb-2 flex items-center">
             <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center text-xs mr-2">
@@ -682,7 +707,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             {currentStepData ? (
               <div className="w-full min-h-[400px] flex items-center justify-center overflow-auto">
                 <svg width="100%" height="500" className="border border-gray-200 rounded min-w-[600px]" viewBox="0 0 600 500">
-                  {/* Define arrow marker for connection lines */}
                   <defs>
                     <marker 
                       id="arrowhead" 
@@ -695,17 +719,13 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                       <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
                     </marker>
                   </defs>
-                  {currentStepData.operation && (
-                    currentStepData.operation.includes('trie') || 
-                    currentStepData.operation === 'start' || 
-                    currentStepData.operation === 'insert_start' || 
-                    currentStepData.operation === 'create_node' || 
-                    currentStepData.operation === 'traverse' || 
-                    currentStepData.operation === 'mark_end' || 
-                    currentStepData.operation === 'complete'
-                  )
-                    ? renderTrieNode(currentStepData.tree || { children: {}, isEnd: false }, '', 350, 80) 
-                    : renderTreeNode(currentStepData.tree, 300, 100)}
+                  
+                  {/* FIXED: Only render Trie if it's actually a Trie visualization */}
+                  {shouldRenderTrie ? (
+                    renderTrieNode(currentStepData.tree || { children: {}, isEnd: false }, '', 350, 80)
+                  ) : (
+                    renderTreeNode(currentStepData.tree, 300, 100, 0, false, null, null, traversalPath)
+                  )}
                 </svg>
               </div>
             ) : (
@@ -719,66 +739,83 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             <p className="font-semibold text-black text-sm">
               {getOperationDescription(currentStepData)}
             </p>
+            {traversalPath.length > 0 && (
+              <p className="text-xs text-blue-600 mt-1">
+                Traversal Path: {traversalPath.join(' → ')}
+              </p>
+            )}
           </div>
         </div>
       </div>
       
-      {/* Show all steps in a separate frame with visualizations */}
       <div className="mt-6 border border-gray-200 p-4 bg-white">
         <h4 className="text-md font-bold text-blue-800 mb-3">All Steps:</h4>
         <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
-          {steps.map((step, index) => (
-            <div 
-              key={index}
-              className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}
-              id={`step-${index}`}
-            >
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="font-medium text-black">Step {index + 1}</div>
-                  <div className="text-gray-600 text-sm mt-1">{getOperationDescription(step)}</div>
-                  
-                  {/* Visual representation of this step */}
-                  <div className="mt-3 min-h-[200px] flex items-center justify-center overflow-auto">
-                    {step.tree || step.operation ? (
-                      <div className="w-full min-h-[200px] overflow-auto">
-                        <svg width="100%" height="400" className="border border-gray-200 rounded min-w-[400px]" viewBox="0 0 400 400">
-                          {/* Define arrow marker for connection lines */}
-                          <defs>
-                            <marker 
-                              id="arrowhead" 
-                              markerWidth="10" 
-                              markerHeight="7" 
-                              refX="9" 
-                              refY="3.5" 
-                              orient="auto"
-                            >
-                              <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
-                            </marker>
-                          </defs>
-                          {step.operation && (
-                            step.operation.includes('trie') || 
-                            step.operation === 'start' || 
-                            step.operation === 'insert_start' || 
-                            step.operation === 'create_node' || 
-                            step.operation === 'traverse' || 
-                            step.operation === 'mark_end' || 
-                            step.operation === 'complete'
-                          )
-                            ? renderTrieNode(step.tree || { children: {}, isEnd: false }, '', 250, 50) 
-                            : renderTreeNode(step.tree, 200, 80)}
-                        </svg>
-                      </div>
-                    ) : (
-                      <div className="text-center text-gray-500">
-                        Empty tree
+          {steps.map((step, index) => {
+            const stepTraversalPath = [];
+            if (step.traversalPath) {
+              stepTraversalPath.push(...step.traversalPath);
+            } else if (step.path) {
+              stepTraversalPath.push(...step.path);
+            } else if (step.operation === 'traverse' && step.comparing && step.tree) {
+              const fullPath = findPathToNode(step.tree, step.comparing);
+              if (fullPath) {
+                stepTraversalPath.push(...fullPath);
+              }
+            }
+            
+            // Trie visualization is handled by separate component
+                        const isStepTrie = false;
+            
+            return (
+              <div 
+                key={index}
+                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}
+                id={`step-${index}`}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="font-medium text-black">Step {index + 1}</div>
+                    <div className="text-gray-600 text-sm mt-1">{getOperationDescription(step)}</div>
+                    
+                    <div className="mt-3 min-h-[200px] flex items-center justify-center overflow-auto">
+                      {step.tree || step.operation ? (
+                        <div className="w-full min-h-[200px] overflow-auto">
+                          <svg width="100%" height="400" className="border border-gray-200 rounded min-w-[400px]" viewBox="0 0 400 400">
+                            <defs>
+                              <marker 
+                                id="arrowhead" 
+                                markerWidth="10" 
+                                markerHeight="7" 
+                                refX="9" 
+                                refY="3.5" 
+                                orient="auto"
+                              >
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
+                              </marker>
+                            </defs>
+                            
+                            {/* Render BST/AVL tree nodes (Trie is handled by separate component) */}
+                            {renderTreeNode(step.tree, 200, 80, 0, false, null, null, stepTraversalPath)}
+                          </svg>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500">
+                          Empty tree
+                        </div>
+                      )}
+                    </div>
+                    
+                    {stepTraversalPath.length > 0 && (
+                      <div className="mt-2 text-xs text-blue-600">
+                        Path: {stepTraversalPath.join(' → ')}
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

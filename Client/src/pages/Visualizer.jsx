@@ -4,10 +4,13 @@ import AlgorithmSelector from '../components/AlgorithmSelector';
 import InputPanel from '../components/InputPanel';
 
 
-import SequentialSortingVisualizer from '../components/sort/SequentialSortingVisualizer';
-import HeapTreeVisualizer from '../components/sort/HeapTreeVisualizer';
-import SearchVisualizer from '../components/sort/SearchVisualizer';
-import TreeVisualizer from '../components/sort/TreeVisualizer';
+import SequentialSortingVisualizer from '../components/Visualizer_comp/SequentialSortingVisualizer';
+import HeapTreeVisualizer from '../components/Visualizer_comp/HeapTreeVisualizer';
+import SearchVisualizer from '../components/Visualizer_comp/SearchVisualizer';
+import BSTVisualizer from '../components/Visualizer_comp/BSTVisualizer';
+import AVLVisualizer from '../components/Visualizer_comp/AVLVisualizer';
+import TrieVisualizer from '../components/Visualizer_comp/TrieVisualizer';
+import TreeVisualizer from '../components/Visualizer_comp/TreeVisualizer';
 import { algorithms } from '../utils/algorithms';
 import { parseInputs } from '../utils/inputParser';
 
@@ -492,10 +495,17 @@ const Visualizer = () => {
   };
 
   const renderVisualization = () => {
-    if (!selectedAlgorithm || !visualizationData) return null;
-
+    // For tree algorithms, we can render even without initial visualizationData if we have steps
+    const treeAlgorithmTypes = ['bst', 'avl-tree', 'trie'];
+    const isTreeAlgorithm = selectedAlgorithm && treeAlgorithmTypes.includes(selectedAlgorithm);
+    
+    if (!selectedAlgorithm || (!visualizationData && !isTreeAlgorithm) || (isTreeAlgorithm && steps.length === 0)) return null;
+    
+    // If it's a tree algorithm and we don't have visualizationData yet, use the first step
+    const effectiveVisualizationData = visualizationData || (isTreeAlgorithm && steps.length > 0 ? steps[0] : null);
+    
     const visualizerProps = {
-      data: visualizationData,
+      data: effectiveVisualizationData,
       steps: steps,
       isPlaying: isVisualizing,
       currentStep,
@@ -560,6 +570,15 @@ const Visualizer = () => {
     }
     
     if (treeAlgorithms.includes(selectedAlgorithm)) {
+      // Render specific tree visualizer based on algorithm type
+      if (selectedAlgorithm === 'bst') {
+        return <BSTVisualizer {...visualizerProps} />;
+      } else if (selectedAlgorithm === 'avl-tree') {
+        return <AVLVisualizer {...visualizerProps} />;
+      } else if (selectedAlgorithm === 'trie') {
+        return <TrieVisualizer {...visualizerProps} />;
+      }
+      // Fallback to generic TreeVisualizer if needed
       return <TreeVisualizer {...visualizerProps} />;
     }
 
