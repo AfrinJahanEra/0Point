@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
@@ -8,7 +8,7 @@ import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
-import 'highlight.js/styles/github.css';
+import 'highlight.js/styles/github.css'; // ← Fixed!
 
 const CreateBlog = () => {
   const { user } = useApp();
@@ -16,25 +16,61 @@ const CreateBlog = () => {
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
-  const [coAuthors, setCoAuthors] = useState(''); // New state for co-authors
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+
+  // Co-authors (Codeforces style)
+  const [showCoAuthors, setShowCoAuthors] = useState(false);
+  const [coAuthorInput, setCoAuthorInput] = useState('');
+  const [selectedCoAuthors, setSelectedCoAuthors] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputRef = useRef(null);
+
+  // Mock users (replace with real API later)
+  const mockUsers = [
+    'tourist', 'jiangly', 'Benq', 'Geothermal', 'ecnerwala', 'orzdevinwang',
+    'ksun48', 'Um_nik', 'Petr', 'Errichto', 'secondthread', 'neal',
+    'awoo', 'hos.lyric', 'maroonrk', 'Radewoosh', 'ainta', 'scott_wu'
+  ];
+
+  useEffect(() => {
+    if (!coAuthorInput.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const filtered = mockUsers
+      .filter(u => u.toLowerCase().includes(coAuthorInput.toLowerCase()) && !selectedCoAuthors.includes(u))
+      .slice(0, 8);
+    setSuggestions(filtered);
+    setShowSuggestions(filtered.length > 0);
+  }, [coAuthorInput, selectedCoAuthors]);
+
+  const addCoAuthor = (username) => {
+    if (!selectedCoAuthors.includes(username)) {
+      setSelectedCoAuthors(prev => [...prev, username]);
+    }
+    setCoAuthorInput('');
+    setShowSuggestions(false);
+    inputRef.current?.focus();
+  };
+
+  const removeCoAuthor = (username) => {
+    setSelectedCoAuthors(prev => prev.filter(u => u !== username));
+  };
 
   const handleSubmit = (e, isDraft = false) => {
     e.preventDefault();
     setIsSubmitting(true);
-
-    // Simulate blog creation or draft saving
     setTimeout(() => {
       setIsSubmitting(false);
-      alert(isDraft ? 'Blog saved as draft!' : 'Blog published successfully!');
+      alert(isDraft ? 'Saved as draft!' : 'Blog published successfully!');
       navigate('/blog');
     }, 1500);
   };
 
-  const togglePreview = () => {
-    setShowPreview(!showPreview);
-  };
+  const togglePreview = () => setShowPreview(!showPreview);
 
   const customComponents = {
     spoiler: ({ summary, children }) => (
@@ -55,57 +91,49 @@ const CreateBlog = () => {
           <div className="lg:col-span-9">
             <div className="flex items-center justify-between mb-6 border-b border-gray-200 pb-4">
               <h2 className="text-xl font-bold text-gray-900">Create New Blog Entry</h2>
-              <button
-                onClick={() => navigate('/blog')}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <button onClick={() => navigate('/blog')} className="text-gray-500 hover:text-gray-700">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
+
             <form onSubmit={(e) => handleSubmit(e, false)}>
               <div className="mb-6">
-                <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                  Title
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
                 <input
                   type="text"
-                  id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Enter a descriptive title for your blog entry"
                   required
                 />
               </div>
 
               <div className="mb-6">
-                <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-2">
-                  Tags (separated by commas)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tags (separated by commas)</label>
                 <input
                   type="text"
-                  id="tags"
                   value={tags}
                   onChange={(e) => setTags(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="e.g., tutorial, dp, greedy"
                 />
               </div>
 
               <div className="mb-6">
-                <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Content (Markdown supported, including LaTeX, code blocks, and Codeforces-style spoilers)
                 </label>
+
                 {!showPreview ? (
                   <textarea
-                    id="content"
                     rows={12}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md font-mono"
-                    placeholder="Write your blog content here using Markdown syntax...&#10;&#10;For example:&#10;**bold text**&#10;[link](https://example.com)&#10;```cpp&#10;// code block&#10;```&#10;$a + b = c$ for inline math&#10;$$E = mc^2$$ for display math&#10;&lt;spoiler summary=&quot;Spoiler Title&quot;&gt;Hidden content&lt;/spoiler&gt;"
+                    placeholder={`Write your blog content here using Markdown syntax...\n\nFor example:\n**bold text**\n[link](https://example.com)\n\`\`\`cpp\n// code block\n\`\`\`\n$a + b = c$ for inline math\n$$E = mc^2$$ for display math\n<spoiler summary="Spoiler Title">Hidden content</spoiler>`}
                     required
                   />
                 ) : (
@@ -121,58 +149,102 @@ const CreateBlog = () => {
                 )}
               </div>
 
-              {/* Co-authors Section - Codeforces Style */}
-              <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-md">
-                <label htmlFor="coauthors" className="block text-sm font-medium text-gray-700 mb-2">
-                  Co-authors (optional)
-                </label>
-                <input
-                  type="text"
-                  id="coauthors"
-                  value={coAuthors}
-                  onChange={(e) => setCoAuthors(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md"
-                  placeholder="Enter usernames separated by commas (e.g., tourist, jiangly, Benq)"
-                />
-                <p className="mt-2 text-xs text-gray-600">
-                  Co-authors will be displayed alongside you and can edit this blog entry.
-                  They must have an account on this platform.
-                </p>
+              {/* Co-authors – Codeforces style */}
+              <div className="mb-6">
+                {!showCoAuthors ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCoAuthors(true)}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium underline"
+                  >
+                    + Add co-authors
+                  </button>
+                ) : (
+                  <div className="p-4 bg-gray-100 border border-gray-300 rounded-md">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Co-authors</label>
+
+                    {selectedCoAuthors.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {selectedCoAuthors.map(author => (
+                          <span
+                            key={author}
+                            className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                          >
+                            {author}
+                            <button type="button" onClick={() => removeCoAuthor(author)} className="hover:text-blue-900">
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="relative">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={coAuthorInput}
+                        onChange={(e) => setCoAuthorInput(e.target.value)}
+                        onFocus={() => coAuthorInput && setShowSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Type username..."
+                      />
+
+                      {showSuggestions && suggestions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
+                          {suggestions.map(username => (
+                            <div
+                              key={username}
+                              onMouseDown={() => addCoAuthor(username)}
+                              className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                            >
+                              {username}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="mt-2 text-xs text-gray-600">
+                      Co-authors will be able to edit this entry and will be displayed as authors.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCoAuthors(false);
+                        setSelectedCoAuthors([]);
+                        setCoAuthorInput('');
+                      }}
+                      className="mt-3 text-sm text-red-600 hover:text-red-800"
+                    >
+                      Remove co-authors
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => navigate('/blog')}
-                  className="px-4 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors duration-300"
-                >
+                <button type="button" onClick={() => navigate('/blog')} className="px-4 py-1.5 border border-gray-300 rounded text-gray-700 hover:bg-gray-50">
                   Discard
                 </button>
-                <button
-                  type="button"
-                  onClick={(e) => handleSubmit(e, true)}
-                  disabled={isSubmitting}
-                  className="px-4 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button type="button" onClick={(e) => handleSubmit(e, true)} disabled={isSubmitting} className="px-4 py-1.5 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50">
                   Save Draft
                 </button>
-                <button
-                  type="button"
-                  onClick={togglePreview}
-                  className="px-4 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors duration-300"
-                >
+                <button type="button" onClick={togglePreview} className="px-4 py-1.5 border border-gray-300 rounded text-gray-700 hover:bg-gray-50">
                   {showPreview ? 'Edit' : 'Preview'}
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-1.5 text-sm bg-blue-800 text-white rounded hover:bg-blue-900 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  className="px-4 py-1.5 bg-blue-800 text-white rounded hover:bg-blue-900 disabled:opacity-50 flex items-center gap-1"
                 >
                   {isSubmitting ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-white" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
                       Publishing...
                     </>
@@ -182,7 +254,6 @@ const CreateBlog = () => {
             </form>
           </div>
 
-          {/* Sidebar */}
           <div className="lg:col-span-3">
             <Sidebar />
           </div>
