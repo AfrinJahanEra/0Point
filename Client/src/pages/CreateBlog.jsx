@@ -7,8 +7,8 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
-import 'katex/dist/katex.min.css'; // For LaTeX rendering
-import 'highlight.js/styles/github.css'; // For code highlighting
+import 'katex/dist/katex.min.css';
+import 'highlight.js/styles/github.css';
 
 const CreateBlog = () => {
   const { user } = useApp();
@@ -16,6 +16,7 @@ const CreateBlog = () => {
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
+  const [coAuthors, setCoAuthors] = useState(''); // New state for co-authors
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -38,7 +39,9 @@ const CreateBlog = () => {
   const customComponents = {
     spoiler: ({ summary, children }) => (
       <details className="my-2">
-        <summary className="cursor-pointer text-blue-600 hover:underline">{summary || 'Spoiler'}</summary>
+        <summary className="cursor-pointer text-blue-600 hover:underline">
+          {summary || 'Spoiler'}
+        </summary>
         <div className="pl-4 border-l-4 border-gray-300">{children}</div>
       </details>
     ),
@@ -76,6 +79,7 @@ const CreateBlog = () => {
                   required
                 />
               </div>
+
               <div className="mb-6">
                 <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-2">
                   Tags (separated by commas)
@@ -89,6 +93,7 @@ const CreateBlog = () => {
                   placeholder="e.g., tutorial, dp, greedy"
                 />
               </div>
+
               <div className="mb-6">
                 <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
                   Content (Markdown supported, including LaTeX, code blocks, and Codeforces-style spoilers)
@@ -115,6 +120,26 @@ const CreateBlog = () => {
                   </div>
                 )}
               </div>
+
+              {/* Co-authors Section - Codeforces Style */}
+              <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-md">
+                <label htmlFor="coauthors" className="block text-sm font-medium text-gray-700 mb-2">
+                  Co-authors (optional)
+                </label>
+                <input
+                  type="text"
+                  id="coauthors"
+                  value={coAuthors}
+                  onChange={(e) => setCoAuthors(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md"
+                  placeholder="Enter usernames separated by commas (e.g., tourist, jiangly, Benq)"
+                />
+                <p className="mt-2 text-xs text-gray-600">
+                  Co-authors will be displayed alongside you and can edit this blog entry.
+                  They must have an account on this platform.
+                </p>
+              </div>
+
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="button"
@@ -156,7 +181,7 @@ const CreateBlog = () => {
               </div>
             </form>
           </div>
-        
+
           {/* Sidebar */}
           <div className="lg:col-span-3">
             <Sidebar />
