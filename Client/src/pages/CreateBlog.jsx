@@ -2,24 +2,36 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import rehypeHighlight from 'rehype-highlight';
+import 'katex/dist/katex.min.css'; // For LaTeX rendering
+import 'highlight.js/styles/github.css'; // For code highlighting
 
 const CreateBlog = () => {
   const { user } = useApp();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
+  const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e, isDraft = false) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate blog creation
+
+    // Simulate blog creation or draft saving
     setTimeout(() => {
       setIsSubmitting(false);
-      alert('Blog created successfully!');
+      alert(isDraft ? 'Blog saved as draft!' : 'Blog published successfully!');
       navigate('/blog');
     }, 1500);
+  };
+
+  const togglePreview = () => {
+    setShowPreview(!showPreview);
   };
 
   return (
@@ -29,7 +41,7 @@ const CreateBlog = () => {
           {/* Main Content */}
           <div className="lg:col-span-9">
             <div className="flex items-center justify-between mb-6 border-b border-gray-200 pb-4">
-              <h2 className="text-xl font-bold text-gray-900">Create New Blog</h2>
+              <h2 className="text-xl font-bold text-gray-900">Create New Blog Entry</h2>
               <button
                 onClick={() => navigate('/blog')}
                 className="text-gray-500 hover:text-gray-700"
@@ -39,11 +51,10 @@ const CreateBlog = () => {
                 </svg>
               </button>
             </div>
-
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={(e) => handleSubmit(e, false)}>
               <div className="mb-6">
                 <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                  Blog Title
+                  Title
                 </label>
                 <input
                   type="text"
@@ -51,33 +62,70 @@ const CreateBlog = () => {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md"
-                  placeholder="Enter a descriptive title for your blog"
+                  placeholder="Enter a descriptive title for your blog entry"
                   required
                 />
               </div>
-
+              <div className="mb-6">
+                <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-2">
+                  Tags (separated by commas)
+                </label>
+                <input
+                  type="text"
+                  id="tags"
+                  value={tags}
+                  onChange={(e) => setTags(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md"
+                  placeholder="e.g., tutorial, dp, greedy"
+                />
+              </div>
               <div className="mb-6">
                 <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
-                  Content
+                  Content (Markdown supported, including LaTeX and code blocks)
                 </label>
-                <textarea
-                  id="content"
-                  rows={12}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md"
-                  placeholder="Write your blog content here..."
-                  required
-                />
+                {!showPreview ? (
+                  <textarea
+                    id="content"
+                    rows={12}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md font-mono"
+                    placeholder="Write your blog content here using Markdown syntax...&#10;&#10;For example:&#10;**bold text**&#10;[link](https://example.com)&#10;```cpp&#10;// code block&#10;```&#10;$a + b = c$ for inline math&#10;$$E = mc^2$$ for display math"
+                    required
+                  />
+                ) : (
+                  <div className="w-full p-4 border border-gray-300 rounded-md bg-white min-h-[300px] prose prose-sm max-w-none">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath]}
+                      rehypePlugins={[rehypeKatex, rehypeHighlight]}
+                    >
+                      {content}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
-
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => navigate('/blog')}
                   className="px-4 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors duration-300"
                 >
-                  Cancel
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmit(e, true)}
+                  disabled={isSubmitting}
+                  className="px-4 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={togglePreview}
+                  className="px-4 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors duration-300"
+                >
+                  {showPreview ? 'Edit' : 'Preview'}
                 </button>
                 <button
                   type="submit"
@@ -92,12 +140,12 @@ const CreateBlog = () => {
                       </svg>
                       Publishing...
                     </>
-                  ) : 'Publish Blog'}
+                  ) : 'Post'}
                 </button>
               </div>
             </form>
           </div>
-          
+        
           {/* Sidebar */}
           <div className="lg:col-span-3">
             <Sidebar />
