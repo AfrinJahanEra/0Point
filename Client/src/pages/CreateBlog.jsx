@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
+import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css'; // For LaTeX rendering
 import 'highlight.js/styles/github.css'; // For code highlighting
 
@@ -32,6 +33,15 @@ const CreateBlog = () => {
 
   const togglePreview = () => {
     setShowPreview(!showPreview);
+  };
+
+  const customComponents = {
+    spoiler: ({ summary, children }) => (
+      <details className="my-2">
+        <summary className="cursor-pointer text-blue-600 hover:underline">{summary || 'Spoiler'}</summary>
+        <div className="pl-4 border-l-4 border-gray-300">{children}</div>
+      </details>
+    ),
   };
 
   return (
@@ -81,7 +91,7 @@ const CreateBlog = () => {
               </div>
               <div className="mb-6">
                 <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
-                  Content (Markdown supported, including LaTeX and code blocks)
+                  Content (Markdown supported, including LaTeX, code blocks, and Codeforces-style spoilers)
                 </label>
                 {!showPreview ? (
                   <textarea
@@ -90,14 +100,15 @@ const CreateBlog = () => {
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md font-mono"
-                    placeholder="Write your blog content here using Markdown syntax...&#10;&#10;For example:&#10;**bold text**&#10;[link](https://example.com)&#10;```cpp&#10;// code block&#10;```&#10;$a + b = c$ for inline math&#10;$$E = mc^2$$ for display math"
+                    placeholder="Write your blog content here using Markdown syntax...&#10;&#10;For example:&#10;**bold text**&#10;[link](https://example.com)&#10;```cpp&#10;// code block&#10;```&#10;$a + b = c$ for inline math&#10;$$E = mc^2$$ for display math&#10;&lt;spoiler summary=&quot;Spoiler Title&quot;&gt;Hidden content&lt;/spoiler&gt;"
                     required
                   />
                 ) : (
                   <div className="w-full p-4 border border-gray-300 rounded-md bg-white min-h-[300px] prose prose-sm max-w-none">
                     <ReactMarkdown
                       remarkPlugins={[remarkMath]}
-                      rehypePlugins={[rehypeKatex, rehypeHighlight]}
+                      rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                      components={customComponents}
                     >
                       {content}
                     </ReactMarkdown>
