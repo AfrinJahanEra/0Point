@@ -1,0 +1,69 @@
+POST /auth/signup/
+
+{
+  "name": "Faiza",
+  "email": "faiza@example.com",
+  "password": "1234",
+  "role": "user"
+}
+
+{
+  "name": "era",
+  "email": "era@google.com",
+  "password": "1234",
+  "role": "user"
+}
+
+
+POST /auth/login/
+
+{
+  "email": "faiza@example.com",
+  "password": "1234"
+}
+
+{
+  "email": "era@google.com",
+  "password": "1234"
+}
+
+
+POST /contests/
+
+{
+  "title": "Test Contest",
+  "description": "Test description",
+  "start_time": "2025-12-20T14:00:00Z",
+  "duration": 3,
+  "type": "individual",
+  "platform": "default"
+}
+
+POST / problems/
+
+{
+    "contest_id": "692504b5c1f8d3243d826e9a",
+    "index": "A",
+    "title": "Sum of Array",
+    "statement": "<p>You are given an array of N integers. Output the sum.</p>",
+    "tags": ["math", "implementation"],
+    "time_limit_seconds": 1.0,
+    "memory_limit_mb": 256,
+    "difficulty": 800
+}
+
+POST /testcases/
+
+{
+    "problem_id": "673401ae8db80e1431a24719",
+    "sample": true,
+    "input_data": "5\n1 2 3 4 5",
+    "output_data": "15"
+}
+
+{
+    "problem_id": "673401ae8db80e1431a24719",
+    "sample": false,
+    "input_data": "10\n10 9 8 7 6 5 4 3 2 1",
+    "output_data": "55"
+}
