@@ -48,3 +48,25 @@ class ContestRegistrationSerializer(serializers.Serializer):
     def validate(self, data):
         # nothing complicated here; view will check contest type
         return data
+
+class ContestUpdateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=200, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    start_time = serializers.DateTimeField(required=False)
+    duration = serializers.FloatField(required=False)
+    type = serializers.ChoiceField(choices=("individual", "team"), required=False)
+    platform = serializers.ChoiceField(
+        choices=("cf","atcoder","codechef","hackerrank","leetcode","default"),
+        required=False
+    )
+    is_live_now = serializers.BooleanField(required=False)
+
+    def validate_title(self, value):
+        if len(value.strip()) == 0:
+            raise serializers.ValidationError("Title cannot be empty.")
+        return value.strip()
+
+    def validate_duration(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Duration must be positive.")
+        return value

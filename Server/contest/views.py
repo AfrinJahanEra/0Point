@@ -5,7 +5,7 @@ from rest_framework import status
 from datetime import datetime
 from mongoengine.errors import ValidationError as MEValidationError
 from .models import Contest, ContestProblem, ContestRegistration
-from .serializers import ContestCreateSerializer, ContestRegistrationSerializer
+from .serializers import ContestCreateSerializer, ContestRegistrationSerializer, ContestUpdateSerializer
 from .utils.auth import get_user_from_request
 from account.models import Account  # your existing Account document
 
@@ -145,3 +145,60 @@ class ContestRegisterAPIView(APIView):
         reg = ContestRegistration(contest=contest, team_id=team_id)
         reg.save()
         return Response({"message": "Team registered successfully", "registration_id": str(reg.id)})
+
+class ContestUpdateAPIView(APIView):
+    """
+    PATCH /contests/<id>/update/
+    Allows the contest creator or an admin to update contest details.
+    """
+    def patch(self, request, contest_id):
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+
+        contest = Contest.objects(id=contest_id).first()
+        if not contest:
+            return Response({"error": "Contest not found"}, status=404)
+
+        # Permission check
+        if str(contest.created_by.id) != str(user.id) and user.role != "admin":
+            return Response({"error": "Permission denied"}, status=403)
+
+        serializer = ContestUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        data = serializer.validated_data
+
+        # Apply updates
+        if "title" in data:
+            contest.title = data["title"]
+
+        if "description" in data:
+            contest.description = data["description"][:1000]
+
+        if "start_time" in data:
+            contest.start_time = data["start_time"]
+
+        if "duration" in data:
+            contest.duration = int(data["duration"] * 60)
+
+        if "type" in data:
+            contest.type = data["type"]
+
+        if "platform" in data:
+            contest.platform = data["platform"]
+
+        # Only admin or contest creator can modify is_live_now
+        if "is_live_now" in data:
+            contest.is_live_now = data["is_live_now"]
+
+        try:
+            contest.save()
+        except MEValidationError as e:
+            return Response({"error": str(e)}, status=400)
+
+        return Response({
+            "message": "Contest updated successfully",
+            "contest_id": str(contest.id)
+        })
