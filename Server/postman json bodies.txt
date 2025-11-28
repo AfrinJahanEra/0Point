@@ -67,3 +67,60 @@ POST /testcases/
     "input_data": "10\n10 9 8 7 6 5 4 3 2 1",
     "output_data": "55"
 }
+
+POST /submissions/
+
+{
+    "problem_id": "673401ae8db80e1431a24719",
+    "language": "cpp",
+    "code": "#include <bits/stdc++.h>\nusing namespace std; int main(){ cout<<\"Hello\"; }"
+}
+
+PATCH /submissions/<id>/verdict/
+
+{
+    "verdict": "ACCEPTED",
+    "runtime_ms": 32,
+    "memory_kb": 10240,
+    "testcases_passed": 10,
+    "total_testcases": 10
+}
+
+PATCH /contests/<id>/leaderboard/freeze/
+
+{
+    "is_frozen": true
+}
+
+POST /contests/<id>/leaderboard/recalculate/
+
+{
+    "apply_freeze": false
+}
+
+GET /contests/<id>/leaderboard/
+
+POST /announcements/
+
+{
+    "contest_id": "673401128db80e1431a246f1",
+    "text": "Contest will begin in 10 minutes!"
+}
+
+{
+    "contest_id": "673401128db80e1431a246f1",
+    "problem_index": "A",
+    "text": "Problem A has a clarified constraint: N ≤ 2e5.",
+    "type": "warning",
+    "is_important": true
+}
+
+POST /tutorials/
+
+{
+    "problem_id": "673401ae8db80e1431a24719",
+    "statement": "To solve this problem, observe that...",
+    "tags": ["dp", "binary_search"],
+    "difficulty_explanation": "Hard because constraints require O(n log n)",
+    "is_official": true
+}
