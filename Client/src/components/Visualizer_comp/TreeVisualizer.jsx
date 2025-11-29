@@ -480,7 +480,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     const nodeId = `${level}-${x}-${y}`;
     const nodeSize = 30;
     const horizontalSpacing = Math.max(150 / (level + 1), 60);
-    const verticalSpacing = 80;
+    const verticalSpacing = 120;
     
     const currentStepData = steps && steps[currentStep];
     const isRotation = isRotationStep(currentStepData);
