@@ -640,7 +640,6 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
               value={speed} 
               onChange={(e) => handleSpeedChange(Number(e.target.value))}
               className="px-2 py-1 border border-gray-300 rounded text-sm"
-              disabled={isPlaying}
             >
               <option value={500}>Fast (0.5s)</option>
               <option value={1000}>Medium (1s)</option>
