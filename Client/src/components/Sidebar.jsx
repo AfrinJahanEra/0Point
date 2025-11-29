@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Trophy, 
   Calendar, 
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 const Sidebar = () => {
+  const navigate = useNavigate();
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
     days: 5,
@@ -196,7 +197,10 @@ const Sidebar = () => {
                 <div className="text-xs text-gray-500">Seconds</div>
               </div>
             </div>
-            <button className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200">
+            <button 
+              onClick={() => navigate('/contest/1/register')} // ADD THIS
+              className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200"
+            >
               Register Now
             </button>
           </div>
