@@ -2,14 +2,38 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import jsPDF from 'jspdf';
 import PDFDownloadButton from '../PDFDownloadButton';
+import { Maximize, Minimize } from 'lucide-react';
 
 const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
   const [hoveredNode, setHoveredNode] = useState(null);
   const svgRef = useRef();
   const currentStepRef = useRef(null);
   const hasCompletedRef = useRef(false);
+  const [speed, setSpeed] = useState(2000); // Default 2 seconds
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenContainerRef = useRef(null);
 
-  // Auto-advance every 2 seconds automatically
+  // Handle fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+      setIsFullscreen(!!fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Auto-advance based on speed setting
   useEffect(() => {
     if (isPlaying && steps && steps.length > 0) {
       const interval = setInterval(() => {
@@ -18,11 +42,11 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         } else {
           if (onStop) onStop();
         }
-      }, 2000);
+      }, speed);
       
       return () => clearInterval(interval);
     }
-  }, [steps, currentStep, onNext, isPlaying, onStop]);
+  }, [steps, currentStep, onNext, isPlaying, onStop, speed]);
 
   // D3.js animation effect
   useEffect(() => {
@@ -62,8 +86,9 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       };
     });
     
-    // Draw edges with D3
+    // Draw edges with D3 - UPDATED FOR NEW VISUAL STYLE
     svg.selectAll(".edge").remove();
+    svg.selectAll(".edge-weight").remove();
     
     // Draw MST edges first (in green)
     if (stepData.mst) {
@@ -89,6 +114,7 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         const midY = (pos1.y + pos2.y) / 2;
         
         svg.append("text")
+          .attr("class", "edge-weight")
           .attr("x", midX)
           .attr("y", midY - 5)
           .attr("text-anchor", "middle")
@@ -129,22 +155,37 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             ((stepData.currentEdge.from === fromNode && stepData.currentEdge.to === toNode) ||
              (stepData.currentEdge.from === toNode && stepData.currentEdge.to === fromNode));
           
-          // Draw edge line
-          svg.append("line")
+          // Check if we're processing neighbors of current node
+          const isProcessingNeighbors = stepData.currentNode === fromNode || stepData.currentNode === toNode;
+          
+          // Draw edge line with appropriate style
+          const edge = svg.append("line")
             .attr("class", "edge")
             .attr("x1", pos1.x)
             .attr("y1", pos1.y)
             .attr("x2", pos2.x)
             .attr("y2", pos2.y)
-            .attr("stroke", isCurrentEdge ? "#1E40AF" : "#93C5FD") // Dark blue for current, light blue for others
-            .attr("stroke-width", isCurrentEdge ? 3 : 2)
-            .attr("opacity", 0.8);
+            .attr("stroke", "#93C5FD") // Light blue default
+            .attr("stroke-width", 2);
+            
+          // Apply dotted line for neighbor search
+          if (isProcessingNeighbors && (stepData.operation === 'add_edge' || stepData.operation === 'update_queue')) {
+            edge.attr("stroke-dasharray", "5,5")
+                .attr("stroke", "#93C5FD"); // Light blue dotted for neighbor search
+          } else if (stepData.mst && stepData.mst.some(edge => 
+            (edge.from === fromNode && edge.to === toNode) || 
+            (edge.from === toNode && edge.to === fromNode))) {
+            edge.attr("stroke", "#1E40AF") // Dark blue for traversed edges
+                .attr("stroke-width", 3)
+                .attr("stroke-dasharray", "none");
+          }
             
           // Draw edge weight
           const midX = (pos1.x + pos2.x) / 2;
           const midY = (pos1.y + pos2.y) / 2;
           
           svg.append("text")
+            .attr("class", "edge-weight")
             .attr("x", midX)
             .attr("y", midY - 5)
             .attr("text-anchor", "middle")
@@ -156,21 +197,35 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       });
     }
     
-    // Draw nodes with D3
+    // Draw nodes with D3 - UPDATED FOR NEW COLOR SCHEME
     svg.selectAll(".node").remove();
     svg.selectAll(".node-label").remove();
     
     nodes.forEach(node => {
       const pos = nodePositions[node];
       
-      // Determine node color based on state
-      let fillColor = "#93C5FD"; // Light blue default
+      // Determine node color based on state - NEW COLOR SCHEME
+      let fillColor = "white"; // Default white
+      let strokeColor = "black"; // Default black border
+      let textColor = "black"; // Default black text
+      
+      // Current node gets special treatment
       if (stepData.currentNode === node) {
-        fillColor = "#1E40AF"; // Dark blue for current node
-      } else if (stepData.visited && stepData.visited.includes(node)) {
-        fillColor = "#3B82F6"; // Medium blue for visited
-      } else if (stepData.inQueue && stepData.inQueue.includes(node)) {
-        fillColor = "#60A5FA"; // Slightly darker light blue for queued
+        fillColor = "#93C5FD"; // Light blue for current node
+        strokeColor = "black";
+        textColor = "black";
+      } 
+      // Visited nodes
+      else if (stepData.visited && stepData.visited.includes(node)) {
+        fillColor = "#1E40AF"; // Dark blue for visited
+        strokeColor = "black";
+        textColor = "white"; // White text for dark blue background
+      }
+      // In queue nodes
+      else if (stepData.inQueue && stepData.inQueue.includes(node)) {
+        fillColor = "#DBEAFE"; // Very light blue for in queue
+        strokeColor = "black";
+        textColor = "black";
       }
       
       // Draw node circle
@@ -180,7 +235,7 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         .attr("cy", pos.y)
         .attr("r", 20)
         .attr("fill", fillColor)
-        .attr("stroke", "#1E40AF")
+        .attr("stroke", strokeColor)
         .attr("stroke-width", 2)
         .on("mouseover", () => setHoveredNode(node))
         .on("mouseout", () => setHoveredNode(null));
@@ -193,7 +248,7 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         .attr("text-anchor", "middle")
         .attr("font-size", "14px")
         .attr("font-weight", "bold")
-        .attr("fill", "white")
+        .attr("fill", textColor)
         .text(node);
     });
     
@@ -306,24 +361,63 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     return bbox;
   };
   
-  // Helper function to draw graph in PDF
+  // Helper function to draw graph in PDF - ZOOM-OUT IMPLEMENTATION
   const drawGraphInPDF = (doc, graph, offsetX, offsetY, level = 0, parentX = null, parentY = null, scale = 1, stepData = null) => {
     if (!graph) return;
     
     const nodes = Object.keys(graph);
     if (nodes.length === 0) return;
     
-    const radius = 80 * scale;
-    const centerX = offsetX + 150 * scale;
-    const centerY = offsetY + 100 * scale;
-    const nodeRadius = 8 * scale;
+    // AUTO ZOOM-OUT: Calculate optimal scale to fit entire graph in PDF
+    const pageWidth = 297; // A4 landscape width in mm
+    const pageHeight = 210; // A4 landscape height in mm
+    const margin = 20; // 20mm margin on all sides
+    
+    // Calculate bounding box of all nodes
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    
+    nodes.forEach((node, index) => {
+      const angle = (index / nodes.length) * 2 * Math.PI;
+      const x = 150 * Math.cos(angle); // Base radius of 150
+      const y = 100 * Math.sin(angle); // Base radius of 100
+      
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    });
+    
+    // Add padding for node size
+    minX -= 20;
+    maxX += 20;
+    minY -= 20;
+    maxY += 20;
+    
+    // Calculate optimal scale to fit graph within page margins
+    const graphWidth = maxX - minX;
+    const graphHeight = maxY - minY;
+    const availableWidth = pageWidth - 2 * margin;
+    const availableHeight = pageHeight - 2 * margin;
+    
+    const optimalScale = Math.min(
+      availableWidth / graphWidth,
+      availableHeight / graphHeight,
+      1 // Don't upscale
+    );
+    
+    // Center the graph on the page
+    const centerX = (pageWidth - graphWidth * optimalScale) / 2 - minX * optimalScale;
+    const centerY = (pageHeight - graphHeight * optimalScale) / 2 - minY * optimalScale;
+    
+    const radius = 80 * optimalScale;
+    const nodeRadius = 8 * optimalScale;
     
     // Draw edges first
     const drawnEdges = new Set();
     nodes.forEach((node, index) => {
       const angle = (index / nodes.length) * 2 * Math.PI;
-      const x1 = centerX + radius * Math.cos(angle);
-      const y1 = centerY + radius * Math.sin(angle);
+      const x1 = centerX + 150 * optimalScale * Math.cos(angle);
+      const y1 = centerY + 100 * optimalScale * Math.sin(angle);
       
       const neighbors = graph[node] || [];
       neighbors.forEach(neighborObj => {
@@ -339,8 +433,8 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         if (neighborIndex === -1) return;
         
         const neighborAngle = (neighborIndex / nodes.length) * 2 * Math.PI;
-        const x2 = centerX + radius * Math.cos(neighborAngle);
-        const y2 = centerY + radius * Math.sin(neighborAngle);
+        const x2 = centerX + 150 * optimalScale * Math.cos(neighborAngle);
+        const y2 = centerY + 100 * optimalScale * Math.sin(neighborAngle);
         
         // Check if this edge is in MST
         const isInMST = stepData && stepData.mst && stepData.mst.some(edge => 
@@ -354,23 +448,23 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         } else {
           doc.setDrawColor(156, 163, 175); // gray-400
         }
-        doc.setLineWidth(0.5 * scale);
+        doc.setLineWidth(0.5 * optimalScale);
         doc.line(x1, y1, x2, y2);
         
         // Draw edge weight
         const midX = (x1 + x2) / 2;
         const midY = (y1 + y2) / 2;
-        doc.setFontSize(6 * scale);
+        doc.setFontSize(6 * optimalScale);
         doc.setTextColor(0, 0, 0); // black
-        doc.text(String(weight), midX, midY - 2 * scale, null, null, 'center');
+        doc.text(String(weight), midX, midY - 2 * optimalScale, null, null, 'center');
       });
     });
     
     // Draw nodes
     nodes.forEach((node, index) => {
       const angle = (index / nodes.length) * 2 * Math.PI;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
+      const x = centerX + 150 * optimalScale * Math.cos(angle);
+      const y = centerY + 100 * optimalScale * Math.sin(angle);
       
       // Determine node style based on step data
       let fillColor = [255, 255, 255]; // white
@@ -392,13 +486,13 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       // Draw node circle
       doc.setFillColor(...fillColor);
       doc.setDrawColor(...strokeColor);
-      doc.setLineWidth(0.5 * scale);
+      doc.setLineWidth(0.5 * optimalScale);
       doc.circle(x, y, nodeRadius, 'FD');
       
       // Draw node value
-      doc.setFontSize(8 * scale);
+      doc.setFontSize(8 * optimalScale);
       doc.setTextColor(0, 0, 0); // black
-      doc.text(String(node), x, y + 3 * scale, null, null, 'center');
+      doc.text(String(node), x, y + 3 * optimalScale, null, null, 'center');
     });
   };
 
@@ -421,6 +515,41 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     } else {
       return 'Processing...';
     }
+  };
+
+
+  // Toggle fullscreen mode using Fullscreen API
+  const toggleFullscreen = () => {
+    if (!fullscreenContainerRef.current) return;
+
+    if (!isFullscreen) {
+      // Enter fullscreen
+      const element = fullscreenContainerRef.current;
+      if (element.requestFullscreen) {
+        element.requestFullscreen();
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+      } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
+      }
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  };
+
+  const handleSpeedChange = (newSpeed) => {
+    setSpeed(newSpeed);
   };
 
   if (!data || !steps || steps.length === 0) return null;
@@ -456,7 +585,23 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">Prim's Algorithm Visualization</h3>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* Speed Control */}
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-gray-700">Speed:</span>
+            <select 
+              value={speed} 
+              onChange={(e) => handleSpeedChange(Number(e.target.value))}
+              className="px-2 py-1 border border-gray-300 rounded text-sm"
+              disabled={isPlaying}
+            >
+              <option value={500}>Fast (0.5s)</option>
+              <option value={1000}>Medium (1s)</option>
+              <option value={2000}>Slow (2s)</option>
+              <option value={3000}>Very Slow (3s)</option>
+            </select>
+          </div>
+          
           {/* ADDED: Download PDF Button */}
           <PDFDownloadButton onClick={downloadStepsAsPDF} label="Download PDF" />
           {isPlaying ? null : isCompleted ? (
@@ -474,9 +619,18 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         </div>
       </div>
       
-      <div className="bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto">
-        <div className="mb-6 bg-white p-3 border-2 border-gray-300">
-          <h4 className="text-sm font-bold text-black mb-2 flex items-center">
+      <div ref={fullscreenContainerRef} className={`group bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto relative ${isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-black border-0 p-0 m-0' : ''}`}>
+        {/* Fullscreen toggle icon positioned on the visualization container like YouTube */}
+        <button 
+          onClick={toggleFullscreen}
+          className="absolute top-4 right-4 bg-black bg-opacity-70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-opacity-90 z-10"
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+          {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+        </button>
+        
+        <div className={`mb-6 bg-white p-3 border-2 border-gray-300 ${isFullscreen ? '!border-0 !p-0' : ''}`}>
+          <h4 className={`text-sm font-bold text-black mb-2 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
             <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center text-xs mr-2">
               {safeCurrentStep + 1}
             </span>
@@ -486,14 +640,14 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             </span>
           </h4>
           
-          <div className="flex justify-center items-center mb-3 overflow-auto py-2 max-h-[500px]">
+          <div className={`flex justify-center items-center mb-3 overflow-auto py-2 max-h-[500px] ${isFullscreen ? 'scale-150' : ''}`}>
             {currentStepData ? (
               <div className="w-full min-h-[400px] flex items-center justify-center overflow-auto">
                 <svg 
                   ref={svgRef} 
                   width="100%" 
                   height="500" 
-                  className="border border-gray-200 rounded min-w-[600px]"
+                  className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`}
                   viewBox="0 0 600 500"
                 />
               </div>
@@ -504,7 +658,7 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             )}
           </div>
           
-          <div className="text-center p-2 bg-white border border-gray-200">
+          <div className={`text-center p-2 bg-white border border-gray-200 ${isFullscreen ? 'hidden' : ''}`}>
             <p className="font-semibold text-black text-sm">
               {getOperationDescription(currentStepData)}
             </p>

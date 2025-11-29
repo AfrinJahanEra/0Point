@@ -1,13 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
+import { Maximize, Minimize } from 'lucide-react';
 
 const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
   const [hoveredNode, setHoveredNode] = useState(null);
   const visualizationRef = useRef(null);
   const currentStepRef = useRef(null);
   const hasCompletedRef = useRef(false);
+  const [speed, setSpeed] = useState(2000); // Default 2 seconds
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenContainerRef = useRef(null);
 
-  // Auto-advance every 2 seconds automatically
+  // Handle fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+      setIsFullscreen(!!fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Auto-advance based on speed setting
   useEffect(() => {
     if (isPlaying && steps && steps.length > 0) {
       const interval = setInterval(() => {
@@ -16,11 +40,11 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         } else {
           if (onStop) onStop();
         }
-      }, 2000);
+      }, speed);
       
       return () => clearInterval(interval);
     }
-  }, [steps, currentStep, onNext, isPlaying, onStop]);
+  }, [steps, currentStep, onNext, isPlaying, onStop, speed]);
 
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
@@ -198,76 +222,121 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     const nodeId = `${prefix}-${level}`;
     const nodeSize = 30;
     const verticalSpacing = 70;
-    const horizontalSpacing = Math.max(200 / (level + 1), 80);
+    const horizontalSpacing = Math.max(120 / (level + 1), 50);
     
-    const nodeLabel = prefix ? prefix.slice(-1) : 'root';
+    // Check if this is the current node being processed
+    const isCurrentNode = currentStepData && 
+      ((currentStepData.path && prefix === currentStepData.path) || 
+       (currentStepData.currentChar && prefix && prefix.slice(-1) === currentStepData.currentChar));
     
     return (
       <g key={nodeId}>
-        <circle
-          cx={x}
-          cy={y}
-          r={nodeSize / 2}
-          fill={node.isEnd ? "#10B981" : "#FFFFFF"}
-          stroke="#9CA3AF"
-          strokeWidth="2"
-          className="cursor-pointer hover:stroke-blue-500 transition-all duration-300 drop-shadow-sm"
-          onMouseEnter={() => setHoveredNode(prefix || 'root')}
-          onMouseLeave={() => setHoveredNode(null)}
-        />
-        
-        <text
-          x={x}
-          y={y + 5}
-          textAnchor="middle"
-          className="font-bold text-black text-base drop-shadow-sm"
-        >
-          {nodeLabel}
-        </text>
-        
-        {node.isEnd && (
-          <text
-            x={x}
-            y={y - 25}
-            textAnchor="middle"
-            className="text-xs text-green-600 font-bold drop-shadow-sm"
-          >
-            END
-          </text>
-        )}
-        
+        {/* Render children first */}
         {node.children && Object.keys(node.children).map((char, index) => {
           const child = node.children[char];
-          const childX = x + (index - (Object.keys(node.children).length - 1) / 2) * horizontalSpacing;
+          const childrenCount = Object.keys(node.children).length;
+          const childX = x + (index - (childrenCount - 1) / 2) * horizontalSpacing;
           const childY = y + verticalSpacing;
           
           return (
             <g key={`${nodeId}-${char}`}>
+              {/* Connection line to child */}
               <line
                 x1={x}
-                y1={y + nodeSize / 2}
+                y1={y + nodeSize/2}
                 x2={childX}
-                y2={childY - nodeSize / 2}
+                y2={childY - nodeSize/2}
                 stroke="#9CA3AF"
                 strokeWidth="2"
-                markerEnd="url(#arrowhead)"
               />
               
+              {/* Character label on the line */}
               <text
                 x={(x + childX) / 2}
-                y={(y + childY) / 2 - 10}
+                y={(y + childY) / 2 - 5}
                 textAnchor="middle"
-                className="text-sm text-blue-600 font-bold bg-white px-1 rounded"
+                className="text-blue-600 font-medium"
               >
                 {char}
               </text>
               
+              {/* Child node */}
               {renderTrieNode(child, prefix + char, childX, childY, level + 1)}
             </g>
           );
         })}
+        
+        {/* Render node circle */}
+        <circle
+          cx={x}
+          cy={y}
+          r={nodeSize/2}
+          fill={node.isEnd ? "#10B981" : "#FFFFFF"}
+          stroke={isCurrentNode ? "#3B82F6" : "#9CA3AF"}
+          strokeWidth={isCurrentNode ? "3" : "2"}
+          className="transition-all duration-300"
+          onMouseEnter={() => setHoveredNode(nodeId)}
+          onMouseLeave={() => setHoveredNode(null)}
+        />
+        
+        {/* Render node value */}
+        <text
+          x={x}
+          y={y + 5}
+          textAnchor="middle"
+          className={`font-bold ${node.isEnd ? 'text-white' : 'text-black'}`}
+        >
+          {prefix ? prefix.slice(-1) : 'root'}
+        </text>
+        
+        {/* Render end marker for end nodes */}
+        {node.isEnd && (
+          <text
+            x={x}
+            y={y - 20}
+            textAnchor="middle"
+            className="text-green-500 font-bold text-xs"
+          >
+            END
+          </text>
+        )}
       </g>
     );
+  };
+
+  // Toggle fullscreen mode using Fullscreen API
+  const toggleFullscreen = () => {
+    if (!fullscreenContainerRef.current) return;
+
+    if (!isFullscreen) {
+      // Enter fullscreen
+      const element = fullscreenContainerRef.current;
+      if (element.requestFullscreen) {
+        element.requestFullscreen();
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+      } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
+      }
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  };
+
+  // Handle speed change
+  const handleSpeedChange = (newSpeed) => {
+    setSpeed(newSpeed);
   };
 
   if (!data || !steps || steps.length === 0) return null;
@@ -280,7 +349,23 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     <div className="mt-2">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">Trie Visualization</h3>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* Speed Control */}
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-gray-700">Speed:</span>
+            <select 
+              value={speed} 
+              onChange={(e) => handleSpeedChange(Number(e.target.value))}
+              className="px-2 py-1 border border-gray-300 rounded text-sm"
+              disabled={isPlaying}
+            >
+              <option value={500}>Fast (0.5s)</option>
+              <option value={1000}>Medium (1s)</option>
+              <option value={2000}>Slow (2s)</option>
+              <option value={3000}>Very Slow (3s)</option>
+            </select>
+          </div>
+          
           {/* ADDED: Download PDF Button */}
           <button 
             onClick={downloadStepsAsPDF}
@@ -303,9 +388,18 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         </div>
       </div>
       
-      <div className="bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto">
-        <div className="mb-6 bg-white p-3 border-2 border-gray-300">
-          <h4 className="text-sm font-bold text-black mb-2 flex items-center">
+      <div ref={fullscreenContainerRef} className={`group bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto relative ${isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-black border-0 p-0 m-0' : ''}`}>
+        {/* Fullscreen toggle icon positioned on the visualization container like YouTube */}
+        <button 
+          onClick={toggleFullscreen}
+          className="absolute top-4 right-4 bg-black bg-opacity-70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-opacity-90 z-10"
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+          {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+        </button>
+        
+        <div className={`mb-6 bg-white p-3 border-2 border-gray-300 ${isFullscreen ? '!border-0 !p-0' : ''}`}>
+          <h4 className={`text-sm font-bold text-black mb-2 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
             <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center text-xs mr-2">
               {safeCurrentStep + 1}
             </span>
@@ -315,10 +409,10 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             </span>
           </h4>
           
-          <div className="flex justify-center items-center mb-3 overflow-auto py-2 max-h-[500px]">
+          <div className={`flex justify-center items-center mb-3 overflow-auto py-2 max-h-[500px] ${isFullscreen ? 'scale-150' : ''}`}>
             {currentStepData ? (
-              <div className="w-full min-h-[400px] flex items-center justify-center overflow-auto">
-                <svg width="100%" height="500" className="border border-gray-200 rounded min-w-[600px]" viewBox="0 0 600 500">
+              <div className={`w-full min-h-[400px] flex items-center justify-center overflow-auto ${isFullscreen ? 'scale-150' : ''}`}>
+                <svg width="100%" height="500" className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`} viewBox="0 0 600 500">
                   <defs>
                     <marker 
                       id="arrowhead" 
@@ -342,7 +436,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             )}
           </div>
           
-          <div className="text-center p-2 bg-white border border-gray-200">
+          <div className={`text-center p-2 bg-white border border-gray-200 ${isFullscreen ? 'hidden' : ''}`}>
             <p className="font-semibold text-black text-sm">
               {getOperationDescription(currentStepData)}
             </p>
@@ -365,10 +459,10 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                     <div className="font-medium text-black">Step {index + 1}</div>
                     <div className="text-gray-600 text-sm mt-1">{getOperationDescription(step)}</div>
                     
-                    <div className="mt-3 min-h-[200px] flex items-center justify-center overflow-auto">
+                    <div className={`mt-3 min-h-[200px] flex items-center justify-center overflow-auto ${isFullscreen ? 'scale-150' : ''}`}>
                       {step.tree || step.operation ? (
-                        <div className="w-full min-h-[200px] overflow-auto">
-                          <svg width="100%" height="400" className="border border-gray-200 rounded min-w-[400px]" viewBox="0 0 400 400">
+                        <div className={`w-full min-h-[200px] overflow-auto ${isFullscreen ? 'scale-150' : ''}`}>
+                          <svg width="100%" height="400" className={`border border-gray-200 rounded min-w-[400px] ${isFullscreen ? '!border-0' : ''}`} viewBox="0 0 400 400">
                             <defs>
                               <marker 
                                 id="arrowhead" 

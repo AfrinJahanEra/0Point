@@ -1,13 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
+import { Maximize, Minimize } from 'lucide-react';
 
 const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const visualizationRef = useRef(null);
   const currentStepRef = useRef(null);
   const hasCompletedRef = useRef(false);
+  const [speed, setSpeed] = useState(2000); // Default 2 seconds
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenContainerRef = useRef(null);
 
-  // Auto-advance every 2 seconds automatically
+  // Handle fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+      setIsFullscreen(!!fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Auto-advance based on speed setting
   useEffect(() => {
     if (isPlaying && steps && steps.length > 0) {
       const interval = setInterval(() => {
@@ -17,11 +41,11 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
           // Stop automatically when we reach the end
           if (onStop) onStop();
         }
-      }, 2000); // Advance every 2 seconds
+      }, speed);
       
       return () => clearInterval(interval);
     }
-  }, [steps, currentStep, onNext, isPlaying, onStop]);
+  }, [steps, currentStep, onNext, isPlaying, onStop, speed]);
 
   // Ensure currentStep doesn't exceed steps length
   useEffect(() => {
@@ -289,21 +313,21 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
           const cellX = startX + ((i - startIndex) * cellWidth * scale);
           const cellY = startY + (line * (cellHeight + 18) * scale) + (6 * scale); // Increased spacing
           
-          const isSorted = step.sorted && step.sorted.includes(arrIdx);
           const isComparing = step.comparing && step.comparing.includes(arrIdx);
           const isSwapping = step.swapping && step.swapping.includes(arrIdx);
+          const isSorted = step.sorted && step.sorted.includes(arrIdx);
           const isPivot = step.pivot !== undefined && arrIdx === step.pivot;
           const isHeapRoot = step.heapRoot !== undefined && arrIdx === step.heapRoot;
           
           // Set fill color based on state
-          if (isSwapping) {
-            doc.setFillColor(156, 163, 175); // gray-400
-          } else if (isComparing) {
-            doc.setFillColor(209, 213, 219); // gray-300
-          } else if (isPivot) {
+          if (isPivot) {
             doc.setFillColor(0, 0, 0); // black
           } else if (isHeapRoot) {
             doc.setFillColor(30, 64, 175); // blue-800
+          } else if (isComparing) {
+            doc.setFillColor(209, 213, 219); // gray-300
+          } else if (isSwapping) {
+            doc.setFillColor(156, 163, 175); // gray-400
           } else if (isSorted) {
             doc.setFillColor(229, 231, 235); // gray-200
           } else {
@@ -336,6 +360,41 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
     }
   };
 
+  // Toggle fullscreen mode using Fullscreen API
+  const toggleFullscreen = () => {
+    if (!fullscreenContainerRef.current) return;
+
+    if (!isFullscreen) {
+      // Enter fullscreen
+      const element = fullscreenContainerRef.current;
+      if (element.requestFullscreen) {
+        element.requestFullscreen();
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+      } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
+      }
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  };
+
+  // Handle speed change
+  const handleSpeedChange = (newSpeed) => {
+    setSpeed(newSpeed);
+  };
+
   if (!data || !data.array || !steps || steps.length === 0) return null;
 
   // Check if visualization has completed (safety check)
@@ -347,7 +406,23 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
     <div className="mt-2">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">Sorting Visualization</h3>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* Speed Control */}
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-gray-700">Speed:</span>
+            <select 
+              value={speed} 
+              onChange={(e) => handleSpeedChange(Number(e.target.value))}
+              className="px-2 py-1 border border-gray-300 rounded text-sm"
+              disabled={isPlaying}
+            >
+              <option value={500}>Fast (0.5s)</option>
+              <option value={1000}>Medium (1s)</option>
+              <option value={2000}>Slow (2s)</option>
+              <option value={3000}>Very Slow (3s)</option>
+            </select>
+          </div>
+          
           <button 
             onClick={downloadStepsAsPDF}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
@@ -369,10 +444,19 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
         </div>
       </div>
       
-      <div className="bg-white p-4 border border-gray-200 mb-4">
+      <div ref={fullscreenContainerRef} className={`group bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto relative ${isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-black border-0 p-0 m-0' : ''}`}>
+        {/* Fullscreen toggle icon positioned on the visualization container like YouTube */}
+        <button 
+          onClick={toggleFullscreen}
+          className="absolute top-4 right-4 bg-black bg-opacity-70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-opacity-90 z-10"
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+          {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+        </button>
+        
         {/* Single animated frame showing current step */}
-        <div className="mb-6 bg-white p-3 border-2 border-gray-300">
-          <h4 className="text-sm font-bold text-black mb-2 flex items-center">
+        <div className={`mb-6 bg-white p-3 border-2 border-gray-300 ${isFullscreen ? '!border-0 !p-0' : ''}`}>
+          <h4 className={`text-sm font-bold text-black mb-2 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
             <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center text-xs mr-2">
               {safeCurrentStep + 1}
             </span>
@@ -382,7 +466,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
             </span>
           </h4>
           
-          <div className="flex justify-center items-center mb-3 py-2">
+          <div className={`flex justify-center items-center mb-3 py-2 ${isFullscreen ? 'scale-150' : ''}`}>
             <div className="flex gap-2 min-w-max px-2">
               {steps[safeCurrentStep] && steps[safeCurrentStep].array ? steps[safeCurrentStep].array.map((value, index) => {
                 const stepData = steps[safeCurrentStep];
@@ -405,7 +489,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
             </div>
           </div>
           
-          <div className="text-center p-2 bg-white border border-gray-200">
+          <div className={`text-center p-2 bg-white border border-gray-200 ${isFullscreen ? 'hidden' : ''}`}>
             <p className="font-semibold text-black text-sm">
               {getOperationDescription(steps[safeCurrentStep])}
             </p>
