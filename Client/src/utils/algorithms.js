@@ -1363,203 +1363,343 @@ export const algorithms = [
       return steps;
     }
   },
-  // Graph Algorithms
-  { 
-    id: 'bfs', 
-    name: 'Breadth-First Search', 
-    description: 'Graph traversal algorithm that explores all vertices at the present depth level before moving on to vertices at the next depth level',
-    inputs: [
-      { label: 'Graph Edges', placeholder: 'Enter edges as pairs separated by commas, e.g., A-B,B-C,C-D,A-C' },
-      { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
-    ],
-    examples: [
-      ['A-B,B-C,C-D,D-E,E-F,F-G,G-H,H-I,I-J,J-K,K-L,L-M,M-N,N-O,O-P,P-Q,Q-R,R-S,S-T,T-U,U-V,V-W,W-X,X-Y,Y-Z', 'A'],
-      ['1-2,2-3,3-4,4-5,1-3,2-4,3-5', '1']
-    ],
-    generateSteps: (data) => {
-      const steps = [];
-      const edges = data.edges || [];
-      const startNode = data.startNode || '';
+  // Graph Algorithm
+
+{ 
+  id: 'bfs', 
+  name: 'Breadth-First Search', 
+  description: 'Graph traversal algorithm that explores all vertices at the present depth level before moving on to vertices at the next depth level',
+  inputs: [
+    { label: 'Graph Edges', placeholder: 'Enter edges as pairs separated by commas, e.g., A-B,B-C,C-D,A-C' },
+    { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
+  ],
+  examples: [
+    ['A-B,B-C,C-D,A-C', 'A'],
+    ['1-2,2-3,3-4,1-3', '1']
+  ],
+  generateSteps: (data) => {
+    const steps = [];
+    const edges = data.edges || [];
+    const startNode = data.startNode || 'A';
+    
+    // Parse edges into adjacency list
+    const graph = {};
+    edges.forEach(edge => {
+      const [from, to] = edge.split('-');
+      if (!graph[from]) graph[from] = [];
+      if (!graph[to]) graph[to] = [];
+      if (!graph[from].includes(to)) graph[from].push(to);
+      if (!graph[to].includes(from)) graph[to].push(from);
+    });
+    
+    // BFS implementation
+    const visited = new Set();
+    const queue = [startNode];
+    
+    steps.push({
+      graph: JSON.parse(JSON.stringify(graph)),
+      queue: [...queue],
+      visited: Array.from(visited),
+      currentNode: null,
+      operation: 'start'
+    });
+    
+    visited.add(startNode);
+    
+    steps.push({
+      graph: JSON.parse(JSON.stringify(graph)),
+      queue: [...queue],
+      visited: Array.from(visited),
+      currentNode: startNode,
+      operation: 'visit'
+    });
+    
+    while (queue.length > 0) {
+      const currentNode = queue.shift();
       
-      // Parse edges into adjacency list
-      const graph = {};
-      edges.forEach(edge => {
-        const [from, to] = edge.split('-');
-        if (!graph[from]) graph[from] = [];
-        if (!graph[to]) graph[to] = [];
-        graph[from].push(to);
-        graph[to].push(from); // Assuming undirected graph
-      });
-      
-      // BFS implementation with step tracking
-      const visited = new Set();
-      const queue = [startNode];
-      visited.add(startNode);
-      
-      // Initial state
       steps.push({
         graph: JSON.parse(JSON.stringify(graph)),
-        queue: [startNode],
+        queue: [...queue],
         visited: Array.from(visited),
-        currentNode: startNode,
-        neighbors: graph[startNode] || [],
-        operation: 'start'
+        currentNode: currentNode,
+        neighbors: graph[currentNode] || [],
+        operation: 'process'
       });
       
-      while (queue.length > 0) {
-        const currentNode = queue.shift();
+      const neighbors = graph[currentNode] || [];
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          queue.push(neighbor);
+          
+          steps.push({
+            graph: JSON.parse(JSON.stringify(graph)),
+            queue: [...queue],
+            visited: Array.from(visited),
+            currentNode: currentNode,
+            neighbor: neighbor,
+            operation: 'enqueue'
+          });
+        }
+      }
+    }
+    
+    steps.push({
+      graph: JSON.parse(JSON.stringify(graph)),
+      queue: [],
+      visited: Array.from(visited),
+      currentNode: null,
+      operation: 'complete'
+    });
+    
+    return steps;
+  }
+},
+
+{ 
+  id: 'dfs', 
+  name: 'Depth-First Search', 
+  description: 'Graph traversal algorithm that explores as far as possible along each branch before backtracking',
+  inputs: [
+    { label: 'Graph Edges', placeholder: 'Enter edges as pairs separated by commas, e.g., A-B,B-C,C-D,A-C' },
+    { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
+  ],
+  examples: [
+    ['A-B,B-C,C-D,A-C', 'A'],
+    ['1-2,2-3,3-4,1-3', '1']
+  ],
+  generateSteps: (data) => {
+    const steps = [];
+    const edges = data.edges || [];
+    const startNode = data.startNode || 'A';
+    
+    // Parse edges into adjacency list
+    const graph = {};
+    edges.forEach(edge => {
+      const [from, to] = edge.split('-');
+      if (!graph[from]) graph[from] = [];
+      if (!graph[to]) graph[to] = [];
+      if (!graph[from].includes(to)) graph[from].push(to);
+      if (!graph[to].includes(from)) graph[to].push(from);
+    });
+    
+    // DFS implementation
+    const visited = new Set();
+    const stack = [startNode];
+    
+    steps.push({
+      graph: JSON.parse(JSON.stringify(graph)),
+      stack: [...stack],
+      visited: Array.from(visited),
+      currentNode: null,
+      operation: 'start'
+    });
+    
+    while (stack.length > 0) {
+      const currentNode = stack.pop();
+      
+      if (!visited.has(currentNode)) {
+        visited.add(currentNode);
         
-        // Process neighbors
+        steps.push({
+          graph: JSON.parse(JSON.stringify(graph)),
+          stack: [...stack],
+          visited: Array.from(visited),
+          currentNode: currentNode,
+          operation: 'visit'
+        });
+        
         const neighbors = graph[currentNode] || [];
-        for (const neighbor of neighbors) {
+        // Add neighbors in reverse order for proper DFS visualization
+        for (let i = neighbors.length - 1; i >= 0; i--) {
+          const neighbor = neighbors[i];
           if (!visited.has(neighbor)) {
-            visited.add(neighbor);
-            queue.push(neighbor);
+            stack.push(neighbor);
             
             steps.push({
               graph: JSON.parse(JSON.stringify(graph)),
-              queue: [...queue],
+              stack: [...stack],
               visited: Array.from(visited),
-              currentNode: neighbor,
-              neighbors: graph[neighbor] || [],
-              operation: 'visit'
+              currentNode: currentNode,
+              neighbor: neighbor,
+              operation: 'push'
             });
           }
         }
         
-        steps.push({
-          graph: JSON.parse(JSON.stringify(graph)),
-          queue: [...queue],
-          visited: Array.from(visited),
-          currentNode: currentNode,
-          neighbors: neighbors,
-          operation: 'process'
-        });
-      }
-      
-      // Final state
-      steps.push({
-        graph: JSON.parse(JSON.stringify(graph)),
-        queue: [],
-        visited: Array.from(visited),
-        currentNode: null,
-        neighbors: [],
-        operation: 'complete'
-      });
-      
-      return steps;
-    }
-  },
-  { 
-    id: 'dfs', 
-    name: 'Depth-First Search', 
-    description: 'Graph traversal algorithm that explores as far as possible along each branch before backtracking',
-    inputs: [
-      { label: 'Graph Edges', placeholder: 'Enter edges as pairs separated by commas, e.g., A-B,B-C,C-D,A-C' },
-      { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
-    ],
-    examples: [
-      ['A-B,B-C,C-D,D-E,E-F,F-G,G-H,H-I,I-J,J-K,K-L,L-M,M-N,N-O,O-P,P-Q,Q-R,R-S,S-T,T-U,U-V,V-W,W-X,X-Y,Y-Z', 'A'],
-      ['1-2,2-3,3-4,4-5,1-3,2-4,3-5', '1']
-    ],
-    generateSteps: (data) => {
-      const steps = [];
-      const edges = data.edges || [];
-      const startNode = data.startNode || '';
-      
-      // Parse edges into adjacency list
-      const graph = {};
-      edges.forEach(edge => {
-        const [from, to] = edge.split('-');
-        if (!graph[from]) graph[from] = [];
-        if (!graph[to]) graph[to] = [];
-        graph[from].push(to);
-        graph[to].push(from); // Assuming undirected graph
-      });
-      
-      // DFS implementation with step tracking
-      const visited = new Set();
-      const stack = [startNode];
-      
-      // Initial state
-      steps.push({
-        graph: JSON.parse(JSON.stringify(graph)),
-        stack: [startNode],
-        visited: Array.from(visited),
-        currentNode: null,
-        neighbors: [],
-        operation: 'start'
-      });
-      
-      while (stack.length > 0) {
-        const currentNode = stack.pop();
-        
-        if (!visited.has(currentNode)) {
-          visited.add(currentNode);
-          
+        if (stack.length > 0) {
           steps.push({
             graph: JSON.parse(JSON.stringify(graph)),
             stack: [...stack],
             visited: Array.from(visited),
             currentNode: currentNode,
-            neighbors: graph[currentNode] || [],
-            operation: 'visit'
-          });
-          
-          // Add neighbors to stack in reverse order for consistent traversal
-          const neighbors = graph[currentNode] || [];
-          for (let i = neighbors.length - 1; i >= 0; i--) {
-            const neighbor = neighbors[i];
-            if (!visited.has(neighbor)) {
-              stack.push(neighbor);
-            }
-          }
-          
-          steps.push({
-            graph: JSON.parse(JSON.stringify(graph)),
-            stack: [...stack],
-            visited: Array.from(visited),
-            currentNode: currentNode,
-            neighbors: graph[currentNode] || [],
-            operation: 'process'
+            operation: 'backtrack'
           });
         }
       }
+    }
+    
+    steps.push({
+      graph: JSON.parse(JSON.stringify(graph)),
+      stack: [],
+      visited: Array.from(visited),
+      currentNode: null,
+      operation: 'complete'
+    });
+    
+    return steps;
+  }
+},
+
+{ 
+  id: 'dijkstra', 
+  name: "Dijkstra's Algorithm", 
+  description: 'Algorithm for finding the shortest paths between nodes in a weighted graph',
+  inputs: [
+    { label: 'Weighted Graph Edges', placeholder: 'Enter weighted edges as triplets separated by commas, e.g., A-B-5,B-C-3,C-D-2,A-C-10' },
+    { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
+  ],
+  examples: [
+    ['A-B-5,B-C-3,C-D-2,A-C-10', 'A'],
+    ['1-2-4,2-3-1,1-3-8,3-4-2', '1']
+  ],
+  generateSteps: (data) => {
+    const steps = [];
+    const weightedEdges = data.weightedEdges || [];
+    const startNode = data.startNode || 'A';
+    
+    // Parse weighted edges into adjacency list
+    const graph = {};
+    const allNodes = new Set();
+    
+    weightedEdges.forEach(edge => {
+      const [from, to, weightStr] = edge.split('-');
+      const weight = parseInt(weightStr);
+      if (!isNaN(weight)) {
+        if (!graph[from]) graph[from] = [];
+        if (!graph[to]) graph[to] = [];
+        graph[from].push({ node: to, weight });
+        graph[to].push({ node: from, weight });
+        allNodes.add(from);
+        allNodes.add(to);
+      }
+    });
+    
+    // Dijkstra's algorithm
+    const distances = {};
+    const visited = new Set();
+    const unvisited = new Set(allNodes);
+    
+    // Initialize distances
+    allNodes.forEach(node => {
+      distances[node] = node === startNode ? 0 : Infinity;
+    });
+    
+    steps.push({
+      graph: JSON.parse(JSON.stringify(graph)),
+      distances: JSON.parse(JSON.stringify(distances)),
+      visited: Array.from(visited),
+      unvisited: Array.from(unvisited),
+      currentNode: null,
+      operation: 'start'
+    });
+    
+    while (unvisited.size > 0) {
+      // Find node with minimum distance
+      let currentNode = null;
+      let minDistance = Infinity;
       
-      // Final state
+      for (const node of unvisited) {
+        if (distances[node] < minDistance) {
+          minDistance = distances[node];
+          currentNode = node;
+        }
+      }
+      
+      if (currentNode === null || distances[currentNode] === Infinity) break;
+      
+      unvisited.delete(currentNode);
+      visited.add(currentNode);
+      
       steps.push({
         graph: JSON.parse(JSON.stringify(graph)),
-        stack: [],
+        distances: JSON.parse(JSON.stringify(distances)),
         visited: Array.from(visited),
-        currentNode: null,
-        neighbors: [],
-        operation: 'complete'
+        unvisited: Array.from(unvisited),
+        currentNode: currentNode,
+        currentDistance: distances[currentNode],
+        operation: 'select_node'
       });
       
-      return steps;
+      // Update neighbors
+      const neighbors = graph[currentNode] || [];
+      for (const neighborObj of neighbors) {
+        const { node: neighbor, weight } = neighborObj;
+        
+        if (!visited.has(neighbor)) {
+          const newDistance = distances[currentNode] + weight;
+          
+          steps.push({
+            graph: JSON.parse(JSON.stringify(graph)),
+            distances: JSON.parse(JSON.stringify(distances)),
+            visited: Array.from(visited),
+            unvisited: Array.from(unvisited),
+            currentNode: currentNode,
+            neighbor: neighbor,
+            operation: 'relax_edge'
+          });
+          
+          if (newDistance < distances[neighbor]) {
+            distances[neighbor] = newDistance;
+            
+            steps.push({
+              graph: JSON.parse(JSON.stringify(graph)),
+              distances: JSON.parse(JSON.stringify(distances)),
+              visited: Array.from(visited),
+              unvisited: Array.from(unvisited),
+              currentNode: currentNode,
+              neighborUpdated: neighbor,
+              newDistance: newDistance,
+              operation: 'update_distance'
+            });
+          }
+        }
+      }
     }
+    
+    steps.push({
+      graph: JSON.parse(JSON.stringify(graph)),
+      distances: JSON.parse(JSON.stringify(distances)),
+      visited: Array.from(visited),
+      unvisited: Array.from(unvisited),
+      currentNode: null,
+      operation: 'complete'
+    });
+    
+    return steps;
+  }
+
   },
-  // Dijkstra's Algorithm for Shortest Path
+  
   { 
-    id: 'dijkstra', 
-    name: "Dijkstra's Algorithm", 
-    description: 'Algorithm for finding the shortest paths between nodes in a weighted graph',
+    id: 'kruskal', 
+    name: "Kruskal's Algorithm", 
+    description: 'Algorithm for finding the minimum spanning tree in a weighted graph using disjoint-set data structure',
     inputs: [
-      { label: 'Weighted Graph Edges', placeholder: 'Enter weighted edges as triplets separated by commas, e.g., A-B-5,B-C-3,C-D-2,A-C-10' },
-      { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
+      { label: 'Weighted Graph Edges', placeholder: 'Enter weighted edges as triplets separated by commas, e.g., A-B-5,B-C-3,C-D-2,A-C-10' }
     ],
     examples: [
-      ['A-B-5,B-C-3,C-D-2,A-C-10,A-D-15', 'A'],
-      ['1-2-4,2-3-1,1-3-8,3-4-2,2-4-6', '1']
+      ['A-B-5,B-C-3,C-D-2,A-C-10'],
+      ['1-2-4,2-3-1,1-3-8,3-4-2']
     ],
     generateSteps: (data) => {
       const steps = [];
       const weightedEdges = data.weightedEdges || [];
-      const startNode = data.startNode || '';
       
-      // Parse weighted edges into adjacency list
+      // Parse weighted edges and collect all nodes
       const graph = {};
       const allNodes = new Set();
+      const edges = [];
       
       weightedEdges.forEach(edge => {
         const [from, to, weightStr] = edge.split('-');
@@ -1568,141 +1708,10 @@ export const algorithms = [
           if (!graph[from]) graph[from] = [];
           if (!graph[to]) graph[to] = [];
           graph[from].push({ node: to, weight });
-          graph[to].push({ node: from, weight }); // Assuming undirected graph
+          graph[to].push({ node: from, weight });
           allNodes.add(from);
           allNodes.add(to);
-        }
-      });
-      
-      // Dijkstra's algorithm implementation with step tracking
-      const distances = {};
-      const previous = {};
-      const visited = new Set();
-      const unvisited = new Set(allNodes);
-      
-      // Initialize distances
-      allNodes.forEach(node => {
-        distances[node] = node === startNode ? 0 : Infinity;
-        previous[node] = null;
-      });
-      
-      // Initial state
-      steps.push({
-        graph: JSON.parse(JSON.stringify(graph)),
-        distances: JSON.parse(JSON.stringify(distances)),
-        previous: JSON.parse(JSON.stringify(previous)),
-        visited: Array.from(visited),
-        unvisited: Array.from(unvisited),
-        currentNode: null,
-        currentDistance: null,
-        neighbors: [],
-        operation: 'start'
-      });
-      
-      while (unvisited.size > 0) {
-        // Find node with minimum distance
-        let currentNode = null;
-        let minDistance = Infinity;
-        
-        for (const node of unvisited) {
-          if (distances[node] < minDistance) {
-            minDistance = distances[node];
-            currentNode = node;
-          }
-        }
-        
-        // If all remaining nodes are unreachable, break
-        if (currentNode === null || distances[currentNode] === Infinity) {
-          break;
-        }
-        
-        // Mark current node as visited
-        unvisited.delete(currentNode);
-        visited.add(currentNode);
-        
-        steps.push({
-          graph: JSON.parse(JSON.stringify(graph)),
-          distances: JSON.parse(JSON.stringify(distances)),
-          previous: JSON.parse(JSON.stringify(previous)),
-          visited: Array.from(visited),
-          unvisited: Array.from(unvisited),
-          currentNode: currentNode,
-          currentDistance: distances[currentNode],
-          neighbors: graph[currentNode] || [],
-          operation: 'select_node'
-        });
-        
-        // Update distances to neighbors
-        const neighbors = graph[currentNode] || [];
-        for (const neighborObj of neighbors) {
-          const { node: neighbor, weight } = neighborObj;
-          if (!visited.has(neighbor)) {
-            const newDistance = distances[currentNode] + weight;
-            if (newDistance < distances[neighbor]) {
-              distances[neighbor] = newDistance;
-              previous[neighbor] = currentNode;
-              
-              steps.push({
-                graph: JSON.parse(JSON.stringify(graph)),
-                distances: JSON.parse(JSON.stringify(distances)),
-                previous: JSON.parse(JSON.stringify(previous)),
-                visited: Array.from(visited),
-                unvisited: Array.from(unvisited),
-                currentNode: currentNode,
-                currentDistance: distances[currentNode],
-                neighborUpdated: neighbor,
-                newDistance: newDistance,
-                neighbors: graph[currentNode] || [],
-                operation: 'update_distance'
-              });
-            }
-          }
-        }
-      }
-      
-      // Final state
-      steps.push({
-        graph: JSON.parse(JSON.stringify(graph)),
-        distances: JSON.parse(JSON.stringify(distances)),
-        previous: JSON.parse(JSON.stringify(previous)),
-        visited: Array.from(visited),
-        unvisited: Array.from(unvisited),
-        currentNode: null,
-        currentDistance: null,
-        neighbors: [],
-        operation: 'complete'
-      });
-      
-      return steps;
-    }
-  },
-  // Kruskal's Algorithm for Minimum Spanning Tree
-  { 
-    id: 'kruskal', 
-    name: "Kruskal's Algorithm", 
-    description: 'Algorithm for finding the minimum spanning tree of a weighted undirected graph',
-    inputs: [
-      { label: 'Weighted Graph Edges', placeholder: 'Enter weighted edges as triplets separated by commas, e.g., A-B-5,B-C-3,C-D-2,A-C-10' }
-    ],
-    examples: [
-      ['A-B-5,B-C-3,C-D-2,A-C-10,A-D-15'],
-      ['1-2-4,2-3-1,1-3-8,3-4-2,2-4-6']
-    ],
-    generateSteps: (data) => {
-      const steps = [];
-      const weightedEdges = data.weightedEdges || [];
-      
-      // Parse weighted edges
-      const edges = [];
-      const allNodes = new Set();
-      
-      weightedEdges.forEach(edge => {
-        const [from, to, weightStr] = edge.split('-');
-        const weight = parseInt(weightStr);
-        if (!isNaN(weight)) {
           edges.push({ from, to, weight });
-          allNodes.add(from);
-          allNodes.add(to);
         }
       });
       
@@ -1713,6 +1722,13 @@ export const algorithms = [
       const parent = {};
       const rank = {};
       
+      // Initialize Union-Find
+      allNodes.forEach(node => {
+        parent[node] = node;
+        rank[node] = 0;
+      });
+      
+      // Find operation for Union-Find
       const find = (node) => {
         if (parent[node] !== node) {
           parent[node] = find(parent[node]); // Path compression
@@ -1720,6 +1736,7 @@ export const algorithms = [
         return parent[node];
       };
       
+      // Union operation for Union-Find
       const union = (x, y) => {
         const rootX = find(x);
         const rootY = find(y);
@@ -1739,65 +1756,69 @@ export const algorithms = [
         return false;
       };
       
-      // Initialize Union-Find
-      allNodes.forEach(node => {
-        parent[node] = node;
-        rank[node] = 0;
-      });
-      
-      // Kruskal's algorithm implementation with step tracking
+      // Kruskal's algorithm
       const mst = [];
       let edgeIndex = 0;
       
       // Initial state
       steps.push({
+        graph: JSON.parse(JSON.stringify(graph)),
         edges: [...edges],
-        mst: [...mst],
+        mst: [],
         parent: JSON.parse(JSON.stringify(parent)),
         rank: JSON.parse(JSON.stringify(rank)),
         currentEdge: null,
         operation: 'start'
       });
       
-      while (mst.length < allNodes.size - 1 && edgeIndex < edges.length) {
+      // Process edges until MST is complete or all edges are processed
+      while (edgeIndex < edges.length && mst.length < allNodes.size - 1) {
         const currentEdge = edges[edgeIndex];
-        edgeIndex++;
         
+        // Show consideration of current edge
         steps.push({
+          graph: JSON.parse(JSON.stringify(graph)),
           edges: [...edges],
           mst: [...mst],
           parent: JSON.parse(JSON.stringify(parent)),
           rank: JSON.parse(JSON.stringify(rank)),
-          currentEdge: currentEdge,
+          currentEdge: { ...currentEdge },
           operation: 'consider_edge'
         });
         
         // Check if adding this edge creates a cycle
         if (union(currentEdge.from, currentEdge.to)) {
-          mst.push(currentEdge);
+          // No cycle - add edge to MST
+          mst.push({ ...currentEdge });
           
           steps.push({
+            graph: JSON.parse(JSON.stringify(graph)),
             edges: [...edges],
             mst: [...mst],
             parent: JSON.parse(JSON.stringify(parent)),
             rank: JSON.parse(JSON.stringify(rank)),
-            currentEdge: currentEdge,
+            addEdge: { ...currentEdge },
             operation: 'add_edge'
           });
         } else {
+          // Cycle detected - skip edge
           steps.push({
+            graph: JSON.parse(JSON.stringify(graph)),
             edges: [...edges],
             mst: [...mst],
             parent: JSON.parse(JSON.stringify(parent)),
             rank: JSON.parse(JSON.stringify(rank)),
-            currentEdge: currentEdge,
+            skipEdge: { ...currentEdge },
             operation: 'skip_edge'
           });
         }
+        
+        edgeIndex++;
       }
       
       // Final state
       steps.push({
+        graph: JSON.parse(JSON.stringify(graph)),
         edges: [...edges],
         mst: [...mst],
         parent: JSON.parse(JSON.stringify(parent)),
@@ -1809,23 +1830,23 @@ export const algorithms = [
       return steps;
     }
   },
-  // Prim's Algorithm for Minimum Spanning Tree
+  
   { 
     id: 'prim', 
     name: "Prim's Algorithm", 
-    description: 'Algorithm for finding the minimum spanning tree of a weighted undirected graph',
+    description: 'Algorithm for finding the minimum spanning tree in a weighted graph by growing the tree one vertex at a time',
     inputs: [
       { label: 'Weighted Graph Edges', placeholder: 'Enter weighted edges as triplets separated by commas, e.g., A-B-5,B-C-3,C-D-2,A-C-10' },
       { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
     ],
     examples: [
-      ['A-B-5,B-C-3,C-D-2,A-C-10,A-D-15', 'A'],
-      ['1-2-4,2-3-1,1-3-8,3-4-2,2-4-6', '1']
+      ['A-B-5,B-C-3,C-D-2,A-C-10', 'A'],
+      ['1-2-4,2-3-1,1-3-8,3-4-2', '1']
     ],
     generateSteps: (data) => {
       const steps = [];
       const weightedEdges = data.weightedEdges || [];
-      const startNode = data.startNode || '';
+      const startNode = data.startNode || 'A';
       
       // Parse weighted edges into adjacency list
       const graph = {};
@@ -1838,66 +1859,58 @@ export const algorithms = [
           if (!graph[from]) graph[from] = [];
           if (!graph[to]) graph[to] = [];
           graph[from].push({ node: to, weight });
-          graph[to].push({ node: from, weight }); // Assuming undirected graph
+          graph[to].push({ node: from, weight });
           allNodes.add(from);
           allNodes.add(to);
         }
       });
       
-      // Prim's algorithm implementation with step tracking
+      // Prim's algorithm
       const mst = [];
       const visited = new Set();
-      const edgesQueue = []; // Will store {from, to, weight}
+      const inQueue = new Set([startNode]);
       
-      // Initialize with start node
-      if (startNode && allNodes.has(startNode)) {
-        visited.add(startNode);
-        
-        // Add all edges from start node to queue
-        const startEdges = graph[startNode] || [];
-        startEdges.forEach(edge => {
-          edgesQueue.push({ from: startNode, to: edge.node, weight: edge.weight });
-        });
-        
-        // Sort queue by weight
-        edgesQueue.sort((a, b) => a.weight - b.weight);
-      }
+      // Initialize edges queue with edges from start node
+      let edgesQueue = [];
+      const startEdges = graph[startNode] || [];
+      startEdges.forEach(edge => {
+        edgesQueue.push({ from: startNode, to: edge.node, weight: edge.weight });
+      });
+      edgesQueue.sort((a, b) => a.weight - b.weight);
       
       // Initial state
       steps.push({
         graph: JSON.parse(JSON.stringify(graph)),
-        mst: [...mst],
+        mst: [],
         visited: Array.from(visited),
+        inQueue: Array.from(inQueue),
         edgesQueue: [...edgesQueue],
-        currentNode: startNode,
+        startNode: startNode,
         operation: 'start'
       });
       
+      // Process until all nodes are visited or queue is empty
       while (edgesQueue.length > 0 && visited.size < allNodes.size) {
         // Get the minimum weight edge
         const minEdge = edgesQueue.shift();
         
-        steps.push({
-          graph: JSON.parse(JSON.stringify(graph)),
-          mst: [...mst],
-          visited: Array.from(visited),
-          edgesQueue: [...edgesQueue],
-          currentEdge: minEdge,
-          operation: 'consider_edge'
-        });
-        
         // If the destination node is not yet visited
         if (!visited.has(minEdge.to)) {
           // Add the edge to MST
-          mst.push(minEdge);
+          mst.push({ ...minEdge });
+          visited.add(minEdge.from);
           visited.add(minEdge.to);
+          inQueue.delete(minEdge.from);
+          inQueue.delete(minEdge.to);
           
           steps.push({
             graph: JSON.parse(JSON.stringify(graph)),
             mst: [...mst],
             visited: Array.from(visited),
+            inQueue: Array.from(inQueue),
             edgesQueue: [...edgesQueue],
-            currentEdge: minEdge,
+            currentNode: minEdge.from,
+            addEdge: { ...minEdge },
             operation: 'add_edge'
           });
           
@@ -1906,6 +1919,7 @@ export const algorithms = [
           newEdges.forEach(edge => {
             if (!visited.has(edge.node)) {
               edgesQueue.push({ from: minEdge.to, to: edge.node, weight: edge.weight });
+              inQueue.add(edge.node);
             }
           });
           
@@ -1916,17 +1930,20 @@ export const algorithms = [
             graph: JSON.parse(JSON.stringify(graph)),
             mst: [...mst],
             visited: Array.from(visited),
+            inQueue: Array.from(inQueue),
             edgesQueue: [...edgesQueue],
-            currentEdge: minEdge,
+            currentNode: minEdge.to,
             operation: 'update_queue'
           });
         } else {
+          // Node already visited, skip this edge
           steps.push({
             graph: JSON.parse(JSON.stringify(graph)),
             mst: [...mst],
             visited: Array.from(visited),
+            inQueue: Array.from(inQueue),
             edgesQueue: [...edgesQueue],
-            currentEdge: minEdge,
+            skipEdge: { ...minEdge },
             operation: 'skip_edge'
           });
         }
@@ -1937,9 +1954,9 @@ export const algorithms = [
         graph: JSON.parse(JSON.stringify(graph)),
         mst: [...mst],
         visited: Array.from(visited),
-        edgesQueue: [...edgesQueue],
+        inQueue: Array.from(inQueue),
+        edgesQueue: [],
         currentNode: null,
-        currentEdge: null,
         operation: 'complete'
       });
       

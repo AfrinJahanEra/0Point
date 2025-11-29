@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as d3 from 'd3';
 import jsPDF from 'jspdf';
+import PDFDownloadButton from '../PDFDownloadButton';
 
 const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
   const [hoveredNode, setHoveredNode] = useState(null);
-  const visualizationRef = useRef(null);
+  const svgRef = useRef();
   const currentStepRef = useRef(null);
   const hasCompletedRef = useRef(false);
 
@@ -22,6 +24,166 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     }
   }, [steps, currentStep, onNext, isPlaying, onStop]);
 
+  // D3.js animation effect
+  useEffect(() => {
+    if (!svgRef.current || !steps || steps.length === 0) return;
+    
+    const svg = d3.select(svgRef.current);
+    const stepData = steps[currentStep];
+    
+    if (!stepData) return;
+    
+    // Clear previous animations
+    svg.selectAll("*").interrupt();
+    
+    // Get SVG dimensions
+    const width = 600;
+    const height = 500;
+    const radius = 150;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    // Collect all nodes
+    const allNodes = new Set();
+    if (stepData.graph) {
+      Object.keys(stepData.graph).forEach(node => allNodes.add(node));
+    }
+    
+    const nodes = Array.from(allNodes);
+    if (nodes.length === 0) return;
+    
+    // Position nodes in a circle
+    const nodePositions = {};
+    nodes.forEach((node, index) => {
+      const angle = (index / nodes.length) * 2 * Math.PI;
+      nodePositions[node] = {
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle)
+      };
+    });
+    
+    // Draw edges with D3
+    svg.selectAll(".edge").remove();
+    
+    if (stepData.graph) {
+      nodes.forEach(fromNode => {
+        const neighbors = stepData.graph[fromNode] || [];
+        neighbors.forEach(neighborObj => {
+          const toNode = neighborObj.node;
+          const weight = neighborObj.weight;
+          
+          // Avoid duplicate edges
+          if (fromNode > toNode) return;
+          
+          const pos1 = nodePositions[fromNode];
+          const pos2 = nodePositions[toNode];
+          
+          if (!pos1 || !pos2) return;
+          
+          // Check if this edge connects to the current node
+          const isConnectedToCurrent = stepData.currentNode && 
+            (fromNode === stepData.currentNode || toNode === stepData.currentNode);
+          
+          // Draw edge line
+          svg.append("line")
+            .attr("class", "edge")
+            .attr("x1", pos1.x)
+            .attr("y1", pos1.y)
+            .attr("x2", pos2.x)
+            .attr("y2", pos2.y)
+            .attr("stroke", isConnectedToCurrent ? "#1E40AF" : "#93C5FD") // Dark blue for current connections, light blue for others
+            .attr("stroke-width", isConnectedToCurrent ? 3 : 2)
+            .attr("opacity", 0.8);
+            
+          // Draw edge weight
+          const midX = (pos1.x + pos2.x) / 2;
+          const midY = (pos1.y + pos2.y) / 2;
+          
+          svg.append("text")
+            .attr("x", midX)
+            .attr("y", midY - 5)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "12px")
+            .attr("font-weight", "bold")
+            .attr("fill", isConnectedToCurrent ? "#1E40AF" : "#9CA3AF")
+            .text(weight);
+        });
+      });
+    }
+    
+    // Draw nodes with D3
+    svg.selectAll(".node").remove();
+    svg.selectAll(".node-label").remove();
+    svg.selectAll(".node-distance").remove();
+    
+    nodes.forEach(node => {
+      const pos = nodePositions[node];
+      
+      // Determine node color based on state
+      let fillColor = "#93C5FD"; // Light blue default
+      if (stepData.currentNode === node) {
+        fillColor = "#1E40AF"; // Dark blue for current node
+      } else if (stepData.visited && stepData.visited.includes(node)) {
+        fillColor = "#3B82F6"; // Medium blue for visited
+      } else if (stepData.unvisited && stepData.unvisited.includes(node)) {
+        fillColor = "#60A5FA"; // Slightly darker light blue for unvisited
+      }
+      
+      // Draw node circle
+      svg.append("circle")
+        .attr("class", "node")
+        .attr("cx", pos.x)
+        .attr("cy", pos.y)
+        .attr("r", 20)
+        .attr("fill", fillColor)
+        .attr("stroke", "#1E40AF")
+        .attr("stroke-width", 2)
+        .on("mouseover", () => setHoveredNode(node))
+        .on("mouseout", () => setHoveredNode(null));
+      
+      // Draw node label
+      svg.append("text")
+        .attr("class", "node-label")
+        .attr("x", pos.x)
+        .attr("y", pos.y)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "14px")
+        .attr("font-weight", "bold")
+        .attr("fill", "white")
+        .text(node);
+      
+      // Draw node distance
+      const distance = stepData.distances && stepData.distances[node];
+      if (distance !== undefined) {
+        svg.append("text")
+          .attr("class", "node-distance")
+          .attr("x", pos.x)
+          .attr("y", pos.y + 15)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "10px")
+          .attr("font-weight", "bold")
+          .attr("fill", "white")
+          .text(distance === Infinity ? "∞" : distance);
+      }
+    });
+    
+    // Add animation for node transitions
+    if (stepData.currentNode) {
+      svg.selectAll(".node")
+        .filter((d, i, nodes) => {
+          const nodeText = d3.select(nodes[i]).text();
+          return nodeText === stepData.currentNode;
+        })
+        .transition()
+        .duration(1000)
+        .attr("r", 25)
+        .transition()
+        .duration(1000)
+        .attr("r", 20);
+    }
+    
+  }, [currentStep, steps]);
+
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
@@ -32,7 +194,7 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     
     // Add title
     doc.setFontSize(22);
-    doc.text('Dijkstra Visualization Steps', 148.5, 15, null, null, 'center');
+    doc.text("Dijkstra's Algorithm Visualization Steps", 148.5, 15, null, null, 'center');
     
     // Add steps with visual representations - one step per page
     for (let index = 0; index < steps.length; index++) {
@@ -155,7 +317,7 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         doc.setLineWidth(0.5 * scale);
         doc.line(x1, y1, x2, y2);
         
-        // Draw weight
+        // Draw edge weight
         const midX = (x1 + x2) / 2;
         const midY = (y1 + y2) / 2;
         doc.setFontSize(6 * scale);
@@ -184,9 +346,6 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         } else if (stepData.unvisited && stepData.unvisited.includes(node)) {
           fillColor = [245, 158, 11]; // amber-500
           strokeColor = [217, 119, 6]; // amber-600
-        } else if (stepData.distances && stepData.distances[node] !== undefined && stepData.distances[node] !== Infinity) {
-          fillColor = [139, 92, 246]; // purple-500
-          strokeColor = [124, 58, 237]; // purple-600
         }
       }
       
@@ -201,43 +360,14 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       doc.setTextColor(0, 0, 0); // black
       doc.text(String(node), x, y + 3 * scale, null, null, 'center');
       
-      // Draw distance if available
-      if (stepData && stepData.distances && stepData.distances[node] !== undefined) {
-        const distance = stepData.distances[node];
-        if (distance !== Infinity) {
-          doc.setFontSize(6 * scale);
-          doc.setTextColor(0, 0, 0); // black
-          doc.text(String(distance), x, y + 12 * scale, null, null, 'center');
-        }
+      // Draw node distance
+      const distance = stepData.distances && stepData.distances[node];
+      if (distance !== undefined) {
+        doc.setFontSize(6 * scale);
+        doc.setTextColor(0, 0, 0); // black
+        doc.text(distance === Infinity ? "∞" : String(distance), x, y + 10 * scale, null, null, 'center');
       }
     });
-  };
-
-  // Function to get node styling based on state
-  const getNodeStyle = (stepData, nodeValue) => {
-    if (!stepData) {
-      return "w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-white text-black border-gray-400";
-    }
-    
-    let baseStyle = "w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 ";
-    
-    if (stepData.currentNode === nodeValue) {
-      baseStyle += "animate-pulse scale-110 bg-blue-500 text-white border-blue-600";
-    } else if (stepData.visited && stepData.visited.includes(nodeValue)) {
-      baseStyle += "bg-green-500 text-white border-green-600";
-    } else if (stepData.unvisited && stepData.unvisited.includes(nodeValue)) {
-      baseStyle += "bg-amber-500 text-white border-amber-600";
-    } else if (stepData.distances && stepData.distances[nodeValue] !== undefined && stepData.distances[nodeValue] !== Infinity) {
-      baseStyle += "bg-purple-500 text-white border-purple-600";
-    } else {
-      baseStyle += "bg-white text-black border-gray-400";
-    }
-    
-    if (hoveredNode === nodeValue) {
-      baseStyle += " transform scale-110 shadow-lg ";
-    }
-    
-    return baseStyle;
   };
 
   // Function to get operation description
@@ -247,120 +377,18 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     const operation = stepData.operation;
     
     if (operation === 'start') {
-      return `Starting Dijkstra's algorithm from node ${Object.keys(stepData.distances || {})[0] || 'unknown'}`;
+      return `Starting Dijkstra's algorithm`;
     } else if (operation === 'select_node') {
       return `Selecting node ${stepData.currentNode} with distance ${stepData.currentDistance}`;
+    } else if (operation === 'relax_edge') {
+      return `Relaxing edge from ${stepData.currentNode} to ${stepData.neighbor}`;
     } else if (operation === 'update_distance') {
-      return `Updating distance to node ${stepData.neighborUpdated} to ${stepData.newDistance}`;
+      return `Updating distance to ${stepData.neighborUpdated} to ${stepData.newDistance}`;
     } else if (operation === 'complete') {
-      return 'Dijkstra\'s algorithm complete!';
+      return "Dijkstra's algorithm complete!";
     } else {
       return 'Processing...';
     }
-  };
-
-  // Function to render graph nodes
-  const renderGraphNode = (graph, stepData) => {
-    if (!graph) return null;
-    
-    const nodes = Object.keys(graph);
-    if (nodes.length === 0) return null;
-    
-    // We'll arrange nodes in a circular pattern for visualization
-    const radius = 200;
-    const centerX = 300;
-    const centerY = 250;
-    
-    return (
-      <g>
-        {/* Draw edges first */}
-        {nodes.map((node, index) => {
-          const angle = (index / nodes.length) * 2 * Math.PI;
-          const x1 = centerX + radius * Math.cos(angle);
-          const y1 = centerY + radius * Math.sin(angle);
-          
-          const neighbors = graph[node] || [];
-          return neighbors.map((neighborObj, neighborIndex) => {
-            const neighbor = neighborObj.node;
-            const weight = neighborObj.weight;
-            
-            // Avoid drawing duplicate edges by only drawing from lower index to higher index
-            const neighborNodeIndex = nodes.indexOf(neighbor);
-            if (neighborNodeIndex <= index) return null;
-            
-            const neighborAngle = (neighborNodeIndex / nodes.length) * 2 * Math.PI;
-            const x2 = centerX + radius * Math.cos(neighborAngle);
-            const y2 = centerY + radius * Math.sin(neighborAngle);
-            
-            return (
-              <g key={`${node}-${neighbor}`}>
-                <line
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke="#9CA3AF"
-                  strokeWidth="2"
-                  className="stroke-gray-400"
-                />
-                {/* Edge weight */}
-                <text
-                  x={(x1 + x2) / 2}
-                  y={(y1 + y2) / 2 - 10}
-                  textAnchor="middle"
-                  className="font-bold text-black text-sm"
-                >
-                  {weight}
-                </text>
-              </g>
-            );
-          });
-        })}
-        
-        {/* Draw nodes */}
-        {nodes.map((node, index) => {
-          const angle = (index / nodes.length) * 2 * Math.PI;
-          const x = centerX + radius * Math.cos(angle);
-          const y = centerY + radius * Math.sin(angle);
-          
-          return (
-            <g key={node}>
-              {/* Render node circle */}
-              <circle
-                cx={x}
-                cy={y}
-                r="20"
-                className={getNodeStyle(stepData, node)}
-                onMouseEnter={() => setHoveredNode(node)}
-                onMouseLeave={() => setHoveredNode(null)}
-              />
-              
-              {/* Render node value */}
-              <text
-                x={x}
-                y={y + 5}
-                textAnchor="middle"
-                className="font-bold text-black"
-              >
-                {node}
-              </text>
-              
-              {/* Render distance if available */}
-              {stepData && stepData.distances && stepData.distances[node] !== undefined && stepData.distances[node] !== Infinity && (
-                <text
-                  x={x}
-                  y={y + 25}
-                  textAnchor="middle"
-                  className="font-bold text-black text-xs"
-                >
-                  {stepData.distances[node]}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </g>
-    );
   };
 
   if (!data || !steps || steps.length === 0) return null;
@@ -398,12 +426,7 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         <h3 className="text-lg text-blue-800">Dijkstra's Algorithm Visualization</h3>
         <div className="flex gap-2">
           {/* ADDED: Download PDF Button */}
-          <button 
-            onClick={downloadStepsAsPDF}
-            className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
-          >
-            Download PDF
-          </button>
+          <PDFDownloadButton onClick={downloadStepsAsPDF} label="Download PDF" />
           {isPlaying ? null : isCompleted ? (
             <button 
               onClick={() => {
@@ -434,9 +457,13 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
           <div className="flex justify-center items-center mb-3 overflow-auto py-2 max-h-[500px]">
             {currentStepData ? (
               <div className="w-full min-h-[400px] flex items-center justify-center overflow-auto">
-                <svg width="100%" height="500" className="border border-gray-200 rounded min-w-[600px]" viewBox="0 0 600 500">
-                  {renderGraphNode(currentStepData.graph, currentStepData)}
-                </svg>
+                <svg 
+                  ref={svgRef} 
+                  width="100%" 
+                  height="500" 
+                  className="border border-gray-200 rounded min-w-[600px]"
+                  viewBox="0 0 600 500"
+                />
               </div>
             ) : (
               <div className="text-center text-gray-500 py-10">
@@ -452,12 +479,12 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
             {currentStepData && (
               <div className="mt-2 text-xs">
                 {currentStepData.visited && currentStepData.visited.length > 0 && (
-                  <p className="text-green-600">
+                  <p className="text-blue-600">
                     Visited: [{currentStepData.visited.join(', ')}]
                   </p>
                 )}
                 {currentStepData.unvisited && currentStepData.unvisited.length > 0 && (
-                  <p className="text-amber-600">
+                  <p className="text-blue-400">
                     Unvisited: [{currentStepData.unvisited.join(', ')}]
                   </p>
                 )}
@@ -486,7 +513,8 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
                       {step.graph || step.operation ? (
                         <div className="w-full min-h-[200px] overflow-auto">
                           <svg width="100%" height="300" className="border border-gray-200 rounded min-w-[400px]" viewBox="0 0 400 300">
-                            {renderGraphNode(step.graph, step)}
+                            {/* Static visualization for step list */}
+                            {renderStaticGraph(step)}
                           </svg>
                         </div>
                       ) : (
@@ -498,20 +526,13 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
                     
                     <div className="mt-2 text-xs">
                       {step.visited && step.visited.length > 0 && (
-                        <p className="text-green-600">
+                        <p className="text-blue-600">
                           Visited: [{step.visited.join(', ')}]
                         </p>
                       )}
                       {step.unvisited && step.unvisited.length > 0 && (
-                        <p className="text-amber-600">
+                        <p className="text-blue-400">
                           Unvisited: [{step.unvisited.join(', ')}]
-                        </p>
-                      )}
-                      {step.distances && (
-                        <p className="text-purple-600">
-                          Distances: {Object.entries(step.distances).map(([node, dist]) => 
-                            dist !== Infinity ? `${node}:${dist}` : `${node}:∞`
-                          ).join(', ')}
                         </p>
                       )}
                     </div>
@@ -523,6 +544,124 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         </div>
       </div>
     </div>
+  );
+};
+
+// Helper function to render static graph for step list
+const renderStaticGraph = (step) => {
+  if (!step.graph) return null;
+  
+  const nodes = Object.keys(step.graph);
+  if (nodes.length === 0) return null;
+  
+  // We'll arrange nodes in a circular pattern for visualization
+  const radius = 100;
+  const centerX = 200;
+  const centerY = 150;
+  
+  // Position nodes
+  const nodePositions = {};
+  nodes.forEach((node, index) => {
+    const angle = (index / nodes.length) * 2 * Math.PI;
+    nodePositions[node] = {
+      x: centerX + radius * Math.cos(angle),
+      y: centerY + radius * Math.sin(angle)
+    };
+  });
+  
+  return (
+    <g>
+      {/* Draw edges */}
+      {nodes.map((fromNode) => {
+        const neighbors = step.graph[fromNode] || [];
+        return neighbors.map((neighborObj) => {
+          const toNode = neighborObj.node;
+          const weight = neighborObj.weight;
+          
+          // Avoid duplicate edges
+          if (fromNode > toNode) return null;
+          
+          const pos1 = nodePositions[fromNode];
+          const pos2 = nodePositions[toNode];
+          
+          // Calculate midpoint for weight label
+          const midX = (pos1.x + pos2.x) / 2;
+          const midY = (pos1.y + pos2.y) / 2;
+          
+          return (
+            <g key={`${fromNode}-${toNode}`}>
+              <line
+                x1={pos1.x}
+                y1={pos1.y}
+                x2={pos2.x}
+                y2={pos2.y}
+                stroke="#93C5FD"
+                strokeWidth="2"
+              />
+              <text
+                x={midX}
+                y={midY - 5}
+                textAnchor="middle"
+                className="font-bold text-gray-600 text-xs"
+              >
+                {weight}
+              </text>
+            </g>
+          );
+        });
+      })}
+      
+      {/* Draw nodes */}
+      {nodes.map((node) => {
+        const pos = nodePositions[node];
+        const isCurrent = step.currentNode === node;
+        const isVisited = step.visited && step.visited.includes(node);
+        const isUnvisited = step.unvisited && step.unvisited.includes(node);
+        
+        let fillColor = "#93C5FD"; // Light blue default
+        if (isCurrent) {
+          fillColor = "#1E40AF"; // Dark blue for current node
+        } else if (isVisited) {
+          fillColor = "#3B82F6"; // Medium blue for visited
+        } else if (isUnvisited) {
+          fillColor = "#60A5FA"; // Slightly darker light blue for unvisited
+        }
+        
+        // Get distance for this node
+        const distance = step.distances && step.distances[node];
+        
+        return (
+          <g key={node}>
+            <circle
+              cx={pos.x}
+              cy={pos.y}
+              r="15"
+              fill={fillColor}
+              stroke="#1E40AF"
+              strokeWidth="2"
+            />
+            <text
+              x={pos.x}
+              y={pos.y}
+              textAnchor="middle"
+              className="font-bold text-white text-sm"
+            >
+              {node}
+            </text>
+            {distance !== undefined && (
+              <text
+                x={pos.x}
+                y={pos.y + 15}
+                textAnchor="middle"
+                className="font-bold text-white text-xs"
+              >
+                {distance === Infinity ? "∞" : distance}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </g>
   );
 };
 

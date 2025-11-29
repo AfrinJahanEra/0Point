@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as d3 from 'd3';
 import jsPDF from 'jspdf';
+import PDFDownloadButton from '../PDFDownloadButton';
 
 const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
   const [hoveredNode, setHoveredNode] = useState(null);
-  const visualizationRef = useRef(null);
+  const svgRef = useRef();
   const currentStepRef = useRef(null);
   const hasCompletedRef = useRef(false);
 
@@ -21,6 +23,135 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
       return () => clearInterval(interval);
     }
   }, [steps, currentStep, onNext, isPlaying, onStop]);
+
+  // D3.js animation effect
+  useEffect(() => {
+    if (!svgRef.current || !steps || steps.length === 0) return;
+    
+    const svg = d3.select(svgRef.current);
+    const stepData = steps[currentStep];
+    
+    if (!stepData) return;
+    
+    // Clear previous animations
+    svg.selectAll("*").interrupt();
+    
+    // Get SVG dimensions
+    const width = 600;
+    const height = 500;
+    const radius = 150;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    // Collect all nodes
+    const allNodes = new Set();
+    if (stepData.graph) {
+      Object.keys(stepData.graph).forEach(node => allNodes.add(node));
+    }
+    
+    const nodes = Array.from(allNodes);
+    if (nodes.length === 0) return;
+    
+    // Position nodes in a circle
+    const nodePositions = {};
+    nodes.forEach((node, index) => {
+      const angle = (index / nodes.length) * 2 * Math.PI;
+      nodePositions[node] = {
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle)
+      };
+    });
+    
+    // Draw edges with D3
+    svg.selectAll(".edge").remove();
+    
+    if (stepData.graph) {
+      nodes.forEach(fromNode => {
+        const neighbors = stepData.graph[fromNode] || [];
+        neighbors.forEach(toNode => {
+          // Avoid duplicate edges
+          if (fromNode > toNode) return;
+          
+          const pos1 = nodePositions[fromNode];
+          const pos2 = nodePositions[toNode];
+          
+          if (!pos1 || !pos2) return;
+          
+          // Check if this edge connects to the current node
+          const isConnectedToCurrent = stepData.currentNode && 
+            (fromNode === stepData.currentNode || toNode === stepData.currentNode);
+          
+          // Draw edge line
+          svg.append("line")
+            .attr("class", "edge")
+            .attr("x1", pos1.x)
+            .attr("y1", pos1.y)
+            .attr("x2", pos2.x)
+            .attr("y2", pos2.y)
+            .attr("stroke", isConnectedToCurrent ? "#1E40AF" : "#93C5FD") // Dark blue for current connections, light blue for others
+            .attr("stroke-width", isConnectedToCurrent ? 3 : 2)
+            .attr("opacity", 0.8);
+        });
+      });
+    }
+    
+    // Draw nodes with D3
+    svg.selectAll(".node").remove();
+    svg.selectAll(".node-label").remove();
+    
+    nodes.forEach(node => {
+      const pos = nodePositions[node];
+      
+      // Determine node color based on state
+      let fillColor = "#93C5FD"; // Light blue default
+      if (stepData.currentNode === node) {
+        fillColor = "#1E40AF"; // Dark blue for current node
+      } else if (stepData.visited && stepData.visited.includes(node)) {
+        fillColor = "#3B82F6"; // Medium blue for visited
+      } else if (stepData.stack && stepData.stack.includes(node)) {
+        fillColor = "#60A5FA"; // Slightly darker light blue for stacked
+      }
+      
+      // Draw node circle
+      svg.append("circle")
+        .attr("class", "node")
+        .attr("cx", pos.x)
+        .attr("cy", pos.y)
+        .attr("r", 20)
+        .attr("fill", fillColor)
+        .attr("stroke", "#1E40AF")
+        .attr("stroke-width", 2)
+        .on("mouseover", () => setHoveredNode(node))
+        .on("mouseout", () => setHoveredNode(null));
+      
+      // Draw node label
+      svg.append("text")
+        .attr("class", "node-label")
+        .attr("x", pos.x)
+        .attr("y", pos.y + 5)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "14px")
+        .attr("font-weight", "bold")
+        .attr("fill", "white")
+        .text(node);
+    });
+    
+    // Add animation for node transitions
+    if (stepData.currentNode) {
+      svg.selectAll(".node")
+        .filter((d, i, nodes) => {
+          const nodeText = d3.select(nodes[i]).text();
+          return nodeText === stepData.currentNode;
+        })
+        .transition()
+        .duration(1000)
+        .attr("r", 25)
+        .transition()
+        .duration(1000)
+        .attr("r", 20);
+    }
+    
+  }, [currentStep, steps]);
 
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
@@ -171,10 +302,10 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         } else if (stepData.visited && stepData.visited.includes(node)) {
           fillColor = [16, 185, 129]; // green-500
           strokeColor = [5, 150, 105]; // green-600
-        } else if (stepData.queue && stepData.queue.includes(node)) {
+        } else if (stepData.stack && stepData.stack.includes(node)) {
           fillColor = [245, 158, 11]; // amber-500
           strokeColor = [217, 119, 6]; // amber-600
-        } else if (stepData.stack && stepData.stack.includes(node)) {
+        } else if (stepData.queue && stepData.queue.includes(node)) {
           fillColor = [139, 92, 246]; // purple-500
           strokeColor = [124, 58, 237]; // purple-600
         }
@@ -193,33 +324,6 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     });
   };
 
-  // Function to get node styling based on state
-  const getNodeStyle = (stepData, nodeValue) => {
-    if (!stepData) {
-      return "w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-white text-black border-gray-400";
-    }
-    
-    let baseStyle = "w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 ";
-    
-    if (stepData.currentNode === nodeValue) {
-      baseStyle += "animate-pulse scale-110 bg-blue-500 text-white border-blue-600";
-    } else if (stepData.visited && stepData.visited.includes(nodeValue)) {
-      baseStyle += "bg-green-500 text-white border-green-600";
-    } else if (stepData.queue && stepData.queue.includes(nodeValue)) {
-      baseStyle += "bg-amber-500 text-white border-amber-600";
-    } else if (stepData.stack && stepData.stack.includes(nodeValue)) {
-      baseStyle += "bg-purple-500 text-white border-purple-600";
-    } else {
-      baseStyle += "bg-white text-black border-gray-400";
-    }
-    
-    if (hoveredNode === nodeValue) {
-      baseStyle += " transform scale-110 shadow-lg ";
-    }
-    
-    return baseStyle;
-  };
-
   // Function to get operation description
   const getOperationDescription = (stepData) => {
     if (!stepData) return 'Processing...';
@@ -227,95 +331,18 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     const operation = stepData.operation;
     
     if (operation === 'start') {
-      return `Starting DFS traversal from node ${stepData.currentNode}`;
+      return `Starting DFS traversal`;
     } else if (operation === 'visit') {
       return `Visiting node ${stepData.currentNode}`;
-    } else if (operation === 'process') {
-      return `Processing node ${stepData.currentNode}`;
+    } else if (operation === 'push') {
+      return `Pushing neighbor ${stepData.neighbor} to stack`;
+    } else if (operation === 'backtrack') {
+      return `Backtracking from node ${stepData.currentNode}`;
     } else if (operation === 'complete') {
       return 'DFS traversal complete!';
     } else {
       return 'Processing...';
     }
-  };
-
-  // Function to render graph nodes
-  const renderGraphNode = (graph, stepData) => {
-    if (!graph) return null;
-    
-    const nodes = Object.keys(graph);
-    if (nodes.length === 0) return null;
-    
-    // We'll arrange nodes in a circular pattern for visualization
-    const radius = 200;
-    const centerX = 300;
-    const centerY = 250;
-    
-    return (
-      <g>
-        {/* Draw edges first */}
-        {nodes.map((node, index) => {
-          const angle = (index / nodes.length) * 2 * Math.PI;
-          const x1 = centerX + radius * Math.cos(angle);
-          const y1 = centerY + radius * Math.sin(angle);
-          
-          const neighbors = graph[node] || [];
-          return neighbors.map((neighbor, neighborIndex) => {
-            // Avoid drawing duplicate edges by only drawing from lower index to higher index
-            const neighborNodeIndex = nodes.indexOf(neighbor);
-            if (neighborNodeIndex <= index) return null;
-            
-            const neighborAngle = (neighborNodeIndex / nodes.length) * 2 * Math.PI;
-            const x2 = centerX + radius * Math.cos(neighborAngle);
-            const y2 = centerY + radius * Math.sin(neighborAngle);
-            
-            return (
-              <line
-                key={`${node}-${neighbor}`}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                stroke="#9CA3AF"
-                strokeWidth="2"
-                className="stroke-gray-400"
-              />
-            );
-          });
-        })}
-        
-        {/* Draw nodes */}
-        {nodes.map((node, index) => {
-          const angle = (index / nodes.length) * 2 * Math.PI;
-          const x = centerX + radius * Math.cos(angle);
-          const y = centerY + radius * Math.sin(angle);
-          
-          return (
-            <g key={node}>
-              {/* Render node circle */}
-              <circle
-                cx={x}
-                cy={y}
-                r="20"
-                className={getNodeStyle(stepData, node)}
-                onMouseEnter={() => setHoveredNode(node)}
-                onMouseLeave={() => setHoveredNode(null)}
-              />
-              
-              {/* Render node value */}
-              <text
-                x={x}
-                y={y + 5}
-                textAnchor="middle"
-                className="font-bold text-black"
-              >
-                {node}
-              </text>
-            </g>
-          );
-        })}
-      </g>
-    );
   };
 
   if (!data || !steps || steps.length === 0) return null;
@@ -353,12 +380,7 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         <h3 className="text-lg text-blue-800">DFS Visualization</h3>
         <div className="flex gap-2">
           {/* ADDED: Download PDF Button */}
-          <button 
-            onClick={downloadStepsAsPDF}
-            className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
-          >
-            Download PDF
-          </button>
+          <PDFDownloadButton onClick={downloadStepsAsPDF} label="Download PDF" />
           {isPlaying ? null : isCompleted ? (
             <button 
               onClick={() => {
@@ -389,9 +411,13 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           <div className="flex justify-center items-center mb-3 overflow-auto py-2 max-h-[500px]">
             {currentStepData ? (
               <div className="w-full min-h-[400px] flex items-center justify-center overflow-auto">
-                <svg width="100%" height="500" className="border border-gray-200 rounded min-w-[600px]" viewBox="0 0 600 500">
-                  {renderGraphNode(currentStepData.graph, currentStepData)}
-                </svg>
+                <svg 
+                  ref={svgRef} 
+                  width="100%" 
+                  height="500" 
+                  className="border border-gray-200 rounded min-w-[600px]"
+                  viewBox="0 0 600 500"
+                />
               </div>
             ) : (
               <div className="text-center text-gray-500 py-10">
@@ -407,12 +433,12 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             {currentStepData && (
               <div className="mt-2 text-xs">
                 {currentStepData.stack && currentStepData.stack.length > 0 && (
-                  <p className="text-purple-600">
+                  <p className="text-blue-600">
                     Stack: [{currentStepData.stack.join(', ')}]
                   </p>
                 )}
                 {currentStepData.visited && currentStepData.visited.length > 0 && (
-                  <p className="text-green-600">
+                  <p className="text-blue-400">
                     Visited: [{currentStepData.visited.join(', ')}]
                   </p>
                 )}
@@ -441,7 +467,8 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
                       {step.graph || step.operation ? (
                         <div className="w-full min-h-[200px] overflow-auto">
                           <svg width="100%" height="300" className="border border-gray-200 rounded min-w-[400px]" viewBox="0 0 400 300">
-                            {renderGraphNode(step.graph, step)}
+                            {/* Static visualization for step list */}
+                            {renderStaticGraph(step)}
                           </svg>
                         </div>
                       ) : (
@@ -453,12 +480,12 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
                     
                     <div className="mt-2 text-xs">
                       {step.stack && step.stack.length > 0 && (
-                        <p className="text-purple-600">
+                        <p className="text-blue-600">
                           Stack: [{step.stack.join(', ')}]
                         </p>
                       )}
                       {step.visited && step.visited.length > 0 && (
-                        <p className="text-green-600">
+                        <p className="text-blue-400">
                           Visited: [{step.visited.join(', ')}]
                         </p>
                       )}
@@ -471,6 +498,95 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         </div>
       </div>
     </div>
+  );
+};
+
+// Helper function to render static graph for step list
+const renderStaticGraph = (step) => {
+  if (!step.graph) return null;
+  
+  const nodes = Object.keys(step.graph);
+  if (nodes.length === 0) return null;
+  
+  // We'll arrange nodes in a circular pattern for visualization
+  const radius = 100;
+  const centerX = 200;
+  const centerY = 150;
+  
+  // Position nodes
+  const nodePositions = {};
+  nodes.forEach((node, index) => {
+    const angle = (index / nodes.length) * 2 * Math.PI;
+    nodePositions[node] = {
+      x: centerX + radius * Math.cos(angle),
+      y: centerY + radius * Math.sin(angle)
+    };
+  });
+  
+  return (
+    <g>
+      {/* Draw edges */}
+      {nodes.map((fromNode) => {
+        const neighbors = step.graph[fromNode] || [];
+        return neighbors.map((toNode) => {
+          // Avoid duplicate edges
+          if (fromNode > toNode) return null;
+          
+          const pos1 = nodePositions[fromNode];
+          const pos2 = nodePositions[toNode];
+          
+          return (
+            <line
+              key={`${fromNode}-${toNode}`}
+              x1={pos1.x}
+              y1={pos1.y}
+              x2={pos2.x}
+              y2={pos2.y}
+              stroke="#93C5FD"
+              strokeWidth="2"
+            />
+          );
+        });
+      })}
+      
+      {/* Draw nodes */}
+      {nodes.map((node) => {
+        const pos = nodePositions[node];
+        const isCurrent = step.currentNode === node;
+        const isVisited = step.visited && step.visited.includes(node);
+        const isStacked = step.stack && step.stack.includes(node);
+        
+        let fillColor = "#93C5FD"; // Light blue default
+        if (isCurrent) {
+          fillColor = "#1E40AF"; // Dark blue for current node
+        } else if (isVisited) {
+          fillColor = "#3B82F6"; // Medium blue for visited
+        } else if (isStacked) {
+          fillColor = "#60A5FA"; // Slightly darker light blue for stacked
+        }
+        
+        return (
+          <g key={node}>
+            <circle
+              cx={pos.x}
+              cy={pos.y}
+              r="15"
+              fill={fillColor}
+              stroke="#1E40AF"
+              strokeWidth="2"
+            />
+            <text
+              x={pos.x}
+              y={pos.y + 5}
+              textAnchor="middle"
+              className="font-bold text-white text-sm"
+            >
+              {node}
+            </text>
+          </g>
+        );
+      })}
+    </g>
   );
 };
 
