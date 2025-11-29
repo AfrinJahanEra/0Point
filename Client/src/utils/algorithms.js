@@ -989,291 +989,291 @@ export const algorithms = [
   }
 },
   { 
-  id: 'avl-tree', 
-  name: 'AVL Tree', 
-  description: 'A self-balancing binary search tree where the heights of the two child subtrees of any node differ by at most one',
-  inputs: [
-    { label: 'Values to Insert', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }
-  ],
-  examples: [
-    ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15'], 
-    ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15']
-  ],
-  generateSteps: (data) => {
-    const steps = [];
-    const values = [...data.array];
-    
-    // Initialize empty tree
-    steps.push({ 
-      tree: null,
-      operation: 'start',
-      insertedValue: null,
-      comparing: null,
-      found: null,
-      rotation: null,
-      traversalPath: []
-    });
-    
-    let tree = null;
-    
-    // Simple AVL tree node structure
-    const createNode = (value) => ({
-      value: value,
-      left: null,
-      right: null,
-      height: 1
-    });
-    
-    // Get height of node
-    const getHeight = (node) => node ? node.height : 0;
-    
-    // Get balance factor
-    const getBalance = (node) => node ? getHeight(node.left) - getHeight(node.right) : 0;
-    
-    // Update height
-    const updateHeight = (node) => {
-      if (node) {
-        node.height = Math.max(getHeight(node.left), getHeight(node.right)) + 1;
-      }
-    };
-    
-    // Right rotate
-    const rightRotate = (y) => {
-      const x = y.left;
-      const T2 = x.right;
+    id: 'avl-tree', 
+    name: 'AVL Tree', 
+    description: 'A self-balancing binary search tree where the heights of the two child subtrees of any node differ by at most one',
+    inputs: [
+      { label: 'Values to Insert', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }
+    ],
+    examples: [
+      ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15'], 
+      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const values = [...data.array];
       
-      // Perform rotation
-      x.right = y;
-      y.left = T2;
-      
-      // Update heights
-      updateHeight(y);
-      updateHeight(x);
-      
-      return x;
-    };
-    
-    // Left rotate
-    const leftRotate = (x) => {
-      const y = x.right;
-      const T2 = y.left;
-      
-      // Perform rotation
-      y.left = x;
-      x.right = T2;
-      
-      // Update heights
-      updateHeight(x);
-      updateHeight(y);
-      
-      return y;
-    };
-    
-    // Insert node with proper step tracking - FIXED VERSION
-    const insertNode = (node, value, traversalPath = []) => {
-      // Standard BST insertion
-      if (node === null) {
-        return createNode(value);
-      }
-      
-      // Add current traversal step
-      const currentTraversalPath = [...traversalPath, node.value];
-      
-      // Show traversal step with complete tree
+      // Initialize empty tree
       steps.push({ 
-        tree: deepCopyTree(tree), // Show the complete current tree
-        operation: 'traverse',
-        insertedValue: value,
-        comparing: node.value,
+        tree: null,
+        operation: 'start',
+        insertedValue: null,
+        comparing: null,
         found: null,
         rotation: null,
-        traversalPath: currentTraversalPath
+        traversalPath: []
       });
       
-      if (value < node.value) {
-        node.left = insertNode(node.left, value, currentTraversalPath);
-      } else if (value > node.value) {
-        node.right = insertNode(node.right, value, currentTraversalPath);
-      } else {
-        // Equal values not allowed
-        return node;
-      }
+      let tree = null;
       
-      // Update height of current node
-      updateHeight(node);
+      // Simple AVL tree node structure
+      const createNode = (value) => ({
+        value: value,
+        left: null,
+        right: null,
+        height: 1
+      });
+      
+      // Get height of node
+      const getHeight = (node) => node ? node.height : 0;
       
       // Get balance factor
-      const balance = getBalance(node);
+      const getBalance = (node) => node ? getHeight(node.left) - getHeight(node.right) : 0;
       
-      // If unbalanced, there are 4 cases
-      
-      // Left Left Case
-      if (balance > 1 && value < node.left.value) {
-        steps.push({ 
-          tree: deepCopyTree(tree),
-          operation: 'rotate',
-          insertedValue: value,
-          comparing: node.value,
-          found: null,
-          rotation: 'right',
-          traversalPath: currentTraversalPath
-        });
-        const newRoot = rightRotate(node);
-        // Update the tree structure
-        updateTreeStructure(tree, node, newRoot);
-        return newRoot;
-      }
-      
-      // Right Right Case
-      if (balance < -1 && value > node.right.value) {
-        steps.push({ 
-          tree: deepCopyTree(tree),
-          operation: 'rotate',
-          insertedValue: value,
-          comparing: node.value,
-          found: null,
-          rotation: 'left',
-          traversalPath: currentTraversalPath
-        });
-        const newRoot = leftRotate(node);
-        // Update the tree structure
-        updateTreeStructure(tree, node, newRoot);
-        return newRoot;
-      }
-      
-      // Left Right Case
-      if (balance > 1 && value > node.left.value) {
-        steps.push({ 
-          tree: deepCopyTree(tree),
-          operation: 'rotate',
-          insertedValue: value,
-          comparing: node.value,
-          found: null,
-          rotation: 'leftright',
-          traversalPath: currentTraversalPath
-        });
-        node.left = leftRotate(node.left);
-        const newRoot = rightRotate(node);
-        // Update the tree structure
-        updateTreeStructure(tree, node, newRoot);
-        return newRoot;
-      }
-      
-      // Right Left Case
-      if (balance < -1 && value < node.right.value) {
-        steps.push({ 
-          tree: deepCopyTree(tree),
-          operation: 'rotate',
-          insertedValue: value,
-          comparing: node.value,
-          found: null,
-          rotation: 'rightleft',
-          traversalPath: currentTraversalPath
-        });
-        node.right = rightRotate(node.right);
-        const newRoot = leftRotate(node);
-        // Update the tree structure
-        updateTreeStructure(tree, node, newRoot);
-        return newRoot;
-      }
-      
-      // Return unchanged node
-      return node;
-    };
-    
-    // Helper function to deep copy tree
-    const deepCopyTree = (node) => {
-      if (!node) return null;
-      return {
-        value: node.value,
-        left: deepCopyTree(node.left),
-        right: deepCopyTree(node.right),
-        height: node.height
+      // Update height
+      const updateHeight = (node) => {
+        if (node) {
+          node.height = Math.max(getHeight(node.left), getHeight(node.right)) + 1;
+        }
       };
-    };
-    
-    // Helper function to update tree structure after rotation
-    const updateTreeStructure = (root, oldNode, newNode) => {
-      if (!root) return;
       
-      if (root === oldNode) {
-        // If we're replacing the root
-        Object.assign(root, newNode);
-        return;
-      }
+      // Right rotate
+      const rightRotate = (y) => {
+        const x = y.left;
+        const T2 = x.right;
+        
+        // Perform rotation
+        x.right = y;
+        y.left = T2;
+        
+        // Update heights
+        updateHeight(y);
+        updateHeight(x);
+        
+        return x;
+      };
       
-      if (root.left === oldNode) {
-        root.left = newNode;
-        return;
-      }
+      // Left rotate
+      const leftRotate = (x) => {
+        const y = x.right;
+        const T2 = y.left;
+        
+        // Perform rotation
+        y.left = x;
+        x.right = T2;
+        
+        // Update heights
+        updateHeight(x);
+        updateHeight(y);
+        
+        return y;
+      };
       
-      if (root.right === oldNode) {
-        root.right = newNode;
-        return;
-      }
-      
-      updateTreeStructure(root.left, oldNode, newNode);
-      updateTreeStructure(root.right, oldNode, newNode);
-    };
-    
-    // Insert each value with proper step tracking
-    for (let i = 0; i < values.length; i++) {
-      const value = values[i];
-      
-      if (tree === null) {
-        // First insertion - create root
-        tree = createNode(value);
+      // Insert node with proper step tracking - FIXED VERSION
+      const insertNode = (node, value, traversalPath = []) => {
+        // Standard BST insertion
+        if (node === null) {
+          return createNode(value);
+        }
+        
+        // Add current traversal step
+        const currentTraversalPath = [...traversalPath, node.value];
+        
+        // Show traversal step with complete tree
         steps.push({ 
-          tree: deepCopyTree(tree),
-          operation: 'insert_root',
+          tree: deepCopyTree(tree), // Show the complete current tree
+          operation: 'traverse',
           insertedValue: value,
-          comparing: null,
+          comparing: node.value,
           found: null,
           rotation: null,
-          traversalPath: []
-        });
-      } else {
-        // Show start of insertion for this value
-        steps.push({ 
-          tree: deepCopyTree(tree),
-          operation: 'insert_start',
-          insertedValue: value,
-          comparing: null,
-          found: null,
-          rotation: null,
-          traversalPath: []
+          traversalPath: currentTraversalPath
         });
         
-        // Use the recursive insert function which will generate all traversal steps
-        tree = insertNode(tree, value, []);
+        if (value < node.value) {
+          node.left = insertNode(node.left, value, currentTraversalPath);
+        } else if (value > node.value) {
+          node.right = insertNode(node.right, value, currentTraversalPath);
+        } else {
+          // Equal values not allowed
+          return node;
+        }
         
-        // Show the tree after insertion and balancing
-        steps.push({ 
-          tree: deepCopyTree(tree),
-          operation: 'after_insert',
-          insertedValue: value,
-          comparing: null,
-          found: null,
-          rotation: null,
-          traversalPath: []
-        });
+        // Update height of current node
+        updateHeight(node);
+        
+        // Get balance factor
+        const balance = getBalance(node);
+        
+        // If unbalanced, there are 4 cases
+        
+        // Left Left Case
+        if (balance > 1 && value < node.left.value) {
+          steps.push({ 
+            tree: deepCopyTree(tree),
+            operation: 'rotate',
+            insertedValue: value,
+            comparing: node.value,
+            found: null,
+            rotation: 'right',
+            traversalPath: currentTraversalPath
+          });
+          const newRoot = rightRotate(node);
+          // Update the tree structure
+          updateTreeStructure(tree, node, newRoot);
+          return newRoot;
+        }
+        
+        // Right Right Case
+        if (balance < -1 && value > node.right.value) {
+          steps.push({ 
+            tree: deepCopyTree(tree),
+            operation: 'rotate',
+            insertedValue: value,
+            comparing: node.value,
+            found: null,
+            rotation: 'left',
+            traversalPath: currentTraversalPath
+          });
+          const newRoot = leftRotate(node);
+          // Update the tree structure
+          updateTreeStructure(tree, node, newRoot);
+          return newRoot;
+        }
+        
+        // Left Right Case
+        if (balance > 1 && value > node.left.value) {
+          steps.push({ 
+            tree: deepCopyTree(tree),
+            operation: 'rotate',
+            insertedValue: value,
+            comparing: node.value,
+            found: null,
+            rotation: 'leftright',
+            traversalPath: currentTraversalPath
+          });
+          node.left = leftRotate(node.left);
+          const newRoot = rightRotate(node);
+          // Update the tree structure
+          updateTreeStructure(tree, node, newRoot);
+          return newRoot;
+        }
+        
+        // Right Left Case
+        if (balance < -1 && value < node.right.value) {
+          steps.push({ 
+            tree: deepCopyTree(tree),
+            operation: 'rotate',
+            insertedValue: value,
+            comparing: node.value,
+            found: null,
+            rotation: 'rightleft',
+            traversalPath: currentTraversalPath
+          });
+          node.right = rightRotate(node.right);
+          const newRoot = leftRotate(node);
+          // Update the tree structure
+          updateTreeStructure(tree, node, newRoot);
+          return newRoot;
+        }
+        
+        // Return unchanged node
+        return node;
+      };
+      
+      // Helper function to deep copy tree
+      const deepCopyTree = (node) => {
+        if (!node) return null;
+        return {
+          value: node.value,
+          left: deepCopyTree(node.left),
+          right: deepCopyTree(node.right),
+          height: node.height
+        };
+      };
+      
+      // Helper function to update tree structure after rotation
+      const updateTreeStructure = (root, oldNode, newNode) => {
+        if (!root) return;
+        
+        if (root === oldNode) {
+          // If we're replacing the root
+          Object.assign(root, newNode);
+          return;
+        }
+        
+        if (root.left === oldNode) {
+          root.left = newNode;
+          return;
+        }
+        
+        if (root.right === oldNode) {
+          root.right = newNode;
+          return;
+        }
+        
+        updateTreeStructure(root.left, oldNode, newNode);
+        updateTreeStructure(root.right, oldNode, newNode);
+      };
+      
+      // Insert each value with proper step tracking
+      for (let i = 0; i < values.length; i++) {
+        const value = values[i];
+        
+        if (tree === null) {
+          // First insertion - create root
+          tree = createNode(value);
+          steps.push({ 
+            tree: deepCopyTree(tree),
+            operation: 'insert_root',
+            insertedValue: value,
+            comparing: null,
+            found: null,
+            rotation: null,
+            traversalPath: []
+          });
+        } else {
+          // Show start of insertion for this value
+          steps.push({ 
+            tree: deepCopyTree(tree),
+            operation: 'insert_start',
+            insertedValue: value,
+            comparing: null,
+            found: null,
+            rotation: null,
+            traversalPath: []
+          });
+          
+          // Use the recursive insert function which will generate all traversal steps
+          tree = insertNode(tree, value, []);
+          
+          // Show the tree after insertion and balancing
+          steps.push({ 
+            tree: deepCopyTree(tree),
+            operation: 'after_insert',
+            insertedValue: value,
+            comparing: null,
+            found: null,
+            rotation: null,
+            traversalPath: []
+          });
+        }
       }
+      
+      // Final state
+      steps.push({ 
+        tree: deepCopyTree(tree),
+        operation: 'complete',
+        insertedValue: null,
+        comparing: null,
+        found: null,
+        rotation: null,
+        traversalPath: []
+      });
+      
+      return steps;
     }
-    
-    // Final state
-    steps.push({ 
-      tree: deepCopyTree(tree),
-      operation: 'complete',
-      insertedValue: null,
-      comparing: null,
-      found: null,
-      rotation: null,
-      traversalPath: []
-    });
-    
-    return steps;
-  }
-},
+  },
   { 
     id: 'trie', 
     name: 'Trie', 
@@ -1358,6 +1358,589 @@ export const algorithms = [
         insertedWord: null,
         currentChar: null,
         path: []
+      });
+      
+      return steps;
+    }
+  },
+  // Graph Algorithms
+  { 
+    id: 'bfs', 
+    name: 'Breadth-First Search', 
+    description: 'Graph traversal algorithm that explores all vertices at the present depth level before moving on to vertices at the next depth level',
+    inputs: [
+      { label: 'Graph Edges', placeholder: 'Enter edges as pairs separated by commas, e.g., A-B,B-C,C-D,A-C' },
+      { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
+    ],
+    examples: [
+      ['A-B,B-C,C-D,D-E,E-F,F-G,G-H,H-I,I-J,J-K,K-L,L-M,M-N,N-O,O-P,P-Q,Q-R,R-S,S-T,T-U,U-V,V-W,W-X,X-Y,Y-Z', 'A'],
+      ['1-2,2-3,3-4,4-5,1-3,2-4,3-5', '1']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const edges = data.edges || [];
+      const startNode = data.startNode || '';
+      
+      // Parse edges into adjacency list
+      const graph = {};
+      edges.forEach(edge => {
+        const [from, to] = edge.split('-');
+        if (!graph[from]) graph[from] = [];
+        if (!graph[to]) graph[to] = [];
+        graph[from].push(to);
+        graph[to].push(from); // Assuming undirected graph
+      });
+      
+      // BFS implementation with step tracking
+      const visited = new Set();
+      const queue = [startNode];
+      visited.add(startNode);
+      
+      // Initial state
+      steps.push({
+        graph: JSON.parse(JSON.stringify(graph)),
+        queue: [startNode],
+        visited: Array.from(visited),
+        currentNode: startNode,
+        neighbors: graph[startNode] || [],
+        operation: 'start'
+      });
+      
+      while (queue.length > 0) {
+        const currentNode = queue.shift();
+        
+        // Process neighbors
+        const neighbors = graph[currentNode] || [];
+        for (const neighbor of neighbors) {
+          if (!visited.has(neighbor)) {
+            visited.add(neighbor);
+            queue.push(neighbor);
+            
+            steps.push({
+              graph: JSON.parse(JSON.stringify(graph)),
+              queue: [...queue],
+              visited: Array.from(visited),
+              currentNode: neighbor,
+              neighbors: graph[neighbor] || [],
+              operation: 'visit'
+            });
+          }
+        }
+        
+        steps.push({
+          graph: JSON.parse(JSON.stringify(graph)),
+          queue: [...queue],
+          visited: Array.from(visited),
+          currentNode: currentNode,
+          neighbors: neighbors,
+          operation: 'process'
+        });
+      }
+      
+      // Final state
+      steps.push({
+        graph: JSON.parse(JSON.stringify(graph)),
+        queue: [],
+        visited: Array.from(visited),
+        currentNode: null,
+        neighbors: [],
+        operation: 'complete'
+      });
+      
+      return steps;
+    }
+  },
+  { 
+    id: 'dfs', 
+    name: 'Depth-First Search', 
+    description: 'Graph traversal algorithm that explores as far as possible along each branch before backtracking',
+    inputs: [
+      { label: 'Graph Edges', placeholder: 'Enter edges as pairs separated by commas, e.g., A-B,B-C,C-D,A-C' },
+      { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
+    ],
+    examples: [
+      ['A-B,B-C,C-D,D-E,E-F,F-G,G-H,H-I,I-J,J-K,K-L,L-M,M-N,N-O,O-P,P-Q,Q-R,R-S,S-T,T-U,U-V,V-W,W-X,X-Y,Y-Z', 'A'],
+      ['1-2,2-3,3-4,4-5,1-3,2-4,3-5', '1']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const edges = data.edges || [];
+      const startNode = data.startNode || '';
+      
+      // Parse edges into adjacency list
+      const graph = {};
+      edges.forEach(edge => {
+        const [from, to] = edge.split('-');
+        if (!graph[from]) graph[from] = [];
+        if (!graph[to]) graph[to] = [];
+        graph[from].push(to);
+        graph[to].push(from); // Assuming undirected graph
+      });
+      
+      // DFS implementation with step tracking
+      const visited = new Set();
+      const stack = [startNode];
+      
+      // Initial state
+      steps.push({
+        graph: JSON.parse(JSON.stringify(graph)),
+        stack: [startNode],
+        visited: Array.from(visited),
+        currentNode: null,
+        neighbors: [],
+        operation: 'start'
+      });
+      
+      while (stack.length > 0) {
+        const currentNode = stack.pop();
+        
+        if (!visited.has(currentNode)) {
+          visited.add(currentNode);
+          
+          steps.push({
+            graph: JSON.parse(JSON.stringify(graph)),
+            stack: [...stack],
+            visited: Array.from(visited),
+            currentNode: currentNode,
+            neighbors: graph[currentNode] || [],
+            operation: 'visit'
+          });
+          
+          // Add neighbors to stack in reverse order for consistent traversal
+          const neighbors = graph[currentNode] || [];
+          for (let i = neighbors.length - 1; i >= 0; i--) {
+            const neighbor = neighbors[i];
+            if (!visited.has(neighbor)) {
+              stack.push(neighbor);
+            }
+          }
+          
+          steps.push({
+            graph: JSON.parse(JSON.stringify(graph)),
+            stack: [...stack],
+            visited: Array.from(visited),
+            currentNode: currentNode,
+            neighbors: graph[currentNode] || [],
+            operation: 'process'
+          });
+        }
+      }
+      
+      // Final state
+      steps.push({
+        graph: JSON.parse(JSON.stringify(graph)),
+        stack: [],
+        visited: Array.from(visited),
+        currentNode: null,
+        neighbors: [],
+        operation: 'complete'
+      });
+      
+      return steps;
+    }
+  },
+  // Dijkstra's Algorithm for Shortest Path
+  { 
+    id: 'dijkstra', 
+    name: "Dijkstra's Algorithm", 
+    description: 'Algorithm for finding the shortest paths between nodes in a weighted graph',
+    inputs: [
+      { label: 'Weighted Graph Edges', placeholder: 'Enter weighted edges as triplets separated by commas, e.g., A-B-5,B-C-3,C-D-2,A-C-10' },
+      { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
+    ],
+    examples: [
+      ['A-B-5,B-C-3,C-D-2,A-C-10,A-D-15', 'A'],
+      ['1-2-4,2-3-1,1-3-8,3-4-2,2-4-6', '1']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const weightedEdges = data.weightedEdges || [];
+      const startNode = data.startNode || '';
+      
+      // Parse weighted edges into adjacency list
+      const graph = {};
+      const allNodes = new Set();
+      
+      weightedEdges.forEach(edge => {
+        const [from, to, weightStr] = edge.split('-');
+        const weight = parseInt(weightStr);
+        if (!isNaN(weight)) {
+          if (!graph[from]) graph[from] = [];
+          if (!graph[to]) graph[to] = [];
+          graph[from].push({ node: to, weight });
+          graph[to].push({ node: from, weight }); // Assuming undirected graph
+          allNodes.add(from);
+          allNodes.add(to);
+        }
+      });
+      
+      // Dijkstra's algorithm implementation with step tracking
+      const distances = {};
+      const previous = {};
+      const visited = new Set();
+      const unvisited = new Set(allNodes);
+      
+      // Initialize distances
+      allNodes.forEach(node => {
+        distances[node] = node === startNode ? 0 : Infinity;
+        previous[node] = null;
+      });
+      
+      // Initial state
+      steps.push({
+        graph: JSON.parse(JSON.stringify(graph)),
+        distances: JSON.parse(JSON.stringify(distances)),
+        previous: JSON.parse(JSON.stringify(previous)),
+        visited: Array.from(visited),
+        unvisited: Array.from(unvisited),
+        currentNode: null,
+        currentDistance: null,
+        neighbors: [],
+        operation: 'start'
+      });
+      
+      while (unvisited.size > 0) {
+        // Find node with minimum distance
+        let currentNode = null;
+        let minDistance = Infinity;
+        
+        for (const node of unvisited) {
+          if (distances[node] < minDistance) {
+            minDistance = distances[node];
+            currentNode = node;
+          }
+        }
+        
+        // If all remaining nodes are unreachable, break
+        if (currentNode === null || distances[currentNode] === Infinity) {
+          break;
+        }
+        
+        // Mark current node as visited
+        unvisited.delete(currentNode);
+        visited.add(currentNode);
+        
+        steps.push({
+          graph: JSON.parse(JSON.stringify(graph)),
+          distances: JSON.parse(JSON.stringify(distances)),
+          previous: JSON.parse(JSON.stringify(previous)),
+          visited: Array.from(visited),
+          unvisited: Array.from(unvisited),
+          currentNode: currentNode,
+          currentDistance: distances[currentNode],
+          neighbors: graph[currentNode] || [],
+          operation: 'select_node'
+        });
+        
+        // Update distances to neighbors
+        const neighbors = graph[currentNode] || [];
+        for (const neighborObj of neighbors) {
+          const { node: neighbor, weight } = neighborObj;
+          if (!visited.has(neighbor)) {
+            const newDistance = distances[currentNode] + weight;
+            if (newDistance < distances[neighbor]) {
+              distances[neighbor] = newDistance;
+              previous[neighbor] = currentNode;
+              
+              steps.push({
+                graph: JSON.parse(JSON.stringify(graph)),
+                distances: JSON.parse(JSON.stringify(distances)),
+                previous: JSON.parse(JSON.stringify(previous)),
+                visited: Array.from(visited),
+                unvisited: Array.from(unvisited),
+                currentNode: currentNode,
+                currentDistance: distances[currentNode],
+                neighborUpdated: neighbor,
+                newDistance: newDistance,
+                neighbors: graph[currentNode] || [],
+                operation: 'update_distance'
+              });
+            }
+          }
+        }
+      }
+      
+      // Final state
+      steps.push({
+        graph: JSON.parse(JSON.stringify(graph)),
+        distances: JSON.parse(JSON.stringify(distances)),
+        previous: JSON.parse(JSON.stringify(previous)),
+        visited: Array.from(visited),
+        unvisited: Array.from(unvisited),
+        currentNode: null,
+        currentDistance: null,
+        neighbors: [],
+        operation: 'complete'
+      });
+      
+      return steps;
+    }
+  },
+  // Kruskal's Algorithm for Minimum Spanning Tree
+  { 
+    id: 'kruskal', 
+    name: "Kruskal's Algorithm", 
+    description: 'Algorithm for finding the minimum spanning tree of a weighted undirected graph',
+    inputs: [
+      { label: 'Weighted Graph Edges', placeholder: 'Enter weighted edges as triplets separated by commas, e.g., A-B-5,B-C-3,C-D-2,A-C-10' }
+    ],
+    examples: [
+      ['A-B-5,B-C-3,C-D-2,A-C-10,A-D-15'],
+      ['1-2-4,2-3-1,1-3-8,3-4-2,2-4-6']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const weightedEdges = data.weightedEdges || [];
+      
+      // Parse weighted edges
+      const edges = [];
+      const allNodes = new Set();
+      
+      weightedEdges.forEach(edge => {
+        const [from, to, weightStr] = edge.split('-');
+        const weight = parseInt(weightStr);
+        if (!isNaN(weight)) {
+          edges.push({ from, to, weight });
+          allNodes.add(from);
+          allNodes.add(to);
+        }
+      });
+      
+      // Sort edges by weight
+      edges.sort((a, b) => a.weight - b.weight);
+      
+      // Union-Find data structure for cycle detection
+      const parent = {};
+      const rank = {};
+      
+      const find = (node) => {
+        if (parent[node] !== node) {
+          parent[node] = find(parent[node]); // Path compression
+        }
+        return parent[node];
+      };
+      
+      const union = (x, y) => {
+        const rootX = find(x);
+        const rootY = find(y);
+        
+        if (rootX !== rootY) {
+          // Union by rank
+          if (rank[rootX] < rank[rootY]) {
+            parent[rootX] = rootY;
+          } else if (rank[rootX] > rank[rootY]) {
+            parent[rootY] = rootX;
+          } else {
+            parent[rootY] = rootX;
+            rank[rootX]++;
+          }
+          return true;
+        }
+        return false;
+      };
+      
+      // Initialize Union-Find
+      allNodes.forEach(node => {
+        parent[node] = node;
+        rank[node] = 0;
+      });
+      
+      // Kruskal's algorithm implementation with step tracking
+      const mst = [];
+      let edgeIndex = 0;
+      
+      // Initial state
+      steps.push({
+        edges: [...edges],
+        mst: [...mst],
+        parent: JSON.parse(JSON.stringify(parent)),
+        rank: JSON.parse(JSON.stringify(rank)),
+        currentEdge: null,
+        operation: 'start'
+      });
+      
+      while (mst.length < allNodes.size - 1 && edgeIndex < edges.length) {
+        const currentEdge = edges[edgeIndex];
+        edgeIndex++;
+        
+        steps.push({
+          edges: [...edges],
+          mst: [...mst],
+          parent: JSON.parse(JSON.stringify(parent)),
+          rank: JSON.parse(JSON.stringify(rank)),
+          currentEdge: currentEdge,
+          operation: 'consider_edge'
+        });
+        
+        // Check if adding this edge creates a cycle
+        if (union(currentEdge.from, currentEdge.to)) {
+          mst.push(currentEdge);
+          
+          steps.push({
+            edges: [...edges],
+            mst: [...mst],
+            parent: JSON.parse(JSON.stringify(parent)),
+            rank: JSON.parse(JSON.stringify(rank)),
+            currentEdge: currentEdge,
+            operation: 'add_edge'
+          });
+        } else {
+          steps.push({
+            edges: [...edges],
+            mst: [...mst],
+            parent: JSON.parse(JSON.stringify(parent)),
+            rank: JSON.parse(JSON.stringify(rank)),
+            currentEdge: currentEdge,
+            operation: 'skip_edge'
+          });
+        }
+      }
+      
+      // Final state
+      steps.push({
+        edges: [...edges],
+        mst: [...mst],
+        parent: JSON.parse(JSON.stringify(parent)),
+        rank: JSON.parse(JSON.stringify(rank)),
+        currentEdge: null,
+        operation: 'complete'
+      });
+      
+      return steps;
+    }
+  },
+  // Prim's Algorithm for Minimum Spanning Tree
+  { 
+    id: 'prim', 
+    name: "Prim's Algorithm", 
+    description: 'Algorithm for finding the minimum spanning tree of a weighted undirected graph',
+    inputs: [
+      { label: 'Weighted Graph Edges', placeholder: 'Enter weighted edges as triplets separated by commas, e.g., A-B-5,B-C-3,C-D-2,A-C-10' },
+      { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
+    ],
+    examples: [
+      ['A-B-5,B-C-3,C-D-2,A-C-10,A-D-15', 'A'],
+      ['1-2-4,2-3-1,1-3-8,3-4-2,2-4-6', '1']
+    ],
+    generateSteps: (data) => {
+      const steps = [];
+      const weightedEdges = data.weightedEdges || [];
+      const startNode = data.startNode || '';
+      
+      // Parse weighted edges into adjacency list
+      const graph = {};
+      const allNodes = new Set();
+      
+      weightedEdges.forEach(edge => {
+        const [from, to, weightStr] = edge.split('-');
+        const weight = parseInt(weightStr);
+        if (!isNaN(weight)) {
+          if (!graph[from]) graph[from] = [];
+          if (!graph[to]) graph[to] = [];
+          graph[from].push({ node: to, weight });
+          graph[to].push({ node: from, weight }); // Assuming undirected graph
+          allNodes.add(from);
+          allNodes.add(to);
+        }
+      });
+      
+      // Prim's algorithm implementation with step tracking
+      const mst = [];
+      const visited = new Set();
+      const edgesQueue = []; // Will store {from, to, weight}
+      
+      // Initialize with start node
+      if (startNode && allNodes.has(startNode)) {
+        visited.add(startNode);
+        
+        // Add all edges from start node to queue
+        const startEdges = graph[startNode] || [];
+        startEdges.forEach(edge => {
+          edgesQueue.push({ from: startNode, to: edge.node, weight: edge.weight });
+        });
+        
+        // Sort queue by weight
+        edgesQueue.sort((a, b) => a.weight - b.weight);
+      }
+      
+      // Initial state
+      steps.push({
+        graph: JSON.parse(JSON.stringify(graph)),
+        mst: [...mst],
+        visited: Array.from(visited),
+        edgesQueue: [...edgesQueue],
+        currentNode: startNode,
+        operation: 'start'
+      });
+      
+      while (edgesQueue.length > 0 && visited.size < allNodes.size) {
+        // Get the minimum weight edge
+        const minEdge = edgesQueue.shift();
+        
+        steps.push({
+          graph: JSON.parse(JSON.stringify(graph)),
+          mst: [...mst],
+          visited: Array.from(visited),
+          edgesQueue: [...edgesQueue],
+          currentEdge: minEdge,
+          operation: 'consider_edge'
+        });
+        
+        // If the destination node is not yet visited
+        if (!visited.has(minEdge.to)) {
+          // Add the edge to MST
+          mst.push(minEdge);
+          visited.add(minEdge.to);
+          
+          steps.push({
+            graph: JSON.parse(JSON.stringify(graph)),
+            mst: [...mst],
+            visited: Array.from(visited),
+            edgesQueue: [...edgesQueue],
+            currentEdge: minEdge,
+            operation: 'add_edge'
+          });
+          
+          // Add all edges from the newly added node to queue
+          const newEdges = graph[minEdge.to] || [];
+          newEdges.forEach(edge => {
+            if (!visited.has(edge.node)) {
+              edgesQueue.push({ from: minEdge.to, to: edge.node, weight: edge.weight });
+            }
+          });
+          
+          // Sort queue by weight
+          edgesQueue.sort((a, b) => a.weight - b.weight);
+          
+          steps.push({
+            graph: JSON.parse(JSON.stringify(graph)),
+            mst: [...mst],
+            visited: Array.from(visited),
+            edgesQueue: [...edgesQueue],
+            currentEdge: minEdge,
+            operation: 'update_queue'
+          });
+        } else {
+          steps.push({
+            graph: JSON.parse(JSON.stringify(graph)),
+            mst: [...mst],
+            visited: Array.from(visited),
+            edgesQueue: [...edgesQueue],
+            currentEdge: minEdge,
+            operation: 'skip_edge'
+          });
+        }
+      }
+      
+      // Final state
+      steps.push({
+        graph: JSON.parse(JSON.stringify(graph)),
+        mst: [...mst],
+        visited: Array.from(visited),
+        edgesQueue: [...edgesQueue],
+        currentNode: null,
+        currentEdge: null,
+        operation: 'complete'
       });
       
       return steps;

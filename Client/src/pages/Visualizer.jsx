@@ -11,6 +11,11 @@ import BSTVisualizer from '../components/Visualizer_comp/BSTVisualizer';
 import AVLVisualizer from '../components/Visualizer_comp/AVLVisualizer';
 import TrieVisualizer from '../components/Visualizer_comp/TrieVisualizer';
 import TreeVisualizer from '../components/Visualizer_comp/TreeVisualizer';
+import BFSVisualizer from '../components/Visualizer_comp/BFSVisualizer';
+import DFSVisualizer from '../components/Visualizer_comp/DFSVisualizer';
+import DijkstraVisualizer from '../components/Visualizer_comp/DijkstraVisualizer';
+import KruskalVisualizer from '../components/Visualizer_comp/KruskalVisualizer';
+import PrimVisualizer from '../components/Visualizer_comp/PrimVisualizer';
 import { algorithms } from '../utils/algorithms';
 import { parseInputs } from '../utils/inputParser';
 
@@ -359,6 +364,209 @@ class Trie {
     
     return current.isEnd;
   }
+}`,
+
+  'bfs': `
+function bfs(graph, startNode) {
+  const visited = new Set();
+  const queue = [startNode];
+  visited.add(startNode);
+  
+  while (queue.length > 0) {
+    const currentNode = queue.shift();
+    
+    // Process neighbors
+    const neighbors = graph[currentNode] || [];
+    for (const neighbor of neighbors) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+  
+  return visited;
+}`,
+
+  'dfs': `
+function dfs(graph, startNode) {
+  const visited = new Set();
+  const stack = [startNode];
+  
+  while (stack.length > 0) {
+    const currentNode = stack.pop();
+    
+    if (!visited.has(currentNode)) {
+      visited.add(currentNode);
+      
+      // Add neighbors to stack in reverse order for consistent traversal
+      const neighbors = graph[currentNode] || [];
+      for (let i = neighbors.length - 1; i >= 0; i--) {
+        const neighbor = neighbors[i];
+        if (!visited.has(neighbor)) {
+          stack.push(neighbor);
+        }
+      }
+    }
+  }
+  
+  return visited;
+}`,
+
+  'dijkstra': `
+function dijkstra(graph, startNode) {
+  const distances = {};
+  const previous = {};
+  const visited = new Set();
+  const unvisited = new Set(Object.keys(graph));
+  
+  // Initialize distances
+  for (const node in graph) {
+    distances[node] = node === startNode ? 0 : Infinity;
+    previous[node] = null;
+  }
+  
+  while (unvisited.size > 0) {
+    // Find node with minimum distance
+    let currentNode = null;
+    let minDistance = Infinity;
+    
+    for (const node of unvisited) {
+      if (distances[node] < minDistance) {
+        minDistance = distances[node];
+        currentNode = node;
+      }
+    }
+    
+    // If all remaining nodes are unreachable, break
+    if (currentNode === null || distances[currentNode] === Infinity) {
+      break;
+    }
+    
+    // Mark current node as visited
+    unvisited.delete(currentNode);
+    visited.add(currentNode);
+    
+    // Update distances to neighbors
+    const neighbors = graph[currentNode] || [];
+    for (const neighborObj of neighbors) {
+      const { node: neighbor, weight } = neighborObj;
+      if (!visited.has(neighbor)) {
+        const newDistance = distances[currentNode] + weight;
+        if (newDistance < distances[neighbor]) {
+          distances[neighbor] = newDistance;
+          previous[neighbor] = currentNode;
+        }
+      }
+    }
+  }
+  
+  return { distances, previous };
+}`,
+
+  'kruskal': `
+class UnionFind {
+  constructor(nodes) {
+    this.parent = {};
+    this.rank = {};
+    
+    nodes.forEach(node => {
+      this.parent[node] = node;
+      this.rank[node] = 0;
+    });
+  }
+  
+  find(node) {
+    if (this.parent[node] !== node) {
+      this.parent[node] = this.find(this.parent[node]); // Path compression
+    }
+    return this.parent[node];
+  }
+  
+  union(x, y) {
+    const rootX = this.find(x);
+    const rootY = this.find(y);
+    
+    if (rootX !== rootY) {
+      // Union by rank
+      if (this.rank[rootX] < this.rank[rootY]) {
+        this.parent[rootX] = rootY;
+      } else if (this.rank[rootX] > this.rank[rootY]) {
+        this.parent[rootY] = rootX;
+      } else {
+        this.parent[rootY] = rootX;
+        this.rank[rootX]++;
+      }
+      return true;
+    }
+    return false;
+  }
+}
+
+function kruskal(nodes, edges) {
+  // Sort edges by weight
+  edges.sort((a, b) => a.weight - b.weight);
+  
+  // Initialize Union-Find
+  const uf = new UnionFind(nodes);
+  
+  // Kruskal's algorithm
+  const mst = [];
+  
+  for (const edge of edges) {
+    // Check if adding this edge creates a cycle
+    if (uf.union(edge.from, edge.to)) {
+      mst.push(edge);
+    }
+    
+    // Stop when MST is complete
+    if (mst.length === nodes.length - 1) {
+      break;
+    }
+  }
+  
+  return mst;
+}`,
+
+  'prim': `
+function prim(graph, startNode) {
+  const mst = [];
+  const visited = new Set([startNode]);
+  const edgesQueue = [];
+  
+  // Add all edges from start node to queue
+  const startEdges = graph[startNode] || [];
+  startEdges.forEach(edge => {
+    edgesQueue.push({ from: startNode, to: edge.node, weight: edge.weight });
+  });
+  
+  // Sort queue by weight
+  edgesQueue.sort((a, b) => a.weight - b.weight);
+  
+  while (edgesQueue.length > 0 && visited.size < Object.keys(graph).length) {
+    // Get the minimum weight edge
+    const minEdge = edgesQueue.shift();
+    
+    // If the destination node is not yet visited
+    if (!visited.has(minEdge.to)) {
+      // Add the edge to MST
+      mst.push(minEdge);
+      visited.add(minEdge.to);
+      
+      // Add all edges from the newly added node to queue
+      const newEdges = graph[minEdge.to] || [];
+      newEdges.forEach(edge => {
+        if (!visited.has(edge.node)) {
+          edgesQueue.push({ from: minEdge.to, to: edge.node, weight: edge.weight });
+        }
+      });
+      
+      // Sort queue by weight
+      edgesQueue.sort((a, b) => a.weight - b.weight);
+    }
+  }
+  
+  return mst;
 }`
 };
 
@@ -522,6 +730,10 @@ const Visualizer = () => {
     const searchAlgorithms = ['linear-search', 'binary-search'];
     // Check if it's a tree algorithm
     const treeAlgorithms = ['bst', 'avl-tree', 'trie'];
+    // Check if it's a graph traversal algorithm
+    const graphTraversalAlgorithms = ['bfs', 'dfs'];
+    // Check if it's a weighted graph algorithm
+    const weightedGraphAlgorithms = ['dijkstra', 'kruskal', 'prim'];
     
     if (sortingAlgorithms.includes(selectedAlgorithm)) {
       // Special handling for heap sort with toggle between array and tree view
@@ -580,6 +792,26 @@ const Visualizer = () => {
       }
       // Fallback to generic TreeVisualizer if needed
       return <TreeVisualizer {...visualizerProps} />;
+    }
+    
+    if (selectedAlgorithm === 'bfs') {
+      return <BFSVisualizer {...visualizerProps} />;
+    }
+    
+    if (selectedAlgorithm === 'dfs') {
+      return <DFSVisualizer {...visualizerProps} />;
+    }
+    
+    if (selectedAlgorithm === 'dijkstra') {
+      return <DijkstraVisualizer {...visualizerProps} />;
+    }
+    
+    if (selectedAlgorithm === 'kruskal') {
+      return <KruskalVisualizer {...visualizerProps} />;
+    }
+    
+    if (selectedAlgorithm === 'prim') {
+      return <PrimVisualizer {...visualizerProps} />;
     }
 
     switch (selectedAlgorithm) {
@@ -715,6 +947,62 @@ const Visualizer = () => {
           return 24; // Traverse
         } else if (stepData.operation === 'mark_end') {
           return 28; // Mark end
+        }
+        return -1;
+        
+      case 'bfs':
+        if (stepData.operation === 'start') {
+          return 3; // Starting BFS
+        } else if (stepData.operation === 'visit') {
+          return 8; // Visiting node
+        } else if (stepData.operation === 'process') {
+          return 15; // Processing node
+        }
+        return -1;
+        
+      case 'dfs':
+        if (stepData.operation === 'start') {
+          return 3; // Starting DFS
+        } else if (stepData.operation === 'visit') {
+          return 8; // Visiting node
+        } else if (stepData.operation === 'process') {
+          return 13; // Processing node
+        }
+        return -1;
+        
+      case 'dijkstra':
+        if (stepData.operation === 'start') {
+          return 7; // Starting Dijkstra
+        } else if (stepData.operation === 'select_node') {
+          return 22; // Selecting node
+        } else if (stepData.operation === 'update_distance') {
+          return 34; // Updating distance
+        }
+        return -1;
+        
+      case 'kruskal':
+        if (stepData.operation === 'start') {
+          return 15; // Starting Kruskal
+        } else if (stepData.operation === 'consider_edge') {
+          return 25; // Considering edge
+        } else if (stepData.operation === 'add_edge') {
+          return 30; // Adding edge
+        } else if (stepData.operation === 'skip_edge') {
+          return 35; // Skipping edge
+        }
+        return -1;
+        
+      case 'prim':
+        if (stepData.operation === 'start') {
+          return 7; // Starting Prim
+        } else if (stepData.operation === 'consider_edge') {
+          return 20; // Considering edge
+        } else if (stepData.operation === 'add_edge') {
+          return 25; // Adding edge
+        } else if (stepData.operation === 'skip_edge') {
+          return 30; // Skipping edge
+        } else if (stepData.operation === 'update_queue') {
+          return 35; // Updating queue
         }
         return -1;
         
