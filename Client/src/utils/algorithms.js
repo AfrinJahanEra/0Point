@@ -4,7 +4,7 @@ export const algorithms = [
     name: 'Bubble Sort', 
     description: 'Simple sorting algorithm that repeatedly steps through the list',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
+    examples: ['64,34,25,12,22,11,90,88,76,50', '5,2,8,1,9,3,7,4,6,10'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -65,7 +65,7 @@ export const algorithms = [
     name: 'Quick Sort', 
     description: 'Divide-and-conquer algorithm that picks an element as pivot and partitions the array around it',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
+    examples: ['64,34,25,12,22,11,90,88,76,50', '5,2,8,1,9,3,7,4,6,10'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -170,7 +170,7 @@ export const algorithms = [
     name: 'Insertion Sort', 
     description: 'Simple sorting algorithm that builds the final sorted array one item at a time',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
+    examples: ['64,34,25,12,22,11,90,88,76,50', '5,2,8,1,9,3,7,4,6,10'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -245,7 +245,7 @@ export const algorithms = [
     name: 'Selection Sort', 
     description: 'In-place comparison sorting algorithm that divides the input list into sorted and unsorted regions',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
+    examples: ['64,34,25,12,22,11,90,88,76,50', '5,2,8,1,9,3,7,4,6,10'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -329,7 +329,7 @@ export const algorithms = [
     name: 'Merge Sort', 
     description: 'Divide-and-conquer algorithm that divides the array into halves, sorts each half, and merges them back together',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
+    examples: ['64,34,25,12,22,11,90,88,76,50', '5,2,8,1,9,3,7,4,6,10'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -491,7 +491,7 @@ export const algorithms = [
     name: 'Heap Sort', 
     description: 'Comparison-based sorting algorithm that uses binary heap data structure',
     inputs: [{ label: 'Array Elements', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }],
-    examples: ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15', '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'],
+    examples: ['64,34,25,12,22,11,90,88,76,50', '5,2,8,1,9,3,7,4,6,10'],
     generateSteps: (data) => {
       const steps = [];
       const array = [...data.array];
@@ -679,8 +679,8 @@ export const algorithms = [
       { label: 'Target Element', placeholder: 'Enter the number to search for, e.g., 8' }
     ],
     examples: [
-      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15', '8'], 
-      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15', '1']
+      ['64,34,25,12,22,11,90,88,76,50', '25'], 
+      ['5,2,8,1,9,3,7,4,6,10', '1']
     ],
     generateSteps: (data) => {
       const steps = [];
@@ -740,8 +740,8 @@ export const algorithms = [
       { label: 'Target Element', placeholder: 'Enter the number to search for, e.g., 5' }
     ],
     examples: [
-      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15', '5'], 
-      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15', '6']
+      ['1,2,3,4,5,6,7,8,9,10', '5'], 
+      ['11,22,34,50,64,76,88,90,95,100', '64']
     ],
     generateSteps: (data) => {
       const steps = [];
@@ -837,8 +837,8 @@ export const algorithms = [
     { label: 'Values to Insert', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }
   ],
   examples: [
-    ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15'], 
-    ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15']
+    ['64,34,25,12,22,11,90,88,76,50'], 
+    ['5,2,8,1,9,3,7,4,6,10']
   ],
   generateSteps: (data) => {
     const steps = [];
@@ -996,8 +996,8 @@ export const algorithms = [
       { label: 'Values to Insert', placeholder: 'Enter numbers separated by commas, e.g., 5,2,8,1,9' }
     ],
     examples: [
-      ['5,2,8,1,9,3,7,4,6,10,11,12,13,14,15'], 
-      ['1,2,3,4,5,6,7,8,9,10,11,12,13,14,15']
+      ['64,34,25,12,22,11,90,88,76,50'], 
+      ['5,2,8,1,9,3,7,4,6,10']
     ],
     generateSteps: (data) => {
       const steps = [];
@@ -1282,8 +1282,8 @@ export const algorithms = [
       { label: 'Words to Insert', placeholder: 'Enter words separated by commas, e.g., cat,dog,car' }
     ],
     examples: [
-      ['cat,dog,car,bird,fish,elephant,giraffe,hippo,iguana,jaguar,kangaroo,lion,monkey,narwhal,octopus'], 
-      ['apple,banana,cherry,date,elderberry,fig,grape,kiwi,lemon,mango,orange,peach,quince,raspberry,strawberry']
+      ['algorithm,binary,compute,data,engine,format,graph,heap,index,json,key'], 
+      ['loop,map,node,object,parse,query,route,sort,tree,union']
     ],
     generateSteps: (data) => {
       const steps = [];
@@ -1374,8 +1374,8 @@ export const algorithms = [
     { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
   ],
   examples: [
-    ['A-B,B-C,C-D,A-C', 'A'],
-    ['1-2,2-3,3-4,1-3', '1']
+    ['A-B,B-C,C-D,D-E,E-F,F-G,G-H,H-I,I-J,J-A', 'A'],
+    ['1-2,2-3,3-4,4-5,5-6,6-7,7-8,8-9,9-10,1-10', '1']
   ],
   generateSteps: (data) => {
     const steps = [];
@@ -1465,8 +1465,8 @@ export const algorithms = [
     { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
   ],
   examples: [
-    ['A-B,B-C,C-D,A-C', 'A'],
-    ['1-2,2-3,3-4,1-3', '1']
+    ['A-B,B-C,C-D,D-E,E-F,F-G,G-H,H-I,I-J,J-A', 'A'],
+    ['1-2,2-3,3-4,4-5,5-6,6-7,7-8,8-9,9-10,1-10', '1']
   ],
   generateSteps: (data) => {
     const steps = [];
@@ -1560,8 +1560,8 @@ export const algorithms = [
     { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
   ],
   examples: [
-    ['A-B-5,B-C-3,C-D-2,A-C-10', 'A'],
-    ['1-2-4,2-3-1,1-3-8,3-4-2', '1']
+    ['A-B-5,B-C-3,C-D-2,D-E-4,E-F-1,F-G-7,G-H-3,H-I-6,I-J-2,J-A-8', 'A'],
+    ['1-2-4,2-3-1,3-4-2,4-5-5,5-6-3,6-7-2,7-8-4,8-9-1,9-10-3,1-10-9', '1']
   ],
   generateSteps: (data) => {
     const steps = [];
@@ -1689,8 +1689,8 @@ export const algorithms = [
       { label: 'Weighted Graph Edges', placeholder: 'Enter weighted edges as triplets separated by commas, e.g., A-B-5,B-C-3,C-D-2,A-C-10' }
     ],
     examples: [
-      ['A-B-5,B-C-3,C-D-2,A-C-10'],
-      ['1-2-4,2-3-1,1-3-8,3-4-2']
+      ['A-B-5,B-C-3,C-D-2,D-E-4,E-F-1,F-G-7,G-H-3,H-I-6,I-J-2,J-A-8'],
+      ['1-2-4,2-3-1,3-4-2,4-5-5,5-6-3,6-7-2,7-8-4,8-9-1,9-10-3,1-10-9']
     ],
     generateSteps: (data) => {
       const steps = [];
@@ -1840,8 +1840,8 @@ export const algorithms = [
       { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
     ],
     examples: [
-      ['A-B-5,B-C-3,C-D-2,A-C-10', 'A'],
-      ['1-2-4,2-3-1,1-3-8,3-4-2', '1']
+      ['A-B-5,B-C-3,C-D-2,D-E-4,E-F-1,F-G-7,G-H-3,H-I-6,I-J-2,J-A-8', 'A'],
+      ['1-2-4,2-3-1,3-4-2,4-5-5,5-6-3,6-7-2,7-8-4,8-9-1,9-10-3,1-10-9', '1']
     ],
     generateSteps: (data) => {
       const steps = [];
