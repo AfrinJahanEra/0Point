@@ -384,9 +384,10 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   }
 
   return (
-    <div className="mt-2">
-      <style jsx>{`
-        .traversal-highlight {
+    <div id="bst-visualizer" className="mt-2">
+      <style>
+        {`
+        #bst-visualizer .traversal-highlight {
           animation: traversal-pulse 1s ease-in-out;
         }
         
@@ -396,7 +397,7 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           100% { transform: scale(1); }
         }
         
-        .path-connection {
+        #bst-visualizer .path-connection {
           stroke-dasharray: 5,5;
           animation: path-dash 2s linear infinite;
         }
@@ -406,54 +407,57 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             stroke-dashoffset: -10;
           }
         }
-      `}</style>
+        `}
+      </style>
       
-      <style jsx>{`
+      <style>
+        {`
         /* Custom scrollbar styling - transparent by default, grey on hover */
-        ::-webkit-scrollbar {
+        #bst-visualizer ::-webkit-scrollbar {
           width: 8px;
           height: 8px;
         }
         
-        ::-webkit-scrollbar-track {
+        #bst-visualizer ::-webkit-scrollbar-track {
           background: transparent;
         }
         
-        ::-webkit-scrollbar-thumb {
+        #bst-visualizer ::-webkit-scrollbar-thumb {
           background: transparent;
           border-radius: 4px;
         }
         
-        ::-webkit-scrollbar-thumb:hover {
+        #bst-visualizer ::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Show scrollbar on hover */
-        *:hover::-webkit-scrollbar-thumb {
+        #bst-visualizer *:hover::-webkit-scrollbar-thumb {
           background: rgba(128, 128, 128, 0.3);
         }
         
-        *:hover::-webkit-scrollbar-thumb:hover {
+        #bst-visualizer *:hover::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Hide scrollbars in fullscreen mode */
-        .fullscreen-container::-webkit-scrollbar {
+        #bst-visualizer .fullscreen-container::-webkit-scrollbar {
           display: none;
         }
         
-        .fullscreen-container {
+        #bst-visualizer .fullscreen-container {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
         
         /* Additional scrollbar hiding for fullscreen */
-        .fullscreen-container::-webkit-scrollbar-thumb,
-        .fullscreen-container::-webkit-scrollbar-track,
-        .fullscreen-container::-webkit-scrollbar-corner {
+        #bst-visualizer .fullscreen-container::-webkit-scrollbar-thumb,
+        #bst-visualizer .fullscreen-container::-webkit-scrollbar-track,
+        #bst-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
-      `}</style>
+        `}
+      </style>
       
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">BST Visualization</h3>

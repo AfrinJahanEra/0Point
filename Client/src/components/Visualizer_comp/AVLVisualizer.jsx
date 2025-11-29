@@ -531,9 +531,10 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   }
 
   return (
-    <div className="mt-2">
-      <style jsx>{`
-        .traversal-highlight {
+    <div id="avl-visualizer" className="mt-2">
+      <style>
+        {`
+        #avl-visualizer .traversal-highlight {
           animation: traversal-pulse 1s ease-in-out;
         }
         
@@ -543,7 +544,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           100% { transform: scale(1); }
         }
         
-        .path-connection {
+        #avl-visualizer .path-connection {
           stroke-dasharray: 5,5;
           animation: path-dash 2s linear infinite;
         }
@@ -555,50 +556,51 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         }
         
         /* Custom scrollbar styling - transparent by default, grey on hover */
-        ::-webkit-scrollbar {
+        #avl-visualizer ::-webkit-scrollbar {
           width: 8px;
           height: 8px;
         }
         
-        ::-webkit-scrollbar-track {
+        #avl-visualizer ::-webkit-scrollbar-track {
           background: transparent;
         }
         
-        ::-webkit-scrollbar-thumb {
+        #avl-visualizer ::-webkit-scrollbar-thumb {
           background: transparent;
           border-radius: 4px;
         }
         
-        ::-webkit-scrollbar-thumb:hover {
+        #avl-visualizer ::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Show scrollbar on hover */
-        *:hover::-webkit-scrollbar-thumb {
+        #avl-visualizer *:hover::-webkit-scrollbar-thumb {
           background: rgba(128, 128, 128, 0.3);
         }
         
-        *:hover::-webkit-scrollbar-thumb:hover {
+        #avl-visualizer *:hover::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Hide scrollbars in fullscreen mode */
-        .fullscreen-container::-webkit-scrollbar {
+        #avl-visualizer .fullscreen-container::-webkit-scrollbar {
           display: none;
         }
         
-        .fullscreen-container {
+        #avl-visualizer .fullscreen-container {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
         
         /* Additional scrollbar hiding for fullscreen */
-        .fullscreen-container::-webkit-scrollbar-thumb,
-        .fullscreen-container::-webkit-scrollbar-track,
-        .fullscreen-container::-webkit-scrollbar-corner {
+        #avl-visualizer .fullscreen-container::-webkit-scrollbar-thumb,
+        #avl-visualizer .fullscreen-container::-webkit-scrollbar-track,
+        #avl-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
-      `}</style>
+        `}
+      </style>
       
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">AVL Tree Visualization</h3>

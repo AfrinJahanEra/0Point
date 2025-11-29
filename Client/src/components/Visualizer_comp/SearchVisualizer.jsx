@@ -307,53 +307,55 @@ const SearchVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onS
   const safeCurrentStep = Math.min(currentStep, Math.max(0, steps.length - 1));
 
   return (
-    <div className="mt-2">
-      <style jsx>{`
+    <div id="search-visualizer" className="mt-2">
+      <style>
+        {`
         /* Custom scrollbar styling - transparent by default, grey on hover */
-        ::-webkit-scrollbar {
+        #search-visualizer ::-webkit-scrollbar {
           width: 8px;
           height: 8px;
         }
         
-        ::-webkit-scrollbar-track {
+        #search-visualizer ::-webkit-scrollbar-track {
           background: transparent;
         }
         
-        ::-webkit-scrollbar-thumb {
+        #search-visualizer ::-webkit-scrollbar-thumb {
           background: transparent;
           border-radius: 4px;
         }
         
-        ::-webkit-scrollbar-thumb:hover {
+        #search-visualizer ::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Show scrollbar on hover */
-        *:hover::-webkit-scrollbar-thumb {
+        #search-visualizer *:hover::-webkit-scrollbar-thumb {
           background: rgba(128, 128, 128, 0.3);
         }
         
-        *:hover::-webkit-scrollbar-thumb:hover {
+        #search-visualizer *:hover::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Hide scrollbars in fullscreen mode */
-        .fullscreen-container::-webkit-scrollbar {
+        #search-visualizer .fullscreen-container::-webkit-scrollbar {
           display: none;
         }
         
-        .fullscreen-container {
+        #search-visualizer .fullscreen-container {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
         
         /* Additional scrollbar hiding for fullscreen */
-        .fullscreen-container::-webkit-scrollbar-thumb,
-        .fullscreen-container::-webkit-scrollbar-track,
-        .fullscreen-container::-webkit-scrollbar-corner {
+        #search-visualizer .fullscreen-container::-webkit-scrollbar-thumb,
+        #search-visualizer .fullscreen-container::-webkit-scrollbar-track,
+        #search-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
-      `}</style>
+        `}
+      </style>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">Search Visualization</h3>
         <div className="flex gap-2 items-center">

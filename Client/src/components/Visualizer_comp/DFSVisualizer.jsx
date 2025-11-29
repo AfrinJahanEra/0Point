@@ -474,9 +474,10 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   const currentStepData = steps[safeCurrentStep];
 
   return (
-    <div className="mt-2">
-      <style jsx>{`
-        .traversal-highlight {
+    <div id="dfs-visualizer" className="mt-2">
+      <style>
+        {`
+        #dfs-visualizer .traversal-highlight {
           animation: traversal-pulse 1s ease-in-out;
         }
         
@@ -486,7 +487,7 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           100% { transform: scale(1); }
         }
         
-        .path-connection {
+        #dfs-visualizer .path-connection {
           stroke-dasharray: 5,5;
           animation: path-dash 2s linear infinite;
         }
@@ -498,50 +499,51 @@ const DFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         }
         
         /* Custom scrollbar styling - transparent by default, grey on hover */
-        ::-webkit-scrollbar {
+        #dfs-visualizer ::-webkit-scrollbar {
           width: 8px;
           height: 8px;
         }
         
-        ::-webkit-scrollbar-track {
+        #dfs-visualizer ::-webkit-scrollbar-track {
           background: transparent;
         }
         
-        ::-webkit-scrollbar-thumb {
+        #dfs-visualizer ::-webkit-scrollbar-thumb {
           background: transparent;
           border-radius: 4px;
         }
         
-        ::-webkit-scrollbar-thumb:hover {
+        #dfs-visualizer ::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Show scrollbar on hover */
-        *:hover::-webkit-scrollbar-thumb {
+        #dfs-visualizer *:hover::-webkit-scrollbar-thumb {
           background: rgba(128, 128, 128, 0.3);
         }
         
-        *:hover::-webkit-scrollbar-thumb:hover {
+        #dfs-visualizer *:hover::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Hide scrollbars in fullscreen mode */
-        .fullscreen-container::-webkit-scrollbar {
+        #dfs-visualizer .fullscreen-container::-webkit-scrollbar {
           display: none;
         }
         
-        .fullscreen-container {
+        #dfs-visualizer .fullscreen-container {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
         
         /* Additional scrollbar hiding for fullscreen */
-        .fullscreen-container::-webkit-scrollbar-thumb,
-        .fullscreen-container::-webkit-scrollbar-track,
-        .fullscreen-container::-webkit-scrollbar-corner {
+        #dfs-visualizer .fullscreen-container::-webkit-scrollbar-thumb,
+        #dfs-visualizer .fullscreen-container::-webkit-scrollbar-track,
+        #dfs-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
-      `}</style>
+        `}
+      </style>
       
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">DFS Visualization</h3>

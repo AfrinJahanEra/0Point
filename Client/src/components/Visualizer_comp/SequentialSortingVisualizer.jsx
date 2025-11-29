@@ -403,53 +403,55 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
   const safeCurrentStep = Math.min(currentStep, Math.max(0, steps.length - 1));
 
   return (
-    <div className="mt-2">
-      <style jsx>{`
+    <div id="sequential-sorting-visualizer" className="mt-2">
+      <style>
+        {`
         /* Custom scrollbar styling - transparent by default, grey on hover */
-        ::-webkit-scrollbar {
+        #sequential-sorting-visualizer ::-webkit-scrollbar {
           width: 8px;
           height: 8px;
         }
         
-        ::-webkit-scrollbar-track {
+        #sequential-sorting-visualizer ::-webkit-scrollbar-track {
           background: transparent;
         }
         
-        ::-webkit-scrollbar-thumb {
+        #sequential-sorting-visualizer ::-webkit-scrollbar-thumb {
           background: transparent;
           border-radius: 4px;
         }
         
-        ::-webkit-scrollbar-thumb:hover {
+        #sequential-sorting-visualizer ::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Show scrollbar on hover */
-        *:hover::-webkit-scrollbar-thumb {
+        #sequential-sorting-visualizer *:hover::-webkit-scrollbar-thumb {
           background: rgba(128, 128, 128, 0.3);
         }
         
-        *:hover::-webkit-scrollbar-thumb:hover {
+        #sequential-sorting-visualizer *:hover::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Hide scrollbars in fullscreen mode */
-        .fullscreen-container::-webkit-scrollbar {
+        #sequential-sorting-visualizer .fullscreen-container::-webkit-scrollbar {
           display: none;
         }
         
-        .fullscreen-container {
+        #sequential-sorting-visualizer .fullscreen-container {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
         
         /* Additional scrollbar hiding for fullscreen */
-        .fullscreen-container::-webkit-scrollbar-thumb,
-        .fullscreen-container::-webkit-scrollbar-track,
-        .fullscreen-container::-webkit-scrollbar-corner {
+        #sequential-sorting-visualizer .fullscreen-container::-webkit-scrollbar-thumb,
+        #sequential-sorting-visualizer .fullscreen-container::-webkit-scrollbar-track,
+        #sequential-sorting-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
-      `}</style>
+        `}
+      </style>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">Sorting Visualization</h3>
         <div className="flex gap-2 items-center">

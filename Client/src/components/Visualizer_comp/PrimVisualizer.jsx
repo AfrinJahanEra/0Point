@@ -559,9 +559,10 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
   const currentStepData = steps[safeCurrentStep];
 
   return (
-    <div className="mt-2">
-      <style jsx>{`
-        .traversal-highlight {
+    <div id="prim-visualizer" className="mt-2">
+      <style>
+        {`
+        #prim-visualizer .traversal-highlight {
           animation: traversal-pulse 1s ease-in-out;
         }
         
@@ -571,7 +572,7 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           100% { transform: scale(1); }
         }
         
-        .path-connection {
+        #prim-visualizer .path-connection {
           stroke-dasharray: 5,5;
           animation: path-dash 2s linear infinite;
         }
@@ -583,50 +584,51 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         }
         
         /* Custom scrollbar styling - transparent by default, grey on hover */
-        ::-webkit-scrollbar {
+        #prim-visualizer ::-webkit-scrollbar {
           width: 8px;
           height: 8px;
         }
         
-        ::-webkit-scrollbar-track {
+        #prim-visualizer ::-webkit-scrollbar-track {
           background: transparent;
         }
         
-        ::-webkit-scrollbar-thumb {
+        #prim-visualizer ::-webkit-scrollbar-thumb {
           background: transparent;
           border-radius: 4px;
         }
         
-        ::-webkit-scrollbar-thumb:hover {
+        #prim-visualizer ::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Show scrollbar on hover */
-        *:hover::-webkit-scrollbar-thumb {
+        #prim-visualizer *:hover::-webkit-scrollbar-thumb {
           background: rgba(128, 128, 128, 0.3);
         }
         
-        *:hover::-webkit-scrollbar-thumb:hover {
+        #prim-visualizer *:hover::-webkit-scrollbar-thumb:hover {
           background: rgba(128, 128, 128, 0.5);
         }
         
         /* Hide scrollbars in fullscreen mode */
-        .fullscreen-container::-webkit-scrollbar {
+        #prim-visualizer .fullscreen-container::-webkit-scrollbar {
           display: none;
         }
         
-        .fullscreen-container {
+        #prim-visualizer .fullscreen-container {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
         
         /* Additional scrollbar hiding for fullscreen */
-        .fullscreen-container::-webkit-scrollbar-thumb,
-        .fullscreen-container::-webkit-scrollbar-track,
-        .fullscreen-container::-webkit-scrollbar-corner {
+        #prim-visualizer .fullscreen-container::-webkit-scrollbar-thumb,
+        #prim-visualizer .fullscreen-container::-webkit-scrollbar-track,
+        #prim-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
-      `}</style>
+        `}
+      </style>
       
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">Prim's Algorithm Visualization</h3>
