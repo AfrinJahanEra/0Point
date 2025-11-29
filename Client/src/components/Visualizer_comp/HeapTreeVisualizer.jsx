@@ -453,6 +453,52 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
 
   return (
     <div className="mt-2">
+      <style jsx>{`
+        /* Custom scrollbar styling - transparent by default, grey on hover */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+          background: transparent;
+          border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(128, 128, 128, 0.5);
+        }
+        
+        /* Show scrollbar on hover */
+        *:hover::-webkit-scrollbar-thumb {
+          background: rgba(128, 128, 128, 0.3);
+        }
+        
+        *:hover::-webkit-scrollbar-thumb:hover {
+          background: rgba(128, 128, 128, 0.5);
+        }
+        
+        /* Hide scrollbars in fullscreen mode */
+        .fullscreen-container::-webkit-scrollbar {
+          display: none;
+        }
+        
+        .fullscreen-container {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        
+        /* Additional scrollbar hiding for fullscreen */
+        .fullscreen-container::-webkit-scrollbar-thumb,
+        .fullscreen-container::-webkit-scrollbar-track,
+        .fullscreen-container::-webkit-scrollbar-corner {
+          display: none;
+        }
+      `}</style>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">Heap Tree Visualization</h3>
         <div className="flex gap-2 items-center">
@@ -481,7 +527,7 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         </div>
       </div>
       
-      <div ref={fullscreenContainerRef} className={`group bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto relative ${isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-black border-0 p-0 m-0' : ''}`}>
+      <div ref={fullscreenContainerRef} className={`group bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto relative ${isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-black border-0 p-0 m-0 fullscreen-container overflow-hidden' : ''}`}>
         {/* Fullscreen toggle icon positioned on the visualization container like YouTube */}
         <button 
           onClick={toggleFullscreen}
@@ -502,7 +548,7 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
             </span>
           </h4>
           
-          <div className={`flex justify-center items-center mb-3 py-2 ${isFullscreen ? 'scale-150' : ''}`}>
+          <div className={`flex justify-center items-center mb-3 py-2 ${isFullscreen ? 'scale-125' : ''}`}>
             <div className="w-full min-h-[300px] flex items-center justify-center">
               <svg 
                 ref={svgRef} 
