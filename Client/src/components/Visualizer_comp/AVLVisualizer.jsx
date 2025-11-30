@@ -452,46 +452,51 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             x2={parentX}
             y2={parentY}
             stroke={isInTraversalPath ? "#3B82F6" : "#9CA3AF"}
-            strokeWidth={isInTraversalPath ? "3" : "2"}
-            className={isInTraversalPath ? 'path-connection' : 'stroke-gray-400'}
+            strokeWidth="2"
+            className="floating-animation delay-3"
           />
         )}
         
-        {/* Render node circle with dragging support */}
+        {/* Render node circle with enhanced floating animation */}
         <g 
           onMouseDown={(e) => handleNodeMouseDown(node.value, actualX, actualY, e)}
-          className="cursor-move"
-          transform={`translate(${actualX}, ${actualY})`}
+          className="cursor-move floating-animation glowing delay-3"
         >
-          <circle
-            r={nodeSize / 2}
-            fill={isInTraversalPath ? "#BFDBFE" : (isInsertedNode ? "#3B82F6" : (isComparingNode ? "#D1D5DB" : "#FFFFFF"))}
-            stroke={isInTraversalPath ? "#3B82F6" : (isInsertedNode ? "#2563EB" : (isComparingNode ? "#374151" : "#9CA3AF"))}
-            strokeWidth="2"
-            className="hover:stroke-blue-500 transition-all duration-500"
-            onMouseEnter={() => setHoveredNode(node.value)}
-            onMouseLeave={() => setHoveredNode(null)}
-          />
-          
-          {/* Render node value */}
-          <text
-            y={5}
-            textAnchor="middle"
-            className={`font-bold ${isInTraversalPath ? 'text-blue-800' : (isInsertedNode ? 'text-white' : (isComparingNode ? 'text-black' : 'text-black'))}`}
-          >
-            {node.value}
-          </text>
-          
-          {/* Render height for AVL trees */}
-          {node.height !== undefined && (
+          <g transform={`translate(${actualX}, ${actualY})`}>
+            <circle
+              r={nodeSize / 2}
+              fill={isInTraversalPath ? "#BFDBFE" : (isInsertedNode ? "#3B82F6" : (isComparingNode ? "#D1D5DB" : "#FFFFFF"))}
+              stroke={isInTraversalPath ? "#3B82F6" : (isInsertedNode ? "#2563EB" : (isComparingNode ? "#374151" : "#9CA3AF"))}
+              strokeWidth="2"
+              className={`hover:stroke-blue-500 transition-all duration-500 ${level % 4 === 0 ? 'delay-1' : level % 4 === 1 ? 'delay-2' : level % 4 === 2 ? 'delay-3' : 'delay-4'}`}
+              onMouseEnter={() => setHoveredNode(node.value)}
+              onMouseLeave={() => setHoveredNode(null)}
+            />
+            
+            {/* Render node value - no animation */}
             <text
-              y={-25}
+              x="0"
+              y="0"
               textAnchor="middle"
-              className="text-xs text-gray-500"
+              dominantBaseline="middle"
+              className="font-bold text-xs select-none"
+              fill={isInTraversalPath ? "#1E40AF" : (isInsertedNode ? "#FFFFFF" : (isComparingNode ? "#1F2937" : "#4B5563"))}
+            >
+              {node.value}
+            </text>
+            
+            {/* Render height value for AVL nodes - no animation */}
+            <text
+              x="0"
+              y={nodeSize / 2 + 12}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="font-medium text-xs select-none"
+              fill="#6B7280"
             >
               h:{node.height}
             </text>
-          )}
+          </g>
         </g>
         
         {/* Render rotation indicator */}
@@ -504,12 +509,12 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
               height="20"
               rx="3"
               fill={rotationPhase === 'breaking' ? "#F59E0B" : rotationPhase === 'rotating' ? "#8B5CF6" : rotationPhase === 'attaching' ? "#10B981" : "#6366F1"}
-              className="opacity-20"
+              className="opacity-20 floating-animation"
             />
             <text
               y={35}
               textAnchor="middle"
-              className="text-xs font-bold fill-white"
+              className="text-xs font-bold fill-white floating-text"
             >
               {rotationPhase ? rotationPhase.toUpperCase() : 'ROTATING'}
             </text>
@@ -526,12 +531,12 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
               height="15"
               rx="3"
               fill="#3B82F6"
-              className="opacity-20"
+              className="opacity-20 floating-animation"
             />
             <text
               y={50}
               textAnchor="middle"
-              className="text-xs font-bold fill-white"
+              className="text-xs font-bold fill-white floating-text"
             >
               {rotationType ? rotationType.toUpperCase() : 'ROTATE'}
             </text>
@@ -747,6 +752,85 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         #avl-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
+        
+        /* Faster floating animation for water-like effect - for nodes and edges */
+        @keyframes float {
+          0% {
+            transform: translateY(0px) translateX(0px);
+          }
+          25% {
+            transform: translateY(-4px) translateX(1px);
+          }
+          50% {
+            transform: translateY(-2px) translateX(0px);
+          }
+          75% {
+            transform: translateY(-3px) translateX(0.5px);
+          }
+          100% {
+            transform: translateY(0px) translateX(0px);
+          }
+        }
+        
+        /* Screen floating animation for entire tree structure */
+        @keyframes screen-float {
+          0% {
+            transform: translateX(0px);
+          }
+          25% {
+            transform: translateX(10px);
+          }
+          50% {
+            transform: translateX(0px);
+          }
+          75% {
+            transform: translateX(-10px);
+          }
+          100% {
+            transform: translateX(0px);
+          }
+        }
+        
+        @keyframes glow {
+          0% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+          50% {
+            filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.4));
+          }
+          100% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+        }
+        
+        .floating-animation {
+          animation: float 3s ease-in-out infinite;
+        }
+        
+        .screen-floating {
+          animation: screen-float 8s ease-in-out infinite;
+        }
+        
+        .glowing {
+          animation: glow 2s ease-in-out infinite;
+        }
+        
+        /* Staggered animations */
+        .delay-1 {
+          animation-delay: 0.1s;
+        }
+        
+        .delay-2 {
+          animation-delay: 0.2s;
+        }
+        
+        .delay-3 {
+          animation-delay: 0.3s;
+        }
+        
+        .delay-4 {
+          animation-delay: 0.4s;
+        }
         `}
       </style>
       
@@ -771,11 +855,11 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           {/* Reset Structure Button */}
           <button 
             onClick={resetStructure}
-            className="px-3 py-1 bg-purple-600 text-white rounded text-sm font-medium hover:bg-purple-700 transition-colors flex items-center"
+            className="px-3 py-1 bg-blue-800 text-white rounded text-sm font-medium hover:bg-blue-900 transition-colors flex items-center"
           >
             Reset Structure
           </button>
-          
+
           <button 
             onClick={downloadStepsAsPDF}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
@@ -849,43 +933,17 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
                       ref={svgRef}
                       transform={`translate(${position.x - 300 * calculateZoomLevel(currentStepData.tree)}, ${position.y - 250})`}
                       onMouseDown={handleMouseDown}
-                      className="cursor-move"
+                      className="cursor-move screen-floating"
                     >
-                      {renderTreeNode(
-                        currentStepData.tree, 
-                        300 * calculateZoomLevel(currentStepData.tree), 
-                        80, 
-                        0, 
-                        false, 
-                        null, 
-                        null,
-                        traversalPath,
-                        currentStepData.comparing,
-                        currentStepData.inserted,
-                        isRotationStep(currentStepData),
-                        currentStepData.rotatingNode,
-                        currentStepData.rotationType
-                      )}
+                      {renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)}
                     </g>
                   ) : (
-                    renderTreeNode(
-                      currentStepData.tree, 
-                      300 * calculateZoomLevel(currentStepData.tree), 
-                      80, 
-                      0, 
-                      false, 
-                      null, 
-                      null,
-                      traversalPath,
-                      currentStepData.comparing,
-                      currentStepData.inserted,
-                      isRotationStep(currentStepData),
-                      currentStepData.rotatingNode,
-                      currentStepData.rotationType
-                    )
+                    <g className="screen-floating">
+                      {renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)}
+                    </g>
                   )}
                 </svg>
-                
+
                 {isFloating && (
                   <div className="absolute top-2 right-2 z-10">
                     <button 
@@ -937,7 +995,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             return (
               <div 
                 key={index}
-                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}
+                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-80 shadow-sm' : 'bg-white border-gray-300'}`}
                 id={`step-${index}`}
               >
                 <div className="flex justify-between items-start">

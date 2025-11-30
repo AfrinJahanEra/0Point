@@ -295,6 +295,9 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     const isCurrentNode = currentStepData && 
       ((currentStepData.path && prefix === currentStepData.path) || 
        (currentStepData.currentChar && prefix && prefix.slice(-1) === currentStepData.currentChar));
+       
+    // Check if this node represents the end of a word
+    const isEndOfWord = node.isEnd === true;
     
     return (
       <g key={nodeId}>
@@ -315,9 +318,10 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                 y2={childY - nodeSize/2}
                 stroke="#9CA3AF"
                 strokeWidth="2"
+                className="floating-animation delay-3"
               />
               
-              {/* Character label on the line */}
+              {/* Character label on the line - no animation */}
               <text
                 x={(actualX + childX) / 2}
                 y={(y + childY) / 2 - 5}
@@ -333,44 +337,37 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           );
         })}
         
-        {/* Render node circle with dragging support */}
+        {/* Render node circle with enhanced floating animation */}
         <g 
           onMouseDown={(e) => handleNodeMouseDown(nodeId, actualX, actualY, e)}
-          className="cursor-move"
-          transform={`translate(${actualX}, ${actualY})`}
+          className="cursor-move floating-animation glowing delay-3"
         >
-          <circle
-            r={nodeSize/2}
-            fill={node.isEnd ? "#10B981" : "#FFFFFF"}
-            stroke={isCurrentNode ? "#3B82F6" : "#9CA3AF"}
-            strokeWidth={isCurrentNode ? "3" : "2"}
-            className="transition-all duration-300"
-            onMouseEnter={() => setHoveredNode(nodeId)}
-            onMouseLeave={() => setHoveredNode(null)}
-          />
-          
-          {/* Render node value */}
-          <text
-            y={5}
-            textAnchor="middle"
-            className={`font-bold ${node.isEnd ? 'text-white' : 'text-black'}`}
-          >
-            {prefix ? prefix.slice(-1) : 'root'}
-          </text>
-          
-          {/* Render end marker for end nodes */}
-          {node.isEnd && (
+          <g transform={`translate(${actualX}, ${actualY})`}>
+            <circle
+              r={nodeSize / 2}
+              fill={isEndOfWord ? "#3B82F6" : "#FFFFFF"}
+              stroke="#9CA3AF"
+              strokeWidth="2"
+              className={`hover:stroke-blue-500 transition-all duration-500 ${level % 4 === 0 ? 'delay-1' : level % 4 === 1 ? 'delay-2' : level % 4 === 2 ? 'delay-3' : 'delay-4'}`}
+            />
+            
+            {/* Render node character - no animation */}
             <text
-              y={-20}
+              x="0"
+              y="0"
               textAnchor="middle"
-              className="text-green-500 font-bold text-xs"
+              dominantBaseline="middle"
+              className="font-bold text-xs select-none"
+              fill={isEndOfWord ? "#FFFFFF" : "#4B5563"}
             >
-              END
+              {node.char}
             </text>
-          )}
+          </g>
         </g>
+
       </g>
     );
+
   };
 
   // ADDED: Helper function to calculate trie depth
@@ -550,6 +547,85 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         #trie-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
+        
+        /* Faster floating animation for water-like effect - for nodes and edges */
+        @keyframes float {
+          0% {
+            transform: translateY(0px) translateX(0px);
+          }
+          25% {
+            transform: translateY(-4px) translateX(1px);
+          }
+          50% {
+            transform: translateY(-2px) translateX(0px);
+          }
+          75% {
+            transform: translateY(-3px) translateX(0.5px);
+          }
+          100% {
+            transform: translateY(0px) translateX(0px);
+          }
+        }
+        
+        /* Screen floating animation for entire tree structure */
+        @keyframes screen-float {
+          0% {
+            transform: translateX(0px);
+          }
+          25% {
+            transform: translateX(10px);
+          }
+          50% {
+            transform: translateX(0px);
+          }
+          75% {
+            transform: translateX(-10px);
+          }
+          100% {
+            transform: translateX(0px);
+          }
+        }
+        
+        @keyframes glow {
+          0% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+          50% {
+            filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.4));
+          }
+          100% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+        }
+        
+        .floating-animation {
+          animation: float 3s ease-in-out infinite;
+        }
+        
+        .screen-floating {
+          animation: screen-float 8s ease-in-out infinite;
+        }
+        
+        .glowing {
+          animation: glow 2s ease-in-out infinite;
+        }
+        
+        /* Staggered animations */
+        .delay-1 {
+          animation-delay: 0.1s;
+        }
+        
+        .delay-2 {
+          animation-delay: 0.2s;
+        }
+        
+        .delay-3 {
+          animation-delay: 0.3s;
+        }
+        
+        .delay-4 {
+          animation-delay: 0.4s;
+        }
         `}
       </style>
       <div className="flex justify-between items-center mb-4">
@@ -573,7 +649,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           {/* Reset Structure Button */}
           <button 
             onClick={resetStructure}
-            className="px-3 py-1 bg-purple-600 text-white rounded text-sm font-medium hover:bg-purple-700 transition-colors flex items-center"
+            className="px-3 py-1 bg-blue-800 text-white rounded text-sm font-medium hover:bg-blue-900 transition-colors flex items-center"
           >
             Reset Structure
           </button>
@@ -652,15 +728,17 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                       ref={svgRef}
                       transform={`translate(${position.x - 300 * calculateZoomLevel(currentStepData.root)}, ${position.y - 250})`}
                       onMouseDown={handleMouseDown}
-                      className="cursor-move"
+                      className="cursor-move screen-floating"
                     >
-                      {renderTrieNode(currentStepData.root, 300 * calculateZoomLevel(currentStepData.root), 100, 0, false, null, null)}
+                      {renderTrieNode(currentStepData.root, '', 300 * calculateZoomLevel(currentStepData.root), 100, 0)}
                     </g>
                   ) : (
-                    renderTrieNode(currentStepData.root, 300 * calculateZoomLevel(currentStepData.root), 100, 0, false, null, null)
+                    <g className="screen-floating">
+                      {renderTrieNode(currentStepData.root, '', 300 * calculateZoomLevel(currentStepData.root), 100, 0)}
+                    </g>
                   )}
                 </svg>
-                
+
                 {isFloating && (
                   <div className="absolute top-2 right-2 z-10">
                     <button 

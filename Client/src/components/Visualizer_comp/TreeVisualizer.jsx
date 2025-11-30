@@ -454,59 +454,24 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
 
     return (
       <React.Fragment key={nodeId}>
-        {/* Render connections to children */}
-        {node.left && nodePositions[node.left.value] && (
-          <svg
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              pointerEvents: 'none',
-              zIndex: 1
-            }}
-          >
-            <line
-              x1={actualX}
-              y1={actualY}
-              x2={nodePositions[node.left.value].x}
-              y2={nodePositions[node.left.value].y}
-              stroke={isInTraversalPath ? "#3B82F6" : "#9CA3AF"}
-              strokeWidth={isInTraversalPath ? "3" : "2"}
-              className={isInTraversalPath ? 'path-connection' : ''}
-            />
-          </svg>
+        {/* Render connection line to parent */}
+        {parentX !== null && parentY !== null && (
+          <line
+            x1={actualX}
+            y1={actualY}
+            x2={parentX}
+            y2={parentY}
+            stroke={isInTraversalPath ? "#3B82F6" : "#9CA3AF"}
+            strokeWidth="2"
+            className="floating-animation delay-3"
+          />
         )}
-        {node.right && nodePositions[node.right.value] && (
-          <svg
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              pointerEvents: 'none',
-              zIndex: 1
-            }}
-          >
-            <line
-              x1={actualX}
-              y1={actualY}
-              x2={nodePositions[node.right.value].x}
-              y2={nodePositions[node.right.value].y}
-              stroke={isInTraversalPath ? "#3B82F6" : "#9CA3AF"}
-              strokeWidth={isInTraversalPath ? "3" : "2"}
-              className={isInTraversalPath ? 'path-connection' : ''}
-            />
-          </svg>
-        )}
-        
-        {/* Render node as motion div with dragging support */}
+
+        {/* Render node as motion div with enhanced floating animation */}
         <motion.div
           className={`node absolute w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm cursor-move select-none transition-all duration-200 ${
             isBeingDragged ? 'shadow-2xl scale-110' : 'hover:scale-105 hover:shadow-lg'
-          } ${isRotationNode ? 'animate-pulse' : ''}`}
+          } ${isRotationNode ? 'animate-pulse' : 'floating-animation glowing delay-1'}`}
           style={{
             left: actualX - 24,
             top: actualY - 24,
@@ -522,37 +487,17 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
               ...prev,
               [nodeId]: {
                 ...prev[nodeId],
-                startX: info.point.x,
-                startY: info.point.y
-              }
-            }));
-            
-            // Update node positions for connection lines
-            setNodePositions(prev => ({
-              ...prev,
-              [nodeId]: {
-                ...prev[nodeId],
-                x: info.point.x,
-                y: info.point.y
+                startX: info.point.x - prev[nodeId].offsetX,
+                startY: info.point.y - prev[nodeId].offsetY
               }
             }));
           }}
-          onDragEnd={handleNodeMouseUp}
-          whileDrag={{
-            scale: 1.1,
-            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)"
-          }}
-          whileHover={{
-            scale: 1.05,
-            boxShadow: "0 8px 16px rgba(0, 0, 0, 0.2)"
+          onDragEnd={() => {
+            setIsDragging(false);
+            setCurrentlyDraggingNode(null);
           }}
         >
-          {node.value}
-          {node.height && (
-            <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs text-gray-500">
-              h:{node.height}
-            </div>
-          )}
+          <span>{nodeData.value}</span>
         </motion.div>
 
         {/* Render children */}
@@ -693,13 +638,83 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           }
         }
         
-        #tree-visualizer .fullscreen-container::-webkit-scrollbar {
-          display: none;
+        /* Faster floating animation for water-like effect - for nodes and edges */
+        @keyframes float {
+          0% {
+            transform: translateY(0px) translateX(0px);
+          }
+          25% {
+            transform: translateY(-4px) translateX(1px);
+          }
+          50% {
+            transform: translateY(-2px) translateX(0px);
+          }
+          75% {
+            transform: translateY(-3px) translateX(0.5px);
+          }
+          100% {
+            transform: translateY(0px) translateX(0px);
+          }
         }
         
-        #tree-visualizer .fullscreen-container {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
+        /* Screen floating animation for entire tree structure */
+        @keyframes screen-float {
+          0% {
+            transform: translateX(0px);
+          }
+          25% {
+            transform: translateX(10px);
+          }
+          50% {
+            transform: translateX(0px);
+          }
+          75% {
+            transform: translateX(-10px);
+          }
+          100% {
+            transform: translateX(0px);
+          }
+        }
+        
+        @keyframes glow {
+          0% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+          50% {
+            filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.4));
+          }
+          100% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+        }
+        
+        .floating-animation {
+          animation: float 3s ease-in-out infinite;
+        }
+        
+        .screen-floating {
+          animation: screen-float 8s ease-in-out infinite;
+        }
+        
+        .glowing {
+          animation: glow 2s ease-in-out infinite;
+        }
+        
+        /* Staggered animations */
+        .delay-1 {
+          animation-delay: 0.1s;
+        }
+        
+        .delay-2 {
+          animation-delay: 0.2s;
+        }
+        
+        .delay-3 {
+          animation-delay: 0.3s;
+        }
+        
+        .delay-4 {
+          animation-delay: 0.4s;
         }
         `}
       </style>
@@ -725,11 +740,11 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           {/* Reset Structure Button */}
           <button 
             onClick={resetStructure}
-            className="px-3 py-1 bg-purple-600 text-white rounded text-sm font-medium hover:bg-purple-700 transition-colors flex items-center"
+            className="px-3 py-1 bg-blue-800 text-white rounded text-sm font-medium hover:bg-blue-900 transition-colors flex items-center"
           >
             Reset Structure
           </button>
-          
+
           <button 
             onClick={downloadStepsAsPDF}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
@@ -801,12 +816,14 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                       ref={svgRef}
                       transform={`translate(${position.x - 300 * calculateZoomLevel(currentStepData.tree)}, ${position.y - 250})`}
                       onMouseDown={handleMouseDown}
-                      className="cursor-move"
+                      className="cursor-move screen-floating"
                     >
                       {renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)}
                     </g>
                   ) : (
-                    renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)
+                    <g className="screen-floating">
+                      {renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)}
+                    </g>
                   )}
                 </svg>
                 
@@ -861,7 +878,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             return (
               <div 
                 key={index}
-                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}
+                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-5 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}
                 id={`step-${index}`}
               >
                 <div className="flex justify-between items-start">
