@@ -1,15 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import { Maximize, Minimize } from 'lucide-react';
 
 const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
   const [hoveredNode, setHoveredNode] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isFloating, setIsFloating] = useState(false);
   const visualizationRef = useRef(null);
   const currentStepRef = useRef(null);
   const hasCompletedRef = useRef(false);
   const [speed, setSpeed] = useState(2000); // Default 2 seconds
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenContainerRef = useRef(null);
+  const svgRef = useRef(null);
 
   // Handle fullscreen change events
   useEffect(() => {
@@ -215,14 +220,76 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     }
   };
 
-  // Function to render trie nodes
+  // State for individual node dragging
+  const [draggedNodes, setDraggedNodes] = useState({});
+  const [currentlyDraggingNode, setCurrentlyDraggingNode] = useState(null);
+
+  // Handle mouse down for individual node dragging
+  const handleNodeMouseDown = useCallback((nodeValue, initialX, initialY, e) => {
+    e.stopPropagation();
+    setIsDragging(true);
+    setCurrentlyDraggingNode(nodeValue);
+    setDraggedNodes(prev => ({
+      ...prev,
+      [nodeValue]: {
+        offsetX: e.clientX - initialX,
+        offsetY: e.clientY - initialY,
+        startX: initialX,
+        startY: initialY
+      }
+    }));
+  }, []);
+
+  // Handle mouse move for individual node dragging
+  const handleNodeMouseMove = useCallback((e) => {
+    if (!isDragging || !currentlyDraggingNode) return;
+    
+    setDraggedNodes(prev => ({
+      ...prev,
+      [currentlyDraggingNode]: {
+        ...prev[currentlyDraggingNode],
+        startX: e.clientX - prev[currentlyDraggingNode].offsetX,
+        startY: e.clientY - prev[currentlyDraggingNode].offsetY
+      }
+    }));
+  }, [isDragging, currentlyDraggingNode]);
+
+  // Handle mouse up for individual node dragging
+  const handleNodeMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setCurrentlyDraggingNode(null);
+  }, []);
+
+  // Add event listeners for individual node dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleNodeMouseMove);
+      document.addEventListener('mouseup', handleNodeMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleNodeMouseMove);
+      document.removeEventListener('mouseup', handleNodeMouseUp);
+    };
+  }, [isDragging, handleNodeMouseMove, handleNodeMouseUp]);
+
+  // Function to render trie nodes with elastic dragging support
   const renderTrieNode = (node, prefix = '', x = 300, y = 50, level = 0) => {
     if (!node) return null;
     
     const nodeId = `${prefix}-${level}`;
     const nodeSize = 30;
     const verticalSpacing = 70;
-    const horizontalSpacing = Math.max(120 / (level + 1), 50);
+    // ADJUSTED: Dynamic horizontal spacing based on trie depth to accommodate wider tries
+    const maxDepth = calculateTrieDepth(node);
+    const baseHorizontalSpacing = 120;
+    const adjustedHorizontalSpacing = Math.max(baseHorizontalSpacing / (1 + maxDepth * 0.1), 40); // Reduce spacing for deeper tries
+    const horizontalSpacing = Math.max(adjustedHorizontalSpacing / (level + 1), 30); // Minimum spacing
+    
+    // Get dragged position if exists
+    const draggedPosition = draggedNodes[nodeId];
+    const actualX = draggedPosition ? draggedPosition.startX : x;
+    const actualY = draggedPosition ? draggedPosition.startY : y;
     
     // Check if this is the current node being processed
     const isCurrentNode = currentStepData && 
@@ -242,8 +309,8 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             <g key={`${nodeId}-${char}`}>
               {/* Connection line to child */}
               <line
-                x1={x}
-                y1={y + nodeSize/2}
+                x1={actualX}
+                y1={actualY + nodeSize/2}
                 x2={childX}
                 y2={childY - nodeSize/2}
                 stroke="#9CA3AF"
@@ -252,7 +319,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
               
               {/* Character label on the line */}
               <text
-                x={(x + childX) / 2}
+                x={(actualX + childX) / 2}
                 y={(y + childY) / 2 - 5}
                 textAnchor="middle"
                 className="text-blue-600 font-medium"
@@ -266,43 +333,109 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           );
         })}
         
-        {/* Render node circle */}
-        <circle
-          cx={x}
-          cy={y}
-          r={nodeSize/2}
-          fill={node.isEnd ? "#10B981" : "#FFFFFF"}
-          stroke={isCurrentNode ? "#3B82F6" : "#9CA3AF"}
-          strokeWidth={isCurrentNode ? "3" : "2"}
-          className="transition-all duration-300"
-          onMouseEnter={() => setHoveredNode(nodeId)}
-          onMouseLeave={() => setHoveredNode(null)}
-        />
-        
-        {/* Render node value */}
-        <text
-          x={x}
-          y={y + 5}
-          textAnchor="middle"
-          className={`font-bold ${node.isEnd ? 'text-white' : 'text-black'}`}
+        {/* Render node circle with dragging support */}
+        <g 
+          onMouseDown={(e) => handleNodeMouseDown(nodeId, actualX, actualY, e)}
+          className="cursor-move"
+          transform={`translate(${actualX}, ${actualY})`}
         >
-          {prefix ? prefix.slice(-1) : 'root'}
-        </text>
-        
-        {/* Render end marker for end nodes */}
-        {node.isEnd && (
+          <circle
+            r={nodeSize/2}
+            fill={node.isEnd ? "#10B981" : "#FFFFFF"}
+            stroke={isCurrentNode ? "#3B82F6" : "#9CA3AF"}
+            strokeWidth={isCurrentNode ? "3" : "2"}
+            className="transition-all duration-300"
+            onMouseEnter={() => setHoveredNode(nodeId)}
+            onMouseLeave={() => setHoveredNode(null)}
+          />
+          
+          {/* Render node value */}
           <text
-            x={x}
-            y={y - 20}
+            y={5}
             textAnchor="middle"
-            className="text-green-500 font-bold text-xs"
+            className={`font-bold ${node.isEnd ? 'text-white' : 'text-black'}`}
           >
-            END
+            {prefix ? prefix.slice(-1) : 'root'}
           </text>
-        )}
+          
+          {/* Render end marker for end nodes */}
+          {node.isEnd && (
+            <text
+              y={-20}
+              textAnchor="middle"
+              className="text-green-500 font-bold text-xs"
+            >
+              END
+            </text>
+          )}
+        </g>
       </g>
     );
   };
+
+  // ADDED: Helper function to calculate trie depth
+  const calculateTrieDepth = (node) => {
+    if (!node || !node.children) return 0;
+    
+    let maxDepth = 0;
+    const children = Object.keys(node.children);
+    for (const child of children) {
+      maxDepth = Math.max(maxDepth, calculateTrieDepth(node.children[child]));
+    }
+    
+    return 1 + maxDepth;
+  };
+
+  // ADDED: Function to calculate appropriate zoom level based on trie depth
+  const calculateZoomLevel = (tree) => {
+    if (!tree) return 1;
+    
+    const depth = calculateTrieDepth(tree);
+    // For tries with depth > 4, we gradually zoom out
+    if (depth > 4) {
+      return Math.max(0.7, 1 - (depth - 4) * 0.1); // Cap at 30% zoom out
+    }
+    return 1; // Normal zoom for shallower tries
+  };
+
+  // Handle mouse down for dragging
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return; // Only left mouse button
+    setIsDragging(true);
+    const rect = svgRef.current.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+    e.preventDefault();
+  }, [position]);
+
+  // Handle mouse move for dragging
+  const handleMouseMove = useCallback((e) => {
+    if (!isDragging) return;
+    setPosition({
+      x: e.clientX - dragOffset.x,
+      y: e.clientY - dragOffset.y
+    });
+  }, [isDragging, dragOffset]);
+
+  // Handle mouse up for dragging
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Add event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Toggle fullscreen mode using Fullscreen API
   const toggleFullscreen = () => {
@@ -334,9 +467,33 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     }
   };
 
+  // Toggle floating mode
+  const toggleFloating = () => {
+    setIsFloating(!isFloating);
+    // Reset position to center when toggling
+    if (!isFloating) {
+      setTimeout(() => {
+        const container = fullscreenContainerRef.current;
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          setPosition({
+            x: containerRect.width / 2,
+            y: containerRect.height / 2
+          });
+        }
+      }, 10);
+    }
+  };
+
   // Handle speed change
   const handleSpeedChange = (newSpeed) => {
     setSpeed(newSpeed);
+  };
+
+  // Reset all node positions to their original structure
+  const resetStructure = () => {
+    setDraggedNodes({});
+    setCurrentlyDraggingNode(null);
   };
 
   if (!data || !steps || steps.length === 0) return null;
@@ -413,6 +570,14 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             </select>
           </div>
           
+          {/* Reset Structure Button */}
+          <button 
+            onClick={resetStructure}
+            className="px-3 py-1 bg-purple-600 text-white rounded text-sm font-medium hover:bg-purple-700 transition-colors flex items-center"
+          >
+            Reset Structure
+          </button>
+          
           {/* ADDED: Download PDF Button */}
           <button 
             onClick={downloadStepsAsPDF}
@@ -435,7 +600,10 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         </div>
       </div>
       
-      <div ref={fullscreenContainerRef} className={`group bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto relative ${isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-black border-0 p-0 m-0 fullscreen-container overflow-hidden' : ''}`}>
+      <div 
+        ref={fullscreenContainerRef}
+        className={`group bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto relative ${isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-black border-0 p-0 m-0 fullscreen-container overflow-hidden' : ''}`}
+      >
         {/* Fullscreen toggle icon positioned on the visualization container like YouTube */}
         <button 
           onClick={toggleFullscreen}
@@ -456,10 +624,16 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             </span>
           </h4>
           
+          {/* MODIFIED: Only tree floats, not the entire background */}
           <div className={`flex justify-center items-center mb-3 overflow-hidden py-2 max-h-[500px] ${isFullscreen ? 'scale-125' : ''}`}>
             {currentStepData ? (
-              <div className="w-full min-h-[400px] flex items-center justify-center overflow-hidden">
-                <svg width="100%" height="500" className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`} viewBox="0 0 600 500">
+              <div className="w-full min-h-[400px] flex items-center justify-center overflow-hidden relative">
+                <svg 
+                  width="100%" 
+                  height="500" 
+                  className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`} 
+                  viewBox={`0 0 ${600 * calculateZoomLevel(currentStepData.root)} 500`}
+                >
                   <defs>
                     <marker 
                       id="arrowhead" 
@@ -473,8 +647,30 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                     </marker>
                   </defs>
                   
-                  {renderTrieNode(currentStepData.tree || { children: {}, isEnd: false }, '', 350, 80)}
+                  {isFloating ? (
+                    <g 
+                      ref={svgRef}
+                      transform={`translate(${position.x - 300 * calculateZoomLevel(currentStepData.root)}, ${position.y - 250})`}
+                      onMouseDown={handleMouseDown}
+                      className="cursor-move"
+                    >
+                      {renderTrieNode(currentStepData.root, 300 * calculateZoomLevel(currentStepData.root), 100, 0, false, null, null)}
+                    </g>
+                  ) : (
+                    renderTrieNode(currentStepData.root, 300 * calculateZoomLevel(currentStepData.root), 100, 0, false, null, null)
+                  )}
                 </svg>
+                
+                {isFloating && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <button 
+                      onClick={toggleFloating}
+                      className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                    >
+                      Dock Tree
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center text-gray-500 py-10">
@@ -509,7 +705,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                     <div className={`mt-3 min-h-[200px] flex items-center justify-center overflow-auto ${isFullscreen ? 'scale-150' : ''}`}>
                       {step.tree || step.operation ? (
                         <div className={`w-full min-h-[200px] overflow-auto ${isFullscreen ? 'scale-150' : ''}`}>
-                          <svg width="100%" height="400" className={`border border-gray-200 rounded min-w-[400px] ${isFullscreen ? '!border-0' : ''}`} viewBox="0 0 400 400">
+                          <svg width="100%" height="400" className={`border border-gray-200 rounded min-w-[400px] ${isFullscreen ? '!border-0' : ''}`} viewBox={`0 0 ${400 * calculateZoomLevel(step.tree || { children: {}, isEnd: false })} 400`}>
                             <defs>
                               <marker 
                                 id="arrowhead" 
@@ -523,7 +719,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                               </marker>
                             </defs>
                             
-                            {renderTrieNode(step.tree || { children: {}, isEnd: false }, '', 250, 50)}
+                            {renderTrieNode(step.tree || { children: {}, isEnd: false }, '', 250 * calculateZoomLevel(step.tree || { children: {}, isEnd: false }), 50)}
                           </svg>
                         </div>
                       ) : (

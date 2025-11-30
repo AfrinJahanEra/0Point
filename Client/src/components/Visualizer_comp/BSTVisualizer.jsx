@@ -1,15 +1,73 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import { Maximize, Minimize } from 'lucide-react';
 
 const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
   const [hoveredNode, setHoveredNode] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isFloating, setIsFloating] = useState(false);
   const visualizationRef = useRef(null);
   const currentStepRef = useRef(null);
   const hasCompletedRef = useRef(false);
   const [speed, setSpeed] = useState(2000); // Default 2 seconds
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenContainerRef = useRef(null);
+  const svgRef = useRef(null);
+
+  // State for individual node dragging
+  const [draggedNodes, setDraggedNodes] = useState({});
+  const [currentlyDraggingNode, setCurrentlyDraggingNode] = useState(null);
+
+  // Handle mouse down for individual node dragging
+  const handleNodeMouseDown = useCallback((nodeValue, initialX, initialY, e) => {
+    e.stopPropagation();
+    setIsDragging(true);
+    setCurrentlyDraggingNode(nodeValue);
+    setDraggedNodes(prev => ({
+      ...prev,
+      [nodeValue]: {
+        offsetX: e.clientX - initialX,
+        offsetY: e.clientY - initialY,
+        startX: initialX,
+        startY: initialY
+      }
+    }));
+  }, []);
+
+  // Handle mouse move for individual node dragging
+  const handleNodeMouseMove = useCallback((e) => {
+    if (!isDragging || !currentlyDraggingNode) return;
+    
+    setDraggedNodes(prev => ({
+      ...prev,
+      [currentlyDraggingNode]: {
+        ...prev[currentlyDraggingNode],
+        startX: e.clientX - prev[currentlyDraggingNode].offsetX,
+        startY: e.clientY - prev[currentlyDraggingNode].offsetY
+      }
+    }));
+  }, [isDragging, currentlyDraggingNode]);
+
+  // Handle mouse up for individual node dragging
+  const handleNodeMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setCurrentlyDraggingNode(null);
+  }, []);
+
+  // Add event listeners for individual node dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleNodeMouseMove);
+      document.addEventListener('mouseup', handleNodeMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleNodeMouseMove);
+      document.removeEventListener('mouseup', handleNodeMouseUp);
+    };
+  }, [isDragging, handleNodeMouseMove, handleNodeMouseUp]);
 
   // Auto-advance based on speed setting
   useEffect(() => {
@@ -246,14 +304,23 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     return null;
   };
 
-  // Recursive function to render tree nodes
+  // Recursive function to render tree nodes with elastic dragging support
   const renderTreeNode = (node, x, y, level = 0, isLeftChild = false, parentX = null, parentY = null, traversalPath = []) => {
     if (!node) return null;
     
     const nodeId = `${level}-${x}-${y}`;
     const nodeSize = 40;
-    const horizontalSpacing = Math.max(200 / (level + 1), 60);
+    // ADJUSTED: Dynamic horizontal spacing based on tree height to accommodate taller trees
+    const treeHeight = calculateTreeHeight(node);
+    const baseHorizontalSpacing = 200;
+    const adjustedHorizontalSpacing = Math.max(baseHorizontalSpacing / (1 + treeHeight * 0.1), 50); // Reduce spacing for taller trees
+    const horizontalSpacing = Math.max(adjustedHorizontalSpacing / (level + 1), 40); // Minimum spacing
     const verticalSpacing = 80;
+    
+    // Get dragged position if exists
+    const draggedPosition = draggedNodes[node.value];
+    const actualX = draggedPosition ? draggedPosition.startX : x;
+    const actualY = draggedPosition ? draggedPosition.startY : y;
     
     // Check if this node is in the traversal path
     const isInTraversalPath = traversalPath.includes(node.value);
@@ -273,8 +340,8 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           y + verticalSpacing, 
           level + 1, 
           true, 
-          x, 
-          y,
+          actualX, 
+          actualY,
           traversalPath
         )}
         {node.right && renderTreeNode(
@@ -283,16 +350,16 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           y + verticalSpacing, 
           level + 1, 
           false, 
-          x, 
-          y,
+          actualX, 
+          actualY,
           traversalPath
         )}
         
         {/* Render connection line to parent */}
         {parentX !== null && parentY !== null && (
           <line
-            x1={x}
-            y1={y}
+            x1={actualX}
+            y1={actualY}
             x2={parentX}
             y2={parentY}
             stroke={isInTraversalPath ? "#3B82F6" : "#9CA3AF"}
@@ -301,31 +368,91 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           />
         )}
         
-        {/* Render node circle */}
-        <circle
-          cx={x}
-          cy={y}
-          r={nodeSize / 2}
-          fill={isInTraversalPath ? "#BFDBFE" : (isInsertedNode ? "#3B82F6" : (isComparingNode ? "#D1D5DB" : "#FFFFFF"))}
-          stroke={isInTraversalPath ? "#3B82F6" : (isInsertedNode ? "#2563EB" : (isComparingNode ? "#374151" : "#9CA3AF"))}
-          strokeWidth="2"
-          className="cursor-pointer hover:stroke-blue-500 transition-all duration-500"
-          onMouseEnter={() => setHoveredNode(node.value)}
-          onMouseLeave={() => setHoveredNode(null)}
-        />
-        
-        {/* Render node value */}
-        <text
-          x={x}
-          y={y + 5}
-          textAnchor="middle"
-          className={`font-bold ${isInTraversalPath ? 'text-blue-800' : (isInsertedNode ? 'text-white' : (isComparingNode ? 'text-black' : 'text-black'))}`}
+        {/* Render node circle with dragging support */}
+        <g 
+          onMouseDown={(e) => handleNodeMouseDown(node.value, actualX, actualY, e)}
+          className="cursor-move"
+          transform={`translate(${actualX}, ${actualY})`}
         >
-          {node.value}
-        </text>
+          <circle
+            r={nodeSize / 2}
+            fill={isInTraversalPath ? "#BFDBFE" : (isInsertedNode ? "#3B82F6" : (isComparingNode ? "#D1D5DB" : "#FFFFFF"))}
+            stroke={isInTraversalPath ? "#3B82F6" : (isInsertedNode ? "#2563EB" : (isComparingNode ? "#374151" : "#9CA3AF"))}
+            strokeWidth="2"
+            className="hover:stroke-blue-500 transition-all duration-500"
+            onMouseEnter={() => setHoveredNode(node.value)}
+            onMouseLeave={() => setHoveredNode(null)}
+          />
+          
+          {/* Render node value */}
+          <text
+            y={5}
+            textAnchor="middle"
+            className={`font-bold ${isInTraversalPath ? 'text-blue-800' : (isInsertedNode ? 'text-white' : (isComparingNode ? 'text-black' : 'text-black'))}`}
+          >
+            {node.value}
+          </text>
+        </g>
       </g>
     );
   };
+
+  // ADDED: Helper function to calculate tree height
+  const calculateTreeHeight = (node) => {
+    if (!node) return 0;
+    return 1 + Math.max(calculateTreeHeight(node.left), calculateTreeHeight(node.right));
+  };
+
+  // ADDED: Function to calculate appropriate zoom level based on tree height
+  const calculateZoomLevel = (tree) => {
+    if (!tree) return 1;
+    
+    const height = calculateTreeHeight(tree);
+    // For trees with height > 4, we gradually zoom out
+    if (height > 4) {
+      return Math.max(0.7, 1 - (height - 4) * 0.1); // Cap at 30% zoom out
+    }
+    return 1; // Normal zoom for shorter trees
+  };
+
+  // Handle mouse down for dragging
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return; // Only left mouse button
+    setIsDragging(true);
+    const rect = svgRef.current.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+    e.preventDefault();
+  }, [position]);
+
+  // Handle mouse move for dragging
+  const handleMouseMove = useCallback((e) => {
+    if (!isDragging) return;
+    setPosition({
+      x: e.clientX - dragOffset.x,
+      y: e.clientY - dragOffset.y
+    });
+  }, [isDragging, dragOffset]);
+
+  // Handle mouse up for dragging
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Add event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Toggle fullscreen mode using Fullscreen API
   const toggleFullscreen = () => {
@@ -357,9 +484,33 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     }
   };
 
+  // Toggle floating mode
+  const toggleFloating = () => {
+    setIsFloating(!isFloating);
+    // Reset position to center when toggling
+    if (!isFloating) {
+      setTimeout(() => {
+        const container = fullscreenContainerRef.current;
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          setPosition({
+            x: containerRect.width / 2,
+            y: containerRect.height / 2
+          });
+        }
+      }, 10);
+    }
+  };
+
   // Handle speed change
   const handleSpeedChange = (newSpeed) => {
     setSpeed(newSpeed);
+  };
+
+  // Reset all node positions to their original structure
+  const resetStructure = () => {
+    setDraggedNodes({});
+    setCurrentlyDraggingNode(null);
   };
 
   if (!data || !steps || steps.length === 0) return null;
@@ -477,6 +628,14 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             </select>
           </div>
           
+          {/* Reset Structure Button */}
+          <button 
+            onClick={resetStructure}
+            className="px-3 py-1 bg-purple-600 text-white rounded text-sm font-medium hover:bg-purple-700 transition-colors flex items-center"
+          >
+            Reset Structure
+          </button>
+          
           <button 
             onClick={downloadStepsAsPDF}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
@@ -522,10 +681,16 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             </span>
           </h4>
           
+          {/* MODIFIED: Only tree floats, not the entire background */}
           <div className={`flex justify-center items-center mb-3 overflow-hidden py-2 max-h-[500px] ${isFullscreen ? 'scale-125' : ''}`}>
             {currentStepData ? (
-              <div className="w-full min-h-[400px] flex items-center justify-center overflow-hidden">
-                <svg width="100%" height="500" className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`} viewBox="0 0 600 500">
+              <div className="w-full min-h-[400px] flex items-center justify-center overflow-hidden relative">
+                <svg 
+                  width="100%" 
+                  height="500" 
+                  className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`} 
+                  viewBox={`0 0 ${600 * calculateZoomLevel(currentStepData.tree)} 500`}
+                >
                   <defs>
                     <marker 
                       id="arrowhead" 
@@ -539,8 +704,30 @@ const BSTVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
                     </marker>
                   </defs>
                   
-                  {renderTreeNode(currentStepData.tree, 300, 100, 0, false, null, null, traversalPath)}
+                  {isFloating ? (
+                    <g 
+                      ref={svgRef}
+                      transform={`translate(${position.x - 300 * calculateZoomLevel(currentStepData.tree)}, ${position.y - 250})`}
+                      onMouseDown={handleMouseDown}
+                      className="cursor-move"
+                    >
+                      {renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)}
+                    </g>
+                  ) : (
+                    renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)
+                  )}
                 </svg>
+                
+                {isFloating && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <button 
+                      onClick={toggleFloating}
+                      className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                    >
+                      Dock Tree
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center text-gray-500 py-10">
