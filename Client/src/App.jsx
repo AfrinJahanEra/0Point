@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { AppProvider } from './context/AppContext';
 import Header from './components/Header';
 import RegisterNow from './pages/RegisterNow';
+import CreateContest from './pages/CreateContest'; // ADD THIS IMPORT
 import Footer from './components/Footer';
 import NavigationBar from './components/NavigationBar';
 import Home from './pages/Home';
@@ -83,6 +84,12 @@ function App() {
             <Route path="/contest/:contestId/register" element={
               <Layout>
                 <RegisterNow />
+              </Layout>
+            } />
+            {/* ADD THE CREATECONTEST ROUTE HERE */}
+            <Route path="/create-contest" element={
+              <Layout>
+                <CreateContest />
               </Layout>
             } />
             <Route path="/practice" element={
