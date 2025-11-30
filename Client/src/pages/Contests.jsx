@@ -165,7 +165,7 @@ const Contests = () => {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Contests</h1>
-                  <p className="text-gray-600 text-sm mt-1">
+                  <p className="text-gray-600 text-xs mt-1">
                     Participate in coding contests and improve your skills
                   </p>
                 </div>
@@ -178,7 +178,7 @@ const Contests = () => {
                     placeholder="Search contests..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
                   />
                 </div>
               </div>
@@ -194,7 +194,7 @@ const Contests = () => {
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
+                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors duration-200 ${
                       activeTab === tab.key
                         ? 'bg-white text-gray-900 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
@@ -218,14 +218,14 @@ const Contests = () => {
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-3 flex-1">
                           {/* Platform Icon */}
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center text-white text-sm font-bold">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center text-white text-xs font-bold">
                             {getPlatformIcon(contest.platform)}
                           </div>
                           
                           {/* Contest Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-2 mb-1">
-                              <h3 className="text-sm font-semibold text-gray-900 truncate">
+                              <h3 className="text-xs font-semibold text-gray-900 truncate">
                                 {contest.title}
                               </h3>
                               <span className={getStatusBadge(contest.status)}>
@@ -283,7 +283,7 @@ const Contests = () => {
                 <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
                   <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No contests found</h3>
-                  <p className="text-gray-600 text-sm">
+                  <p className="text-gray-600 text-xs">
                     Try adjusting your filters to find more contests.
                   </p>
                 </div>
@@ -298,7 +298,7 @@ const Contests = () => {
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center space-x-2 mb-3">
                   <Filter className="w-4 h-4 text-gray-700" />
-                  <h2 className="text-sm font-semibold text-gray-900">Filter by Platform</h2>
+                  <h2 className="text-xs font-semibold text-gray-900">Filter by Platform</h2>
                 </div>
                 
                 <div className="space-y-1">
@@ -314,7 +314,7 @@ const Contests = () => {
                     <button
                       key={platform.key}
                       onClick={() => setActivePlatform(platform.key)}
-                      className={`w-full flex items-center space-x-3 px-3 py-2 text-sm rounded-lg transition-colors duration-200 ${
+                      className={`w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors duration-200 ${
                         activePlatform === platform.key
                           ? 'bg-blue-50 text-blue-800 border border-blue-200'
                           : 'text-gray-700 hover:bg-gray-50'
@@ -331,7 +331,7 @@ const Contests = () => {
             {/* Quick Stats */}
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="p-3 border-b border-gray-200">
-                <h2 className="text-sm font-semibold text-gray-900 mb-3">Contest Stats</h2>
+                <h2 className="text-xs font-semibold text-gray-900 mb-3">Contest Stats</h2>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Live Contests</span>
@@ -354,18 +354,6 @@ const Contests = () => {
                 </div>
               </div>
             </div>
-
-            {/* Host Contest CTA */}
-            <div className="bg-gradient-to-br from-blue-800 to-blue-600 rounded-lg p-4 text-white">
-              <h3 className="font-semibold text-sm mb-2">Host Your Contest</h3>
-              <p className="text-xs opacity-90 mb-3">
-                Create and manage your own coding contests for the community.
-              </p>
-              <button className="w-full bg-white text-blue-800 py-2 rounded text-xs font-semibold hover:bg-gray-100 transition-colors duration-200">
-                Create Contest
-              </button>
-            </div>
-
             <Sidebar />
           </div>
         </div>
