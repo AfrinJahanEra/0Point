@@ -1,15 +1,62 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Maximize, Minimize } from 'lucide-react';
 
-const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev }) => {
+const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, viewMode = 'tree' }) => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const svgRef = useRef(null);
   const animationRef = useRef(null);
   const [speed, setSpeed] = useState(2000); // Default 2 seconds
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenContainerRef = useRef(null);
+  
+  // State for individual node dragging
+  const [draggedNodes, setDraggedNodes] = useState({});
+  const [currentlyDraggingNode, setCurrentlyDraggingNode] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Handle mouse down for individual node dragging
+  const handleNodeMouseDown = useCallback((nodeIndex, initialX, initialY, e) => {
+    e.stopPropagation();
+    setIsDragging(true);
+    setCurrentlyDraggingNode(nodeIndex);
+    setDraggedNodes(prev => ({
+      ...prev,
+      [nodeIndex]: {
+        offsetX: e.clientX - initialX,
+        offsetY: e.clientY - initialY,
+        startX: initialX,
+        startY: initialY
+      }
+    }));
+  }, []);
+  
+  // Handle mouse move for individual node dragging
+  const handleNodeMouseMove = useCallback((e) => {
+    if (!isDragging || !currentlyDraggingNode) return;
+    
+    setDraggedNodes(prev => ({
+      ...prev,
+      [currentlyDraggingNode]: {
+        ...prev[currentlyDraggingNode],
+        startX: e.clientX - prev[currentlyDraggingNode].offsetX,
+        startY: e.clientY - prev[currentlyDraggingNode].offsetY
+      }
+    }));
+  }, [isDragging, currentlyDraggingNode]);
+  
+  // Handle mouse up for individual node dragging
+  const handleNodeMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setCurrentlyDraggingNode(null);
+  }, []);
+  
+  // Reset all node positions to their original structure
+  const resetStructure = () => {
+    setDraggedNodes({});
+    setCurrentlyDraggingNode(null);
+  };
   
   // Handle fullscreen change events
   useEffect(() => {
@@ -30,6 +77,19 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
   }, []);
+  
+  // Add mouse move and up event listeners to document
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleNodeMouseMove);
+      document.addEventListener('mouseup', handleNodeMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleNodeMouseMove);
+      document.removeEventListener('mouseup', handleNodeMouseUp);
+    };
+  }, [isDragging, handleNodeMouseMove, handleNodeMouseUp]);
   
   // Animation state
   const [interpolatedData, setInterpolatedData] = useState(data);
@@ -67,113 +127,11 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index];
       
-      // Check if we need a new page
-      if (currentPageY > pageHeight - 120) {
-        doc.addPage();
-        currentPageY = 20;
-      }
-      
-      // Add step header
-      doc.setFontSize(14);
-      doc.text(`Step ${index + 1}`, 20, currentPageY);
-      
-      doc.setFontSize(10);
-      doc.text(getOperationDescription(step), 20, currentPageY + 7);
-      
-      // Add array representation
-      const arrayStr = `Array: [${step.array.join(', ')}]`;
-      doc.text(arrayStr, 20, currentPageY + 14);
-      
-      // Capture and add step visualization
-      try {
-        const stepElement = document.getElementById(`step-${index}`);
-        if (stepElement) {
-          const canvas = await html2canvas(stepElement, {
-            scale: 0.8,
-            useCORS: true,
-            backgroundColor: '#ffffff'
-          });
-          
-          const imgData = canvas.toDataURL('image/png');
-          const imgWidth = 120;
-          const imgHeight = (canvas.height * imgWidth) / canvas.width;
-          
-          // Check if image fits on current page
-          if (currentPageY + 25 + imgHeight > pageHeight) {
-            doc.addPage();
-            currentPageY = 20;
-          }
-          
-          doc.addImage(imgData, 'PNG', 20, currentPageY + 18, imgWidth, imgHeight);
-          currentPageY += 25 + imgHeight;
-        } else {
-          // Fallback if element not found
-          doc.line(20, currentPageY + 18, 277, currentPageY + 18);
-          currentPageY += 25;
-        }
-      } catch (error) {
-        console.error('Error capturing step visualization:', error);
-        // Fallback if capture fails
-        doc.line(20, currentPageY + 18, 277, currentPageY + 18);
-        currentPageY += 25;
-      }
-      
-      // Add a small delay to prevent UI blocking
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
-    
-    // Save the PDF
-    doc.save('heap-sort-steps.pdf');
-  };
-  
-  // Function to create a text-based tree representation (fallback)
-  const createTextTree = (step, stepIndex) => {
-    const positions = calculateTreePositions(step.array);
-    const lines = [];
-    
-    // Simple tree representation
-    lines.push(`Tree structure for step ${stepIndex + 1}:`);
-    
-    // Group nodes by level
-    const levels = {};
-    positions.forEach((pos, idx) => {
-      const level = Math.floor(Math.log2(idx + 1));
-      if (!levels[level]) levels[level] = [];
-      levels[level].push({ index: idx, value: pos.value, position: idx });
-    });
-    
-    // Create a visual representation
-    Object.keys(levels).forEach(level => {
-      const nodes = levels[level];
-      const nodeStr = nodes.map(node => `[${node.index}:${node.value}]`).join(' ');
-      lines.push(`  Level ${level}: ${nodeStr}`);
-    });
-    
-    return lines;
-  };
-  
-  // Function to download all steps as PDF with visual representations (screenshot version)
-  const downloadStepsAsPDFWithScreenshots = async () => {
-    const doc = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a4'
-    });
-    
-    // Add title
-    doc.setFontSize(22);
-    doc.text('Heap Sort Visualization Steps', 148.5, 15, null, null, 'center');
-    
-    // Add steps with visual representations - one step per page
-    for (let index = 0; index < steps.length; index++) {
-      const step = steps[index];
-      
-      // Add a new page for each step (except the first one)
       if (index > 0) {
         doc.addPage();
+        currentPageY = 30;
       }
       
-      // Add step header
       doc.setFontSize(16);
       doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
       
@@ -193,6 +151,126 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     
     // Save the PDF
     doc.save('heap-sort-steps-with-visuals.pdf');
+  };
+  
+  // Function to download steps as PDF with screenshots (alternative method)
+  const downloadStepsAsPDFWithScreenshots = async () => {
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+    
+    doc.setFontSize(22);
+    doc.text('Heap Sort Visualization Steps', 148.5, 15, null, null, 'center');
+    
+    for (let index = 0; index < steps.length; index++) {
+      const step = steps[index];
+      
+      if (index > 0) {
+        doc.addPage();
+      }
+      
+      doc.setFontSize(16);
+      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
+      
+      doc.setFontSize(12);
+      doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
+      
+      // Add array representation
+      const arrayStr = `Array: [${step.array.join(', ')}]`;
+      doc.text(arrayStr, 148.5, 45, null, null, 'center');
+      
+      // Create a temporary element for this step
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.width = '600px';
+      tempContainer.style.padding = '20px';
+      
+      // Generate step visualization
+      const stepPositions = calculateTreePositions(step.array);
+      const stepConnections = getConnections(step.array);
+      
+      // Simple SVG representation
+      const svgNS = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("width", "600");
+      svg.setAttribute("height", "300");
+      svg.setAttribute("viewBox", "0 0 300 200");
+      
+      // Draw connections
+      stepConnections.forEach(conn => {
+        const fromPos = stepPositions[conn.from];
+        const toPos = stepPositions[conn.to];
+        
+        if (fromPos && toPos) {
+          const line = document.createElementNS(svgNS, "line");
+          line.setAttribute("x1", fromPos.x * 0.6);
+          line.setAttribute("y1", fromPos.y * 0.6 + 20);
+          line.setAttribute("x2", toPos.x * 0.6);
+          line.setAttribute("y2", toPos.y * 0.6 + 20);
+          line.setAttribute("stroke", "#9ca3af");
+          line.setAttribute("stroke-width", "1");
+          svg.appendChild(line);
+        }
+      });
+      
+      // Draw nodes
+      stepPositions.forEach((pos, posIdx) => {
+        // Circle
+        const circle = document.createElementNS(svgNS, "circle");
+        circle.setAttribute("cx", pos.x * 0.6);
+        circle.setAttribute("cy", pos.y * 0.6 + 20);
+        circle.setAttribute("r", "12");
+        
+        // Node styling
+        const nodeStyle = getNodeStyle(step, posIdx);
+        circle.setAttribute("class", nodeStyle);
+        svg.appendChild(circle);
+        
+        // Text
+        const text = document.createElementNS(svgNS, "text");
+        text.setAttribute("x", pos.x * 0.6);
+        text.setAttribute("y", pos.y * 0.6 + 20);
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dy", ".3em");
+        text.setAttribute("font-size", "8");
+        text.setAttribute("font-weight", "bold");
+        text.setAttribute("fill", getNodeTextColor(step, posIdx));
+        text.textContent = pos.value;
+        svg.appendChild(text);
+      });
+      
+      tempContainer.appendChild(svg);
+      document.body.appendChild(tempContainer);
+      
+      try {
+        // Capture screenshot
+        const canvas = await html2canvas(tempContainer, {
+          scale: 2,
+          useCORS: true,
+          logging: false
+        });
+        
+        // Add image to PDF
+        const imgData = canvas.toDataURL('image/png');
+        doc.addImage(imgData, 'PNG', 20, 50, 257, 128);
+      } catch (error) {
+        console.error('Error capturing step screenshot:', error);
+        // Fallback to drawing method
+        drawTreeVisualization(doc, step, 148.5, 60);
+      }
+      
+      // Clean up
+      document.body.removeChild(tempContainer);
+      
+      // Add a small delay to prevent UI blocking
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
+    // Save the PDF
+    doc.save('heap-sort-steps-with-screenshots.pdf');
   };
   
   // Function to draw tree visualization using jsPDF
@@ -220,7 +298,7 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       height: maxY - minY
     };
     
-    // Calculate scaling to fit page
+    // Scale to fit page
     const pageWidth = 297; // A4 landscape width in mm
     const pageHeight = 210; // A4 landscape height in mm
     const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
@@ -230,11 +308,11 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     const scaleY = availableHeight / bbox.height;
     const scale = Math.min(scaleX, scaleY, 1); // Don't upscale
     
-    // Calculate position to center
+    // Calculate offset to center
     const treeWidth = bbox.width * scale;
     const treeHeight = bbox.height * scale;
     const offsetX = (pageWidth - treeWidth) / 2 - bbox.minX * scale;
-    const offsetY = (availableHeight - treeHeight) / 2 + 50 - bbox.minY * scale; // +50 for header space
+    const offsetY = (availableHeight - treeHeight) / 2 + 60 - bbox.minY * scale;
     
     // Draw connections
     connections.forEach(conn => {
@@ -243,7 +321,7 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       
       if (fromPos && toPos) {
         doc.setDrawColor(156, 163, 175); // gray-400
-        doc.setLineWidth(0.5);
+        doc.setLineWidth(0.5 * scale);
         doc.line(
           offsetX + fromPos.x * scale,
           offsetY + fromPos.y * scale,
@@ -302,18 +380,10 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       return 'Starting heap sort visualization...';
     } else if (operation === 'build_heap_start') {
       return 'Building max heap from array';
-    } else if (operation === 'heapify_start') {
-      return `Heapifying subtree rooted at position ${stepData.heapRoot !== undefined ? stepData.heapRoot : 'N/A'}`;
-    } else if (operation === 'compare_children') {
-      return `Comparing elements at positions ${stepData.comparing && stepData.comparing.length > 0 ? stepData.comparing.join(' and ') : 'N/A'}`;
-    } else if (operation === 'swap_heap') {
-      return `Swapping elements at positions ${stepData.swapping && stepData.swapping.length > 0 ? stepData.swapping.join(' and ') : 'N/A'} to maintain heap property`;
-    } else if (operation === 'after_swap') {
-      return `Heap property restored after swap`;
-    } else if (operation === 'no_swap_needed') {
-      return `No swap needed, heap property maintained`;
-    } else if (operation === 'heap_built') {
-      return 'Max heap successfully built';
+    } else if (operation === 'heapify') {
+      return `Heapifying subtree rooted at index ${stepData.heapRoot}`;
+    } else if (operation === 'after_heapify') {
+      return `Max heap successfully built`;
     } else if (operation === 'extract_max') {
       return `Extracting maximum element from heap`;
     } else if (operation === 'after_extract') {
@@ -331,13 +401,13 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     }
   };
 
-  // Function to calculate tree positions
+  // Function to calculate tree positions with better spacing
   const calculateTreePositions = (array) => {
     if (!array || array.length === 0) return [];
     
     const positions = [];
-    const levelHeight = 60;
-    const nodeSpacing = 40;
+    const levelHeight = 80;
+    const baseNodeSpacing = 300;
     
     // Calculate positions for each node
     for (let i = 0; i < array.length; i++) {
@@ -346,13 +416,15 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       const levelStartIndex = levelNodes - 1;
       const nodeIndexInLevel = i - levelStartIndex;
       
-      // Calculate x position (centered within level)
-      const levelWidth = (levelNodes - 1) * nodeSpacing;
-      const startX = 150 - levelWidth / 2;
-      const x = startX + nodeIndexInLevel * nodeSpacing;
+      // Calculate x position (centered within level) with dynamic spacing
+      // Increase spacing for deeper levels to prevent overlap
+      const levelSpacing = Math.max(baseNodeSpacing / (level + 1), 80);  // Keep minimum spacing
+      const levelWidth = (levelNodes - 1) * levelSpacing;
+      const startX = 350 - levelWidth / 2;  // Center within 700px width for better centering
+      const x = startX + nodeIndexInLevel * levelSpacing;
       
       // Calculate y position
-      const y = level * levelHeight + 20;
+      const y = level * levelHeight + 20;  // Reduced vertical offset to fit on screen
       
       positions.push({ x, y, value: array[i] });
     }
@@ -445,6 +517,12 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
   };
 
   if (!data || !steps || steps.length === 0) return null;
+  
+    // Helper function to determine if a step should be shown based on viewMode
+    const shouldShowStep = (step) => {
+      // Since we're in the HeapTreeVisualizer, we should only show steps when in tree mode
+      return viewMode === 'tree';
+    };
 
   const safeCurrentStep = Math.min(currentStep, Math.max(0, steps.length - 1));
   const currentStepData = steps[safeCurrentStep];
@@ -499,6 +577,34 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         #heap-tree-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
+        
+        /* Screen floating animation for nodes and edges only */
+        @keyframes screen-float {
+          0% {
+            transform: translateX(0px) translateY(0px);
+          }
+          25% {
+            transform: translateX(5px) translateY(-3px);
+          }
+          50% {
+            transform: translateX(0px) translateY(0px);
+          }
+          75% {
+            transform: translateX(-5px) translateY(2px);
+          }
+          100% {
+            transform: translateX(0px) translateY(0px);
+          }
+        }
+        
+        .screen-floating-nodes-edges {
+          animation: screen-float 6s ease-in-out infinite;
+        }
+        
+        /* No animation for text elements */
+        .no-animation {
+          animation: none;
+        }
         `}
       </style>
       <div className="flex justify-between items-center mb-4">
@@ -519,6 +625,14 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
             </select>
           </div>
           
+          {/* Reset Structure Button */}
+          <button 
+            onClick={resetStructure}
+            className="px-3 py-1 bg-blue-800 text-white rounded text-sm font-medium hover:bg-blue-900 transition-colors flex items-center"
+          >
+            Reset Structure
+          </button>
+
           <button 
             onClick={downloadStepsAsPDFWithScreenshots}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
@@ -550,57 +664,79 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
           </h4>
           
           <div className={`flex justify-center items-center mb-3 py-2 ${isFullscreen ? 'scale-125' : ''}`}>
-            <div className="w-full min-h-[300px] flex items-center justify-center">
+            <div className="w-full min-h-[400px] flex items-center justify-center mx-auto overflow-hidden">
               <svg 
                 ref={svgRef} 
                 width="100%" 
-                height="300" 
+                height="350" 
                 className={`border border-gray-200 rounded ${isFullscreen ? '!border-0' : ''}`}
-                viewBox="0 0 300 200"
+                viewBox="0 0 600 250"  // Adjusted viewBox for better centering
               >
                 {/* Draw connections */}
                 {connections.map((conn, index) => {
                   const fromPos = treePositions[conn.from];
                   const toPos = treePositions[conn.to];
                   
+                  // Get dragged positions if they exist
+                  const draggedFromPos = draggedNodes[conn.from];
+                  const draggedToPos = draggedNodes[conn.to];
+                  
+                  const actualFromX = draggedFromPos ? draggedFromPos.startX : (fromPos ? fromPos.x * 0.7 : 0);
+                  const actualFromY = draggedFromPos ? draggedFromPos.startY : (fromPos ? fromPos.y * 0.7 + 20 : 0);
+                  const actualToX = draggedToPos ? draggedToPos.startX : (toPos ? toPos.x * 0.7 : 0);
+                  const actualToY = draggedToPos ? draggedToPos.startY : (toPos ? toPos.y * 0.7 + 20 : 0);
+                  
                   if (fromPos && toPos) {
                     return (
                       <line
                         key={index}
-                        x1={fromPos.x * 0.6}
-                        y1={fromPos.y * 0.6 + 20}
-                        x2={toPos.x * 0.6}
-                        y2={toPos.y * 0.6 + 20}
+                        x1={actualFromX}
+                        y1={actualFromY}
+                        x2={actualToX}
+                        y2={actualToY}
                         stroke="#9ca3af"
                         strokeWidth="1"
+                        className="screen-floating-nodes-edges"
                       />
                     );
                   }
                   return null;
                 })}
                 
-                {/* Draw nodes */}
-                {treePositions.map((pos, posIdx) => (
-                  <g key={posIdx}>
-                    <circle
-                      cx={pos.x * 0.6}
-                      cy={pos.y * 0.6 + 20}
-                      r="12"
-                      className={`transition-all duration-300 ${getNodeStyle(currentStepData, posIdx)}`}
-                    />
-                    <text
-                      x={pos.x * 0.6}
-                      y={pos.y * 0.6 + 20}
-                      textAnchor="middle"
-                      dy=".3em"
-                      fontSize="8"
-                      fontWeight="bold"
-                      fill={getNodeTextColor(currentStepData, posIdx)}
+                {/* Draw nodes with text that move together using transform approach */}
+                {treePositions.map((pos, posIdx) => {
+                  // Get dragged position if exists
+                  const draggedPosition = draggedNodes[posIdx];
+                  const actualX = draggedPosition ? draggedPosition.startX : pos.x * 0.7;
+                  const actualY = draggedPosition ? draggedPosition.startY : pos.y * 0.7 + 20;
+                  
+                  return (
+                    <g 
+                      key={posIdx}
+                      className="screen-floating-nodes-edges"
+                      onMouseDown={(e) => handleNodeMouseDown(posIdx, actualX, actualY, e)}
                     >
-                      {pos.value}
-                    </text>
-                  </g>
-                ))}
+                      <g transform={`translate(${actualX}, ${actualY})`}>
+                        <circle
+                          r="12"
+                          className={`transition-all duration-300 ${getNodeStyle(currentStepData, posIdx)} cursor-move`}
+                        />
+                        <text
+                          x="0"
+                          y="0"
+                          textAnchor="middle"
+                          dy=".3em"
+                          fontSize="8"
+                          fontWeight="bold"
+                          fill={getNodeTextColor(currentStepData, posIdx)}
+                        >
+                          {pos.value}
+                        </text>
+                      </g>
+                    </g>
+                  );
+                })}
+
               </svg>
             </div>
           </div>
@@ -615,8 +751,8 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       
       <div className="mt-6 border border-gray-200 p-4 bg-white">
         <h4 className="text-md font-bold text-blue-800 mb-3">All Steps:</h4>
-        <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
-          {steps.map((step, index) => {
+        <div className="space-y-4 max-h-[900px] overflow-y-auto pr-2">
+          {steps.filter(shouldShowStep).map((step, index) => {
             const stepPositions = calculateTreePositions(step.array);
             const stepConnections = getConnections(step.array);
             
@@ -632,12 +768,12 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
                     <div className="text-gray-600 text-sm mt-1">{getOperationDescription(step)}</div>
                     
                     <div className="mt-3">
-                      <div className="w-full min-h-[150px] flex items-center justify-center">
+                      <div className="w-full min-h-[400px] flex items-center justify-center overflow-visible">
                         <svg 
                           width="100%" 
-                          height="150" 
+                          height="350" 
                           className="border border-gray-200 rounded"
-                          viewBox="0 0 300 120"
+                          viewBox="0 0 600 300"  // Increased viewBox to show full tree
                         >
                           {/* Draw connections for this step */}
                           {stepConnections.map((conn, connIdx) => {
@@ -648,55 +784,46 @@ const HeapTreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
                               return (
                                 <line
                                   key={connIdx}
-                                  x1={fromPos.x * 0.6}
-                                  y1={fromPos.y * 0.6 + 20}
-                                  x2={toPos.x * 0.6}
-                                  y2={toPos.y * 0.6 + 20}
+                                  x1={fromPos.x * 0.7}
+                                  y1={fromPos.y * 0.7 + 20}
+                                  x2={toPos.x * 0.7}
+                                  y2={toPos.y * 0.7 + 20}
                                   stroke="#9ca3af"
                                   strokeWidth="1"
+                                  className="screen-floating-nodes-edges"
                                 />
                               );
                             }
                             return null;
                           })}
                           
-                          {/* Draw nodes for this step */}
+                          {/* Draw nodes with text that move together using transform approach */}
                           {stepPositions.map((pos, posIdx) => (
-                            <g key={posIdx}>
-                              <circle
-                                cx={pos.x * 0.6}
-                                cy={pos.y * 0.6 + 20}
-                                r="12"
-                                className={`transition-all duration-300 ${getNodeStyle(step, posIdx)}`}
-                              />
-                              <text
-                                x={pos.x * 0.6}
-                                y={pos.y * 0.6 + 20}
-                                textAnchor="middle"
-                                dy=".3em"
-                                fontSize="8"
-                                fontWeight="bold"
-                                fill={getNodeTextColor(step, posIdx)}
-                              >
-                                {pos.value}
-                              </text>
+                            <g key={posIdx} className="screen-floating-nodes-edges">
+                              <g transform={`translate(${pos.x * 0.7}, ${pos.y * 0.7 + 20})`}>
+                                <circle
+                                  r="12"
+                                  className={`transition-all duration-300 ${getNodeStyle(step, posIdx)}`}
+                                />
+                                <text
+                                  x="0"
+                                  y="0"
+                                  textAnchor="middle"
+                                  dy=".3em"
+                                  fontSize="8"
+                                  fontWeight="bold"
+                                  fill={getNodeTextColor(step, posIdx)}
+                                >
+                                  {pos.value}
+                                </text>
+                              </g>
                             </g>
                           ))}
+
                         </svg>
                       </div>
                     </div>
                     
-                    {/* Array representation */}
-                    <div className="mt-2 flex flex-wrap gap-1 justify-center">
-                      {step.array.map((value, arrIdx) => (
-                        <div 
-                          key={arrIdx}
-                          className={`w-8 h-8 flex items-center justify-center text-xs font-medium border rounded ${step.sorted && step.sorted.includes(arrIdx) ? 'bg-gray-200 border-gray-400' : 'bg-white border-gray-300'}`}
-                        >
-                          {value}
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 </div>
               </div>

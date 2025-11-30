@@ -15,6 +15,10 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenContainerRef = useRef(null);
   const svgRef = useRef(null);
+  
+  // State for individual node dragging
+  const [draggedNodes, setDraggedNodes] = useState({});
+  const [currentlyDraggingNode, setCurrentlyDraggingNode] = useState(null);
 
   // Handle fullscreen change events
   useEffect(() => {
@@ -80,9 +84,10 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
       
       // Add a visual representation of the trie
-      if (step.tree || step.operation) {
+      if (step.root || step.tree || step.operation) {
         // Calculate bounding box for scaling
-        const bbox = calculateTrieBoundingBox(step.tree || { children: {}, isEnd: false });
+        const rootNode = step.tree || step.root || { children: {}, isEnd: false };
+        const bbox = calculateTrieBoundingBox(rootNode);
         const pageWidth = 297; // A4 landscape width in mm
         const pageHeight = 210; // A4 landscape height in mm
         const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
@@ -99,7 +104,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         const x = (pageWidth - treeWidth) / 2 - bbox.minX * scale;
         const y = (availableHeight - treeHeight) / 2 + 50 - bbox.minY * scale; // +50 for header space
         
-        drawTrieInPDF(doc, step.tree || { children: {}, isEnd: false }, '', x, y, 0, scale);
+        drawTrieInPDF(doc, rootNode, '', x, y, 0, scale);
       } else {
         doc.text('Empty trie', 148.5, 105, null, null, 'center');
       }
@@ -127,13 +132,15 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     bbox.maxY = Math.max(bbox.maxY, y + nodeSize/2);
     
     // Process children
-    const children = node.children ? Object.keys(node.children) : [];
-    children.forEach((char, index) => {
-      const child = node.children[char];
-      const childX = x + (index - (children.length - 1) / 2) * horizontalSpacing;
-      const childY = y + verticalSpacing;
-      calculateTrieBoundingBox(child, prefix + char, level + 1, childX, childY, bbox);
-    });
+    if (node.children) {
+      const children = Object.keys(node.children);
+      children.forEach((char, index) => {
+        const child = node.children[char];
+        const childX = x + (index - (children.length - 1) / 2) * horizontalSpacing;
+        const childY = y + verticalSpacing;
+        calculateTrieBoundingBox(child, prefix + char, level + 1, childX, childY, bbox);
+      });
+    }
     
     // Add some padding
     bbox.width = bbox.maxX - bbox.minX + 20;
@@ -151,7 +158,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     const horizontalSpacing = Math.max(60 / (level + 1), 25) * scale; // Increased horizontal spacing
     
     // Get the character for this node (last character of prefix, or 'root' for root)
-    const nodeLabel = prefix ? prefix.slice(-1) : 'root';
+    const nodeLabel = node.char || (prefix ? prefix.slice(-1) : 'root');
     
     // Draw node circle
     if (node.isEnd) {
@@ -176,25 +183,27 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     }
     
     // Draw children
-    const children = node.children ? Object.keys(node.children) : [];
-    children.forEach((char, index) => {
-      const child = node.children[char];
-      const childX = x + (index - (children.length - 1) / 2) * horizontalSpacing;
-      const childY = y + verticalSpacing;
-      
-      // Connection line
-      doc.setDrawColor(156, 163, 175); // gray-400
-      doc.setLineWidth(0.7 * scale);
-      doc.line(x, y + nodeSize, childX, childY - nodeSize); // Adjusted line endpoints
-      
-      // Character label on the line
-      doc.setFontSize(7 * scale);
-      doc.setTextColor(59, 130, 246); // blue-600
-      doc.text(char, (x + childX) / 2, (y + childY) / 2 - 3 * scale, null, null, 'center'); // Moved up slightly
-      
-      // Child node
-      drawTrieInPDF(doc, child, prefix + char, childX, childY, level + 1, scale);
-    });
+    if (node.children) {
+      const children = Object.keys(node.children);
+      children.forEach((char, index) => {
+        const child = node.children[char];
+        const childX = x + (index - (children.length - 1) / 2) * horizontalSpacing;
+        const childY = y + verticalSpacing;
+        
+        // Connection line
+        doc.setDrawColor(156, 163, 175); // gray-400
+        doc.setLineWidth(0.7 * scale);
+        doc.line(x, y + nodeSize, childX, childY - nodeSize); // Adjusted line endpoints
+        
+        // Character label on the line
+        doc.setFontSize(7 * scale);
+        doc.setTextColor(59, 130, 246); // blue-600
+        doc.text(char, (x + childX) / 2, (y + childY) / 2 - 3 * scale, null, null, 'center'); // Moved up slightly
+        
+        // Child node
+        drawTrieInPDF(doc, child, prefix + char, childX, childY, level + 1, scale);
+      });
+    }
   };
 
   // Function to get operation description
@@ -220,9 +229,40 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     }
   };
 
-  // State for individual node dragging
-  const [draggedNodes, setDraggedNodes] = useState({});
-  const [currentlyDraggingNode, setCurrentlyDraggingNode] = useState(null);
+  // Toggle fullscreen mode using Fullscreen API
+  const toggleFullscreen = () => {
+    if (!fullscreenContainerRef.current) return;
+
+    if (!isFullscreen) {
+      // Enter fullscreen
+      const element = fullscreenContainerRef.current;
+      if (element.requestFullscreen) {
+        element.requestFullscreen();
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+      } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
+      }
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  };
+
+  // Handle speed change
+  const handleSpeedChange = (newSpeed) => {
+    setSpeed(newSpeed);
+  };
 
   // Handle mouse down for individual node dragging
   const handleNodeMouseDown = useCallback((nodeValue, initialX, initialY, e) => {
@@ -273,224 +313,112 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     };
   }, [isDragging, handleNodeMouseMove, handleNodeMouseUp]);
 
-  // Function to render trie nodes with elastic dragging support
+  // Reset all node positions to their original structure
+  const resetStructure = () => {
+    setDraggedNodes({});
+    setCurrentlyDraggingNode(null);
+  };
+
+  // Function to render trie nodes (simple version without dragging)
   const renderTrieNode = (node, prefix = '', x = 300, y = 50, level = 0) => {
     if (!node) return null;
     
     const nodeId = `${prefix}-${level}`;
     const nodeSize = 30;
     const verticalSpacing = 70;
-    // ADJUSTED: Dynamic horizontal spacing based on trie depth to accommodate wider tries
-    const maxDepth = calculateTrieDepth(node);
-    const baseHorizontalSpacing = 120;
-    const adjustedHorizontalSpacing = Math.max(baseHorizontalSpacing / (1 + maxDepth * 0.1), 40); // Reduce spacing for deeper tries
-    const horizontalSpacing = Math.max(adjustedHorizontalSpacing / (level + 1), 30); // Minimum spacing
+    const horizontalSpacing = Math.max(200 / (level + 1), 80);
     
     // Get dragged position if exists
     const draggedPosition = draggedNodes[nodeId];
     const actualX = draggedPosition ? draggedPosition.startX : x;
     const actualY = draggedPosition ? draggedPosition.startY : y;
     
-    // Check if this is the current node being processed
-    const isCurrentNode = currentStepData && 
-      ((currentStepData.path && prefix === currentStepData.path) || 
-       (currentStepData.currentChar && prefix && prefix.slice(-1) === currentStepData.currentChar));
-       
-    // Check if this node represents the end of a word
-    const isEndOfWord = node.isEnd === true;
+    // Use 'char' property if available, otherwise use prefix logic
+    const nodeLabel = node.char || (prefix ? prefix.slice(-1) : 'root');
     
     return (
       <g key={nodeId}>
         {/* Render children first */}
-        {node.children && Object.keys(node.children).map((char, index) => {
-          const child = node.children[char];
-          const childrenCount = Object.keys(node.children).length;
-          const childX = x + (index - (childrenCount - 1) / 2) * horizontalSpacing;
-          const childY = y + verticalSpacing;
-          
-          return (
-            <g key={`${nodeId}-${char}`}>
-              {/* Connection line to child */}
-              <line
-                x1={actualX}
-                y1={actualY + nodeSize/2}
-                x2={childX}
-                y2={childY - nodeSize/2}
-                stroke="#9CA3AF"
-                strokeWidth="2"
-                className="floating-animation delay-3"
-              />
-              
-              {/* Character label on the line - no animation */}
-              <text
-                x={(actualX + childX) / 2}
-                y={(y + childY) / 2 - 5}
-                textAnchor="middle"
-                className="text-blue-600 font-medium"
-              >
-                {char}
-              </text>
-              
-              {/* Child node */}
-              {renderTrieNode(child, prefix + char, childX, childY, level + 1)}
-            </g>
-          );
-        })}
+        {node.children && Object.keys(node.children).length > 0 ? (
+          Object.keys(node.children).map((char, index) => {
+            const child = node.children[char];
+            const childrenCount = Object.keys(node.children).length;
+            const childX = x + (index - (childrenCount - 1) / 2) * horizontalSpacing;
+            const childY = y + verticalSpacing;
+            
+            // Get dragged position for child if exists
+            const childNodeId = `${prefix + char}-${level + 1}`;
+            const childDraggedPosition = draggedNodes[childNodeId];
+            const actualChildX = childDraggedPosition ? childDraggedPosition.startX : childX;
+            const actualChildY = childDraggedPosition ? childDraggedPosition.startY : childY;
+            
+            return (
+              <g key={`${nodeId}-${char}`}>
+                {/* Connection line to child with elastic stretching */}
+                <line
+                  x1={actualX}
+                  y1={actualY + nodeSize/2}
+                  x2={actualChildX}
+                  y2={actualChildY - nodeSize/2}
+                  stroke="#9CA3AF"
+                  strokeWidth="2"
+                  className="screen-floating"
+                />
+                
+                <text
+                  x={(actualX + actualChildX) / 2}
+                  y={(actualY + actualChildY) / 2 - 10}
+                  textAnchor="middle"
+                  className="text-sm text-blue-600 font-bold bg-white px-1 rounded"
+                >
+                  {char}
+                </text>
+                
+                {renderTrieNode(child, prefix + char, childX, childY, level + 1)}
+              </g>
+            );
+          })
+        ) : null}
         
-        {/* Render node circle with enhanced floating animation */}
+        {/* Render node circle with drag support */}
         <g 
           onMouseDown={(e) => handleNodeMouseDown(nodeId, actualX, actualY, e)}
-          className="cursor-move floating-animation glowing delay-3"
+          className="cursor-move screen-floating"
         >
           <g transform={`translate(${actualX}, ${actualY})`}>
             <circle
               r={nodeSize / 2}
-              fill={isEndOfWord ? "#3B82F6" : "#FFFFFF"}
+              fill={node.isEnd ? "#10B981" : "#FFFFFF"}
               stroke="#9CA3AF"
               strokeWidth="2"
-              className={`hover:stroke-blue-500 transition-all duration-500 ${level % 4 === 0 ? 'delay-1' : level % 4 === 1 ? 'delay-2' : level % 4 === 2 ? 'delay-3' : 'delay-4'}`}
+              className="hover:stroke-blue-500 transition-all duration-300 drop-shadow-sm"
+              onMouseEnter={() => setHoveredNode(prefix || 'root')}
+              onMouseLeave={() => setHoveredNode(null)}
             />
             
-            {/* Render node character - no animation */}
             <text
               x="0"
-              y="0"
+              y="5"
               textAnchor="middle"
-              dominantBaseline="middle"
-              className="font-bold text-xs select-none"
-              fill={isEndOfWord ? "#FFFFFF" : "#4B5563"}
+              className="font-bold text-black text-base drop-shadow-sm"
             >
-              {node.char}
+              {nodeLabel}
             </text>
+            
+            {node.isEnd && (
+              <text
+                x="0"
+                y="-25"
+                textAnchor="middle"
+                className="text-xs text-green-600 font-bold drop-shadow-sm"
+              >
+                END
+              </text>
+            )}
           </g>
         </g>
-
       </g>
     );
-
-  };
-
-  // ADDED: Helper function to calculate trie depth
-  const calculateTrieDepth = (node) => {
-    if (!node || !node.children) return 0;
-    
-    let maxDepth = 0;
-    const children = Object.keys(node.children);
-    for (const child of children) {
-      maxDepth = Math.max(maxDepth, calculateTrieDepth(node.children[child]));
-    }
-    
-    return 1 + maxDepth;
-  };
-
-  // ADDED: Function to calculate appropriate zoom level based on trie depth
-  const calculateZoomLevel = (tree) => {
-    if (!tree) return 1;
-    
-    const depth = calculateTrieDepth(tree);
-    // For tries with depth > 4, we gradually zoom out
-    if (depth > 4) {
-      return Math.max(0.7, 1 - (depth - 4) * 0.1); // Cap at 30% zoom out
-    }
-    return 1; // Normal zoom for shallower tries
-  };
-
-  // Handle mouse down for dragging
-  const handleMouseDown = useCallback((e) => {
-    if (e.button !== 0) return; // Only left mouse button
-    setIsDragging(true);
-    const rect = svgRef.current.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    });
-    e.preventDefault();
-  }, [position]);
-
-  // Handle mouse move for dragging
-  const handleMouseMove = useCallback((e) => {
-    if (!isDragging) return;
-    setPosition({
-      x: e.clientX - dragOffset.x,
-      y: e.clientY - dragOffset.y
-    });
-  }, [isDragging, dragOffset]);
-
-  // Handle mouse up for dragging
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  // Add event listeners for dragging
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-    
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
-
-  // Toggle fullscreen mode using Fullscreen API
-  const toggleFullscreen = () => {
-    if (!fullscreenContainerRef.current) return;
-
-    if (!isFullscreen) {
-      // Enter fullscreen
-      const element = fullscreenContainerRef.current;
-      if (element.requestFullscreen) {
-        element.requestFullscreen();
-      } else if (element.webkitRequestFullscreen) {
-        element.webkitRequestFullscreen();
-      } else if (element.mozRequestFullScreen) {
-        element.mozRequestFullScreen();
-      } else if (element.msRequestFullscreen) {
-        element.msRequestFullscreen();
-      }
-    } else {
-      // Exit fullscreen
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      } else if (document.mozCancelFullScreen) {
-        document.mozCancelFullScreen();
-      } else if (document.msExitFullscreen) {
-        document.msExitFullscreen();
-      }
-    }
-  };
-
-  // Toggle floating mode
-  const toggleFloating = () => {
-    setIsFloating(!isFloating);
-    // Reset position to center when toggling
-    if (!isFloating) {
-      setTimeout(() => {
-        const container = fullscreenContainerRef.current;
-        if (container) {
-          const containerRect = container.getBoundingClientRect();
-          setPosition({
-            x: containerRect.width / 2,
-            y: containerRect.height / 2
-          });
-        }
-      }, 10);
-    }
-  };
-
-  // Handle speed change
-  const handleSpeedChange = (newSpeed) => {
-    setSpeed(newSpeed);
-  };
-
-  // Reset all node positions to their original structure
-  const resetStructure = () => {
-    setDraggedNodes({});
-    setCurrentlyDraggingNode(null);
   };
 
   if (!data || !steps || steps.length === 0) return null;
@@ -498,6 +426,9 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
   const isCompleted = steps.length > 0 && currentStep === steps.length - 1 && !isPlaying;
   const safeCurrentStep = Math.min(currentStep, Math.max(0, steps.length - 1));
   const currentStepData = steps[safeCurrentStep];
+  
+  // Debug log to see the structure
+  // console.log('Current step data:', currentStepData);
 
   return (
     <div id="trie-visualizer" className="mt-2">
@@ -548,83 +479,27 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           display: none;
         }
         
-        /* Faster floating animation for water-like effect - for nodes and edges */
-        @keyframes float {
-          0% {
-            transform: translateY(0px) translateX(0px);
-          }
-          25% {
-            transform: translateY(-4px) translateX(1px);
-          }
-          50% {
-            transform: translateY(-2px) translateX(0px);
-          }
-          75% {
-            transform: translateY(-3px) translateX(0.5px);
-          }
-          100% {
-            transform: translateY(0px) translateX(0px);
-          }
-        }
-        
         /* Screen floating animation for entire tree structure */
         @keyframes screen-float {
           0% {
-            transform: translateX(0px);
+            transform: translateX(0px) translateY(0px);
           }
           25% {
-            transform: translateX(10px);
+            transform: translateX(5px) translateY(-3px);
           }
           50% {
-            transform: translateX(0px);
+            transform: translateX(0px) translateY(0px);
           }
           75% {
-            transform: translateX(-10px);
+            transform: translateX(-5px) translateY(2px);
           }
           100% {
-            transform: translateX(0px);
+            transform: translateX(0px) translateY(0px);
           }
-        }
-        
-        @keyframes glow {
-          0% {
-            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
-          }
-          50% {
-            filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.4));
-          }
-          100% {
-            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
-          }
-        }
-        
-        .floating-animation {
-          animation: float 3s ease-in-out infinite;
         }
         
         .screen-floating {
-          animation: screen-float 8s ease-in-out infinite;
-        }
-        
-        .glowing {
-          animation: glow 2s ease-in-out infinite;
-        }
-        
-        /* Staggered animations */
-        .delay-1 {
-          animation-delay: 0.1s;
-        }
-        
-        .delay-2 {
-          animation-delay: 0.2s;
-        }
-        
-        .delay-3 {
-          animation-delay: 0.3s;
-        }
-        
-        .delay-4 {
-          animation-delay: 0.4s;
+          animation: screen-float 6s ease-in-out infinite;
         }
         `}
       </style>
@@ -708,7 +583,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                   width="100%" 
                   height="500" 
                   className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`} 
-                  viewBox={`0 0 ${600 * calculateZoomLevel(currentStepData.root)} 500`}
+                  viewBox="0 0 600 500"
                 >
                   <defs>
                     <marker 
@@ -723,32 +598,10 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                     </marker>
                   </defs>
                   
-                  {isFloating ? (
-                    <g 
-                      ref={svgRef}
-                      transform={`translate(${position.x - 300 * calculateZoomLevel(currentStepData.root)}, ${position.y - 250})`}
-                      onMouseDown={handleMouseDown}
-                      className="cursor-move screen-floating"
-                    >
-                      {renderTrieNode(currentStepData.root, '', 300 * calculateZoomLevel(currentStepData.root), 100, 0)}
-                    </g>
-                  ) : (
-                    <g className="screen-floating">
-                      {renderTrieNode(currentStepData.root, '', 300 * calculateZoomLevel(currentStepData.root), 100, 0)}
-                    </g>
-                  )}
+                  <g className="screen-floating">
+                    {renderTrieNode(currentStepData.tree || currentStepData.root, '', 300, 100, 0)}
+                  </g>
                 </svg>
-
-                {isFloating && (
-                  <div className="absolute top-2 right-2 z-10">
-                    <button 
-                      onClick={toggleFloating}
-                      className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                    >
-                      Dock Tree
-                    </button>
-                  </div>
-                )}
               </div>
             ) : (
               <div className="text-center text-gray-500 py-10">
@@ -756,7 +609,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
               </div>
             )}
           </div>
-          
+
           <div className={`text-center p-2 bg-white border border-gray-200 ${isFullscreen ? 'hidden' : ''}`}>
             <p className="font-semibold text-black text-sm">
               {getOperationDescription(currentStepData)}
@@ -781,9 +634,9 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                     <div className="text-gray-600 text-sm mt-1">{getOperationDescription(step)}</div>
                     
                     <div className={`mt-3 min-h-[200px] flex items-center justify-center overflow-auto ${isFullscreen ? 'scale-150' : ''}`}>
-                      {step.tree || step.operation ? (
+                      {step.root || step.operation ? (
                         <div className={`w-full min-h-[200px] overflow-auto ${isFullscreen ? 'scale-150' : ''}`}>
-                          <svg width="100%" height="400" className={`border border-gray-200 rounded min-w-[400px] ${isFullscreen ? '!border-0' : ''}`} viewBox={`0 0 ${400 * calculateZoomLevel(step.tree || { children: {}, isEnd: false })} 400`}>
+                          <svg width="100%" height="400" className={`border border-gray-200 rounded min-w-[400px] ${isFullscreen ? '!border-0' : ''}`} viewBox="0 0 400 400">
                             <defs>
                               <marker 
                                 id="arrowhead" 
@@ -797,7 +650,8 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                               </marker>
                             </defs>
                             
-                            {renderTrieNode(step.tree || { children: {}, isEnd: false }, '', 250 * calculateZoomLevel(step.tree || { children: {}, isEnd: false }), 50)}
+                            {renderTrieNode(step.tree || step.root || { children: {}, isEnd: false }, '', 200, 80)}
+
                           </svg>
                         </div>
                       ) : (

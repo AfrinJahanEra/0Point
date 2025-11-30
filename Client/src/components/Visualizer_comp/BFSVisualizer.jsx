@@ -12,6 +12,12 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   const [speed, setSpeed] = useState(2000); // Default 2 seconds
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenContainerRef = useRef(null);
+  
+  // State for node dragging
+  const [draggedNodes, setDraggedNodes] = useState({});
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragNode, setDragNode] = useState(null);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Auto-advance based on speed setting
   useEffect(() => {
@@ -56,14 +62,19 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     const nodes = Array.from(allNodes);
     if (nodes.length === 0) return;
     
-    // Position nodes in a circle
+    // Position nodes in a circle with support for dragged positions
     const nodePositions = {};
     nodes.forEach((node, index) => {
-      const angle = (index / nodes.length) * 2 * Math.PI;
-      nodePositions[node] = {
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle)
-      };
+      // Check if node has been dragged
+      if (draggedNodes[node]) {
+        nodePositions[node] = draggedNodes[node];
+      } else {
+        const angle = (index / nodes.length) * 2 * Math.PI;
+        nodePositions[node] = {
+          x: centerX + radius * Math.cos(angle),
+          y: centerY + radius * Math.sin(angle)
+        };
+      }
     });
     
     // Draw edges with D3 - UPDATED FOR NEW VISUAL STYLE
@@ -144,8 +155,8 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         textColor = "black";
       }
       
-      // Draw node circle
-      svg.append("circle")
+      // Draw node circle with drag support
+      const nodeCircle = svg.append("circle")
         .attr("class", "node")
         .attr("cx", pos.x)
         .attr("cy", pos.y)
@@ -153,12 +164,64 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         .attr("fill", fillColor)
         .attr("stroke", strokeColor)
         .attr("stroke-width", 2)
+        .attr("data-node", node)
+        .style("cursor", "pointer")
         .on("mouseover", () => setHoveredNode(node))
-        .on("mouseout", () => setHoveredNode(null));
+        .on("mouseout", () => setHoveredNode(null))
+        .call(d3.drag()
+          .on("start", function(event) {
+            setIsDragging(true);
+            setDragNode(node);
+            setDragStart({ x: event.x, y: event.y });
+          })
+          .on("drag", function(event) {
+            // Update the dragged node position
+            const newX = event.x;
+            const newY = event.y;
+            
+            // Update the node position
+            d3.select(this)
+              .attr("cx", newX)
+              .attr("cy", newY);
+            
+            // Update the node label position
+            svg.selectAll(`.node-label[data-node="${node}"]`)
+              .attr("x", newX)
+              .attr("y", newY + 5);
+            
+            // Update connected edges
+            svg.selectAll(".edge")
+              .each(function() {
+                const edge = d3.select(this);
+                const x1 = parseFloat(edge.attr("x1"));
+                const y1 = parseFloat(edge.attr("y1"));
+                const x2 = parseFloat(edge.attr("x2"));
+                const y2 = parseFloat(edge.attr("y2"));
+                
+                if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
+                  edge.attr("x1", newX).attr("y1", newY);
+                }
+                if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
+                  edge.attr("x2", newX).attr("y2", newY);
+                }
+              });
+            
+            // Update the position in our state
+            setDraggedNodes(prev => ({
+              ...prev,
+              [node]: { x: newX, y: newY }
+            }));
+          })
+          .on("end", function() {
+            setIsDragging(false);
+            setDragNode(null);
+          })
+        );
       
       // Draw node label
       svg.append("text")
         .attr("class", "node-label")
+        .attr("data-node", node)
         .attr("x", pos.x)
         .attr("y", pos.y + 5)
         .attr("text-anchor", "middle")
@@ -183,7 +246,7 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         .attr("r", 20);
     }
     
-  }, [currentStep, steps]);
+  }, [currentStep, steps, draggedNodes, isDragging, dragNode]);
 
   // Handle fullscreen change events
   useEffect(() => {
@@ -461,6 +524,11 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     }
   };
 
+  // Reset node positions to original layout
+  const resetNodePositions = () => {
+    setDraggedNodes({});
+  };
+
   // Handle speed change
   const handleSpeedChange = (newSpeed) => {
     setSpeed(newSpeed);
@@ -541,6 +609,29 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         #bfs-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
+        
+        /* Screen floating animation for entire graph structure */
+        @keyframes screen-float {
+          0% {
+            transform: translateX(0px);
+          }
+          25% {
+            transform: translateX(10px);
+          }
+          50% {
+            transform: translateX(0px);
+          }
+          75% {
+            transform: translateX(-10px);
+          }
+          100% {
+            transform: translateX(0px);
+          }
+        }
+        
+        .screen-floating {
+          animation: screen-float 8s ease-in-out infinite;
+        }
         `}
       </style>
       
@@ -561,6 +652,14 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
               <option value={3000}>Very Slow (3s)</option>
             </select>
           </div>
+          
+          {/* Reset Node Positions Button */}
+          <button 
+            onClick={resetNodePositions}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            Reset Layout
+          </button>
           
           <PDFDownloadButton onClick={downloadStepsAsPDF} label="Download PDF" />
           {isPlaying ? null : isCompleted ? (
@@ -609,9 +708,10 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
                   ref={svgRef} 
                   width="100%" 
                   height="500" 
-                  className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`}
+                  className={`border border-gray-200 rounded min-w-[600px] screen-floating ${isFullscreen ? '!border-0' : ''}`}
                   viewBox="0 0 600 500"
                 />
+
               </div>
             ) : (
               <div className="text-center text-gray-500 py-10">

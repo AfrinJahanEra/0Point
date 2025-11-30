@@ -1182,12 +1182,28 @@ export const algorithms = [
       };
       
       // Helper function to deep copy tree
-      const deepCopyTree = (node) => {
+      const deepCopyTree = (node, visited = new Set(), depth = 0) => {
+        // Prevent stack overflow for very deep trees
+        if (depth > 1000) return null;
+        
         if (!node) return null;
+        
+        // Handle circular references
+        if (visited.has(node)) {
+          return { 
+            value: node.value, 
+            left: null, 
+            right: null, 
+            height: node.height 
+          };
+        }
+        
+        visited.add(node);
+        
         return {
           value: node.value,
-          left: deepCopyTree(node.left),
-          right: deepCopyTree(node.right),
+          left: deepCopyTree(node.left, visited, depth + 1),
+          right: deepCopyTree(node.right, visited, depth + 1),
           height: node.height
         };
       };
@@ -1212,8 +1228,13 @@ export const algorithms = [
           return;
         }
         
-        updateTreeStructure(root.left, oldNode, newNode);
-        updateTreeStructure(root.right, oldNode, newNode);
+        // Add safety check to prevent infinite recursion
+        if (root.left) {
+          updateTreeStructure(root.left, oldNode, newNode);
+        }
+        if (root.right) {
+          updateTreeStructure(root.right, oldNode, newNode);
+        }
       };
       
       // Insert each value with proper step tracking

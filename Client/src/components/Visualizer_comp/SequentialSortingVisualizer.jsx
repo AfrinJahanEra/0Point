@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import { Maximize, Minimize } from 'lucide-react';
 
-const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
+const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart, viewMode = 'array' }) => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const visualizationRef = useRef(null);
   const currentStepRef = useRef(null);
@@ -10,6 +10,12 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
   const [speed, setSpeed] = useState(2000); // Default 2 seconds
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenContainerRef = useRef(null);
+  
+    // Helper function to determine if a step should be shown based on viewMode
+    const shouldShowStep = (step) => {
+      // Since we're in the SequentialSortingVisualizer, we should only show steps when in array mode
+      return viewMode === 'array';
+    };
 
   // Handle fullscreen change events
   useEffect(() => {
@@ -548,7 +554,7 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
       <div className="mt-6 border border-gray-200 p-4 bg-white">
         <h4 className="text-md font-bold text-blue-800 mb-3">All Steps:</h4>
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-          {steps.map((step, index) => (
+          {steps.filter(shouldShowStep).map((step, index) => (
             <div 
               key={index}
               className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}

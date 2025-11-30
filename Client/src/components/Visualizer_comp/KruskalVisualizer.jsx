@@ -12,6 +12,12 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
   const [speed, setSpeed] = useState(2000); // Default 2 seconds
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenContainerRef = useRef(null);
+  
+  // State for node dragging
+  const [draggedNodes, setDraggedNodes] = useState({});
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragNode, setDragNode] = useState(null);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Handle fullscreen change events
   useEffect(() => {
@@ -76,57 +82,27 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
     const nodes = Array.from(allNodes);
     if (nodes.length === 0) return;
     
-    // Position nodes in a circle
+    // Position nodes in a circle with support for dragged positions
     const nodePositions = {};
     nodes.forEach((node, index) => {
-      const angle = (index / nodes.length) * 2 * Math.PI;
-      nodePositions[node] = {
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle)
-      };
+      // Check if node has been dragged
+      if (draggedNodes[node]) {
+        nodePositions[node] = draggedNodes[node];
+      } else {
+        const angle = (index / nodes.length) * 2 * Math.PI;
+        nodePositions[node] = {
+          x: centerX + radius * Math.cos(angle),
+          y: centerY + radius * Math.sin(angle)
+        };
+      }
     });
     
     // Draw edges with D3 - UPDATED FOR NEW VISUAL STYLE
     svg.selectAll(".edge").remove();
     svg.selectAll(".edge-weight").remove();
     
-    // Draw MST edges first (in green)
-    if (stepData.mst) {
-      stepData.mst.forEach(edge => {
-        const pos1 = nodePositions[edge.from];
-        const pos2 = nodePositions[edge.to];
-        
-        if (!pos1 || !pos2) return;
-        
-        // Draw MST edge line in green
-        svg.append("line")
-          .attr("class", "edge mst-edge")
-          .attr("x1", pos1.x)
-          .attr("y1", pos1.y)
-          .attr("x2", pos2.x)
-          .attr("y2", pos2.y)
-          .attr("stroke", "#10B981") // green-500
-          .attr("stroke-width", 3)
-          .attr("opacity", 0.8);
-          
-        // Draw edge weight
-        const midX = (pos1.x + pos2.x) / 2;
-        const midY = (pos1.y + pos2.y) / 2;
-        
-        svg.append("text")
-          .attr("class", "edge-weight")
-          .attr("x", midX)
-          .attr("y", midY - 5)
-          .attr("text-anchor", "middle")
-          .attr("font-size", "12px")
-          .attr("font-weight", "bold")
-          .attr("fill", "#10B981")
-          .text(edge.weight);
-      });
-    }
-    
-    // Draw all edges (non-MST edges in light blue)
     if (stepData.graph) {
+      // Draw all edges first
       nodes.forEach(fromNode => {
         const neighbors = stepData.graph[fromNode] || [];
         neighbors.forEach(neighborObj => {
@@ -141,20 +117,6 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
           
           if (!pos1 || !pos2) return;
           
-          // Check if this edge is in MST
-          const isInMST = stepData.mst && stepData.mst.some(edge => 
-            (edge.from === fromNode && edge.to === toNode) || 
-            (edge.from === toNode && edge.to === fromNode)
-          );
-          
-          // Skip if already drawn as MST edge
-          if (isInMST) return;
-          
-          // Check if this is the current edge being considered
-          const isCurrentEdge = stepData.currentEdge && 
-            ((stepData.currentEdge.from === fromNode && stepData.currentEdge.to === toNode) ||
-             (stepData.currentEdge.from === toNode && stepData.currentEdge.to === fromNode));
-          
           // Draw edge line with appropriate style
           const edge = svg.append("line")
             .attr("class", "edge")
@@ -164,19 +126,24 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
             .attr("y2", pos2.y)
             .attr("stroke", "#93C5FD") // Light blue default
             .attr("stroke-width", 2);
-            
-          // Apply dotted line for neighbor search
-          if (isCurrentEdge && stepData.operation === 'consider_edge') {
-            edge.attr("stroke-dasharray", "5,5")
-                .attr("stroke", "#93C5FD"); // Light blue dotted for neighbor search
-          } else if (stepData.mst && stepData.mst.some(edge => 
+          
+          // Highlight MST edges
+          if (stepData.mst && stepData.mst.some(edge => 
             (edge.from === fromNode && edge.to === toNode) || 
             (edge.from === toNode && edge.to === fromNode))) {
-            edge.attr("stroke", "#1E40AF") // Dark blue for traversed edges
-                .attr("stroke-width", 3)
-                .attr("stroke-dasharray", "none");
+            edge.attr("stroke", "#1E40AF") // Dark blue for MST edges
+                .attr("stroke-width", 3);
           }
-            
+          
+          // Highlight current edge being considered
+          if (stepData.currentEdge && 
+            ((stepData.currentEdge.from === fromNode && stepData.currentEdge.to === toNode) ||
+             (stepData.currentEdge.from === toNode && stepData.currentEdge.to === fromNode))) {
+            edge.attr("stroke", "#93C5FD") // Light blue for current edge
+                .attr("stroke-width", 2)
+                .attr("stroke-dasharray", "5,5");
+          }
+          
           // Draw edge weight
           const midX = (pos1.x + pos2.x) / 2;
           const midY = (pos1.y + pos2.y) / 2;
@@ -188,7 +155,7 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
             .attr("text-anchor", "middle")
             .attr("font-size", "12px")
             .attr("font-weight", "bold")
-            .attr("fill", isCurrentEdge ? "#1E40AF" : "#9CA3AF")
+            .attr("fill", "#9CA3AF")
             .text(weight);
         });
       });
@@ -212,15 +179,15 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         strokeColor = "black";
         textColor = "black";
       } 
-      // Visited nodes
-      else if (stepData.visited && stepData.visited.includes(node)) {
-        fillColor = "#1E40AF"; // Dark blue for visited
+      // MST nodes
+      else if (stepData.mstNodes && stepData.mstNodes.includes(node)) {
+        fillColor = "#1E40AF"; // Dark blue for MST nodes
         strokeColor = "black";
         textColor = "white"; // White text for dark blue background
       }
       
-      // Draw node circle
-      svg.append("circle")
+      // Draw node circle with drag support
+      const nodeCircle = svg.append("circle")
         .attr("class", "node")
         .attr("cx", pos.x)
         .attr("cy", pos.y)
@@ -228,12 +195,78 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         .attr("fill", fillColor)
         .attr("stroke", strokeColor)
         .attr("stroke-width", 2)
+        .attr("data-node", node)
+        .style("cursor", "pointer")
         .on("mouseover", () => setHoveredNode(node))
-        .on("mouseout", () => setHoveredNode(null));
+        .on("mouseout", () => setHoveredNode(null))
+        .call(d3.drag()
+          .on("start", function(event) {
+            setIsDragging(true);
+            setDragNode(node);
+            setDragStart({ x: event.x, y: event.y });
+          })
+          .on("drag", function(event) {
+            // Update the dragged node position
+            const newX = event.x;
+            const newY = event.y;
+            
+            // Update the node position
+            d3.select(this)
+              .attr("cx", newX)
+              .attr("cy", newY);
+            
+            // Update the node label position
+            svg.selectAll(`.node-label[data-node="${node}"]`)
+              .attr("x", newX)
+              .attr("y", newY + 5);
+            
+            // Update connected edges
+            svg.selectAll(".edge, .edge-weight")
+              .each(function() {
+                const element = d3.select(this);
+                const x1 = parseFloat(element.attr("x1"));
+                const y1 = parseFloat(element.attr("y1"));
+                const x2 = parseFloat(element.attr("x2"));
+                const y2 = parseFloat(element.attr("y2"));
+                const textX = parseFloat(element.attr("x"));
+                const textY = parseFloat(element.attr("y"));
+                
+                // Update edge positions
+                if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                  if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
+                    element.attr("x1", newX).attr("y1", newY);
+                  }
+                  if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
+                    element.attr("x2", newX).attr("y2", newY);
+                  }
+                }
+                
+                // Update edge weight positions
+                if (!isNaN(textX) && !isNaN(textY)) {
+                  if (Math.abs(textX - (pos.x + (element.attr("x2") ? parseFloat(element.attr("x2")) : pos.x))/2) < 1 && 
+                      Math.abs(textY - (pos.y + (element.attr("y2") ? parseFloat(element.attr("y2")) : pos.y) - 5)/2) < 1) {
+                    element.attr("x", (newX + (element.attr("x2") ? parseFloat(element.attr("x2")) : newX))/2)
+                           .attr("y", (newY + (element.attr("y2") ? parseFloat(element.attr("y2")) : newY) - 5)/2);
+                  }
+                }
+              });
+            
+            // Update the position in our state
+            setDraggedNodes(prev => ({
+              ...prev,
+              [node]: { x: newX, y: newY }
+            }));
+          })
+          .on("end", function() {
+            setIsDragging(false);
+            setDragNode(null);
+          })
+        );
       
       // Draw node label
       svg.append("text")
         .attr("class", "node-label")
+        .attr("data-node", node)
         .attr("x", pos.x)
         .attr("y", pos.y + 5)
         .attr("text-anchor", "middle")
@@ -258,7 +291,7 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         .attr("r", 20);
     }
     
-  }, [currentStep, steps]);
+  }, [currentStep, steps, draggedNodes, isDragging, dragNode]);
 
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
@@ -544,6 +577,11 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
     setSpeed(newSpeed);
   };
 
+  // Reset node positions to original layout
+  const resetNodePositions = () => {
+    setDraggedNodes({});
+  };
+
   if (!data || !steps || steps.length === 0) return null;
 
   const isCompleted = steps.length > 0 && currentStep === steps.length - 1 && !isPlaying;
@@ -619,6 +657,29 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         #kruskal-visualizer .fullscreen-container::-webkit-scrollbar-corner {
           display: none;
         }
+        
+        /* Screen floating animation for entire graph structure */
+        @keyframes screen-float {
+          0% {
+            transform: translateX(0px);
+          }
+          25% {
+            transform: translateX(10px);
+          }
+          50% {
+            transform: translateX(0px);
+          }
+          75% {
+            transform: translateX(-10px);
+          }
+          100% {
+            transform: translateX(0px);
+          }
+        }
+        
+        .screen-floating {
+          animation: screen-float 8s ease-in-out infinite;
+        }
         `}
       </style>
       
@@ -639,6 +700,14 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
               <option value={3000}>Very Slow (3s)</option>
             </select>
           </div>
+          
+          {/* Reset Node Positions Button */}
+          <button 
+            onClick={resetNodePositions}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            Reset Layout
+          </button>
           
           {/* ADDED: Download PDF Button */}
           <PDFDownloadButton onClick={downloadStepsAsPDF} label="Download PDF" />
@@ -685,7 +754,7 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
                   ref={svgRef} 
                   width="100%" 
                   height="500" 
-                  className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`}
+                  className={`border border-gray-200 rounded min-w-[600px] screen-floating ${isFullscreen ? '!border-0' : ''}`}
                   viewBox="0 0 600 500"
                 />
               </div>

@@ -767,9 +767,9 @@ const Visualizer = () => {
               </div>
             </div>
             {heapViewMode === 'array' ? (
-              <SequentialSortingVisualizer {...visualizerProps} />
+              <SequentialSortingVisualizer {...visualizerProps} viewMode="array" />
             ) : (
-              <HeapTreeVisualizer {...visualizerProps} />
+              <HeapTreeVisualizer {...visualizerProps} viewMode="tree" />
             )}
           </div>
         );

@@ -12,6 +12,12 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
   const [speed, setSpeed] = useState(2000); // Default 2 seconds
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenContainerRef = useRef(null);
+  
+  // State for node dragging
+  const [draggedNodes, setDraggedNodes] = useState({});
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragNode, setDragNode] = useState(null);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Handle fullscreen change events
   useEffect(() => {
@@ -76,14 +82,19 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     const nodes = Array.from(allNodes);
     if (nodes.length === 0) return;
     
-    // Position nodes in a circle
+    // Position nodes in a circle with support for dragged positions
     const nodePositions = {};
     nodes.forEach((node, index) => {
-      const angle = (index / nodes.length) * 2 * Math.PI;
-      nodePositions[node] = {
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle)
-      };
+      // Check if node has been dragged
+      if (draggedNodes[node]) {
+        nodePositions[node] = draggedNodes[node];
+      } else {
+        const angle = (index / nodes.length) * 2 * Math.PI;
+        nodePositions[node] = {
+          x: centerX + radius * Math.cos(angle),
+          y: centerY + radius * Math.sin(angle)
+        };
+      }
     });
     
     // Draw edges with D3 - UPDATED FOR NEW VISUAL STYLE
@@ -182,8 +193,8 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         textColor = "black";
       }
       
-      // Draw node circle
-      svg.append("circle")
+      // Draw node circle with drag support
+      const nodeCircle = svg.append("circle")
         .attr("class", "node")
         .attr("cx", pos.x)
         .attr("cy", pos.y)
@@ -191,12 +202,88 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         .attr("fill", fillColor)
         .attr("stroke", strokeColor)
         .attr("stroke-width", 2)
+        .attr("data-node", node)
+        .style("cursor", "pointer")
         .on("mouseover", () => setHoveredNode(node))
-        .on("mouseout", () => setHoveredNode(null));
+        .on("mouseout", () => setHoveredNode(null))
+        .call(d3.drag()
+          .on("start", function(event) {
+            setIsDragging(true);
+            setDragNode(node);
+            setDragStart({ x: event.x, y: event.y });
+          })
+          .on("drag", function(event) {
+            // Update the dragged node position
+            const newX = event.x;
+            const newY = event.y;
+            
+            // Update the node position
+            d3.select(this)
+              .attr("cx", newX)
+              .attr("cy", newY);
+            
+            // Update the node label position
+            svg.selectAll(`.node-label[data-node="${node}"]`)
+              .attr("x", newX)
+              .attr("y", newY);
+            
+            // Update the node distance position
+            svg.selectAll(`.node-distance[data-node="${node}"]`)
+              .attr("x", newX)
+              .attr("y", newY + 15);
+            
+            // Update connected edges
+            svg.selectAll(".edge, .edge-weight")
+              .each(function() {
+                const element = d3.select(this);
+                const x1 = parseFloat(element.attr("x1"));
+                const y1 = parseFloat(element.attr("y1"));
+                const x2 = parseFloat(element.attr("x2"));
+                const y2 = parseFloat(element.attr("y2"));
+                const textX = parseFloat(element.attr("x"));
+                const textY = parseFloat(element.attr("y"));
+                
+                // Update edge positions
+                if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                  if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
+                    element.attr("x1", newX).attr("y1", newY);
+                  }
+                  if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
+                    element.attr("x2", newX).attr("y2", newY);
+                  }
+                }
+                
+                // Update edge weight positions
+                if (!isNaN(textX) && !isNaN(textY)) {
+                  const midX = (pos.x + (element.attr("x1") ? parseFloat(element.attr("x1")) : pos.x) + 
+                               (element.attr("x2") ? parseFloat(element.attr("x2")) : pos.x)) / 2;
+                  const midY = (pos.y + (element.attr("y1") ? parseFloat(element.attr("y1")) : pos.y) + 
+                               (element.attr("y2") ? parseFloat(element.attr("y2")) : pos.y)) / 2;
+                  
+                  if (Math.abs(textX - (pos.x + (element.attr("x2") ? parseFloat(element.attr("x2")) : pos.x))/2) < 1 && 
+                      Math.abs(textY - (pos.y + (element.attr("y2") ? parseFloat(element.attr("y2")) : pos.y) - 5)/2) < 1) {
+                    element.attr("x", (newX + (element.attr("x2") ? parseFloat(element.attr("x2")) : newX))/2)
+                           .attr("y", (newY + (element.attr("y2") ? parseFloat(element.attr("y2")) : newY) - 5)/2);
+                  }
+                }
+              });
+            
+            // Update the position in our state
+            setDraggedNodes(prev => ({
+              ...prev,
+              [node]: { x: newX, y: newY }
+            }));
+          })
+          .on("end", function() {
+            setIsDragging(false);
+            setDragNode(null);
+          })
+        );
       
       // Draw node label
       svg.append("text")
         .attr("class", "node-label")
+        .attr("data-node", node)
         .attr("x", pos.x)
         .attr("y", pos.y)
         .attr("text-anchor", "middle")
@@ -210,6 +297,7 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       if (distance !== undefined) {
         svg.append("text")
           .attr("class", "node-distance")
+          .attr("data-node", node)
           .attr("x", pos.x)
           .attr("y", pos.y + 15)
           .attr("text-anchor", "middle")
@@ -235,7 +323,7 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         .attr("r", 20);
     }
     
-  }, [currentStep, steps]);
+  }, [currentStep, steps, draggedNodes, isDragging, dragNode]);
 
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
@@ -518,6 +606,11 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     setSpeed(newSpeed);
   };
 
+  // Reset node positions to original layout
+  const resetNodePositions = () => {
+    setDraggedNodes({});
+  };
+
   if (!data || !steps || steps.length === 0) return null;
 
   const isCompleted = steps.length > 0 && currentStep === steps.length - 1 && !isPlaying;
@@ -547,6 +640,29 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
           to {
             stroke-dashoffset: -10;
           }
+        }
+        
+        /* Screen floating animation for entire graph structure */
+        @keyframes screen-float {
+          0% {
+            transform: translateX(0px);
+          }
+          25% {
+            transform: translateX(10px);
+          }
+          50% {
+            transform: translateX(0px);
+          }
+          75% {
+            transform: translateX(-10px);
+          }
+          100% {
+            transform: translateX(0px);
+          }
+        }
+        
+        .screen-floating {
+          animation: screen-float 8s ease-in-out infinite;
         }
         `}
       </style>
@@ -618,6 +734,14 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
             </select>
           </div>
           
+          {/* Reset Node Positions Button */}
+          <button 
+            onClick={resetNodePositions}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            Reset Layout
+          </button>
+          
           {/* ADDED: Download PDF Button */}
           <PDFDownloadButton onClick={downloadStepsAsPDF} label="Download PDF" />
           {isPlaying ? null : isCompleted ? (
@@ -663,9 +787,10 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
                   ref={svgRef} 
                   width="100%" 
                   height="500" 
-                  className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`}
+                  className={`border border-gray-200 rounded min-w-[600px] screen-floating ${isFullscreen ? '!border-0' : ''}`}
                   viewBox="0 0 600 500"
                 />
+
               </div>
             ) : (
               <div className="text-center text-gray-500 py-10">
