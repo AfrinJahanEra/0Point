@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AppProvider } from './context/AppContext';
 import Header from './components/Header';
+import ProblemInside from './pages/ProblemInside';
 import RegisterNow from './pages/RegisterNow';
 import CreateContest from './pages/CreateContest'; // ADD THIS IMPORT
 import Footer from './components/Footer';
@@ -20,6 +21,8 @@ import Community from './pages/Community';
 import Dashboard from './pages/Dashboard';
 import CreateBlog from './pages/CreateBlog';
 import Submissions from './pages/Submissions';
+import ContestInside from './pages/ContestInside';
+import AddTutorial from './pages/AddTutorial'; // Adjust path as needed
 
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
@@ -68,11 +71,17 @@ function App() {
             {/* Login and Register pages without Header and Footer */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/problem/:problemId" element={<ProblemInside />} />
             
             {/* Pages with Header and Footer only */}
             <Route path="/home" element={
               <Layout>
                 <Home />
+              </Layout>
+            } />
+            <Route path="/contest/inside" element={
+              <Layout>
+                <ContestInside />
               </Layout>
             } />
             <Route path="/contests" element={
@@ -92,6 +101,9 @@ function App() {
                 <CreateContest />
               </Layout>
             } />
+            <Route path="/contests/create/tutorial" element={
+              <AddTutorial />
+              } />
             <Route path="/practice" element={
               <Layout>
                 <Practice />
