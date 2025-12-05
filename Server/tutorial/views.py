@@ -1,8 +1,7 @@
-import os
+import cloudinary.uploader
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.conf import settings
 from mongoengine.errors import ValidationError as MEValidationError
 
 from .models import Tutorial
@@ -11,21 +10,20 @@ from problem.models import Problem
 from contest.utils.auth import get_user_from_request
 
 
-def save_file(file, folder="tutorials"):
-    media_root = settings.MEDIA_ROOT
-    dest_dir = os.path.join(media_root, folder)
-    os.makedirs(dest_dir, exist_ok=True)
+# -----------------------------
+# CLOUDINARY UPLOAD HELPER
+# -----------------------------
+def upload_to_cloudinary(file):
+    """
+    Upload file to Cloudinary and return secure URL.
+    """
+    result = cloudinary.uploader.upload(file)
+    return result["secure_url"]
 
-    import time, uuid
-    name = f"{int(time.time())}_{uuid.uuid4().hex}_{file.name}"
-    path = os.path.join(dest_dir, name)
 
-    with open(path, "wb+") as f:
-        for chunk in file.chunks():
-            f.write(chunk)
-
-    return f"{settings.MEDIA_URL}{folder}/{name}"
-
+# -----------------------------
+# CREATE TUTORIAL
+# -----------------------------
 class TutorialCreateAPIView(APIView):
     def post(self, request):
         user = get_user_from_request(request)
@@ -49,9 +47,13 @@ class TutorialCreateAPIView(APIView):
         # Handle images
         images = []
         for f in request.FILES.getlist("images"):
-            images.append(save_file(f, "tutorials"))
+            try:
+                url = upload_to_cloudinary(f)
+                images.append(url)
+            except Exception as e:
+                return Response({"error": f"Image upload failed: {str(e)}"}, status=500)
 
-        # Sample IO
+        # Handle sample IOs
         sample_ios_raw = request.data.get("sample_ios")
         sample_ios = []
         if sample_ios_raw:
@@ -83,6 +85,10 @@ class TutorialCreateAPIView(APIView):
             "tutorial_id": str(tutorial.id)
         }, status=201)
 
+
+# -----------------------------
+# LIST TUTORIALS BY PROBLEM
+# -----------------------------
 class TutorialListByProblemAPIView(APIView):
     def get(self, request, problem_id):
         tutorials = Tutorial.objects(problem=problem_id).order_by("-created_at")
@@ -96,6 +102,10 @@ class TutorialListByProblemAPIView(APIView):
             })
         return Response({"tutorials": data})
 
+
+# -----------------------------
+# TUTORIAL DETAIL
+# -----------------------------
 class TutorialDetailAPIView(APIView):
     def get(self, request, tutorial_id):
         t = Tutorial.objects(id=tutorial_id).first()
@@ -114,4 +124,63 @@ class TutorialDetailAPIView(APIView):
             "video_url": t.video_url,
             "is_official": t.is_official,
             "created_at": t.created_at.isoformat()
+        })
+
+
+class TutorialUpdateAPIView(APIView):
+    """
+    PATCH /tutorials/<id>/
+    Allows updating tutorial fields and adding images.
+    """
+    MAX_IMAGES = 5
+
+    def patch(self, request, tutorial_id):
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+
+        tutorial = Tutorial.objects(id=tutorial_id).first()
+        if not tutorial:
+            return Response({"error": "Tutorial not found"}, status=404)
+
+        # Only contest creator, problem setter, or admin
+        if not (str(tutorial.problem.contest.created_by.id) == str(user.id) or user.role == "admin"):
+            return Response({"error": "Permission denied"}, status=403)
+
+        serializer = TutorialUpdateSerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        data = serializer.validated_data
+
+        # Update simple fields
+        for key, value in data.items():
+            setattr(tutorial, key, value)
+
+        # Handle new images
+        new_files = request.FILES.getlist("images")
+        if new_files:
+            total_images = len(tutorial.images or []) + len(new_files)
+            if total_images > self.MAX_IMAGES:
+                return Response({"error": f"Total images exceed maximum of {self.MAX_IMAGES}"}, status=400)
+
+            uploaded_urls = []
+            try:
+                for f in new_files:
+                    url = upload_to_cloudinary(f)
+                    uploaded_urls.append(url)
+            except Exception as e:
+                return Response({"error": f"Image upload failed: {str(e)}"}, status=500)
+
+            tutorial.images = (tutorial.images or []) + uploaded_urls
+
+        try:
+            tutorial.save()
+        except MEValidationError as e:
+            return Response({"error": str(e)}, status=400)
+
+        return Response({
+            "message": "Tutorial updated successfully",
+            "tutorial_id": str(tutorial.id),
+            "images": tutorial.images
         })

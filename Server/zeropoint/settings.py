@@ -1,19 +1,19 @@
 from pathlib import Path
+import os
 from mongoengine import connect
+import cloudinary
+from dotenv import load_dotenv
 
-connect(
-    db="zeropoint",
-    host="mongodb://localhost:27017/zeropoint",
-)
-
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-jo4)@$hdpdx)(_r@9nh24&14d)lca5q*k)x9pfvohg^u8&rsdi'
+load_dotenv(dotenv_path=BASE_DIR / '.env')
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -61,11 +61,61 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'zeropoint.wsgi.application'
+ASGI_APPLICATION = 'techsage.asgi.application'
+
+connect(
+    db=os.getenv('MONGO_DB_NAME', 'zeropoint'),
+    host=os.getenv('MONGO_URI'),
+    alias='default',
+    # ssl=True,
+    # retryWrites=True,
+    # w='majority'
+)
+
+if os.getenv('DJANGO_ENV') == 'production':
+    REDIS_URL = os.getenv('REDIS_URL') 
+else:
+    REDIS_URL = 'redis://127.0.0.1:6379' 
+
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [REDIS_URL],
+        },
+    },
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    'UNAUTHENTICATED_USER': None,
+}
+
+CORS_ALLOWED_ORIGINS = [
+    # 'https://tech-sage-5poh.vercel.app',
+    'http://localhost:5173',  
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+cloudinary.config(
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET'),
+    secure=True
+)
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.dummy',
     }
 }
 
@@ -85,13 +135,13 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

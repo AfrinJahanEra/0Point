@@ -5,6 +5,7 @@ from mongoengine import (
 from datetime import datetime
 from contest.models import Contest
 from account.models import Account
+import cloudinary.uploader
 
 
 class Announcement(Document):

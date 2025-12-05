@@ -9,6 +9,8 @@ from .serializers import AnnouncementCreateSerializer, AnnouncementUpdateSeriali
 from contest.models import Contest
 from contest.utils.auth import get_user_from_request
 
+import cloudinary.uploader
+
 
 class AnnouncementCreateAPIView(APIView):
     """
