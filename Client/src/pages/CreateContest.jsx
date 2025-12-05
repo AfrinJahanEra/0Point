@@ -62,7 +62,8 @@ Output:
         {
           id: 1,
           input: '5 2\n1 3 2 5 4',
-          output: '1 6 1 10 2'
+          output: '1 6 1 10 2',
+          explanation: 'After first iteration: [1, 6, 1, 10, 2]\nAfter second iteration: [1, 12, 0, 20, 1]' // ← ADD THIS
         },
         {
           id: 2,
@@ -190,10 +191,6 @@ Space Complexity: O(n)`
             <ArrowLeft className="w-4 h-4" />
             Back to Contests
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Create New Contest</h1>
-          <p className="text-gray-600 mt-2">
-            Set up your coding contest with problems, test cases, and configuration
-          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -202,7 +199,7 @@ Space Complexity: O(n)`
             {/* Problems List */}
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="p-4 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-900">Problems</h3>
+                <h3 className="font-semibold gray-900">Problems</h3>
               </div>
               <div className="p-2">
                 {problems.map(problem => (
@@ -253,6 +250,12 @@ Space Complexity: O(n)`
                   <Eye className="w-4 h-4" />
                   Preview
                 </button>
+                <Link 
+                  to="/contests/create/tutorial"
+                  className="w-full border border-gray-300 text-gray-700 py-2 rounded text-xs font-semibold hover:bg-gray-50 transition-colors duration-200 flex items-center justify-center gap-2">
+                  <GraduationCap className="w-4 h-4" />
+                  Add Tutorial
+                </Link>
               </div>
             </div>
           </div>
@@ -455,6 +458,23 @@ Space Complexity: O(n)`
                                     }}
                                     rows={4}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                                    Explanation (Optional)
+                                  </label>
+                                  <textarea
+                                    value={testCase.explanation || ''}
+                                    onChange={(e) => {
+                                      const updatedTestCases = currentProblem.testCases.map(tc =>
+                                        tc.id === testCase.id ? { ...tc, explanation: e.target.value } : tc
+                                      );
+                                      handleProblemChange(currentProblem.id, 'testCases', updatedTestCases);
+                                    }}
+                                    rows={3}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
+                                    placeholder="Explain the test case logic..."
                                   />
                                 </div>
                               </div>
