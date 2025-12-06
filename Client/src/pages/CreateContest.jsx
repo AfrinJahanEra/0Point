@@ -22,84 +22,23 @@ import {
 
 const CreateContest = () => {
   const navigate = useNavigate();
-  const [activeProblem, setActiveProblem] = useState('A');
+  const [activeProblem, setActiveProblem] = useState(null);
   const [contestData, setContestData] = useState({
-    title: 'IUT Winter Coding Challenge',
-    description: 'A competitive programming contest with problems of varying difficulty levels for IUT students.',
-    startTime: '2023-12-15T18:00',
+    title: '',
+    description: '',
+    startTime: '',
     duration: 3,
     type: 'individual',
     platform: 'IUT'
   });
 
-  const [problems, setProblems] = useState([
-    {
-      id: 'A',
-      title: 'Array Transformation',
-      statement: `You are given an array of integers. Your task is to transform the array according to the following rules:
-
-1. For each element at position i, if it is greater than the element at position i-1, double its value.
-2. If it is less than the element at position i-1, halve its value (rounding down).
-3. The first element remains unchanged.
-
-Write a function that performs this transformation for k iterations.
-
-**Input**
-- The first line contains two integers n and k (1 ≤ n ≤ 1000, 1 ≤ k ≤ 10)
-- The second line contains n integers representing the array
-
-**Output**
-- Print the transformed array after k iterations
-
-**Example**
-Input:
-5 2
-1 3 2 5 4
-
-Output:
-1 6 1 10 2`,
-      testCases: [
-        {
-          id: 1,
-          input: '5 2\n1 3 2 5 4',
-          output: '1 6 1 10 2',
-          explanation: 'After first iteration: [1, 6, 1, 10, 2]\nAfter second iteration: [1, 12, 0, 20, 1]' // ← ADD THIS
-        },
-        {
-          id: 2,
-          input: '3 1\n4 2 8',
-          output: '4 1 16'
-        }
-      ],
-      timeLimit: 2,
-      memoryLimit: 256,
-      tags: ['Arrays', 'Simulation', 'Easy'],
-      tutorial: `This problem can be solved by directly simulating the process for k iterations.
-
-Approach:
-1. Read the input values n, k and the array
-2. For k iterations:
-   - Create a new array for the next iteration
-   - For each element (except the first), apply the transformation rules
-   - Update the array for the next iteration
-3. Print the final array
-
-Time Complexity: O(n*k)
-Space Complexity: O(n)`
-    },
-    {
-      id: 'B',
-      title: 'Binary Search Tree',
-      statement: 'Problem statement for Binary Search Tree...',
-      testCases: [],
-      timeLimit: 2,
-      memoryLimit: 256,
-      tags: ['Trees', 'BST'],
-      tutorial: ''
-    }
-  ]);
-
+  const [problems, setProblems] = useState([]);
   const [newTag, setNewTag] = useState('');
+
+  // Function to generate a unique problem ID for internal use
+  const generateProblemId = () => {
+    return `problem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
 
   const handleContestChange = (field, value) => {
     setContestData(prev => ({
@@ -108,25 +47,46 @@ Space Complexity: O(n)`
     }));
   };
 
-  const handleProblemChange = (problemId, field, value) => {
-    setProblems(prev => prev.map(problem => 
-      problem.id === problemId ? { ...problem, [field]: value } : problem
-    ));
+  const handleProblemChange = (problemInternalId, field, value) => {
+    // If changing the problem index (the display letter)
+    if (field === 'problemIndex') {
+      const newIndex = value.toUpperCase().trim();
+      
+      // Check if index is already taken by another problem
+      const isIndexTaken = problems.some(p => 
+        p.problemIndex === newIndex && p.id !== problemInternalId
+      );
+      
+      if (isIndexTaken) {
+        alert(`Problem index "${newIndex}" is already taken!`);
+        return;
+      }
+      
+      setProblems(prev => prev.map(problem => 
+        problem.id === problemInternalId ? { ...problem, problemIndex: newIndex } : problem
+      ));
+    } else {
+      setProblems(prev => prev.map(problem => 
+        problem.id === problemInternalId ? { ...problem, [field]: value } : problem
+      ));
+    }
   };
 
   const addProblem = () => {
-    const newId = String.fromCharCode(65 + problems.length);
-    setProblems(prev => [...prev, {
-      id: newId,
-      title: `Problem ${newId}`,
+    const newProblem = {
+      id: generateProblemId(), // Internal unique ID
+      problemIndex: '', // Empty index by default
+      title: '',  
       statement: '',
       testCases: [],
       timeLimit: 2,
       memoryLimit: 256,
       tags: [],
       tutorial: ''
-    }]);
-    setActiveProblem(newId);
+    };
+    
+    setProblems(prev => [...prev, newProblem]);
+    setActiveProblem(newProblem.id);
   };
 
   const addTestCase = (problemId) => {
@@ -148,6 +108,19 @@ Space Complexity: O(n)`
         ? { ...problem, testCases: problem.testCases.filter(tc => tc.id !== testCaseId) }
         : problem
     ));
+  };
+
+  const handleDeleteProblem = (problemId) => {
+    setProblems((prev) => {
+      const newList = prev.filter((p) => p.id !== problemId);
+      
+      // Update active problem
+      if (problemId === activeProblem) {
+        setActiveProblem(newList.length > 0 ? newList[0].id : null);
+      }
+      
+      return newList;
+    });
   };
 
   const addTag = (problemId) => {
@@ -183,15 +156,6 @@ Space Complexity: O(n)`
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
-        <div className="mb-6">
-          <Link 
-            to="/contests" 
-            className="inline-flex items-center gap-2 text-blue-800 hover:text-blue-900 font-medium mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Contests
-          </Link>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
@@ -203,28 +167,37 @@ Space Complexity: O(n)`
               </div>
               <div className="p-2">
                 {problems.map(problem => (
-                  <button
-                    key={problem.id}
-                    onClick={() => setActiveProblem(problem.id)}
-                    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors duration-200 ${
-                      activeProblem === problem.id
-                        ? 'bg-blue-50 text-blue-800 border border-blue-200'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
-                      activeProblem === problem.id
-                        ? 'bg-blue-800 text-white'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {problem.id}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium truncate">
-                        {problem.title}
+                  <div key={problem.id} className="relative group">
+                    <button
+                      onClick={() => setActiveProblem(problem.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors duration-200 ${
+                        activeProblem === problem.id
+                          ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
+                        activeProblem === problem.id
+                          ? 'bg-blue-800 text-white'
+                          : 'bg-gray-100'
+                      }`}>
+                        {problem.problemIndex || ''}
                       </div>
-                    </div>
-                  </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium truncate">
+                          {problem.title || 'Untitled Problem'}
+                        </div>
+                      </div>
+                    </button>
+                    {/* Delete button - visible on hover */}
+                    <button
+                      onClick={() => handleDeleteProblem(problem.id)}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-red-600 hover:text-red-800 p-1"
+                      title="Delete Problem"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 ))}
                 <button
                   onClick={addProblem}
@@ -246,15 +219,17 @@ Space Complexity: O(n)`
                   <Save className="w-4 h-4" />
                   Save Draft
                 </button>
-                <button className="w-full border border-gray-300 text-gray-700 py-2 rounded text-xs font-semibold hover:bg-gray-50 transition-colors duration-200 flex items-center justify-center gap-2">
-                  <Eye className="w-4 h-4" />
-                  Preview
-                </button>
                 <Link 
                   to="/contests/create/tutorial"
                   className="w-full border border-gray-300 text-gray-700 py-2 rounded text-xs font-semibold hover:bg-gray-50 transition-colors duration-200 flex items-center justify-center gap-2">
                   <GraduationCap className="w-4 h-4" />
                   Add Tutorial
+                </Link>
+                <Link 
+                  to="/contests/create/publish"
+                  className="w-full border border-gray-300 text-gray-700 py-2 rounded text-xs font-semibold hover:bg-gray-50 transition-colors duration-200 flex items-center justify-center gap-2">
+                  <GraduationCap className="w-4 h-4" />
+                  Publish
                 </Link>
               </div>
             </div>
@@ -266,11 +241,6 @@ Space Complexity: O(n)`
               <div className="bg-white rounded-lg border border-gray-200">
                 {/* Contest Settings */}
                 <div className="p-6 border-b border-gray-200">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Trophy className="w-5 h-5 text-gray-700" />
-                    <h2 className="text-lg font-semibold text-gray-900">Contest Settings</h2>
-                  </div>
-
                   <div className="space-y-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-2">
@@ -365,44 +335,52 @@ Space Complexity: O(n)`
                 {/* Problem Editor */}
                 {currentProblem && (
                   <div className="p-6">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-semibold text-gray-900">
-                        Problem {currentProblem.id} - {currentProblem.title}
+                        {currentProblem.problemIndex ? `Problem ${currentProblem.problemIndex}` : 'New Problem'}
                       </h2>
-                      <span className="text-green-600 text-xs font-medium flex items-center gap-1">
-                        <Check className="w-4 h-4" />
-                        Saved
-                      </span>
                     </div>
-
                     <div className="space-y-6">
                       {/* Problem Statement */}
                       <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <FileText className="w-4 h-4 text-gray-700" />
-                          <h3 className="font-semibold text-gray-900">Problem Statement</h3>
-                        </div>
                         <div className="space-y-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-2">
-                              Problem Title
+                              Problem Index
+                            </label>
+                            <input
+                              type="text"
+                              value={currentProblem.problemIndex}
+                              onChange={(e) => handleProblemChange(currentProblem.id, 'problemIndex', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
+                              placeholder="A, B, C, etc."
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Use single letters (A-Z) or multiple letters (AA, AB, etc.)
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-2">
+                              Title
                             </label>
                             <input
                               type="text"
                               value={currentProblem.title}
                               onChange={(e) => handleProblemChange(currentProblem.id, 'title', e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="Enter problem title"
                             />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-2">
-                              Problem Statement
+                              Statement
                             </label>
                             <textarea
                               value={currentProblem.statement}
                               onChange={(e) => handleProblemChange(currentProblem.id, 'statement', e.target.value)}
                               rows={12}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
+                              placeholder="Enter problem statement..."
                             />
                           </div>
                         </div>
@@ -410,10 +388,6 @@ Space Complexity: O(n)`
 
                       {/* Test Cases */}
                       <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <TestTube className="w-4 h-4 text-gray-700" />
-                          <h3 className="font-semibold text-gray-900">Test Cases</h3>
-                        </div>
                         <div className="space-y-4">
                           {currentProblem.testCases.map(testCase => (
                             <div key={testCase.id} className="border border-gray-200 rounded-lg p-4">
@@ -442,6 +416,7 @@ Space Complexity: O(n)`
                                     }}
                                     rows={4}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
+                                    placeholder="Enter test case input..."
                                   />
                                 </div>
                                 <div>
@@ -458,6 +433,7 @@ Space Complexity: O(n)`
                                     }}
                                     rows={4}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
+                                    placeholder="Enter expected output..."
                                   />
                                 </div>
                                 <div className="col-span-2">
@@ -493,10 +469,6 @@ Space Complexity: O(n)`
 
                       {/* Constraints */}
                       <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <Sliders className="w-4 h-4 text-gray-700" />
-                          <h3 className="font-semibold text-gray-900">Constraints & Limits</h3>
-                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-2">
@@ -530,7 +502,6 @@ Space Complexity: O(n)`
                       {/* Tags */}
                       <div>
                         <div className="flex items-center gap-2 mb-3">
-                          <Tag className="w-4 h-4 text-gray-700" />
                           <h3 className="font-semibold text-gray-900">Problem Tags</h3>
                         </div>
                         <div className="flex flex-wrap gap-2 mb-3">
@@ -574,12 +545,7 @@ Space Complexity: O(n)`
                 {/* Actions */}
                 <div className="p-6 border-t border-gray-200">
                   <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <button
-                      type="button"
-                      onClick={() => navigate('/contests')}
-                      className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 font-semibold"
-                    >
-                      Cancel
+                    <button>
                     </button>
                     <div className="flex gap-3 w-full sm:w-auto">
                       <button
@@ -588,6 +554,13 @@ Space Complexity: O(n)`
                       >
                         <Eye className="w-4 h-4" />
                         Preview
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full sm:w-auto px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 font-semibold flex items-center gap-2"
+                      >
+                        <Check className="w-4 h-4" />
+                        Test
                       </button>
                       <button
                         type="submit"
