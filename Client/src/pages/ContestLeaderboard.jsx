@@ -1,5 +1,6 @@
 // ContestLeaderboard.jsx
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { 
   Trophy, 
   User, 
@@ -13,229 +14,55 @@ import {
   BarChart3,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  Loader
 } from 'lucide-react';
 
 const ContestLeaderboard = () => {
-  const [timeRemaining, setTimeRemaining] = useState(2 * 60 * 60 + 45 * 60 + 18);
+  const { contestId } = useParams();
+  const [timeRemaining, setTimeRemaining] = useState(null);
   const [contestStatus, setContestStatus] = useState('live');
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
-  // Mock leaderboard data
-  const mockLeaderboard = [
-    {
-      rank: 1,
-      username: 'pro_coder',
-      name: 'Alex Johnson',
-      score: 1850,
-      problemsSolved: 6,
-      penalty: 245,
-      rating: 2200,
-      ratingChange: +150,
-      country: 'US',
-      institution: 'MIT',
-      isCurrentUser: false,
-      submissions: [
-        { problem: 'A', time: 5, status: 'AC' },
-        { problem: 'B', time: 12, status: 'AC' },
-        { problem: 'C', time: 45, status: 'AC' },
-        { problem: 'D', time: 78, status: 'AC' },
-        { problem: 'E', time: 120, status: 'AC' },
-        { problem: 'F', time: 165, status: 'AC' }
-      ]
-    },
-    {
-      rank: 2,
-      username: 'algo_master',
-      name: 'Sarah Chen',
-      score: 1700,
-      problemsSolved: 5,
-      penalty: 312,
-      rating: 2050,
-      ratingChange: +120,
-      country: 'CA',
-      institution: 'University of Toronto',
-      isCurrentUser: false,
-      submissions: [
-        { problem: 'A', time: 7, status: 'AC' },
-        { problem: 'B', time: 25, status: 'AC' },
-        { problem: 'C', time: 50, status: 'AC' },
-        { problem: 'D', time: 95, status: 'AC' },
-        { problem: 'E', time: 140, status: 'WA' },
-        { problem: 'F', time: 180, status: 'AC' }
-      ]
-    },
-    {
-      rank: 3,
-      username: 'binary_wizard',
-      name: 'Mohammed Ali',
-      score: 1650,
-      problemsSolved: 5,
-      penalty: 356,
-      rating: 1980,
-      ratingChange: +95,
-      country: 'EG',
-      institution: 'Cairo University',
-      isCurrentUser: false,
-      submissions: [
-        { problem: 'A', time: 8, status: 'AC' },
-        { problem: 'B', time: 20, status: 'AC' },
-        { problem: 'C', time: 65, status: 'AC' },
-        { problem: 'D', time: 110, status: 'AC' },
-        { problem: 'E', time: 155, status: 'AC' },
-        { problem: 'F', time: 200, status: '-' }
-      ]
-    },
-    {
-      rank: 4,
-      username: 'code_ninja',
-      name: 'Kenji Tanaka',
-      score: 1550,
-      problemsSolved: 5,
-      penalty: 412,
-      rating: 1920,
-      ratingChange: +80,
-      country: 'JP',
-      institution: 'University of Tokyo',
-      isCurrentUser: false,
-      submissions: [
-        { problem: 'A', time: 10, status: 'AC' },
-        { problem: 'B', time: 30, status: 'AC' },
-        { problem: 'C', time: 75, status: 'AC' },
-        { problem: 'D', time: 125, status: 'AC' },
-        { problem: 'E', time: 170, status: 'WA' },
-        { problem: 'F', time: 210, status: '-' }
-      ]
-    },
-    {
-      rank: 5,
-      username: 'data_struct',
-      name: 'Priya Sharma',
-      score: 1420,
-      problemsSolved: 4,
-      penalty: 280,
-      rating: 1850,
-      ratingChange: +65,
-      country: 'IN',
-      institution: 'IIT Delhi',
-      isCurrentUser: false,
-      submissions: [
-        { problem: 'A', time: 12, status: 'AC' },
-        { problem: 'B', time: 35, status: 'AC' },
-        { problem: 'C', time: 85, status: 'AC' },
-        { problem: 'D', time: 140, status: 'AC' },
-        { problem: 'E', time: 190, status: '-' },
-        { problem: 'F', time: 220, status: '-' }
-      ]
-    },
-    // Current user at rank 150
-    {
-      rank: 150,
-      username: 'user123',
-      name: 'Your Name',
-      score: 450,
-      problemsSolved: 2,
-      penalty: 156,
-      rating: 1450,
-      ratingChange: +25,
-      country: 'BD',
-      institution: 'IUT',
-      isCurrentUser: true,
-      submissions: [
-        { problem: 'A', time: 15, status: 'AC' },
-        { problem: 'B', time: 40, status: 'AC' },
-        { problem: 'C', time: 90, status: 'WA' },
-        { problem: 'D', time: 150, status: '-' },
-        { problem: 'E', time: 200, status: '-' },
-        { problem: 'F', time: 240, status: '-' }
-      ]
-    },
-    {
-      rank: 249,
-      username: 'java_dev',
-      name: 'Roberto Silva',
-      score: 320,
-      problemsSolved: 2,
-      penalty: 210,
-      rating: 1380,
-      ratingChange: -15,
-      country: 'BR',
-      institution: 'University of São Paulo',
-      isCurrentUser: false,
-      submissions: [
-        { problem: 'A', time: 18, status: 'AC' },
-        { problem: 'B', time: 60, status: 'AC' },
-        { problem: 'C', time: 110, status: '-' },
-        { problem: 'D', time: 180, status: '-' },
-        { problem: 'E', time: 220, status: '-' },
-        { problem: 'F', time: 260, status: '-' }
-      ]
-    },
-    {
-      rank: 350,
-      username: 'python_newbie',
-      name: 'Emma Wilson',
-      score: 210,
-      problemsSolved: 1,
-      penalty: 145,
-      rating: 1250,
-      ratingChange: -25,
-      country: 'GB',
-      institution: 'Cambridge',
-      isCurrentUser: false,
-      submissions: [
-        { problem: 'A', time: 25, status: 'AC' },
-        { problem: 'B', time: 70, status: 'WA' },
-        { problem: 'C', time: 130, status: '-' },
-        { problem: 'D', time: 190, status: '-' },
-        { problem: 'E', time: 230, status: '-' },
-        { problem: 'F', time: 270, status: '-' }
-      ]
-    },
-    {
-      rank: 478,
-      username: 'cpp_fan',
-      name: 'Dmitri Ivanov',
-      score: 100,
-      problemsSolved: 1,
-      penalty: 195,
-      rating: 1180,
-      ratingChange: -40,
-      country: 'RU',
-      institution: 'Moscow State',
-      isCurrentUser: false,
-      submissions: [
-        { problem: 'A', time: 35, status: 'AC' },
-        { problem: 'B', time: 85, status: '-' },
-        { problem: 'C', time: 150, status: '-' },
-        { problem: 'D', time: 210, status: '-' },
-        { problem: 'E', time: 250, status: '-' },
-        { problem: 'F', time: 280, status: '-' }
-      ]
-    },
-    {
-      rank: 531,
-      username: 'beginner_coder',
-      name: 'Ahmed Hassan',
-      score: 0,
-      problemsSolved: 0,
-      penalty: 0,
-      rating: 1050,
-      ratingChange: -50,
-      country: 'PK',
-      institution: 'FAST',
-      isCurrentUser: false,
-      submissions: [
-        { problem: 'A', time: 50, status: '-' },
-        { problem: 'B', time: 100, status: '-' },
-        { problem: 'C', time: 170, status: '-' },
-        { problem: 'D', time: 230, status: '-' },
-        { problem: 'E', time: 270, status: '-' },
-        { problem: 'F', time: 300, status: '-' }
-      ]
+  // Fetch leaderboard data from backend
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`http://localhost:8000/contests/${contestId}/leaderboard/`);
+        if (!response.ok) {
+          throw new Error(`HTTP Error: ${response.status}`);
+        }
+        const data = await response.json();
+        setLeaderboardData(data.leaderboard || []);
+        
+        // Set initial time remaining if provided by backend
+        if (data.time_remaining) {
+          setTimeRemaining(data.time_remaining);
+        }
+        
+        // Set contest status if provided
+        if (data.status) {
+          setContestStatus(data.status);
+        }
+        
+        setError(null);
+      } catch (err) {
+        setError(err.message);
+        console.error('Error fetching leaderboard:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (contestId) {
+      fetchLeaderboard();
     }
-  ];
-
-  const [leaderboardData, setLeaderboardData] = useState(mockLeaderboard);
+  }, [contestId]);
 
   useEffect(() => {
     if (contestStatus === 'live') {
@@ -282,26 +109,32 @@ const ContestLeaderboard = () => {
     return null;
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading leaderboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 font-semibold mb-2">Error Loading Leaderboard</p>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">IUT Winter Coding Challenge</h1>
-            </div>
-            
-            {/* Timer at Top Right */}
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-blue-600" />
-              <div className="text-right">
-                <div className="text-sx text-gray-600">Time Remaining</div>
-                <div className="font-mono font-bold text-lg text-gray-900">{formatTime(timeRemaining)}</div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Leaderboard Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
