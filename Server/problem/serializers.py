@@ -1,3 +1,4 @@
+# problem/serializers.py
 from rest_framework import serializers
 
 class ProblemCreateSerializer(serializers.Serializer):
@@ -5,33 +6,35 @@ class ProblemCreateSerializer(serializers.Serializer):
     index = serializers.CharField(max_length=5)
     title = serializers.CharField(max_length=250)
     statement = serializers.CharField()
-    tags = serializers.ListField(child=serializers.CharField(max_length=50), required=False)
+    tags = serializers.ListField(child=serializers.CharField(max_length=50), required=False, default=list)
+    
+    # Accept both field names
     time_limit_seconds = serializers.FloatField(default=2.0)
+    time_limit = serializers.FloatField(required=False)  # Accept frontend field name
+    
     memory_limit_mb = serializers.IntegerField(default=256)
-    difficulty = serializers.IntegerField(default=800)
+    memory_limit = serializers.IntegerField(required=False)  # Accept frontend field name
+    
+    difficulty = serializers.CharField(default="Medium")
+    test_cases = serializers.ListField(required=False, default=list)
 
-    # images will be handled separately via multipart uploads (request.FILES)
-    def validate_index(self, value):
-        if not value.strip():
-            raise serializers.ValidationError("Index (A/B/C) cannot be empty")
-        return value.strip().upper()
-
-    def validate_time_limit_seconds(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("time_limit_seconds must be > 0")
-        return value
-
-    def validate_memory_limit_mb(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("memory_limit_mb must be > 0")
-        return value
-
+    def validate(self, data):
+        # If frontend sends time_limit, map it to time_limit_seconds
+        if 'time_limit' in data and 'time_limit_seconds' not in data:
+            data['time_limit_seconds'] = data['time_limit']
+        
+        # If frontend sends memory_limit, map it to memory_limit_mb
+        if 'memory_limit' in data and 'memory_limit_mb' not in data:
+            data['memory_limit_mb'] = data['memory_limit']
+        
+        return data
+    
+    # ... rest of validators ...
 
 class ProblemUpdateSerializer(serializers.Serializer):
-    # Partial update fields
     title = serializers.CharField(max_length=250, required=False)
     statement = serializers.CharField(required=False)
     tags = serializers.ListField(child=serializers.CharField(max_length=50), required=False)
-    time_limit_seconds = serializers.FloatField(required=False)
-    memory_limit_mb = serializers.IntegerField(required=False)
-    difficulty = serializers.IntegerField(required=False)
+    time_limit = serializers.FloatField(required=False)
+    memory_limit = serializers.IntegerField(required=False)
+    difficulty = serializers.CharField(required=False)

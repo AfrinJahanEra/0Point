@@ -1,17 +1,25 @@
+# announcement/serializers.py
 from rest_framework import serializers
 
 class AnnouncementCreateSerializer(serializers.Serializer):
-    contest_id = serializers.CharField()
-    text = serializers.CharField()
-    problem_index = serializers.CharField(required=False)
-    is_important = serializers.BooleanField(required=False)
-    visible_to = serializers.CharField(required=False)
-    type = serializers.CharField(required=False)
+    contest_id = serializers.CharField(required=True)
+    text = serializers.CharField(required=True, max_length=5000)
+    problem_index = serializers.CharField(required=False, allow_blank=True, max_length=10)
+    is_important = serializers.BooleanField(required=False, default=False)
+    is_pinned = serializers.BooleanField(required=False, default=False)
+    type = serializers.ChoiceField(
+        choices=["info", "warning", "important", "update"],
+        required=False,
+        default="info"
+    )
 
 
 class AnnouncementUpdateSerializer(serializers.Serializer):
-    text = serializers.CharField(required=False)
-    problem_index = serializers.CharField(required=False)
+    text = serializers.CharField(required=False, max_length=5000)
+    problem_index = serializers.CharField(required=False, allow_blank=True, max_length=10)
     is_important = serializers.BooleanField(required=False)
-    visible_to = serializers.CharField(required=False)
-    type = serializers.CharField(required=False)
+    is_pinned = serializers.BooleanField(required=False)
+    type = serializers.ChoiceField(
+        choices=["info", "warning", "important", "update"],
+        required=False
+    )

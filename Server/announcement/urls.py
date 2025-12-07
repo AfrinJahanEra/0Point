@@ -1,14 +1,19 @@
+# announcement/urls.py
 from django.urls import path
 from .views import (
     AnnouncementCreateAPIView,
-    AnnouncementListAPIView,
+    ContestAnnouncementsAPIView,
+    AnnouncementDetailAPIView,
     AnnouncementUpdateAPIView,
-    AnnouncementDeleteAPIView
+    AnnouncementDeleteAPIView,
+    TogglePinAnnouncementAPIView,
 )
 
 urlpatterns = [
-    path("announcements/", AnnouncementCreateAPIView.as_view()),
-    path("contests/<str:contest_id>/announcements/", AnnouncementListAPIView.as_view()),
-    path("announcements/<str:announcement_id>/", AnnouncementUpdateAPIView.as_view()),
-    path("announcements/<str:announcement_id>/delete/", AnnouncementDeleteAPIView.as_view()),
+    path('announcements/', AnnouncementCreateAPIView.as_view(), name='create-announcement'),
+    path('announcements/<announcement_id>/', AnnouncementDetailAPIView.as_view(), name='announcement-detail'),
+    path('announcements/<announcement_id>/update/', AnnouncementUpdateAPIView.as_view(), name='update-announcement'),
+    path('announcements/<announcement_id>/delete/', AnnouncementDeleteAPIView.as_view(), name='delete-announcement'),
+    path('announcements/<announcement_id>/toggle-pin/', TogglePinAnnouncementAPIView.as_view(), name='toggle-pin-announcement'),
+    path('contests/<contest_id>/announcements/', ContestAnnouncementsAPIView.as_view(), name='contest-announcements'),
 ]

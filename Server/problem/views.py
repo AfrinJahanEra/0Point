@@ -1,4 +1,6 @@
+# problem/views.py
 import os
+import uuid
 import cloudinary.uploader
 from datetime import datetime
 
@@ -11,7 +13,7 @@ from mongoengine.errors import ValidationError as MEValidationError, NotUniqueEr
 
 from .models import Problem
 from .serializers import ProblemCreateSerializer, ProblemUpdateSerializer
-from contest.models import Contest
+from contest.models import Contest, ContestProblem
 from contest.utils.auth import get_user_from_request
 from account.models import Account
 
@@ -34,71 +36,59 @@ def upload_to_cloudinary(file):
 # CREATE PROBLEM
 # -----------------------------
 class ProblemCreateAPIView(APIView):
+    """
+    POST /api/problems/
+    Payload:
+    {
+        "contest_id": "...",
+        "title": "...",
+        "statement": "...",
+        "index": "A",
+        "time_limit": 2,
+        "memory_limit": 256,
+        "tags": ["math", "dp"],
+        "test_cases": [{"input": "...", "output": "...", "explanation": "..."}]
+    }
+    """
     def post(self, request):
-        user = get_user_from_request(request)
-        if not user:
-            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-
-        serializer = ProblemCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        data = serializer.validated_data
-
-        # Check contest
-        contest = Contest.objects(id=data["contest_id"]).first()
+        data = request.data
+        contest = Contest.objects(id=data.get("contest_id")).first()
         if not contest:
-            return Response({"error": "Contest not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Contest not found"}, status=404)
 
-        # Permission check
-        if not (str(contest.created_by.id) == str(user.id) or user.role == "admin"):
-            return Response({"error": "Only contest creator or admin can add problems"}, status=status.HTTP_403_FORBIDDEN)
-
-        # Unique index
-        existing = Problem.objects(contest=contest, index=data["index"]).first()
-        if existing:
-            return Response({"error": f"Problem index '{data['index']}' already exists"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Handle images
-        files = request.FILES.getlist("images")
-        if len(files) > MAX_IMAGES:
-            return Response({"error": f"Maximum {MAX_IMAGES} images allowed"}, status=status.HTTP_400_BAD_REQUEST)
-
-        image_urls = []
-        try:
-            for f in files:
-                url = upload_to_cloudinary(f)
-                image_urls.append(url)
-        except Exception as e:
-            return Response({"error": f"Image upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        problem_id = str(uuid.uuid4())  # unique problem id
+        
         # Create problem
-        p = Problem(
+        problem = Problem(
+            problem_id=problem_id,
+            title=data.get("title", ""),
+            statement=data.get("statement", ""),
+            time_limit=int(data.get("time_limit", 2)),
+            memory_limit=int(data.get("memory_limit", 256)),
+            tags=data.get("tags", [])
+        )
+        problem.save()
+
+        # Link problem to contest
+        ContestProblem.objects.create(
             contest=contest,
-            index=data["index"],
-            title=data["title"],
-            statement=data["statement"],
-            tags=data.get("tags", []),
-            time_limit_seconds=data.get("time_limit_seconds", 2.0),
-            memory_limit_mb=data.get("memory_limit_mb", 256),
-            images=image_urls,
-            difficulty=data.get("difficulty", 800),
+            problem_id=problem_id,
+            index=data.get("index", "A")
         )
 
-        try:
-            p.save()
-        except (MEValidationError, NotUniqueError, ValueError) as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        # Import TestCase here to avoid circular imports
+        from testcase.models import TestCase
+        
+        # Create test cases
+        for tc in data.get("test_cases", []):
+            TestCase.objects.create(
+                problem_id=problem_id,
+                input_data=tc.get("input", ""),
+                output_data=tc.get("output", ""),
+                explanation=tc.get("explanation", "")
+            )
 
-        return Response({
-            "message": "Problem created",
-            "problem": {
-                "id": str(p.id),
-                "contest_id": str(contest.id),
-                "index": p.index,
-                "title": p.title,
-            }
-        }, status=status.HTTP_201_CREATED)
+        return Response({"message": "Problem created", "problem_id": problem_id}, status=201)
 
 
 # -----------------------------
@@ -110,18 +100,22 @@ class ProblemListByContestAPIView(APIView):
         if not contest:
             return Response({"error": "Contest not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        problems = Problem.objects(contest=contest).order_by("index")
+        # Get contest problems via ContestProblem
+        contest_problems = ContestProblem.objects(contest=contest).order_by("index")
+        
         data = []
-
-        for p in problems:
-            data.append({
-                "id": str(p.id),
-                "index": p.index,
-                "title": p.title,
-                "time_limit_seconds": p.time_limit_seconds,
-                "memory_limit_mb": p.memory_limit_mb,
-                "difficulty": p.difficulty,
-            })
+        for cp in contest_problems:
+            # Find the actual problem
+            problem = Problem.objects(problem_id=cp.problem_id).first()
+            if problem:
+                data.append({
+                    "problem_id": problem.problem_id,
+                    "index": cp.index,
+                    "title": problem.title,
+                    "time_limit": problem.time_limit,
+                    "memory_limit": problem.memory_limit,
+                    "difficulty": getattr(problem, 'difficulty', 'Medium'),
+                })
 
         return Response({"problems": data})
 
@@ -131,22 +125,29 @@ class ProblemListByContestAPIView(APIView):
 # -----------------------------
 class ProblemDetailAPIView(APIView):
     def get(self, request, problem_id):
-        p = Problem.objects(id=problem_id).first()
-        if not p:
-            return Response({"error": "Problem not found"}, status=status.HTTP_404_NOT_FOUND)
+        # Try to find problem by problem_id (not mongo _id)
+        problem = Problem.objects(problem_id=problem_id).first()
+        if not problem:
+            # Also try by mongo _id for backward compatibility
+            problem = Problem.objects(id=problem_id).first()
+            if not problem:
+                return Response({"error": "Problem not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Find which contest this problem belongs to
+        contest_problem = ContestProblem.objects(problem_id=problem.problem_id).first()
+        contest_id = str(contest_problem.contest.id) if contest_problem else None
 
         return Response({
-            "id": str(p.id),
-            "contest_id": str(p.contest.id),
-            "index": p.index,
-            "title": p.title,
-            "statement": p.statement,
-            "tags": p.tags,
-            "time_limit_seconds": p.time_limit_seconds,
-            "memory_limit_mb": p.memory_limit_mb,
-            "images": p.images,
-            "difficulty": p.difficulty,
-            "created_at": p.created_at.isoformat()
+            "problem_id": problem.problem_id,
+            "contest_id": contest_id,
+            "index": contest_problem.index if contest_problem else "A",
+            "title": problem.title,
+            "statement": problem.statement,
+            "tags": problem.tags,
+            "time_limit": problem.time_limit,
+            "memory_limit": problem.memory_limit,
+            "difficulty": getattr(problem, 'difficulty', 'Medium'),
+            "created_at": problem.created_at.isoformat() if hasattr(problem, 'created_at') else None
         })
 
 
@@ -159,12 +160,22 @@ class ProblemUpdateAPIView(APIView):
         if not user:
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        p = Problem.objects(id=problem_id).first()
-        if not p:
-            return Response({"error": "Problem not found"}, status=status.HTTP_404_NOT_FOUND)
+        # Try to find problem by problem_id (not mongo _id)
+        problem = Problem.objects(problem_id=problem_id).first()
+        if not problem:
+            # Also try by mongo _id for backward compatibility
+            problem = Problem.objects(id=problem_id).first()
+            if not problem:
+                return Response({"error": "Problem not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Permission
-        if not (str(p.contest.created_by.id) == str(user.id) or user.role == "admin"):
+        # Find contest to check permissions
+        contest_problem = ContestProblem.objects(problem_id=problem.problem_id).first()
+        if not contest_problem:
+            return Response({"error": "Problem not linked to any contest"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Permission check
+        contest = contest_problem.contest
+        if not (str(contest.created_by.id) == str(user.id) or getattr(user, 'role', None) == "admin"):
             return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = ProblemUpdateSerializer(data=request.data, partial=True)
@@ -175,12 +186,12 @@ class ProblemUpdateAPIView(APIView):
 
         # Update simple fields
         for k, v in data.items():
-            setattr(p, k, v)
+            setattr(problem, k, v)
 
-        # Upload new images
+        # Upload new images (if applicable)
         new_files = request.FILES.getlist("images")
         if new_files:
-            if len(p.images) + len(new_files) > MAX_IMAGES:
+            if len(problem.images) + len(new_files) > MAX_IMAGES:
                 return Response({"error": f"Total images exceed {MAX_IMAGES}"}, status=status.HTTP_400_BAD_REQUEST)
 
             new_urls = []
@@ -191,14 +202,14 @@ class ProblemUpdateAPIView(APIView):
             except Exception as e:
                 return Response({"error": f"Image upload failed: {str(e)}"}, status=500)
 
-            p.images = p.images + new_urls
+            problem.images = problem.images + new_urls
 
         try:
-            p.save()
+            problem.save()
         except (MEValidationError, ValueError) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"message": "Problem updated", "id": str(p.id)})
+        return Response({"message": "Problem updated", "problem_id": problem.problem_id})
 
 
 # -----------------------------
@@ -210,12 +221,32 @@ class ProblemDeleteAPIView(APIView):
         if not user:
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        p = Problem.objects(id=problem_id).first()
-        if not p:
-            return Response({"error": "Problem not found"}, status=status.HTTP_404_NOT_FOUND)
+        # Try to find problem by problem_id (not mongo _id)
+        problem = Problem.objects(problem_id=problem_id).first()
+        if not problem:
+            # Also try by mongo _id for backward compatibility
+            problem = Problem.objects(id=problem_id).first()
+            if not problem:
+                return Response({"error": "Problem not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        if not (str(p.contest.created_by.id) == str(user.id) or user.role == "admin"):
+        # Find contest to check permissions
+        contest_problem = ContestProblem.objects(problem_id=problem.problem_id).first()
+        if not contest_problem:
+            return Response({"error": "Problem not linked to any contest"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Permission check
+        contest = contest_problem.contest
+        if not (str(contest.created_by.id) == str(user.id) or getattr(user, 'role', None) == "admin"):
             return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-        p.delete()
+        # Delete associated test cases first
+        from testcase.models import TestCase
+        TestCase.objects(problem_id=problem.problem_id).delete()
+        
+        # Delete contest-problem link
+        contest_problem.delete()
+        
+        # Delete the problem
+        problem.delete()
+        
         return Response({"message": "Problem deleted"})

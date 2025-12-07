@@ -1,9 +1,10 @@
+# testcase/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from mongoengine.errors import ValidationError as MEValidationError
 from .serializers import TestcaseCreateSerializer, TestcaseUpdateSerializer
-from .models import Testcase
+from .models import TestCase  # Changed from Testcase to TestCase
 from problem.models import Problem
 from contest.utils.auth import get_user_from_request
 
@@ -24,16 +25,25 @@ class TestcaseCreateAPIView(APIView):
 
         data = serializer.validated_data
 
-        problem = Problem.objects(id=data["problem_id"]).first()
+        # Find problem by problem_id (not mongo _id)
+        problem = Problem.objects(problem_id=data["problem_id"]).first()
         if not problem:
             return Response({"error": "Problem not found"}, status=404)
 
+        # Find which contest this problem belongs to
+        from contest.models import ContestProblem
+        contest_problem = ContestProblem.objects(problem_id=problem.problem_id).first()
+        if not contest_problem:
+            return Response({"error": "Problem not linked to any contest"}, status=404)
+        
+        contest = contest_problem.contest
+
         # Only contest creator/admin can add testcase
-        if not (str(problem.contest.created_by.id) == str(user.id) or user.role == "admin"):
+        if not (str(contest.created_by.id) == str(user.id) or getattr(user, 'role', None) == "admin"):
             return Response({"error": "Permission denied"}, status=403)
 
-        tc = Testcase(
-            problem=problem,
+        tc = TestCase(  # Changed from Testcase to TestCase
+            problem_id=problem.problem_id,
             sample=data.get("sample", False),
             input_data=data["input_data"],
             output_data=data["output_data"],
@@ -54,11 +64,15 @@ class TestcaseCreateAPIView(APIView):
 
 class TestcaseListByProblemAPIView(APIView):
     def get(self, request, problem_id):
-        problem = Problem.objects(id=problem_id).first()
+        # Try to find problem by problem_id (not mongo _id)
+        problem = Problem.objects(problem_id=problem_id).first()
         if not problem:
-            return Response({"error": "Problem not found"}, status=404)
+            # Also try by mongo _id for backward compatibility
+            problem = Problem.objects(id=problem_id).first()
+            if not problem:
+                return Response({"error": "Problem not found"}, status=404)
 
-        tcs = Testcase.objects(problem=problem)
+        tcs = TestCase.objects(problem_id=problem.problem_id)  # Changed from problem=problem
         data = []
         for t in tcs:
             data.append({
@@ -76,7 +90,7 @@ class TestcaseDetailAPIView(APIView):
     Only problem owner/admin may view hidden details.
     """
     def get(self, request, testcase_id):
-        tc = Testcase.objects(id=testcase_id).first()
+        tc = TestCase.objects(id=testcase_id).first()  # Changed from Testcase
         if not tc:
             return Response({"error": "Testcase not found"}, status=404)
 
@@ -95,8 +109,20 @@ class TestcaseDetailAPIView(APIView):
         if not user:
             return Response({"error": "Hidden testcase"}, status=403)
 
+        # Find problem and contest to check permissions
+        problem = Problem.objects(problem_id=tc.problem_id).first()
+        if not problem:
+            return Response({"error": "Problem not found"}, status=404)
+            
+        from contest.models import ContestProblem
+        contest_problem = ContestProblem.objects(problem_id=problem.problem_id).first()
+        if not contest_problem:
+            return Response({"error": "Problem not linked to any contest"}, status=404)
+        
+        contest = contest_problem.contest
+
         # Only contest creator/admin can view hidden testcases
-        if not (str(tc.problem.contest.created_by.id) == str(user.id) or user.role == "admin"):
+        if not (str(contest.created_by.id) == str(user.id) or getattr(user, 'role', None) == "admin"):
             return Response({"error": "Permission denied"}, status=403)
 
         return Response({
@@ -113,11 +139,23 @@ class TestcaseUpdateAPIView(APIView):
         if not user:
             return Response({"error": "Auth required"}, status=401)
 
-        tc = Testcase.objects(id=testcase_id).first()
+        tc = TestCase.objects(id=testcase_id).first()  # Changed from Testcase
         if not tc:
             return Response({"error": "Not found"}, status=404)
 
-        if not (str(tc.problem.contest.created_by.id) == str(user.id) or user.role == "admin"):
+        # Find problem and contest to check permissions
+        problem = Problem.objects(problem_id=tc.problem_id).first()
+        if not problem:
+            return Response({"error": "Problem not found"}, status=404)
+            
+        from contest.models import ContestProblem
+        contest_problem = ContestProblem.objects(problem_id=problem.problem_id).first()
+        if not contest_problem:
+            return Response({"error": "Problem not linked to any contest"}, status=404)
+        
+        contest = contest_problem.contest
+
+        if not (str(contest.created_by.id) == str(user.id) or getattr(user, 'role', None) == "admin"):
             return Response({"error": "Permission denied"}, status=403)
 
         serializer = TestcaseUpdateSerializer(data=request.data, partial=True)
@@ -141,11 +179,23 @@ class TestcaseDeleteAPIView(APIView):
         if not user:
             return Response({"error": "Auth required"}, status=401)
 
-        tc = Testcase.objects(id=testcase_id).first()
+        tc = TestCase.objects(id=testcase_id).first()  # Changed from Testcase
         if not tc:
             return Response({"error": "Not found"}, status=404)
 
-        if not (str(tc.problem.contest.created_by.id) == str(user.id) or user.role == "admin"):
+        # Find problem and contest to check permissions
+        problem = Problem.objects(problem_id=tc.problem_id).first()
+        if not problem:
+            return Response({"error": "Problem not found"}, status=404)
+            
+        from contest.models import ContestProblem
+        contest_problem = ContestProblem.objects(problem_id=problem.problem_id).first()
+        if not contest_problem:
+            return Response({"error": "Problem not linked to any contest"}, status=404)
+        
+        contest = contest_problem.contest
+
+        if not (str(contest.created_by.id) == str(user.id) or getattr(user, 'role', None) == "admin"):
             return Response({"error": "Permission denied"}, status=403)
 
         tc.delete()

@@ -1,32 +1,24 @@
+# testcase/models.py
 from mongoengine import (
-    Document, ReferenceField, StringField, BooleanField, IntField, DateTimeField
+    Document, StringField, BooleanField, DateTimeField, IntField
 )
 from datetime import datetime
-from problem.models import Problem
 
-
-class Testcase(Document):
-    problem = ReferenceField(Problem, required=True)
-
-    # If sample=True → displayed to user
-    sample = BooleanField(default=False)
-
-    # Input/output (stored as plain text)
+class TestCase(Document):
+    problem_id = StringField(required=True)
     input_data = StringField(required=True)
     output_data = StringField(required=True)
-
-    # Optional overrides per testcase
-    time_limit_override = IntField(null=True)      # ms or seconds (your choice)
-    memory_limit_override = IntField(null=True)    # MB
-
+    explanation = StringField(default="")
+    sample = BooleanField(default=False)
+    time_limit_override = IntField(null=True)      # Added back
+    memory_limit_override = IntField(null=True)    # Added back
+    
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
 
     meta = {
-        "collection": "testcases",
-        "indexes": [
-            ("problem", "sample"),
-        ]
+        "collection": "test_cases",
+        "indexes": ["problem_id", "sample"]
     }
 
     def save(self, *args, **kwargs):

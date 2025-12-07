@@ -1,72 +1,69 @@
-# apps/contest/serializers.py
+# contest/serializers.py
 from rest_framework import serializers
-from datetime import datetime, timedelta
-from mongoengine import errors as me_errors
-from .models import Contest, ContestProblem, ContestRegistration
-from account.models import Account
+from .models import Contest, ContestProblem, TestCase
 
+class TestCaseSerializer(serializers.Serializer):
+    input = serializers.CharField()
+    output = serializers.CharField()
+    explanation = serializers.CharField(required=False, allow_blank=True)
+    difficulty = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    sample = serializers.BooleanField(default=False)
+
+class ContestProblemSerializer(serializers.Serializer):
+    index = serializers.CharField()
+    title = serializers.CharField()
+    statement = serializers.CharField()
+    time_limit_seconds = serializers.FloatField()
+    memory_limit_mb = serializers.IntegerField()
+    tags = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_null=True
+    )
+    difficulty = serializers.CharField(required=False, allow_blank=True)
+    tutorial = serializers.CharField(required=False, allow_blank=True, default="")  # Add this
+    test_cases = TestCaseSerializer(many=True)
 
 class ContestCreateSerializer(serializers.Serializer):
-    title = serializers.CharField(max_length=200)
+    title = serializers.CharField()
     description = serializers.CharField(required=False, allow_blank=True)
-    start_time = serializers.DateTimeField()
-    duration = serializers.FloatField()  # hours (you can accept hours and convert to minutes)
-    type = serializers.ChoiceField(choices=("individual", "team"), default="individual")
-    platform = serializers.ChoiceField(choices=("cf","atcoder","codechef","hackerrank","leetcode","default"), default="default")
-
-    def validate_title(self, value):
-        if len(value.strip()) == 0:
-            raise serializers.ValidationError("Title cannot be empty.")
-        return value.strip()
-
-    def validate_duration(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Duration must be positive.")
-        return value
+    start_time = serializers.DateTimeField(required=False, allow_null=True)
+    duration = serializers.FloatField(required=False, allow_null=True)
+    type = serializers.CharField(required=False, allow_blank=True)
+    platform = serializers.CharField(required=False, allow_blank=True)
+    problems = ContestProblemSerializer(many=True, required=False)
+    status = serializers.CharField(required=False, default="draft")
+    # Add these for test contests
+    testers = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list
+    )
+    test_start_time = serializers.DateTimeField(required=False, allow_null=True)
+    test_duration = serializers.FloatField(required=False, allow_null=True)
 
     def create(self, validated_data):
-        # Convert duration hours -> minutes
-        duration_minutes = int(validated_data["duration"] * 60)
+        problems_data = validated_data.pop("problems", [])
+        status = validated_data.pop("status", "draft")
+        testers = validated_data.pop("testers", [])
+        test_start_time = validated_data.pop("test_start_time", None)
+        test_duration = validated_data.pop("test_duration", None)
+        
+        contest = Contest(**validated_data)
+        contest.status = status
+        contest.testers = testers
+        contest.test_start_time = test_start_time
+        if test_duration:
+            contest.test_duration = test_duration
 
-        contest = Contest(
-            title=validated_data["title"],
-            description=validated_data.get("description", "")[:1000],
-            start_time=validated_data["start_time"],
-            duration=duration_minutes,
-            type=validated_data["type"],
-            platform=validated_data["platform"],
-            # created_by must be injected by view
-        )
+        for problem_data in problems_data:
+            test_cases_data = problem_data.pop("test_cases", [])
+            testcases = [TestCase(**tc) for tc in test_cases_data]
+
+            problem = ContestProblem(
+                **problem_data,
+                test_cases=testcases
+            )
+            contest.problems.append(problem)
+
         return contest
-
-
-class ContestRegistrationSerializer(serializers.Serializer):
-    # For individual: nothing else required (current user implied)
-    # For team: require team_id (string)
-    team_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-
-    def validate(self, data):
-        # nothing complicated here; view will check contest type
-        return data
-
-class ContestUpdateSerializer(serializers.Serializer):
-    title = serializers.CharField(max_length=200, required=False)
-    description = serializers.CharField(required=False, allow_blank=True)
-    start_time = serializers.DateTimeField(required=False)
-    duration = serializers.FloatField(required=False)
-    type = serializers.ChoiceField(choices=("individual", "team"), required=False)
-    platform = serializers.ChoiceField(
-        choices=("cf","atcoder","codechef","hackerrank","leetcode","default"),
-        required=False
-    )
-    is_live_now = serializers.BooleanField(required=False)
-
-    def validate_title(self, value):
-        if len(value.strip()) == 0:
-            raise serializers.ValidationError("Title cannot be empty.")
-        return value.strip()
-
-    def validate_duration(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Duration must be positive.")
-        return value
