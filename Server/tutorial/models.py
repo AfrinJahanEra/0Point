@@ -1,43 +1,20 @@
-from mongoengine import (
-    Document, ReferenceField, StringField, ListField,
-    DateTimeField, BooleanField, DictField
-)
+# tutorial/models.py (create this file if it doesn't exist)
+from mongoengine import Document, StringField, DateTimeField, ReferenceField, IntField
 from datetime import datetime
-from problem.models import Problem
+from contest.models import Contest, ContestProblem
 from account.models import Account
 
-
 class Tutorial(Document):
-    problem = ReferenceField(Problem, required=True)
-    author = ReferenceField(Account, required=True)
-
-    statement = StringField(required=True)  
-    tags = ListField(StringField(max_length=50), default=list)
-
-    # Optional difficulty section
-    difficulty_explanation = StringField(null=True)
-
-    # Multiple sample IO's
-    sample_ios = ListField(
-        DictField(),  # each dict will contain {"input": "...", "output": "..."}
-        default=list
-    )
-
-    # Images (stored as URLs / paths)
-    images = ListField(StringField(), default=list)
-
-    video_url = StringField(null=True)
-
-    is_official = BooleanField(default=True)
-
+    meta = {'collection': 'tutorials'}
+    
+    contest = ReferenceField(Contest, required=True)
+    problem_index = StringField(required=True)  # A, B, C, etc.
+    content = StringField(required=True)
+    created_by = ReferenceField(Account, required=True)
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
-
-    meta = {
-        "collection": "tutorials",
-        "indexes": ["problem", "-created_at"]
-    }
-
+    version = IntField(default=1)
+    
     def save(self, *args, **kwargs):
         self.updated_at = datetime.utcnow()
-        return super().save(*args, **kwargs)
+        return super(Tutorial, self).save(*args, **kwargs)

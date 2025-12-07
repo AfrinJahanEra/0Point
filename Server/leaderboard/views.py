@@ -9,32 +9,79 @@ from .models import ContestLeaderboard, LeaderboardEntry
 from .serializers import FreezeSerializer, RecalculateSerializer
 from .services import calculate_leaderboard
 
-
 class LeaderboardView(APIView):
     """
     GET /contests/<id>/leaderboard/
     """
     def get(self, request, contest_id):
+        from datetime import datetime
+        
         contest = Contest.objects(id=contest_id).first()
         if not contest:
             return Response({"error": "Contest not found"}, status=404)
+
+        # Get current user
+        current_user = get_user_from_request(request)
+        current_user_id = str(current_user.id) if current_user else None
 
         lb = LeaderboardEntry.objects(contest=contest).order_by("rank")
 
         results = []
         for e in lb:
+            # Check if this is the current user
+            is_current_user = current_user_id == str(e.user.id) if current_user_id else False
+            
+            # Get user details
+            user = e.user
+            
+            # Format problem status for the frontend
+            # Create an array for all problems A-F (assuming 6 problems)
+            submissions = []
+            problems = ['A', 'B', 'C', 'D', 'E', 'F']
+            
+            for problem in problems:
+                problem_data = e.problem_results.get(problem) if e.problem_results else None
+                status = "NA"  # Not Attempted
+                
+                if problem_data:
+                    if problem_data.get("verdict") == "ACCEPTED":
+                        status = "AC"
+                    elif problem_data.get("tries", 0) > 0:
+                        status = "WA"
+                
+                submissions.append({
+                    "problem": problem,
+                    "status": status
+                })
+            
+            # Count solved problems
+            problems_solved = 0
+            if e.problem_results:
+                for problem_data in e.problem_results.values():
+                    if problem_data.get("verdict") == "ACCEPTED":
+                        problems_solved += 1
+
             results.append({
-                "user": e.user.name,
-                "user_id": str(e.user.id),
                 "rank": e.rank,
+                "username": user.username if hasattr(user, 'username') and user.username else user.name,  # Use name as fallback
+                "name": user.name if hasattr(user, 'name') else "Anonymous",
+                "country": user.country if hasattr(user, 'country') else "Unknown",
+                "institution": user.institution if hasattr(user, 'institution') else "Unknown",
                 "score": e.total_score,
+                "problemsSolved": problems_solved,
                 "penalty": e.total_penalty,
-                "problem_results": e.problem_results,
-                "is_frozen": e.is_frozen
+                "rating": user.rating if hasattr(user, 'rating') else 1500,
+                "ratingChange": e.rating_change if hasattr(e, 'rating_change') else 0,
+                "isCurrentUser": is_current_user,
+                "submissions": submissions
             })
 
-        return Response({"leaderboard": results})
-
+        return Response({
+            "leaderboard": results,
+     
+            "status": status
+        })
+    
 class FreezeLeaderboardView(APIView):
     """
     PATCH /contests/<id>/leaderboard/freeze/

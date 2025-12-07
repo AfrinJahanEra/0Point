@@ -1,186 +1,374 @@
-import cloudinary.uploader
+# tutorial/views.py (create this file)
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from mongoengine.errors import ValidationError as MEValidationError
+from datetime import datetime
+from mongoengine.errors import ValidationError as MEValidationError, DoesNotExist
 
+from contest.models import Contest
+from account.models import Account
 from .models import Tutorial
-from .serializers import TutorialCreateSerializer, TutorialUpdateSerializer
-from problem.models import Problem
+from .serializers import TutorialSerializer, TutorialResponseSerializer
 from contest.utils.auth import get_user_from_request
 
-
-# -----------------------------
-# CLOUDINARY UPLOAD HELPER
-# -----------------------------
-def upload_to_cloudinary(file):
-    """
-    Upload file to Cloudinary and return secure URL.
-    """
-    result = cloudinary.uploader.upload(file)
-    return result["secure_url"]
-
-
-# -----------------------------
-# CREATE TUTORIAL
-# -----------------------------
-class TutorialCreateAPIView(APIView):
-    def post(self, request):
+class TutorialListCreateAPIView(APIView):
+    def get(self, request, contest_id):
+        """Get all tutorials for a contest"""
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get user
         user = get_user_from_request(request)
         if not user:
-            return Response({"error": "Authentication required"}, status=401)
-
-        serializer = TutorialCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
-
-        data = serializer.validated_data
-
-        problem = Problem.objects(id=data["problem_id"]).first()
-        if not problem:
-            return Response({"error": "Problem not found"}, status=404)
-
-        # Only contest creator, problem setter, or admin can write tutorial
-        if not (str(problem.contest.created_by.id) == str(user.id) or user.role == "admin"):
-            return Response({"error": "Permission denied"}, status=403)
-
-        # Handle images
-        images = []
-        for f in request.FILES.getlist("images"):
-            try:
-                url = upload_to_cloudinary(f)
-                images.append(url)
-            except Exception as e:
-                return Response({"error": f"Image upload failed: {str(e)}"}, status=500)
-
-        # Handle sample IOs
-        sample_ios_raw = request.data.get("sample_ios")
-        sample_ios = []
-        if sample_ios_raw:
-            import json
-            try:
-                sample_ios = json.loads(sample_ios_raw)
-            except:
-                return Response({"error": "sample_ios must be valid JSON"}, status=400)
-
-        tutorial = Tutorial(
-            problem=problem,
-            author=user,
-            statement=data["statement"],
-            tags=data.get("tags", []),
-            difficulty_explanation=data.get("difficulty_explanation"),
-            video_url=data.get("video_url"),
-            is_official=data.get("is_official", True),
-            images=images,
-            sample_ios=sample_ios
-        )
-
-        try:
-            tutorial.save()
-        except MEValidationError as e:
-            return Response({"error": str(e)}, status=400)
-
-        return Response({
-            "message": "Tutorial created",
-            "tutorial_id": str(tutorial.id)
-        }, status=201)
-
-
-# -----------------------------
-# LIST TUTORIALS BY PROBLEM
-# -----------------------------
-class TutorialListByProblemAPIView(APIView):
-    def get(self, request, problem_id):
-        tutorials = Tutorial.objects(problem=problem_id).order_by("-created_at")
-        data = []
-        for t in tutorials:
-            data.append({
-                "id": str(t.id),
-                "author": t.author.name,
-                "is_official": t.is_official,
-                "created_at": t.created_at.isoformat()
+            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Check if user has permission (creator or admin)
+        is_creator = contest.created_by and str(contest.created_by.id) == str(user.id)
+        if not is_creator:
+            return Response({"error": "Permission denied. Only contest creator can manage tutorials."}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        # Get tutorials for this contest
+        tutorials = Tutorial.objects(contest=contest)
+        
+        # Group by problem index
+        tutorial_dict = {}
+        for tutorial in tutorials:
+            if tutorial.problem_index not in tutorial_dict:
+                tutorial_dict[tutorial.problem_index] = []
+            tutorial_dict[tutorial.problem_index].append({
+                "id": str(tutorial.id),
+                "content": tutorial.content,
+                "created_at": tutorial.created_at,
+                "updated_at": tutorial.updated_at,
+                "version": tutorial.version
             })
-        return Response({"tutorials": data})
-
-
-# -----------------------------
-# TUTORIAL DETAIL
-# -----------------------------
-class TutorialDetailAPIView(APIView):
-    def get(self, request, tutorial_id):
-        t = Tutorial.objects(id=tutorial_id).first()
-        if not t:
-            return Response({"error": "Not found"}, status=404)
-
+        
         return Response({
-            "id": str(t.id),
-            "problem": str(t.problem.id),
-            "author": t.author.name,
-            "statement": t.statement,
-            "tags": t.tags,
-            "difficulty_explanation": t.difficulty_explanation,
-            "sample_ios": t.sample_ios,
-            "images": t.images,
-            "video_url": t.video_url,
-            "is_official": t.is_official,
-            "created_at": t.created_at.isoformat()
+            "contest_id": str(contest.id),
+            "contest_title": contest.title,
+            "tutorials_by_problem": tutorial_dict
         })
-
-
-class TutorialUpdateAPIView(APIView):
-    """
-    PATCH /tutorials/<id>/
-    Allows updating tutorial fields and adding images.
-    """
-    MAX_IMAGES = 5
-
-    def patch(self, request, tutorial_id):
+    
+    def post(self, request, contest_id):
+        """Create or update a tutorial"""
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get user
         user = get_user_from_request(request)
         if not user:
-            return Response({"error": "Authentication required"}, status=401)
-
-        tutorial = Tutorial.objects(id=tutorial_id).first()
-        if not tutorial:
-            return Response({"error": "Tutorial not found"}, status=404)
-
-        # Only contest creator, problem setter, or admin
-        if not (str(tutorial.problem.contest.created_by.id) == str(user.id) or user.role == "admin"):
-            return Response({"error": "Permission denied"}, status=403)
-
-        serializer = TutorialUpdateSerializer(data=request.data, partial=True)
+            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Check if user has permission (creator)
+        is_creator = contest.created_by and str(contest.created_by.id) == str(user.id)
+        if not is_creator:
+            return Response({"error": "Permission denied. Only contest creator can manage tutorials."}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        # Validate request data
+        serializer = TutorialSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
-
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
         data = serializer.validated_data
-
-        # Update simple fields
-        for key, value in data.items():
-            setattr(tutorial, key, value)
-
-        # Handle new images
-        new_files = request.FILES.getlist("images")
-        if new_files:
-            total_images = len(tutorial.images or []) + len(new_files)
-            if total_images > self.MAX_IMAGES:
-                return Response({"error": f"Total images exceed maximum of {self.MAX_IMAGES}"}, status=400)
-
-            uploaded_urls = []
+        
+        # Check if problem exists in contest
+        problem_exists = False
+        for problem in contest.problems:
+            if problem.index == data['problem_index']:
+                problem_exists = True
+                break
+        
+        if not problem_exists:
+            return Response({"error": f"Problem {data['problem_index']} not found in contest"}, 
+                          status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if tutorial already exists
+        existing_tutorial = Tutorial.objects(
+            contest=contest, 
+            problem_index=data['problem_index']
+        ).first()
+        
+        if existing_tutorial:
+            # Update existing tutorial
+            existing_tutorial.content = data['content']
+            existing_tutorial.version += 1
             try:
-                for f in new_files:
-                    url = upload_to_cloudinary(f)
-                    uploaded_urls.append(url)
-            except Exception as e:
-                return Response({"error": f"Image upload failed: {str(e)}"}, status=500)
-
-            tutorial.images = (tutorial.images or []) + uploaded_urls
-
+                existing_tutorial.save()
+                tutorial = existing_tutorial
+            except MEValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Create new tutorial
+            try:
+                tutorial = Tutorial(
+                    contest=contest,
+                    problem_index=data['problem_index'],
+                    content=data['content'],
+                    created_by=user
+                )
+                tutorial.save()
+            except MEValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Also update the tutorial field in ContestProblem
+        for problem in contest.problems:
+            if problem.index == data['problem_index']:
+                problem.tutorial = data['content']
+                break
+        
         try:
-            tutorial.save()
-        except MEValidationError as e:
-            return Response({"error": str(e)}, status=400)
+            contest.save()
+        except Exception as e:
+            # Log error but don't fail the tutorial save
+            print(f"Warning: Could not update contest problem tutorial field: {e}")
+        
+        # Return response
+        response_data = {
+            "id": str(tutorial.id),
+            "contest_id": str(contest.id),
+            "problem_index": tutorial.problem_index,
+            "content": tutorial.content,
+            "created_by": str(user.id),
+            "created_at": tutorial.created_at,
+            "updated_at": tutorial.updated_at,
+            "version": tutorial.version,
+            "message": "Tutorial saved successfully"
+        }
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
-        return Response({
-            "message": "Tutorial updated successfully",
-            "tutorial_id": str(tutorial.id),
-            "images": tutorial.images
-        })
+
+class TutorialDetailAPIView(APIView):
+    def get(self, request, contest_id, problem_index):
+        """Get tutorial for a specific problem"""
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if problem exists
+        problem_exists = False
+        problem_data = None
+        for problem in contest.problems:
+            if problem.index == problem_index.upper():
+                problem_exists = True
+                problem_data = {
+                    "index": problem.index,
+                    "title": problem.title,
+                    "code": problem.index,
+                    "difficulty": problem.difficulty or "Medium",
+                    "tags": problem.tags
+                }
+                break
+        
+        if not problem_exists:
+            return Response({"error": f"Problem {problem_index} not found in contest"}, 
+                          status=status.HTTP_404_NOT_FOUND)
+        
+        # Get tutorial
+        tutorial = Tutorial.objects(
+            contest=contest, 
+            problem_index=problem_index.upper()
+        ).first()
+        
+        # Check if user has access
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Different access rules based on contest status
+        can_access_tutorial = False
+        
+        if contest.status == "past":
+            # Past contests: everyone can see tutorials
+            can_access_tutorial = True
+        elif contest.status == "draft":
+            # Drafts: only creator can see
+            is_creator = contest.created_by and str(contest.created_by.id) == str(user.id)
+            can_access_tutorial = is_creator
+        elif contest.status in ["upcoming", "live"]:
+            # Live/upcoming: only registered users can see
+            from contest.models import ContestRegistration
+            is_registered = ContestRegistration.objects.filter(
+                user=user, contest=contest
+            ).first()
+            can_access_tutorial = bool(is_registered)
+        else:
+            # Other statuses: default to no access
+            can_access_tutorial = False
+        
+        if not can_access_tutorial:
+            return Response({
+                "error": "Access denied",
+                "message": "You don't have permission to view this tutorial"
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        response_data = {
+            "contest": {
+                "id": str(contest.id),
+                "title": contest.title,
+                "status": contest.status
+            },
+            "problem": problem_data,
+            "tutorial": {
+                "content": tutorial.content if tutorial else "",
+                "exists": bool(tutorial),
+                "created_at": tutorial.created_at if tutorial else None,
+                "updated_at": tutorial.updated_at if tutorial else None,
+                "version": tutorial.version if tutorial else 0
+            },
+            "permissions": {
+                "can_edit": contest.created_by and str(contest.created_by.id) == str(user.id)
+            }
+        }
+        
+        return Response(response_data)
+    
+    def delete(self, request, contest_id, problem_index):
+        """Delete tutorial for a problem"""
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get user
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Check if user is creator
+        is_creator = contest.created_by and str(contest.created_by.id) == str(user.id)
+        if not is_creator:
+            return Response({"error": "Permission denied. Only contest creator can delete tutorials."}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        # Find and delete tutorial
+        tutorial = Tutorial.objects(
+            contest=contest, 
+            problem_index=problem_index.upper()
+        ).first()
+        
+        if not tutorial:
+            return Response({"error": "Tutorial not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            tutorial.delete()
+            
+            # Also clear tutorial field in ContestProblem
+            for problem in contest.problems:
+                if problem.index == problem_index.upper():
+                    problem.tutorial = ""
+                    break
+            
+            contest.save()
+            
+            return Response({
+                "message": "Tutorial deleted successfully",
+                "contest_id": str(contest.id),
+                "problem_index": problem_index
+            })
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TutorialBulkUpdateAPIView(APIView):
+    def post(self, request, contest_id):
+        """Update tutorials for multiple problems at once"""
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get user
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Check if user is creator
+        is_creator = contest.created_by and str(contest.created_by.id) == str(user.id)
+        if not is_creator:
+            return Response({"error": "Permission denied. Only contest creator can manage tutorials."}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        # Expecting data in format: { "A": "tutorial content", "B": "tutorial content" }
+        tutorials_data = request.data
+        
+        if not isinstance(tutorials_data, dict):
+            return Response({"error": "Invalid data format. Expected object with problem indices as keys."}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        results = []
+        errors = []
+        
+        for problem_index, content in tutorials_data.items():
+            # Validate problem exists
+            problem_exists = False
+            for problem in contest.problems:
+                if problem.index == problem_index.upper():
+                    problem_exists = True
+                    break
+            
+            if not problem_exists:
+                errors.append(f"Problem {problem_index} not found in contest")
+                continue
+            
+            # Update or create tutorial
+            tutorial = Tutorial.objects(
+                contest=contest, 
+                problem_index=problem_index.upper()
+            ).first()
+            
+            if tutorial:
+                tutorial.content = content
+                tutorial.version += 1
+                action = "updated"
+            else:
+                tutorial = Tutorial(
+                    contest=contest,
+                    problem_index=problem_index.upper(),
+                    content=content,
+                    created_by=user
+                )
+                action = "created"
+            
+            try:
+                tutorial.save()
+                
+                # Update ContestProblem tutorial field
+                for problem in contest.problems:
+                    if problem.index == problem_index.upper():
+                        problem.tutorial = content
+                        break
+                
+                results.append({
+                    "problem_index": problem_index,
+                    "action": action,
+                    "tutorial_id": str(tutorial.id),
+                    "version": tutorial.version
+                })
+                
+            except Exception as e:
+                errors.append(f"Failed to save tutorial for problem {problem_index}: {str(e)}")
+        
+        # Save contest with updated tutorial fields
+        try:
+            contest.save()
+        except Exception as e:
+            errors.append(f"Failed to update contest: {str(e)}")
+        
+        response_data = {
+            "results": results,
+            "errors": errors,
+            "total_processed": len(results),
+            "total_errors": len(errors)
+        }
+        
+        status_code = status.HTTP_200_OK if not errors else status.HTTP_207_MULTI_STATUS
+        return Response(response_data, status=status_code)
