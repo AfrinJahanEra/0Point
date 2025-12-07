@@ -22,7 +22,8 @@ import Dashboard from './pages/Dashboard';
 import CreateBlog from './pages/CreateBlog';
 import Submissions from './pages/Submissions';
 import ContestInside from './pages/ContestInside';
-import AddTutorial from './pages/AddTutorial'; // Adjust path as needed
+import MySubmissions from './pages/MySubmissions'; // Import MySubmissions page
+import ContestLeaderboard from './pages/ContestLeaderboard';
 
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
@@ -55,7 +56,7 @@ function App() {
           <Toaster 
             toastOptions={{
               style: {
-                background: '#1e40af', // Dark blue color
+                background: '#1e40af',
                 color: '#ffffff',
               },
               iconTheme: {
@@ -71,7 +72,9 @@ function App() {
             {/* Login and Register pages without Header and Footer */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/problem/:problemId" element={<ProblemInside />} />
+            
+            {/* Visualizer takes full screen without Header and Footer */}
+            <Route path="/visualizer" element={<Visualizer />} />
             
             {/* Pages with Header and Footer only */}
             <Route path="/home" element={
@@ -79,43 +82,70 @@ function App() {
                 <Home />
               </Layout>
             } />
-            <Route path="/contest/inside" element={
+            
+            {/* REORDER: Contest-specific routes FIRST (more specific) */}
+            <Route path="/contests/:contestId/register" element={
+              <Layout>
+                <RegisterNow />
+              </Layout>
+            } />
+            
+            <Route path="/contests/:contestId/edit" element={
+              <Layout>
+                <CreateContest />
+              </Layout>
+            } />
+            
+            <Route path="/contests/:contestId/problems/:problemIndex" element={
+              <Layout>
+                <ProblemInside />
+              </Layout>
+            } />
+            
+            {/* IMPORTANT FIX: Add these missing contest routes */}
+            <Route path="/contests/:contestId/submissions" element={
+              <Layout>
+                <MySubmissions /> {/* Make sure this component exists */}
+              </Layout>
+            } />
+            
+            <Route path="/contests/:contestId/leaderboard" element={
+              <Layout>
+                <ContestLeaderboard /> {/* Make sure this component exists */}
+              </Layout>
+            } />
+            
+            {/* General contest route LAST (less specific) */}
+            <Route path="/contests/:contestId" element={
               <Layout>
                 <ContestInside />
               </Layout>
             } />
+            
             <Route path="/contests" element={
               <Layout>
                 <Contests />
               </Layout>
             } />
-            {/* ADD THE REGISTERNOW ROUTE HERE */}
-            <Route path="/contest/:contestId/register" element={
-              <Layout>
-                <RegisterNow />
-              </Layout>
-            } />
-            {/* ADD THE CREATECONTEST ROUTE HERE */}
+            
             <Route path="/create-contest" element={
               <Layout>
                 <CreateContest />
               </Layout>
             } />
-            <Route path="/contests/create/tutorial" element={
-              <AddTutorial />
-              } />
+          
             <Route path="/practice" element={
               <Layout>
                 <Practice />
               </Layout>
             } />
-            {/* Visualizer takes full screen without Header and Footer */}
-            <Route path="/visualizer" element={<Visualizer />} />
+            
             <Route path="/leaderboard" element={
               <Layout>
                 <Leaderboard />
               </Layout>
             } />
+            
             <Route path="/community" element={
               <Layout>
                 <Community />
@@ -128,16 +158,19 @@ function App() {
                 <Blog />
               </NavLayout>
             } />
+            
             <Route path="/dashboard" element={
               <NavLayout>
                 <Dashboard />
               </NavLayout>
             } />
+            
             <Route path="/create-blog" element={
               <NavLayout>
                 <CreateBlog />
               </NavLayout>
             } />
+            
             <Route path="/submissions" element={
               <NavLayout>
                 <Submissions />
@@ -149,5 +182,4 @@ function App() {
     </AppProvider>
   );
 }
-
 export default App;
