@@ -7,7 +7,8 @@ import {
   History, Trophy, MessageSquare, Download, Flag,
   Award, Plus, AlertCircle, Loader2, CheckCircle,
   XCircle, Clock as ClockIcon,
-  FileQuestionIcon
+  FileQuestionIcon,
+  BookOpen
 } from 'lucide-react';
 
 const ContestInside = () => {
@@ -23,6 +24,10 @@ const ContestInside = () => {
   const [error, setError] = useState(null);
   const [contestData, setContestData] = useState(null);
   const [problems, setProblems] = useState([]);
+  // Add this with your other state variables
+const [solvedProblems, setSolvedProblems] = useState(new Set());
+  // Add this to your state variables
+  const [problemStatuses, setProblemStatuses] = useState({});
   const [announcements, setAnnouncements] = useState([]);
   const [userStats, setUserStats] = useState({
     solved: 0,
@@ -179,43 +184,56 @@ try {
   console.error('⚠️ Announcements error:', announcementsError);
 }
 
-      // 4. Fetch user problem status (OPTIONAL - don't block on error)
-      console.log('📡 Fetching user status...');
-      try {
-        const statusRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/problems/status/`,
-          { headers: getHeaders() }
-        ).catch(err => {
-          console.error('⚠️ Status fetch error (continuing):', err.message);
-          return { data: { problem_statuses: {} } }; // Return empty on error
-        });
-        
-        console.log('👤 User status response:', statusRes.data);
-        
-        if (statusRes.data && statusRes.data.problem_statuses) {
-          const statuses = statusRes.data.problem_statuses;
-          let solved = 0;
-          let attempted = 0;
-          
-          Object.values(statuses).forEach(status => {
-            if (status.solved) solved++;
-            if (status.status === 'attempted' || status.attempted) attempted++;
-          });
-          
-          const totalAttempts = solved + attempted;
-          const accuracy = totalAttempts > 0 ? Math.round((solved / totalAttempts) * 100) : 0;
-          
-          setUserStats({
-            solved,
-            attempted,
-            total: problems.length,
-            accuracy: `${accuracy}%`
-          });
-        }
-      } catch (statusError) {
-        console.error('⚠️ Status error:', statusError);
-        // Don't block on error
+// In your fetchContestData function, replace the status fetching section:
+// 4. Fetch user problem status
+console.log('📡 Fetching user problem status...');
+try {
+  const statusRes = await axios.get(
+    `http://localhost:8000/contests/${contestId}/problems/status/`,
+    { headers: getHeaders() }
+  ).catch(err => {
+    console.error('⚠️ Status fetch error (continuing):', err.response?.data || err.message);
+    return { data: { problem_statuses: {} } };
+  });
+  
+  console.log('👤 Problem status response:', statusRes.data);
+  
+  if (statusRes.data && statusRes.data.problem_statuses) {
+    const statuses = statusRes.data.problem_statuses;
+    setProblemStatuses(statuses);
+    
+    // Calculate stats
+    let solved = 0;
+    let attempted = 0;
+    
+    Object.values(statuses).forEach(status => {
+      if (status.solved) solved++;
+      if (status.status === 'attempted' || status.status === 'solved') attempted++;
+    });
+    
+    const totalAttempts = solved + (attempted - solved); // Unique attempted problems
+    const accuracy = totalAttempts > 0 ? Math.round((solved / totalAttempts) * 100) : 0;
+    
+    setUserStats({
+      solved,
+      attempted: totalAttempts,
+      total: problems.length,
+      accuracy: `${accuracy}%`
+    });
+    
+    // Also create a set of solved problems for quick checking
+    const solvedSet = new Set();
+    Object.entries(statuses).forEach(([problemIndex, status]) => {
+      if (status.solved) {
+        solvedSet.add(problemIndex);
       }
+    });
+    setSolvedProblems(solvedSet);
+  }
+} catch (statusError) {
+  console.error('⚠️ Status error:', statusError);
+  // Don't block on error
+}
 
       // 5. Calculate time remaining (OPTIONAL)
       if (contest.status === 'live' && contest.start_time && contest.duration) {
@@ -336,9 +354,35 @@ const handlePostAnnouncement = async () => {
 };
 
   // Get problem status icon
-  const getProblemStatusIcon = (problemIndex) => {
+// Update getProblemStatusIcon function
+const getProblemStatusIcon = (problem) => {
+  const problemIndex = problem.problem_id || problem.index || problem.code;
+  const status = problemStatuses[problemIndex];
+  
+  if (!status) {
     return <div className="w-3 h-3 rounded-full bg-gray-300"></div>;
-  };
+  }
+  
+  if (status.solved) {
+    return (
+      <div className="flex items-center justify-center" title="Solved">
+        <CheckCircle className="w-4 h-4 text-green-600" />
+      </div>
+    );
+  }
+  
+  if (status.status === 'attempted') {
+    return (
+      <div className="flex items-center justify-center" title="Attempted">
+        <XCircle className="w-4 h-4 text-red-500" />
+      </div>
+    );
+  }
+  
+  return (
+    <div className="w-3 h-3 rounded-full bg-gray-300" title="Not attempted"></div>
+  );
+};
 
   // Loading state
   if (loading) {
@@ -486,21 +530,37 @@ const handlePostAnnouncement = async () => {
                     icon: <MessageSquare className="w-5 h-5" />, 
                     label: 'Discussions',
                     onClick: () => navigate(`/contests/${contestId}/discussion`)
+                  },
+                  // In the navigation array, add this new item:
+                  { 
+                    id: 'editorial', 
+                    icon: <BookOpen className="w-5 h-5" />, 
+                    label: 'Editorial',
+                    onClick: () => navigate(`/contests/${contestId}/editorial`),
+                    // Conditionally show only for past contests
+                    show: contestData.status === 'past'
                   }
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={item.onClick}
-                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors mb-1 ${
-                      activeTab === item.id
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {item.icon}
-                    <span className="font-medium">{item.label}</span>
-                  </button>
-                ))}
+                ].map((item) => {
+                  
+                  if (item.id === 'editorial' && contestData.status !== 'past') {
+    return null; // Don't render editorial
+  }
+  
+  return (
+    <button
+      key={item.id}
+      onClick={item.onClick}
+      className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors mb-1 ${
+        activeTab === item.id
+          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+          : 'text-gray-700 hover:bg-gray-50'
+      }`}
+    >
+      {item.icon}
+      <span className="font-medium">{item.label}</span>
+    </button>
+  );
+})}
               </div>
             </div>
 
@@ -605,7 +665,7 @@ const handlePostAnnouncement = async () => {
                           onClick={() => handleProblemClick(problem)}
                         >
                           <td className="p-4">
-                            {getProblemStatusIcon(problem.index)}
+                            {getProblemStatusIcon(problem)}
                           </td>
                           <td className="p-4">
                             <span className="font-semibold text-blue-700">
