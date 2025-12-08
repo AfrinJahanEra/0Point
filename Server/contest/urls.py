@@ -68,4 +68,5 @@ urlpatterns = [
     path('problems/<str:problem_id>/submissions/', SubmissionListByProblemAPIView.as_view(), name='problem-submissions'),
     path('contests/<str:contest_id>/problems/list/', ContestProblemsListAPIView.as_view(), name='contest-problems-list'),
     path('submissions/create/', SubmissionCreateAPIView.as_view(), name='submission-create'),
+    path('contests/<str:contest_id>/editorial/', ContestEditorialAPIView.as_view()),
 ]

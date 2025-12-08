@@ -421,9 +421,20 @@ class ContestSubmissionsAPIView(APIView):
             print(f"DEBUG: Applied user filter for user: {user.id}")
         
         # Apply verdict filter
+        # Apply verdict filter - handle both AC and ACCEPTED
         if verdict != 'all':
-            query &= Q(verdict=verdict)
-            print(f"DEBUG: Applied verdict filter: {verdict}")
+            if verdict == 'AC':
+                # Match both "AC" and "ACCEPTED" for accepted submissions
+                query &= (Q(verdict='AC') | Q(verdict='ACCEPTED'))
+                print(f"DEBUG: Applied AC filter (including ACCEPTED)")
+            elif verdict == 'WA':
+                # Similarly handle WA variations if needed
+                query &= (Q(verdict='WA') | Q(verdict='WRONG_ANSWER') | Q(verdict='WRONG ANSWER'))
+                print(f"DEBUG: Applied WA filter")
+            else:
+                # For other verdicts, use exact match
+                query &= Q(verdict=verdict)
+                print(f"DEBUG: Applied verdict filter: {verdict}")
         
         # Apply problem filter
         if problem != 'all':
@@ -441,6 +452,19 @@ class ContestSubmissionsAPIView(APIView):
         submissions_data = []
         for submission in submissions:
             sub_data = submission.to_dict()
+
+            if submission.verdict == 'ACCEPTED':
+                sub_data['verdict'] = 'AC'
+            elif submission.verdict == 'WRONG_ANSWER':
+                sub_data['verdict'] = 'WA'
+            elif submission.verdict == 'TIME_LIMIT_EXCEEDED':
+                sub_data['verdict'] = 'TLE'
+            elif submission.verdict == 'MEMORY_LIMIT_EXCEEDED':
+                sub_data['verdict'] = 'MLE'
+            elif submission.verdict == 'COMPILATION_ERROR':
+                sub_data['verdict'] = 'CE'
+            elif submission.verdict == 'RUNTIME_ERROR':
+                sub_data['verdict'] = 'RE'
             
             # Convert timestamps to Asia/Dhaka timezone
             if submission.submitted_at:

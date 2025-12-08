@@ -18,6 +18,120 @@ from mongoengine.queryset.visitor import Q
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.utils import timezone
+from datetime import timedelta
+import pytz
+from mongoengine.queryset.visitor import Q
+from contest.models import Contest
+from submission.models import Submission
+from contest.utils.auth import get_user_from_request
+from account.models import Account
+
+class UserProblemStatusAPIView(APIView):
+    """Get user's problem status for a contest"""
+    
+    def get(self, request, contest_id):
+        user = get_user_from_request(request)
+        
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=404)
+        
+        # Initialize status for all problems
+        problem_statuses = {}
+        for problem in contest.problems:
+            problem_statuses[problem.index] = {
+                "status": "unsolved",
+                "attempts": 0,
+                "solved": False,
+                "last_submission": None,
+                "first_accepted": None,
+                "submission_count": 0,
+                "accepted_count": 0
+            }
+        
+        # If user is logged in, fetch their actual submission data
+        if user:
+            print(f"DEBUG: Fetching submissions for user {user.id} in contest {contest_id}")
+            
+            # Get all submissions by this user for this contest
+            submissions = Submission.objects(
+                contest=contest,
+                user=user
+            ).order_by('submitted_at')
+            
+            print(f"DEBUG: Found {len(submissions)} submissions")
+            
+            # Process each submission
+            for submission in submissions:
+                problem_index = submission.problem_index
+                if problem_index not in problem_statuses:
+                    continue
+                
+                status_data = problem_statuses[problem_index]
+                status_data["attempts"] += 1
+                status_data["submission_count"] += 1
+                status_data["last_submission"] = submission.submitted_at
+                
+                # Check if this submission is accepted
+                if submission.verdict in ["AC", "ACCEPTED"]:
+                    status_data["accepted_count"] += 1
+                    
+                    # Mark as solved
+                    if not status_data["solved"]:
+                        status_data["solved"] = True
+                        status_data["status"] = "solved"
+                        status_data["first_accepted"] = submission.submitted_at
+                        
+                        # Calculate contest time for first accepted
+                        if submission.contest_time:
+                            status_data["contest_time"] = submission.contest_time
+                        else:
+                            # Calculate contest time
+                            try:
+                                if contest.start_time and submission.submitted_at:
+                                    # Convert to timezone-aware datetimes
+                                    dhaka_tz = pytz.timezone('Asia/Dhaka')
+                                    
+                                    # Ensure contest start_time is timezone aware
+                                    if contest.start_time.tzinfo is None:
+                                        start_time_dhaka = dhaka_tz.localize(contest.start_time)
+                                    else:
+                                        start_time_dhaka = contest.start_time.astimezone(dhaka_tz)
+                                    
+                                    # Ensure submission time is timezone aware
+                                    if submission.submitted_at.tzinfo is None:
+                                        submitted_at_dhaka = dhaka_tz.localize(submission.submitted_at)
+                                    else:
+                                        submitted_at_dhaka = submission.submitted_at.astimezone(dhaka_tz)
+                                    
+                                    # Calculate time difference in minutes
+                                    time_diff = (submitted_at_dhaka - start_time_dhaka).total_seconds() / 60.0
+                                    status_data["contest_time"] = time_diff
+                            except Exception as e:
+                                print(f"DEBUG: Error calculating contest time: {e}")
+                                status_data["contest_time"] = None
+                else:
+                    # If not solved yet, mark as attempted
+                    if not status_data["solved"] and status_data["status"] == "unsolved":
+                        status_data["status"] = "attempted"
+            
+            print(f"DEBUG: Final statuses: {problem_statuses}")
+        else:
+            print(f"DEBUG: User not authenticated, returning default statuses")
+        
+        return Response({
+            "contest_id": str(contest.id),
+            "problem_statuses": problem_statuses,
+            "user_id": str(user.id) if user else None,
+            "total_solved": sum(1 for status in problem_statuses.values() if status["solved"]),
+            "total_attempted": sum(1 for status in problem_statuses.values() if status["status"] in ["attempted", "solved"])
+        })
+    
 class ContestProblemTutorialAPIView(APIView):
     """
     API to manage tutorials for contest problems
@@ -450,34 +564,6 @@ class ContestProblemDetailAPIView(APIView):
         
         return Response(problem_data)  # MAKE SURE THIS LINE RETURNS A RESPONSE!
 
-class UserProblemStatusAPIView(APIView):
-    def get(self, request, contest_id):
-        # Don't require authentication for now
-        # user = get_user_from_request(request)
-        # if not user:
-        #     return Response({"error": "Authentication required"}, status=401)
-        
-        try:
-            contest = Contest.objects.get(id=contest_id)
-        except Contest.DoesNotExist:
-            return Response({"error": "Contest not found"}, status=404)
-        
-        problem_statuses = {}
-        
-        # For now, return default status
-        for problem in contest.problems:
-            problem_statuses[problem.index] = {
-                "status": "unsolved",
-                "attempts": 0,
-                "solved": False,
-                "last_submission": None
-            }
-        
-        return Response({
-            "contest_id": str(contest.id),
-            "problem_statuses": problem_statuses
-        })
-
 class ContestUpdateAPIView(APIView):
     def patch(self, request, contest_id):
         user = get_user_from_request(request)
@@ -633,6 +719,9 @@ class ContestPublishAPIView(APIView):
         except Exception as e:
             return Response({"error": f"Failed to save contest: {str(e)}"}, status=400)
           
+from datetime import datetime, timedelta
+import pytz
+
 def get_contest_status(contest):
     """
     Calculate contest status based on current time.
@@ -641,22 +730,25 @@ def get_contest_status(contest):
     if getattr(contest, "status", "draft") == "draft":
         return {"status": "draft", "participants": 0}
     
-    now = datetime.now(timezone.utc)
+    # Use Asia/Dhaka timezone
+    dhaka_tz = pytz.timezone('Asia/Dhaka')
+    
+    # Current time in Dhaka
+    now = datetime.now(dhaka_tz)
     start_time = contest.start_time
     
     if not start_time:
         return {"status": "upcoming", "participants": 0}
     
-    # Ensure start_time has timezone
+    # Ensure start_time is in Dhaka timezone
     if start_time.tzinfo is None:
-        local_tz = pytz.timezone('Asia/Dhaka')
-        start_time = local_tz.localize(start_time).astimezone(timezone.utc)
-    else:
-        start_time = start_time.astimezone(timezone.utc)
+        start_time = dhaka_tz.localize(start_time)
+    elif str(start_time.tzinfo) != 'Asia/Dhaka':
+        start_time = start_time.astimezone(dhaka_tz)
     
-    # Convert duration from hours to minutes for calculation
+    # Convert duration from hours to minutes
     duration_hours = contest.duration if contest.duration else 0
-    duration_minutes = duration_hours * 60  # Convert hours to minutes
+    duration_minutes = duration_hours * 60
     
     if duration_hours > 0:
         end_time = start_time + timedelta(minutes=duration_minutes)
@@ -668,7 +760,7 @@ def get_contest_status(contest):
         else:
             status = "past"
     else:
-        # If no duration, check if start_time has passed
+        # No duration specified
         status = "past" if now > start_time else "upcoming"
     
     participants = ContestRegistration.objects(contest=contest).count()
@@ -1166,5 +1258,116 @@ class AnnouncementCreateAPIView(APIView):
             "announcement": announcement.to_dict()
         }, status=201)
     
+# Add this to your contest/views.py
+class ContestEditorialAPIView(APIView):
+    """
+    Get editorial overview for a contest (accessible to all for past contests)
+    """
+    
+    def get(self, request, contest_id):
+        """Get editorial overview for a contest"""
+        print(f"DEBUG: ContestEditorialAPIView - contest: {contest_id}")
+        
+        try:
+            contest = Contest.objects.get(id=contest_id)
+            print(f"DEBUG: Found contest: {contest.title}, Status: {contest.status}")
+        except Contest.DoesNotExist:
+            print("DEBUG: Contest not found")
+            return Response({"error": "Contest not found"}, status=404)
+        
+        user = get_user_from_request(request)
+        user_id = user.id if user else None
+        print(f"DEBUG: User ID: {user_id}")
+        
+        # Check if editorial can be accessed
+        can_access_editorial = False
+        access_error = None
+        
+        if contest.status == "past":
+            # Past contests - editorial is accessible to everyone
+            can_access_editorial = True
+            print("DEBUG: Past contest - editorial access granted to all")
+        elif contest.status == "draft":
+            # Drafts - only creator can access
+            if user and contest.created_by and str(contest.created_by.id) == str(user.id):
+                can_access_editorial = True
+                print("DEBUG: Draft contest - creator can access editorial")
+            else:
+                access_error = "Editorial not available in draft contests"
+                print("DEBUG: Draft contest - editorial access denied")
+        elif contest.status in ["live", "upcoming", "test"]:
+            # During contest, editorial is restricted
+            if getattr(contest, 'editorial_published', False):
+                # If editorial is explicitly published, allow access
+                can_access_editorial = True
+                print("DEBUG: Contest in progress - editorial published, access granted")
+            elif user and contest.created_by and str(contest.created_by.id) == str(user.id):
+                # Creator can always access
+                can_access_editorial = True
+                print("DEBUG: Contest in progress - creator access to editorial")
+            else:
+                access_error = "Editorial will be available after the contest ends"
+                print("DEBUG: Contest in progress - editorial not published yet")
+        
+        if not can_access_editorial:
+            print(f"DEBUG: Editorial access denied: {access_error}")
+            return Response({
+                "error": "Access denied",
+                "message": access_error or "You don't have access to the editorial",
+                "contest_status": contest.status,
+                "editorial_published": getattr(contest, 'editorial_published', False),
+                "can_access": False
+            }, status=403)
+        
+        # Prepare editorial overview
+        try:
+            # Get all problems with tutorials
+            problems_with_tutorials = []
+            total_problems = len(contest.problems)
+            
+            for problem in contest.problems:
+                has_tutorial = bool(problem.tutorial and problem.tutorial.strip())
+                
+                problem_data = {
+                    "index": problem.index,
+                    "title": problem.title,
+                    "difficulty": problem.difficulty or "Medium",
+                    "tags": problem.tags or [],
+                    "has_tutorial": has_tutorial,
+                    "tutorial_length": len(problem.tutorial) if has_tutorial else 0,
+                    "tutorial_preview": problem.tutorial[:100] + "..." if has_tutorial and len(problem.tutorial) > 100 else (problem.tutorial if has_tutorial else "")
+                }
+                
+                problems_with_tutorials.append(problem_data)
+            
+            # Count stats
+            tutorials_count = sum(1 for p in problems_with_tutorials if p["has_tutorial"])
+            
+            print(f"DEBUG: Prepared editorial overview - {tutorials_count}/{total_problems} tutorials available")
+            
+            response_data = {
+                "contest_id": str(contest.id),
+                "contest_title": contest.title,
+                "contest_status": contest.status,
+                "editorial_published": getattr(contest, 'editorial_published', False),
+                "total_problems": total_problems,
+                "tutorials_available": tutorials_count,
+                "problems": problems_with_tutorials,
+                "can_access": True,
+                "created_at": contest.start_time.isoformat() if contest.start_time else None,
+                "created_by": {
+                    "id": str(contest.created_by.id) if contest.created_by else None,
+                    "name": contest.created_by.name if contest.created_by else None
+                } if contest.created_by else None
+            }
+            
+            return Response(response_data)
+            
+        except Exception as e:
+            print(f"DEBUG: Error preparing editorial: {str(e)}")
+            return Response({
+                "error": f"Error preparing editorial: {str(e)}",
+                "can_access": False
+            }, status=500)
 
 
