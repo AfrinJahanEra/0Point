@@ -578,6 +578,7 @@ const Visualizer = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState([]);
   const [heapViewMode, setHeapViewMode] = useState('array'); // 'array' or 'tree'
+  const [activeTab, setActiveTab] = useState('dsa'); // 'dsa', 'io', or 'code'
   const animationRef = useRef(null);
   const audioContextRef = useRef(null);
 
@@ -1019,119 +1020,195 @@ const Visualizer = () => {
         <div className="text-center py-4 bg-white border-b border-gray-200">
           <h1 className="text-3xl font-bold text-blue-800 mb-1">0Point Visualizer</h1>
           <p className="text-blue-800 text-base">Watch algorithms come to life with interactive visualizations</p>
-        </div>
-        
-        <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-0" style={{ height: 'calc(100vh - 120px)' }}>
-          {/* Left Column - Input and Code */}
-          <div className="bg-white border-r border-sky-200 flex flex-col h-full">
-            <div className="p-6 overflow-y-auto flex-grow h-full">
-              <h2 className="text-xl text-blue-800 mb-3">Algorithm & Input</h2>
-              
-              <div className="mb-6">
-                <AlgorithmSelector
-                  selectedAlgorithm={selectedAlgorithm}
-                  onAlgorithmChange={handleAlgorithmChange}
-                />
-              </div>
-              
-              {selectedAlgorithm && (
-                <div className="mb-6">
-                  <InputPanel
-                    algorithm={algorithms.find(alg => alg.id === selectedAlgorithm)}
-                    inputValues={inputValues}
-                    onInputChange={handleInputChange}
-                    onLoadExample={loadExample}
-                    onStart={startVisualization}
-                    isVisualizing={isVisualizing}
-                    selectedAlgorithm={selectedAlgorithm}
-                  />
-                </div>
-              )}
-              
-              {/* Code Display */}
-              {selectedAlgorithm && (
-                <div className="mt-6 flex-grow flex flex-col">
-                  <h3 className="text-lg text-blue-800 mb-2">Algorithm Code</h3>
-                  <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto font-mono text-sm flex-grow">
-                    {algorithmCodes[selectedAlgorithm]?.split('\n').map((line, index) => (
-                      <div 
-                        key={index} 
-                        className={index === currentLineToHighlight ? 'bg-yellow-500 bg-opacity-30 p-1 rounded code-line-highlight' : ''}
-                      >
-                        <span className="text-gray-500 mr-4 select-none">{index + 1}</span>
-                        {line}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+          
+          {/* Navbar for Visualizer Sections */}
+          <div className="flex justify-center mt-4">
+            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+              <button
+                onClick={() => setActiveTab('dsa')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'dsa' ? 'bg-white text-blue-800 shadow' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                DSA Visualizer
+              </button>
+              <button
+                onClick={() => setActiveTab('io')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'io' ? 'bg-white text-blue-800 shadow' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                I/O Visualizer
+              </button>
+              <button
+                onClick={() => setActiveTab('code')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'code' ? 'bg-white text-blue-800 shadow' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                Code Visualizer
+              </button>
             </div>
           </div>
+        </div>
+        
+        <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-0" style={{ height: 'calc(100vh - 160px)' }}>
+          {/* Left Column - Input and Code */}
+          {activeTab === 'dsa' && (
+            <div className="bg-white border-r border-sky-200 flex flex-col h-full">
+              <div className="p-6 overflow-y-auto flex-grow h-full">
+                <h2 className="text-xl text-blue-800 mb-3">Algorithm & Input</h2>
+                
+                <div className="mb-6">
+                  <AlgorithmSelector
+                    selectedAlgorithm={selectedAlgorithm}
+                    onAlgorithmChange={handleAlgorithmChange}
+                  />
+                </div>
+                
+                {selectedAlgorithm && (
+                  <div className="mb-6">
+                    <InputPanel
+                      algorithm={algorithms.find(alg => alg.id === selectedAlgorithm)}
+                      inputValues={inputValues}
+                      onInputChange={handleInputChange}
+                      onLoadExample={loadExample}
+                      onStart={startVisualization}
+                      isVisualizing={isVisualizing}
+                      selectedAlgorithm={selectedAlgorithm}
+                    />
+                  </div>
+                )}
+                
+                {/* Code Display */}
+                {selectedAlgorithm && (
+                  <div className="mt-6 flex-grow flex flex-col">
+                    <h3 className="text-lg text-blue-800 mb-2">Algorithm Code</h3>
+                    <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto font-mono text-sm flex-grow">
+                      {algorithmCodes[selectedAlgorithm]?.split('\n').map((line, index) => (
+                        <div 
+                          key={index} 
+                          className={index === currentLineToHighlight ? 'bg-yellow-500 bg-opacity-30 p-1 rounded code-line-highlight' : ''}
+                        >
+                          <span className="text-gray-500 mr-4 select-none">{index + 1}</span>
+                          {line}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           
-          {/* Right Column - Visualization */}
+          {/* Right Column - Visualization or Other Content */}
           <div className="bg-white flex flex-col h-full">
             <div className="p-6 overflow-y-auto flex-grow h-full">
-              <h2 className="text-xl text-blue-800 mb-3">Visualization</h2>
-              {renderVisualization()}
-              
-              {!selectedAlgorithm && (
-                <div className="border border-gray-400 p-6 mt-6 bg-white">
-                  <div className="flex flex-col md:flex-row items-center">
-                    <div className="mb-4 md:mb-0 md:mr-6">
-                      <div className="w-16 h-20 bg-white border border-gray-400 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg text-black mb-2">How to Use This Visualizer</h3>
-                      <div className="grid grid-cols-1 gap-4 text-black">
-                        <p><span>1. Select an algorithm</span> from the dropdown menu</p>
-                        <p><span>2. Enter the required inputs</span> as comma-separated values</p>
-                        <p><span>3. Click "Start Visualization"</span> to see the algorithm in action</p>
-                        <p><span>4. Observe</span> how the algorithm works step by step</p>
-                      </div>
-                    </div>
-                  </div>
+              {activeTab === 'dsa' && (
+                <>
+                  <h2 className="text-xl text-blue-800 mb-3">Visualization</h2>
+                  {renderVisualization()}
                   
-                  {/* Tips for new users */}
-                  <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg">
-                    <h3 className="text-black mb-1">Quick Tips</h3>
-                    <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
-                      <li>Try the "Example" buttons to quickly load sample data</li>
-                      <li>Sorting algorithms work best with 5-10 numbers</li>
-                      <li>Pause animations anytime to examine steps closely</li>
-                      <li>Use the navigation buttons to move between steps</li>
-                    </ul>
+                  {!selectedAlgorithm && (
+                    <div className="border border-gray-400 p-6 mt-6 bg-white">
+                      <div className="flex flex-col md:flex-row items-center">
+                        <div className="mb-4 md:mb-0 md:mr-6">
+                          <div className="w-16 h-20 bg-white border border-gray-400 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg text-black mb-2">How to Use This Visualizer</h3>
+                          <div className="grid grid-cols-1 gap-4 text-black">
+                            <p><span>1. Select an algorithm</span> from the dropdown menu</p>
+                            <p><span>2. Enter the required inputs</span> as comma-separated values</p>
+                            <p><span>3. Click "Start Visualization"</span> to see the algorithm in action</p>
+                            <p><span>4. Observe</span> how the algorithm works step by step</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Tips for new users */}
+                      <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg">
+                        <h3 className="text-black mb-1">Quick Tips</h3>
+                        <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
+                          <li>Try the "Example" buttons to quickly load sample data</li>
+                          <li>Sorting algorithms work best with 5-10 numbers</li>
+                          <li>Pause animations anytime to examine steps closely</li>
+                          <li>Use the navigation buttons to move between steps</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedAlgorithm && !visualizationData && (
+                    <div className="text-center py-6 text-black">
+                      <p className="mb-4">Click "Start Visualization" to begin</p>
+                      <div className="inline-block p-3 bg-white border border-gray-200 rounded-lg max-w-md">
+                        <h3 className="text-black mb-1">Visualization Tips</h3>
+                        <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1 text-left">
+                          <li>Animations will show each step of the algorithm</li>
+                          <li>Use controls to pause, stop, or navigate steps</li>
+                          <li>Hover over elements to see additional information</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Tips for using the visualizer */}
+                  {selectedAlgorithm && (
+                    <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg">
+                      <h3 className="text-black mb-1">Tips for Using the Visualizer</h3>
+                      <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
+                        <li>Click "Start Visualization" to begin the animation</li>
+                        <li>Use the Next/Previous buttons to navigate through steps</li>
+                        <li>Hover over elements to see more details</li>
+                        <li>Adjust your browser window for better viewing</li>
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              {activeTab === 'io' && (
+                <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                  <div className="max-w-md mx-auto">
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">I/O Visualizer</h2>
+                    <p className="text-gray-600 mb-6">Interactive Input/Output visualization coming soon...</p>
+                    <div className="bg-gray-100 border border-gray-200 rounded-lg p-6 text-left">
+                      <h3 className="font-medium text-gray-800 mb-2">What to expect:</h3>
+                      <ul className="text-gray-600 text-sm space-y-1">
+                        <li>• Step-by-step visualization of program I/O</li>
+                        <li>• Interactive input simulation</li>
+                        <li>• Output tracing and debugging</li>
+                        <li>• Real-time data flow visualization</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               )}
               
-              {selectedAlgorithm && !visualizationData && (
-                <div className="text-center py-6 text-black">
-                  <p className="mb-4">Click "Start Visualization" to begin</p>
-                  <div className="inline-block p-3 bg-white border border-gray-200 rounded-lg max-w-md">
-                    <h3 className="text-black mb-1">Visualization Tips</h3>
-                    <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1 text-left">
-                      <li>Animations will show each step of the algorithm</li>
-                      <li>Use controls to pause, stop, or navigate steps</li>
-                      <li>Hover over elements to see additional information</li>
-                    </ul>
+              {activeTab === 'code' && (
+                <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                  <div className="max-w-md mx-auto">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Code Visualizer</h2>
+                    <p className="text-gray-600 mb-6">Interactive code execution visualization coming soon...</p>
+                    <div className="bg-gray-100 border border-gray-200 rounded-lg p-6 text-left">
+                      <h3 className="font-medium text-gray-800 mb-2">What to expect:</h3>
+                      <ul className="text-gray-600 text-sm space-y-1">
+                        <li>• Line-by-line code execution</li>
+                        <li>• Variable state tracking</li>
+                        <li>• Call stack visualization</li>
+                        <li>• Memory allocation diagrams</li>
+                      </ul>
+                    </div>
                   </div>
-                </div>
-              )}
-              
-              {/* Tips for using the visualizer */}
-              {selectedAlgorithm && (
-                <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg">
-                  <h3 className="text-black mb-1">Tips for Using the Visualizer</h3>
-                  <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
-                    <li>Click "Start Visualization" to begin the animation</li>
-                    <li>Use the Next/Previous buttons to navigate through steps</li>
-                    <li>Hover over elements to see more details</li>
-                    <li>Adjust your browser window for better viewing</li>
-                  </ul>
                 </div>
               )}
             </div>
