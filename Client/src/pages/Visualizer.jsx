@@ -16,8 +16,8 @@ import DFSVisualizer from '../components/Visualizer_comp/DFSVisualizer';
 import DijkstraVisualizer from '../components/Visualizer_comp/DijkstraVisualizer';
 import KruskalVisualizer from '../components/Visualizer_comp/KruskalVisualizer';
 import PrimVisualizer from '../components/Visualizer_comp/PrimVisualizer';
-import IOVisualizer from '../components/Visualizer_comp/IOVisualizer';
-import CodeVisualizer from '../components/Visualizer_comp/CodeVisualizer';
+import IOVisualizer from '../components/Io_Visualizer/IOVisualizer';
+import CodeVisualizer from '../components/CodeVisualizer/CodeVisualizer';
 import { algorithms } from '../utils/algorithms';
 import { parseInputs } from '../utils/inputParser';
 
