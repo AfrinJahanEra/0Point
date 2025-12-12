@@ -1104,17 +1104,6 @@ const addTestCase = (problemId) => {
                   />
                   {publishErrors.testStartTime && <p className="text-red-500 text-xs mt-1">{publishErrors.testStartTime}</p>}
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Test Duration (minutes)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={publishSettings.testDuration}
-                    onChange={e => handleSettingChange('testDuration', parseInt(e.target.value))}
-                    className={`w-full px-3 py-2 border ${publishErrors.testDuration ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-                  />
-                  {publishErrors.testDuration && <p className="text-red-500 text-xs mt-1">{publishErrors.testDuration}</p>}
-                </div>
               </div>
             )}
           </div>

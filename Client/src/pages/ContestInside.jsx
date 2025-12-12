@@ -217,7 +217,7 @@ try {
     setUserStats({
       solved,
       attempted: totalAttempts,
-      total: problems.length,
+      total: problemsList.length, 
       accuracy: `${accuracy}%`
     });
     
@@ -235,21 +235,26 @@ try {
   // Don't block on error
 }
 
+
+
       // 5. Calculate time remaining (OPTIONAL)
-      if (contest.status === 'live' && contest.start_time && contest.duration) {
-        try {
-          const startTime = new Date(contest.start_time);
-          const endTime = new Date(startTime.getTime() + (contest.duration * 60 * 60 * 1000));
-          const now = new Date();
-          
-          if (now >= startTime && now <= endTime) {
-            const remainingSeconds = Math.floor((endTime - now) / 1000);
-            setTimeRemaining(remainingSeconds);
-          }
-        } catch (timeError) {
-          console.error('⚠️ Time calculation error:', timeError);
-        }
-      }
+if (contest.status === 'live' && contest.start_time && contest.duration) {
+  try {
+    const startTime = new Date(contest.start_time);
+    const endTime = new Date(startTime.getTime() + (contest.duration * 60 * 60 * 1000));
+    const now = new Date();
+    
+    if (now >= startTime && now <= endTime) {
+      const remainingSeconds = Math.floor((endTime - now) / 1000);
+      setTimeRemaining(remainingSeconds);
+      console.log('⏰ Timer started:', remainingSeconds, 'seconds remaining');
+    } else if (now > endTime) {
+      setTimeRemaining(0);
+    }
+  } catch (timeError) {
+    console.error('⚠️ Time calculation error:', timeError);
+  }
+}
 
       console.log('🎉 All data loaded successfully!');
       setLoading(false);
@@ -289,6 +294,50 @@ useEffect(() => {
     setLoading(false);
   }
 }, [contestId]);
+
+
+useEffect(() => {
+  if (contestId) {
+    console.log('🔍 useEffect triggered for contest:', contestId);
+    fetchContestData();
+  } else {
+    console.error('❌ No contestId provided');
+    setError('No contest ID provided');
+    setLoading(false);
+  }
+}, [contestId]);
+
+// === ADD THIS COUNTDOWN TIMER EFFECT HERE ===
+useEffect(() => {
+  let intervalId;
+  
+  if (contestData?.status === 'live' && timeRemaining > 0) {
+    intervalId = setInterval(() => {
+      setTimeRemaining(prevTime => {
+        if (prevTime <= 1) {
+          clearInterval(intervalId);
+          
+          // Optionally refresh contest data when time runs out
+          setTimeout(() => {
+            fetchContestData();
+          }, 1000);
+          
+          return 0;
+        }
+        return prevTime - 1;
+      });
+    }, 1000);
+  }
+  
+  // Cleanup interval on component unmount or when dependencies change
+  return () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+    }
+  };
+}, [contestData?.status, timeRemaining]);
+// === END OF ADDED CODE ===
+
 
   // Handle problem click
   const handleProblemClick = (problem) => {
