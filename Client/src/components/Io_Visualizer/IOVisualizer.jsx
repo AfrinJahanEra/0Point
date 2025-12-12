@@ -11,6 +11,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
   const [nodeDetails, setNodeDetails] = useState(null);
   const [stackData, setStackData] = useState([]);
   const [queueData, setQueueData] = useState([]);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   
   // Ref to track programmatic input updates
   const isProgrammaticUpdate = useRef(false);
@@ -25,7 +26,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
   const [error, setError] = useState('');
   const [metadata, setMetadata] = useState({});
   
-  // Function to add element to stack or queue
+  // Function to add element to stack or queue with animation trigger
   const handleAddElement = (value) => {
     if (!value.trim()) return;
     
@@ -60,6 +61,9 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         isProgrammaticUpdate.current = true;
         setInternalInputValue(newInputValue);
       }
+      // Trigger animation
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 1000 / animationSpeed);
     } else if (inputType === 'queue') {
       // Enqueue to queue (add to end)
       const newData = [...queueData, parsedValue];
@@ -77,6 +81,9 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         isProgrammaticUpdate.current = true;
         setInternalInputValue(newInputValue);
       }
+      // Trigger animation
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 1000 / animationSpeed);
     }
   };
   
@@ -567,7 +574,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
     }
   }, [inputType, inputValue, stackData, queueData, isProgrammaticUpdate]);
 
-  // Enhanced array visualization
+  // Enhanced array visualization with unique animations
   const renderArrayVisualization = () => {
     if (!Array.isArray(parsedData)) return null;
     
@@ -579,9 +586,10 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               key={index}
               className={`
                 w-16 h-16 flex flex-col items-center justify-center 
-                border-2 border-gray-400 rounded transition-all duration-300
-                ${selectedNode === index ? 'ring-2 ring-gray-800 scale-110' : ''}
-                bg-white
+                border-2 border-black rounded transition-all duration-300
+                ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-110' : ''}
+                bg-white hover:bg-gray-100
+                ${isAnimating ? 'animate-uniquePulse' : ''}
               `}
               onClick={() => {
                 setSelectedNode(index);
@@ -595,7 +603,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 });
               }}
             >
-              <span className="font-bold text-lg">
+              <span className="font-bold text-lg text-black">
                 {item === null ? 'null' : String(item)}
               </span>
               <span className="text-xs text-gray-600 mt-1">[{index}]</span>
@@ -605,27 +613,27 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         
         {/* Array stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
-          <div className="border border-gray-300 p-3 rounded">
+          <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Length</div>
-            <div className="text-lg font-bold">{parsedData.length}</div>
+            <div className="text-lg font-bold text-black">{parsedData.length}</div>
           </div>
           
           {metadata.hasNumbers && (
             <>
-              <div className="border border-gray-300 p-3 rounded">
+              <div className="border border-black p-3 rounded bg-white">
                 <div className="text-sm text-gray-600">Sum</div>
-                <div className="text-lg font-bold">{metadata.sum}</div>
+                <div className="text-lg font-bold text-black">{metadata.sum}</div>
               </div>
-              <div className="border border-gray-300 p-3 rounded">
+              <div className="border border-black p-3 rounded bg-white">
                 <div className="text-sm text-gray-600">Avg</div>
-                <div className="text-lg font-bold">{metadata.average.toFixed(2)}</div>
+                <div className="text-lg font-bold text-black">{metadata.average.toFixed(2)}</div>
               </div>
             </>
           )}
           
-          <div className="border border-gray-300 p-3 rounded">
+          <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Types</div>
-            <div className="text-xs">
+            <div className="text-xs text-black">
               {metadata.hasNumbers && 'N '}
               {metadata.hasStrings && 'S '}
               {metadata.hasBooleans && 'B '}
@@ -637,14 +645,12 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
     );
   };
 
-  // Stack visualization (vertical layout)
+  // Stack visualization (vertical layout) with slide-in animation
   const renderStackVisualization = () => {
     // Use stackData for stack operations
     const displayData = inputType === 'stack' ? stackData : parsedData;
     
     if (!Array.isArray(displayData)) return null;
-    
-
     
     return (
       <div className="flex flex-col items-center w-full">
@@ -654,9 +660,10 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               key={index}
               className={`
                 w-full h-16 flex items-center justify-between px-4
-                border-2 border-gray-400 rounded transition-all duration-300 mb-2
-                ${selectedNode === index ? 'ring-2 ring-gray-800 scale-105' : ''}
-                bg-white
+                border-2 border-black rounded transition-all duration-300 mb-2
+                ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-105' : ''}
+                bg-white hover:bg-gray-100
+                ${isAnimating && index === displayData.length - 1 ? 'animate-uniqueSlideIn' : ''}
               `}
               onClick={() => {
                 setSelectedNode(index);
@@ -671,7 +678,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               }}
             >
               <div className="flex items-center">
-                <span className="font-bold text-lg">
+                <span className="font-bold text-lg text-black">
                   {item === null ? 'null' : String(item)}
                 </span>
                 <span className="text-xs text-gray-600 ml-2">[{index}]</span>
@@ -683,46 +690,42 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
           ))}
         </div>
         
-
-        
         {/* Stack stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
-          <div className="border border-gray-300 p-3 rounded">
+          <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Size</div>
-            <div className="text-lg font-bold">{stackData.length}</div>
+            <div className="text-lg font-bold text-black">{stackData.length}</div>
           </div>
           
           {stackData.length > 0 && (
-            <div className="border border-gray-300 p-3 rounded">
+            <div className="border border-black p-3 rounded bg-white">
               <div className="text-sm text-gray-600">Top Element</div>
-              <div className="text-lg font-bold">
+              <div className="text-lg font-bold text-black">
                 {stackData[stackData.length - 1] === null ? 'null' : String(stackData[stackData.length - 1])}
               </div>
             </div>
           )}
           
-          <div className="border border-gray-300 p-3 rounded">
+          <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Bottom Index</div>
-            <div className="text-lg font-bold">0</div>
+            <div className="text-lg font-bold text-black">0</div>
           </div>
           
-          <div className="border border-gray-300 p-3 rounded">
+          <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Top Index</div>
-            <div className="text-lg font-bold">{stackData.length > 0 ? stackData.length - 1 : 'N/A'}</div>
+            <div className="text-lg font-bold text-black">{stackData.length > 0 ? stackData.length - 1 : 'N/A'}</div>
           </div>
         </div>
       </div>
     );
   };
 
-  // Queue visualization (vertical layout)
+  // Queue visualization (vertical layout) with slide-in animation
   const renderQueueVisualization = () => {
     // Use queueData for queue operations
     const displayData = inputType === 'queue' ? queueData : parsedData;
     
     if (!Array.isArray(displayData)) return null;
-    
-
     
     return (
       <div className="flex flex-col items-center w-full">
@@ -732,9 +735,10 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               key={index}
               className={`
                 w-full h-16 flex items-center justify-between px-4
-                border-2 border-gray-400 rounded transition-all duration-300 mb-2
-                ${selectedNode === index ? 'ring-2 ring-gray-800 scale-105' : ''}
-                bg-white
+                border-2 border-black rounded transition-all duration-300 mb-2
+                ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-105' : ''}
+                bg-white hover:bg-gray-100
+                ${isAnimating && index === displayData.length - 1 ? 'animate-uniqueSlideIn' : ''}
               `}
               onClick={() => {
                 setSelectedNode(index);
@@ -749,7 +753,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               }}
             >
               <div className="flex items-center">
-                <span className="font-bold text-lg">
+                <span className="font-bold text-lg text-black">
                   {item === null ? 'null' : String(item)}
                 </span>
                 <span className="text-xs text-gray-600 ml-2">[{index}]</span>
@@ -761,42 +765,40 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
           ))}
         </div>
         
-
-        
         {/* Queue stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
-          <div className="border border-gray-300 p-3 rounded">
+          <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Size</div>
-            <div className="text-lg font-bold">{queueData.length}</div>
+            <div className="text-lg font-bold text-black">{queueData.length}</div>
           </div>
           
           {queueData.length > 0 && (
             <>
-              <div className="border border-gray-300 p-3 rounded">
+              <div className="border border-black p-3 rounded bg-white">
                 <div className="text-sm text-gray-600">Front Element</div>
-                <div className="text-lg font-bold">
+                <div className="text-lg font-bold text-black">
                   {queueData[0] === null ? 'null' : String(queueData[0])}
                 </div>
               </div>
-              <div className="border border-gray-300 p-3 rounded">
+              <div className="border border-black p-3 rounded bg-white">
                 <div className="text-sm text-gray-600">Rear Element</div>
-                <div className="text-lg font-bold">
+                <div className="text-lg font-bold text-black">
                   {queueData[queueData.length - 1] === null ? 'null' : String(queueData[queueData.length - 1])}
                 </div>
               </div>
             </>
           )}
           
-          <div className="border border-gray-300 p-3 rounded">
+          <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Front Index</div>
-            <div className="text-lg font-bold">0</div>
+            <div className="text-lg font-bold text-black">0</div>
           </div>
         </div>
       </div>
     );
   };
 
-  // Linked list visualization
+  // Linked list visualization with chain animation
   const renderLinkedListVisualization = () => {
     if (!Array.isArray(parsedData)) return null;
     
@@ -809,9 +811,10 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 <div 
                   className={`
                     w-20 h-16 flex flex-col items-center justify-center
-                    border-2 border-gray-400 rounded transition-all duration-300
-                    ${selectedNode === index ? 'ring-2 ring-gray-800 scale-105' : ''}
-                    bg-white
+                    border-2 border-black rounded transition-all duration-300
+                    ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-105' : ''}
+                    bg-white hover:bg-gray-100
+                    ${isAnimating ? 'animate-uniqueChain' : ''}
                   `}
                   onClick={() => {
                     setSelectedNode(index);
@@ -825,13 +828,13 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                     });
                   }}
                 >
-                  <span className="font-bold text-sm">
+                  <span className="font-bold text-sm text-black">
                     {item === null ? 'null' : String(item)}
                   </span>
                   <span className="text-xs text-gray-600 mt-1">[{index}]</span>
                 </div>
                 {index < parsedData.length - 1 && (
-                  <div className="mx-2 text-xl font-bold text-gray-500">→</div>
+                  <div className="mx-2 text-xl font-bold text-black">→</div>
                 )}
               </React.Fragment>
             ))}
@@ -840,38 +843,38 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         
         {/* Linked list stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
-          <div className="border border-gray-300 p-3 rounded">
+          <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Length</div>
-            <div className="text-lg font-bold">{parsedData.length}</div>
+            <div className="text-lg font-bold text-black">{parsedData.length}</div>
           </div>
           
           {parsedData.length > 0 && (
             <>
-              <div className="border border-gray-300 p-3 rounded">
+              <div className="border border-black p-3 rounded bg-white">
                 <div className="text-sm text-gray-600">Head</div>
-                <div className="text-lg font-bold">
+                <div className="text-lg font-bold text-black">
                   {parsedData[0] === null ? 'null' : String(parsedData[0])}
                 </div>
               </div>
-              <div className="border border-gray-300 p-3 rounded">
+              <div className="border border-black p-3 rounded bg-white">
                 <div className="text-sm text-gray-600">Tail</div>
-                <div className="text-lg font-bold">
+                <div className="text-lg font-bold text-black">
                   {parsedData[parsedData.length - 1] === null ? 'null' : String(parsedData[parsedData.length - 1])}
                 </div>
               </div>
             </>
           )}
           
-          <div className="border border-gray-300 p-3 rounded">
+          <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Operations</div>
-            <div className="text-xs">Insert, Delete, Traverse</div>
+            <div className="text-xs text-black">Insert, Delete, Traverse</div>
           </div>
         </div>
       </div>
     );
   };
 
-  // Enhanced tree visualization with better layout
+  // Enhanced tree visualization with branch grow animation
   const renderTreeVisualization = () => {
     if (!parsedData || !parsedData.nodes) return null;
     
@@ -954,8 +957,8 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
       const minY = Math.min(...allNodes.map(n => n.y));
       const maxY = Math.max(...allNodes.map(n => n.y));
       
-      const width = Math.max(600, maxX - minX + padding * 2);
-      const height = Math.max(400, maxY - minY + padding * 2);
+      const width = Math.max(800, maxX - minX + padding * 2);
+      const height = Math.max(600, maxY - minY + padding * 2);
       const offsetX = width / 2;
       const offsetY = padding;
       
@@ -973,17 +976,19 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
       <div className="w-full overflow-auto">
         <svg
           ref={svgRef}
-          width={layout.width}
-          height={layout.height}
+          width="100%"
+          height="100%"
           viewBox={`0 0 ${layout.width} ${layout.height}`}
-          className="border border-gray-200 rounded-lg bg-white"
+          className="border border-black rounded-lg bg-white min-h-[400px]"
         >
-          {/* Render edges */}
+          {/* Render edges with draw animation */}
           {layout.edges.map((edge, index) => {
             const fromNode = layout.nodes.find(n => n.label === edge.from);
             const toNode = layout.nodes.find(n => n.label === edge.to);
             
             if (!fromNode || !toNode) return null;
+            
+            const length = Math.sqrt(Math.pow(toNode.x - fromNode.x, 2) + Math.pow(toNode.y - fromNode.y, 2));
             
             return (
               <line
@@ -992,25 +997,26 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 y1={fromNode.y}
                 x2={toNode.x}
                 y2={toNode.y}
-                stroke="#6B7280"
+                stroke="#001F3F"
                 strokeWidth="2"
                 markerEnd={edge.directed ? "url(#arrowhead)" : undefined}
-                className="transition-all duration-300"
+                className={`transition-all duration-300 ${isAnimating ? 'animate-uniqueEdgeDraw' : ''}`}
+                style={{ strokeDasharray: length, strokeDashoffset: isAnimating ? length : 0 }}
               />
             );
           })}
           
-          {/* Render nodes */}
+          {/* Render nodes with grow animation */}
           {layout.nodes.map((node, index) => (
             <g key={index}>
               <circle
                 cx={node.x}
                 cy={node.y}
                 r="28"
-                fill={selectedNode === node.label ? "#3B82F6" : "#10B981"}
-                stroke={selectedNode === node.label ? "#1D4ED8" : "#047857"}
+                fill={selectedNode === node.label ? "#001F3F" : "white"}
+                stroke={selectedNode === node.label ? "#001F3F" : "black"}
                 strokeWidth="3"
-                className="cursor-pointer transition-all duration-300 hover:stroke-blue-500 hover:scale-110"
+                className={`cursor-pointer transition-all duration-300 hover:stroke-[#001F3F] hover:scale-110 ${isAnimating ? 'animate-uniqueGrow' : ''}`}
                 onClick={() => {
                   setSelectedNode(node.label);
                   setNodeDetails({
@@ -1026,7 +1032,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 y={node.y}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                className="font-bold text-sm fill-white select-none pointer-events-none"
+                className="font-bold text-sm fill-black select-none pointer-events-none"
               >
                 {node.label}
               </text>
@@ -1043,7 +1049,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               refY="3.5"
               orient="auto"
             >
-              <polygon points="0 0, 10 3.5, 0 7" fill="#6B7280" />
+              <polygon points="0 0, 10 3.5, 0 7" fill="#001F3F" />
             </marker>
           </defs>
         </svg>
@@ -1051,25 +1057,140 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
     );
   };
 
-  // Enhanced graph visualization
+  // Enhanced graph visualization with circular layout
   const renderGraphVisualization = () => {
     if (!parsedData || !parsedData.nodes) return null;
     
-    return renderTreeVisualization(); // Reuse tree visualization for now
+    const { nodes, edges } = parsedData;
+    if (nodes.length === 0) return <div className="text-gray-500">No nodes to display</div>;
+    
+    // Calculate circular layout for graph
+    const calculateGraphLayout = () => {
+      const nodeMap = new Map();
+      nodes.forEach(node => {
+        nodeMap.set(node.label, { ...node, x: 0, y: 0 });
+      });
+      
+      const numNodes = nodes.length;
+      const centerX = 400;
+      const centerY = 300;
+      const minRadius = 100;
+      const maxRadius = 300;
+      const radius = Math.min(maxRadius, minRadius + (numNodes * 10)); // Scale radius with number of nodes
+      
+      nodes.forEach((node, index) => {
+        const angle = (index / numNodes) * Math.PI * 2;
+        const n = nodeMap.get(node.label);
+        n.x = centerX + radius * Math.cos(angle);
+        n.y = centerY + radius * Math.sin(angle);
+      });
+      
+      const allNodes = Array.from(nodeMap.values());
+      const width = Math.max(800, radius * 2 + 100);
+      const height = Math.max(600, radius * 2 + 100);
+      
+      return { nodes: allNodes, edges, width, height };
+    };
+    
+    const layout = calculateGraphLayout();
+    
+    return (
+      <div className="w-full overflow-auto">
+        <svg
+          ref={svgRef}
+          width="100%"
+          height="100%"
+          viewBox={`0 0 ${layout.width} ${layout.height}`}
+          className="border border-black rounded-lg bg-white min-h-[400px]"
+        >
+          {/* Render edges with draw animation */}
+          {layout.edges.map((edge, index) => {
+            const fromNode = layout.nodes.find(n => n.label === edge.from);
+            const toNode = layout.nodes.find(n => n.label === edge.to);
+            
+            if (!fromNode || !toNode) return null;
+            
+            const length = Math.sqrt(Math.pow(toNode.x - fromNode.x, 2) + Math.pow(toNode.y - fromNode.y, 2));
+            
+            return (
+              <line
+                key={index}
+                x1={fromNode.x}
+                y1={fromNode.y}
+                x2={toNode.x}
+                y2={toNode.y}
+                stroke="#001F3F"
+                strokeWidth="2"
+                markerEnd={edge.directed ? "url(#arrowhead)" : undefined}
+                className={`transition-all duration-300 ${isAnimating ? 'animate-uniqueEdgeDraw' : ''}`}
+                style={{ strokeDasharray: length, strokeDashoffset: isAnimating ? length : 0 }}
+              />
+            );
+          })}
+          
+          {/* Render nodes with grow animation */}
+          {layout.nodes.map((node, index) => (
+            <g key={index}>
+              <circle
+                cx={node.x}
+                cy={node.y}
+                r="28"
+                fill={selectedNode === node.label ? "#001F3F" : "white"}
+                stroke={selectedNode === node.label ? "#001F3F" : "black"}
+                strokeWidth="3"
+                className={`cursor-pointer transition-all duration-300 hover:stroke-[#001F3F] hover:scale-110 ${isAnimating ? 'animate-uniqueGrow' : ''}`}
+                onClick={() => {
+                  setSelectedNode(node.label);
+                  setNodeDetails({
+                    label: node.label,
+                    level: node.level || 0,
+                    children: edges.filter(e => e.from === node.label).length,
+                    parents: edges.filter(e => e.to === node.label).length
+                  });
+                }}
+              />
+              <text
+                x={node.x}
+                y={node.y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="font-bold text-sm fill-black select-none pointer-events-none"
+              >
+                {node.label}
+              </text>
+            </g>
+          ))}
+          
+          {/* Arrowhead marker for directed edges */}
+          <defs>
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="7"
+              refX="9"
+              refY="3.5"
+              orient="auto"
+            >
+              <polygon points="0 0, 10 3.5, 0 7" fill="#001F3F" />
+            </marker>
+          </defs>
+        </svg>
+      </div>
+    );
   };
 
   // Render visualization based on input type
   const renderVisualization = () => {
     if (error) {
       return (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+        <div className="p-4 bg-white border border-[#001F3F] rounded-lg">
           <div className="flex items-center">
-            <svg className="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-[#001F3F] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div>
-              <h3 className="font-medium text-red-800">Error Parsing Input</h3>
-              <p className="text-red-600 text-sm mt-1">{error}</p>
+              <h3 className="font-medium text-[#001F3F]">Error Parsing Input</h3>
+              <p className="text-[#001F3F] text-sm mt-1">{error}</p>
             </div>
           </div>
         </div>
@@ -1090,14 +1211,14 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
     return (
       <div className="w-full">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">
+          <h3 className="text-lg font-semibold text-black">
             {inputType.charAt(0).toUpperCase() + inputType.slice(1)} Visualization
           </h3>
           <div className="flex items-center space-x-2">
             <select
               value={visualizationMode}
               onChange={(e) => setVisualizationMode(e.target.value)}
-              className="text-sm p-2 border border-gray-300 rounded-md"
+              className="text-sm p-2 border border-black rounded-md bg-white text-black"
             >
               <option value="default">Default View</option>
               <option value="compact">Compact</option>
@@ -1105,9 +1226,18 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
             </select>
             <button
               onClick={() => setIsAnimating(!isAnimating)}
-              className={`px-3 py-1 text-sm rounded-md ${isAnimating ? 'bg-yellow-500 text-white' : 'bg-gray-200'}`}
+              className={`px-3 py-1 text-sm rounded-md ${isAnimating ? 'bg-[#001F3F] text-white' : 'bg-gray-200 text-black'}`}
             >
               {isAnimating ? 'Stop' : 'Animate'}
+            </button>
+            <button 
+              title="Full Screen"
+              onClick={() => setIsFullScreen(true)}
+              className="p-1 rounded-md bg-gray-200 text-black hover:bg-gray-300"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
             </button>
           </div>
         </div>
@@ -1123,13 +1253,13 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         
         {/* Node Details Panel */}
         {nodeDetails && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h4 className="font-medium text-gray-800 mb-2">Node Details</h4>
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-black">
+            <h4 className="font-medium text-black mb-2">Node Details</h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
               {Object.entries(nodeDetails).map(([key, value]) => (
                 <div key={key} className="flex justify-between">
                   <span className="text-gray-600 capitalize">{key}:</span>
-                  <span className="font-medium">{String(value)}</span>
+                  <span className="font-medium text-black">{String(value)}</span>
                 </div>
               ))}
             </div>
@@ -1137,12 +1267,12 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         )}
         
         {/* Metadata Summary */}
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="mt-4 p-3 bg-white rounded-lg border border-[#001F3F]">
           <div className="flex items-center">
-            <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-[#001F3F] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-blue-800 font-medium">{metadata.summary}</span>
+            <span className="text-[#001F3F] font-medium">{metadata.summary}</span>
           </div>
         </div>
       </div>
@@ -1153,10 +1283,10 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
   if (externalInputType !== undefined || externalInputValue !== undefined) {
     return (
       <div className="flex flex-col h-full">
-        <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex-grow">
+        <div className="p-4 bg-white border border-black rounded-lg shadow-sm flex-grow">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-blue-800">I/O Visualization</h2>
-            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+            <h2 className="text-xl font-bold text-[#001F3F]">I/O Visualization</h2>
+            <span className="px-3 py-1 bg-[#001F3F] text-white rounded-full text-sm font-medium">
               {inputType.toUpperCase()}
             </span>
           </div>
@@ -1170,11 +1300,11 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
   
   // Standalone mode with full controls
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div className="flex flex-col h-full bg-white rounded-lg border border-black shadow-sm">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">I/O Visualizer</h2>
+            <h2 className="text-2xl font-bold text-black">I/O Visualizer</h2>
             <p className="text-gray-600 mt-1">Interactive visualization for data structures and algorithms</p>
           </div>
           <div className="flex items-center space-x-2">
@@ -1188,15 +1318,15 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               onChange={(e) => setAnimationSpeed(parseFloat(e.target.value))}
               className="w-24"
             />
-            <span className="text-sm font-medium">{animationSpeed}x</span>
+            <span className="text-sm font-medium text-black">{animationSpeed}x</span>
           </div>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Input Section */}
           <div className="space-y-6">
-            <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Input Configuration</h3>
+            <div className="bg-gray-50 p-5 rounded-xl border border-black">
+              <h3 className="text-lg font-semibold text-black mb-4">Input Configuration</h3>
               
               <div className="space-y-4">
                 <div>
@@ -1208,7 +1338,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                       <button
                         key={type}
                         onClick={() => setInputType(type)}
-                        className={`p-3 rounded-lg text-center transition-all ${inputType === type ? 'bg-blue-500 text-white' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
+                        className={`p-3 rounded-lg text-center transition-all ${inputType === type ? 'bg-[#001F3F] text-white' : 'bg-white border border-black hover:bg-gray-100'}`}
                       >
                         <div className="font-medium">{type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')}</div>
                       </button>
@@ -1222,7 +1352,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                     <input
                       type="text"
                       placeholder="Enter element to add"
-                      className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="flex-1 p-2 border border-black rounded-lg focus:ring-2 focus:ring-[#001F3F] focus:border-[#001F3F] bg-white text-black"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           handleAddElement(e.target.value);
@@ -1236,7 +1366,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                         handleAddElement(input.value);
                         input.value = '';
                       }}
-                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                      className="px-3 py-2 bg-[#001F3F] text-white rounded-lg hover:bg-[#001F3F]/80 transition-colors"
                     >
                       Add
                     </button>
@@ -1251,7 +1381,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder={getPlaceholder(inputType)}
-                    className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-32"
+                    className="w-full p-4 border border-black rounded-lg focus:ring-2 focus:ring-[#001F3F] focus:border-[#001F3F] h-32 bg-white text-black"
                     rows="4"
                   />
                 </div>
@@ -1259,8 +1389,8 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
             </div>
             
             {/* Examples Section */}
-            <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Examples</h3>
+            <div className="bg-gray-50 p-5 rounded-xl border border-black">
+              <h3 className="text-lg font-semibold text-black mb-4">Quick Examples</h3>
               <div className="grid grid-cols-1 gap-3">
                 <ExampleButton
                   title="Array Example"
@@ -1327,7 +1457,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
           </div>
           
           {/* Visualization Section */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-inner p-5 overflow-hidden">
+          <div className="bg-white border border-black rounded-xl shadow-inner p-5 overflow-hidden min-h-[600px]">
             <div className="h-full overflow-auto">
               {renderVisualization()}
             </div>
@@ -1335,7 +1465,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         </div>
         
         {/* Footer with info */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-6 border-t border-black">
           <div className="flex items-center justify-between text-sm text-gray-500">
             <div className="flex items-center">
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1344,13 +1474,69 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               <span>Click on elements for detailed information</span>
             </div>
             <div>
-              <span className="text-blue-600 font-medium">{metadata.type}</span>
+              <span className="text-[#001F3F] font-medium">{metadata.type}</span>
               <span className="mx-2">•</span>
               <span>{new Date(metadata.timestamp).toLocaleTimeString()}</span>
             </div>
           </div>
         </div>
       </div>
+      {isFullScreen && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded-lg w-11/12 h-5/6 overflow-auto">
+            <div className="flex justify-end mb-2">
+              <button 
+                onClick={() => setIsFullScreen(false)}
+                className="px-3 py-1 bg-[#001F3F] text-white rounded hover:bg-[#001F3F]/80"
+              >
+                Close
+              </button>
+            </div>
+            {renderVisualization()}
+          </div>
+        </div>
+      )}
+      <style jsx>{`
+        @keyframes uniquePulse {
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.1); opacity: 0.7; box-shadow: 0 0 10px rgba(0, 31, 63, 0.5); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes uniqueSlideIn {
+          0% { transform: translateY(-50px); opacity: 0; }
+          60% { transform: translateY(10px); opacity: 0.8; }
+          100% { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes uniqueChain {
+          0% { transform: rotate(0deg); opacity: 0.5; }
+          50% { transform: rotate(5deg); opacity: 1; }
+          100% { transform: rotate(0deg); opacity: 1; }
+        }
+        @keyframes uniqueEdgeDraw {
+          0% { stroke-dashoffset: inherit; }
+          100% { stroke-dashoffset: 0; }
+        }
+        @keyframes uniqueGrow {
+          0% { r: 0; opacity: 0; }
+          70% { r: 30; opacity: 0.8; }
+          100% { r: 28; opacity: 1; }
+        }
+        .animate-uniquePulse {
+          animation: uniquePulse 0.6s ease-in-out;
+        }
+        .animate-uniqueSlideIn {
+          animation: uniqueSlideIn 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+        .animate-uniqueChain {
+          animation: uniqueChain 0.5s ease-in-out;
+        }
+        .animate-uniqueEdgeDraw {
+          animation: uniqueEdgeDraw 1s linear forwards;
+        }
+        .animate-uniqueGrow {
+          animation: uniqueGrow 0.7s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
@@ -1364,11 +1550,11 @@ const ExampleButton = ({ title, description, data, type, setInputType, setInputV
         setInputValue(data);
       }
     }}
-    className={`p-4 text-left rounded-lg border transition-all ${currentType === type ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'}`}
+    className={`p-4 text-left rounded-lg border transition-all ${currentType === type ? 'border-[#001F3F] bg-gray-50' : 'border-black hover:border-[#001F3F] hover:bg-gray-50'}`}
   >
-    <div className="font-medium text-gray-800">{title}</div>
+    <div className="font-medium text-black">{title}</div>
     <div className="text-sm text-gray-600 mt-1">{description}</div>
-    <div className="text-xs font-mono bg-gray-100 p-2 mt-2 rounded truncate">{data}</div>
+    <div className="text-xs font-mono bg-gray-100 p-2 mt-2 rounded truncate text-black">{data}</div>
   </button>
 );
 
