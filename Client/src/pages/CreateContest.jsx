@@ -94,7 +94,7 @@ useEffect(() => {
           title: contestData.title || '',
           description: contestData.description || '',
           startTime: contestData.start_time ? contestData.start_time.replace('Z', '') : '',
-          duration: contestData.duration_minutes || 3,
+          duration: contestData.duration || 3,
           type: contestData.type || 'individual',
           platform: contestData.platform || 'IUT'
         });
@@ -378,9 +378,7 @@ const handleSaveDraft = async () => {
     alert(editMode ? "Draft updated successfully!" : "Draft saved successfully!");
     
     // If this was a new contest creation (not edit mode), navigate to the new contest
-    if (!editMode && data.id) {
-      navigate(`/contest/edit/${data.id}`);
-    }
+
   } catch (err) {
     console.error("Request failed:", err);
     alert("Could not reach server.");

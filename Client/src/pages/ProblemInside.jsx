@@ -111,14 +111,15 @@ useEffect(() => {
             
             if (problemRes.data) {
               console.log('Problem data response:', problemRes.data);
+               console.log('Contest status from problem response:', problemRes.data.contest_status);
               setProblemData(problemRes.data);
               
               // If we don't have contestData yet, use data from problem response
               if (!contestData && problemRes.data.contest_title) {
                 setContestData({
+                  status: problemRes.data.contest_status,  // This should be "past" from your backend
                   title: problemRes.data.contest_title,
                   platform: 'Custom Platform',
-                  status: 'live', // default
                   type: 'individual' // default
                 });
               }
@@ -450,6 +451,15 @@ useEffect(() => {
     <Trophy className="w-4 h-4" />
     <span className="text-xs font-semibold text-gray-900">Leaderboard</span>
   </Link>
+   {displayContestData.status === 'past' && (
+    <Link
+    to={`/contests/${contestId}/editorial`}
+    className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
+  >
+    <Trophy className="w-4 h-4" />
+    <span className="text-xs font-semibold text-gray-900">Editorial</span>
+  </Link>
+   )}
 </div>
 
             {/* Problem Stats */}
@@ -515,72 +525,77 @@ useEffect(() => {
                     </div>
                   )}
                   
-                  {/* Sample Test Cases */}
-                  {problemData?.sample_test_cases && problemData.sample_test_cases.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                      {problemData.sample_test_cases.map((testCase, index) => (
-                        <div key={index}>
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold text-gray-900">
-                              Sample {index === 0 ? '' : index + 1} {index === 0 ? 'Input' : ''}
-                            </h4>
-                            <button 
-                              onClick={() => {
-                                navigator.clipboard.writeText(testCase.input);
-                                alert('Copied to clipboard!');
-                              }}
-                              className="text-gray-500 hover:text-gray-700 transition-colors" 
-                              title="Copy"
-                            >
-                              <Clipboard className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <pre className="bg-gray-800 text-gray-100 p-4 rounded font-mono text-xs overflow-x-auto whitespace-pre">
-                            {testCase.input}
-                          </pre>
-                          
-                          <div className="mt-4 flex items-center justify-between mb-2">
-                            <h4 className="font-semibold text-gray-900">
-                              Sample {index === 0 ? '' : index + 1} {index === 0 ? 'Output' : ''}
-                            </h4>
-                            <button 
-                              onClick={() => {
-                                navigator.clipboard.writeText(testCase.output);
-                                alert('Copied to clipboard!');
-                              }}
-                              className="text-gray-500 hover:text-gray-700 transition-colors" 
-                              title="Copy"
-                            >
-                              <Clipboard className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <pre className="bg-gray-800 text-gray-100 p-4 rounded font-mono text-xs overflow-x-auto whitespace-pre">
-                            {testCase.output}
-                          </pre>
-                          
-                          {testCase.explanation && (
-                            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                              <h4 className="font-semibold text-blue-900 mb-2">Explanation</h4>
-                              <p className="text-blue-800 text-xs">
-                                {testCase.explanation}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mb-8 p-4 bg-gray-50 border border-gray-200 rounded">
-                      <p className="text-gray-600 text-sm">No sample test cases available.</p>
-                    </div>
-                  )}
-
-                  {problemData?.tutorial && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-8">
-                      <h4 className="font-semibold text-green-900 mb-2">Tutorial / Editorial</h4>
-                      <div className="text-green-800 text-sm" dangerouslySetInnerHTML={{ __html: problemData.tutorial }} />
-                    </div>
-                  )}
+{/* Sample Test Cases */}
+{problemData?.sample_test_cases && problemData.sample_test_cases.length > 0 ? (
+  <div className="space-y-8 mb-8"> {/* Changed from grid to space-y */}
+    {problemData.sample_test_cases.map((testCase, index) => (
+      <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+          <h4 className="font-semibold text-gray-900">
+            Sample Test Case {index + 1}
+          </h4>
+        </div>
+        
+        {/* Input and Output side by side */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+          {/* Input Column */}
+          <div className="border-r border-gray-200">
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-200">
+              <h5 className="font-medium text-gray-900">Input</h5>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(testCase.input);
+                }}
+                className="text-gray-500 hover:text-gray-700 transition-colors" 
+                title="Copy"
+              >
+                <Clipboard className="w-4 h-4" />
+              </button>
+            </div>
+            <pre className="bg-gray-800 text-gray-100 p-4 font-mono text-xs overflow-x-auto whitespace-pre m-0">
+              {testCase.input}
+            </pre>
+          </div>
+          
+          {/* Output Column */}
+          <div>
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-200">
+              <h5 className="font-medium text-gray-900">Output</h5>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(testCase.output);
+                }}
+                className="text-gray-500 hover:text-gray-700 transition-colors" 
+                title="Copy"
+              >
+                <Clipboard className="w-4 h-4" />
+              </button>
+            </div>
+            <pre className="bg-gray-800 text-gray-100 p-4 font-mono text-xs overflow-x-auto whitespace-pre m-0">
+              {testCase.output}
+            </pre>
+          </div>
+        </div>
+        
+        {/* Explanation - Full width below */}
+        {testCase.explanation && (
+          <div className="border-t border-gray-200">
+            <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
+              <h5 className="font-medium text-blue-900">Explanation</h5>
+            </div>
+            <div className="p-4 bg-blue-50 text-blue-800 text-xs">
+              {testCase.explanation}
+            </div>
+          </div>
+        )}
+      </div>
+    ))}
+  </div>
+) : (
+  <div className="mb-8 p-4 bg-gray-50 border border-gray-200 rounded">
+    <p className="text-gray-600 text-sm">No sample test cases available.</p>
+  </div>
+)}
                 </div>
               </div>
             </div>

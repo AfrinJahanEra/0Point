@@ -13,12 +13,53 @@ const Contests = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredContests, setFilteredContests] = useState([]);
   const [registeredContests, setRegisteredContests] = useState([]);
+  const [contestStatuses, setContestStatuses] = useState({});
+
 
   const navigate = useNavigate();
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
 
   // Fetch contests and registrations
+
+  const getDerivedStatus = (contest) => {
+  const now = new Date();
+  const start = new Date(contest.start_time);
+  const end = new Date(start.getTime() + contest.duration * 60 * 60 * 1000); // duration in hours
+
+  if (contest.status === 'draft') return 'draft';
+  if (now < start) return 'upcoming';
+  if (now >= start && now <= end) return 'live';
+  return 'past';
+};
+
+
+  useEffect(() => {
+  // Only if you want to track all contests individually
+  contests.forEach(contest => {
+    if (!contestStatuses[contest.id]) {
+      const ws = new WebSocket(`ws://${window.location.host}/ws/contest/${contest.id}/status/`);
+
+      ws.onopen = () => console.log(`Connected to contest ${contest.id} status WebSocket`);
+      ws.onclose = () => console.log(`Disconnected from contest ${contest.id}`);
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        setContestStatuses(prev => ({
+          ...prev,
+          [contest.id]: data.status
+        }));
+      };
+    }
+  });
+
+  // Cleanup: close WebSockets when component unmounts
+  return () => {
+    // You could store ws connections in a ref to close them here
+  };
+}, [contests]);
+
+
   useEffect(() => {
     const fetchContests = async () => {
       try {
@@ -436,13 +477,8 @@ const handleDraftEdit = (contestId, e) => {
 >
   {contest.title}
 </h3>
-                          <span className={getStatusBadge(contest.status)}>
-                            {contest.status === 'live' ? 'Live' : 
-                             contest.status === 'upcoming' ? 'Upcoming' : 
-                             contest.status === 'past' ? 'Past' :
-                             contest.status === 'draft' ? 'Draft' :
-                             contest.status === 'test' ? 'Test' : contest.status}
-                          </span>
+                          
+
                         </div>
                         <p className="text-xs text-gray-600 mb-2">
                           {getPlatformName(contest.platform)} • {contest.type === 'individual' ? 'Individual' : 'Team' || 'Individual'}
