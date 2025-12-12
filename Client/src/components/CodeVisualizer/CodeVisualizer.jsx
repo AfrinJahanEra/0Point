@@ -332,7 +332,8 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
         const match = trimmed.match(/(\w+)\s*=\s*([^;]+)/);
         if (match) {
           const varName = match[1];
-          const value = evaluateExpression(match[2], variablesState);
+          const expression = match[2];
+          const value = evaluateExpression(expression, variablesState);
           
           // Check if this is a loop variable
           const isLoopVar = /^(i|j|k|index|count|n|[a-z]Index)$/.test(varName);
@@ -345,11 +346,15 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
           
           // If this is a loop variable, add to output for tracking
           if (isLoopVar) {
-            output.push({
-              step,
-              value: `Loop var ${varName} = ${value}`,
-              line: lineIndex + 1
-            });
+            output.push(`Loop var ${varName} = ${value}`);
+          }
+          
+          // If there are calculations in the expression, show them
+          if (expression.includes('+') || expression.includes('-') || expression.includes('*') || expression.includes('/')) {
+            // Only show calculation details for non-loop variables or significant calculations
+            if (!isLoopVar || Math.abs(value) > 10) {
+              output.push(`${varName} = ${expression} = ${value}`);
+            }
           }
         }
       }
@@ -358,36 +363,35 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
       if (trimmed.includes('cout') || trimmed.includes('printf') || trimmed.includes('print')) {
         // Handle different output formats
         let outputValue = '';
+        let outputExpression = '';
         
         if (trimmed.includes('cout')) {
           // C++ cout statements
           const coutMatches = trimmed.match(/<<\s*([^;]+)/g);
           if (coutMatches) {
-            outputValue = coutMatches.map(match => {
-              const varName = match.split('<<')[1].trim();
-              return evaluateExpression(varName, variablesState);
-            }).join(' ');
+            const expressions = coutMatches.map(match => match.split('<<')[1].trim());
+            outputExpression = expressions.join(' << ');
+            outputValue = expressions.map(expr => evaluateExpression(expr, variablesState)).join(' ');
           }
         } else if (trimmed.includes('printf')) {
           // C printf statements
           const printfMatch = trimmed.match(/printf\s*\(\s*"[^"]*"\s*,\s*([^)]+)\s*\)/);
           if (printfMatch) {
+            outputExpression = printfMatch[1];
             outputValue = evaluateExpression(printfMatch[1], variablesState);
           }
         } else if (trimmed.includes('print')) {
           // Python/other print statements
           const printMatch = trimmed.match(/print\s*\(\s*([^)]+)\s*\)/);
           if (printMatch) {
+            outputExpression = printMatch[1];
             outputValue = evaluateExpression(printMatch[1], variablesState);
           }
         }
         
         if (outputValue) {
-          output.push({
-            step,
-            value: outputValue,
-            line: lineIndex + 1
-          });
+          // Show both the expression and its evaluated value
+          output.push(`cout: ${outputExpression} => ${outputValue}`);
         }
       }
       
@@ -399,11 +403,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
           const loopVar = loopVarMatch[1] || loopVarMatch[2];
           if (loopVar && variablesState[loopVar]) {
             // Add loop variable to output for tracking
-            output.push({
-              step,
-              value: `Loop var ${loopVar} = ${variablesState[loopVar].value}`,
-              line: lineIndex + 1
-            });
+            output.push(`Loop var ${loopVar} = ${variablesState[loopVar].value}`);
           }
         }
         
@@ -506,6 +506,16 @@ def tracer(frame, event, arg):
     for var_name, var_value in {**globals_copy, **locals_copy}.items():
       if var_name in ['i', 'j', 'k', 'index', 'count', 'n'] or var_name.endswith('Index'):
         output_lines.append({'line': frame.f_lineno, 'output': f'Loop var {var_name} = {var_value}'})
+      
+      # Also capture significant calculations
+      try:
+        # Convert to number if possible
+        num_value = float(var_value)
+        if abs(num_value) > 10 or (num_value != int(num_value)):
+          # For significant values, show the variable assignment
+          output_lines.append({'line': frame.f_lineno, 'output': f'{var_name} = {var_value}'})
+      except:
+        pass  # Not a number, ignore
     
     stack = []
     current = frame
@@ -542,6 +552,7 @@ sys.settrace(tracer)
       let output_index = 0;
       
       trace_js.forEach((step, i) => {
+        // Add all outputs for this line to cumulative output
         while (output_index < output_lines_js.length && output_lines_js[output_index].line === step.line) {
           cumulative_output.push(output_lines_js[output_index].output);
           output_index++;
@@ -557,6 +568,7 @@ sys.settrace(tracer)
       });
       
       setExecutionTrace(processed_trace);
+      executeStepByStep(processed_trace);
       
     } catch (err) {
       setOutputLog([{ step: 0, value: `Execution error: ${err.message}`, line: 0 }]);
@@ -609,7 +621,8 @@ sys.settrace(tracer)
         const variables = {};
         for (let prop in scope.properties) {
           if (!prop.startsWith('_')) {
-            const value = String(interpreter.pseudoToNative(scope.properties[prop]));
+            const nativeValue = interpreter.pseudoToNative(scope.properties[prop]);
+            const value = String(nativeValue);
             variables[prop] = value;
             
             // Check if this is a loop variable and add to output for tracking
@@ -617,6 +630,19 @@ sys.settrace(tracer)
               const state = interpreter.stateStack[interpreter.stateStack.length - 1];
               const line = state.node.loc ? state.node.loc.start.line : 0;
               output_lines.push({line, output: `Loop var ${prop} = ${value}`});
+            }
+            
+            // Also capture significant calculations
+            try {
+              const numValue = parseFloat(value);
+              if (!isNaN(numValue) && (Math.abs(numValue) > 10 || numValue !== Math.floor(numValue))) {
+                // For significant values, show the variable assignment
+                const state = interpreter.stateStack[interpreter.stateStack.length - 1];
+                const line = state.node.loc ? state.node.loc.start.line : 0;
+                output_lines.push({line, output: `${prop} = ${value}`});
+              }
+            } catch {
+              // Not a number, ignore
             }
           }
         }
@@ -650,6 +676,7 @@ sys.settrace(tracer)
       }
       
       setExecutionTrace(trace);
+      executeStepByStep(trace);
       
     } catch (err) {
       setOutputLog([{ step: 0, value: `Execution error: ${err.message}`, line: 0 }]);
@@ -677,9 +704,9 @@ sys.settrace(tracer)
     } else {
       const { trace } = simulateExecution();
       setExecutionTrace(trace);
+      // For simulated languages, execute step by step after setting trace
+      executeStepByStep(trace);
     }
-    
-    executeStepByStep(executionTrace);
   };
 
   const pauseExecution = () => {
@@ -940,6 +967,7 @@ sys.settrace(tracer)
     const lineOutputs = {};
     const lineLoopVars = {};
     
+    // Process execution trace to collect outputs and loop variables per line
     executionTrace.forEach(step => {
       if (!lineExecutions[step.line]) {
         lineExecutions[step.line] = [];
@@ -948,12 +976,14 @@ sys.settrace(tracer)
       }
       lineExecutions[step.line].push(step);
       
-      // Collect outputs for this line
+      // Collect outputs for this line (including loop variable outputs)
       if (step.output && step.output.length > 0) {
-        const newOutputs = step.output.filter(out => 
-          !lineOutputs[step.line].includes(out)
-        );
-        lineOutputs[step.line].push(...newOutputs);
+        // Add all outputs for this step to this line
+        step.output.forEach(out => {
+          if (!lineOutputs[step.line].includes(out)) {
+            lineOutputs[step.line].push(out);
+          }
+        });
       }
       
       // Collect loop variables for this line
@@ -961,12 +991,12 @@ sys.settrace(tracer)
         const loopVars = {};
         Object.entries(step.variables).forEach(([name, value]) => {
           // Check if this is likely a loop variable (i, j, k, index, count, etc.)
-          if (/^(i|j|k|index|count|n|[a-z]Index)$/.test(name)) {
+          if (/^(i|j|k|index|count|n|[a-z]Index)$/i.test(name)) {
             loopVars[name] = value;
           }
         });
         if (Object.keys(loopVars).length > 0) {
-          lineLoopVars[step.line].push(loopVars);
+          lineLoopVars[step.line].push({...loopVars});
         }
       }
     });
@@ -1029,10 +1059,18 @@ sys.settrace(tracer)
                     .join(', ');
                 }
                 
-                // Get output at this line
+                // Also check if any outputs are loop variable outputs
+                const loopVarOutputs = outputs.filter(out => typeof out === 'string' && out.startsWith('Loop var '));
+                if (loopVarOutputs.length > 0 && !loopVarsDisplay) {
+                  // If we have loop variable outputs but no loop vars extracted, use the outputs
+                  loopVarsDisplay = loopVarOutputs.map(out => out.replace('Loop var ', '')).join(', ');
+                }
+                
+                // Get output at this line (excluding loop variable outputs)
                 let outputDisplay = '';
-                if (outputs.length > 0) {
-                  outputDisplay = outputs.join(', ');
+                const regularOutputs = outputs.filter(out => typeof out === 'string' && !out.startsWith('Loop var '));
+                if (regularOutputs.length > 0) {
+                  outputDisplay = regularOutputs.join(', ');
                 }
                 
                 return (
@@ -1295,18 +1333,81 @@ Or try these examples:
           
           {/* Output Console */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-            <div className="border-b border-gray-200 p-4">
+            <div className="border-b border-gray-200 p-4 flex justify-between items-center">
               <h2 className="font-semibold text-gray-800">Output Console</h2>
+              <div className="text-xs text-gray-500">
+                {outputLog.filter(entry => entry.value && !entry.value.startsWith('Loop var')).length} outputs, 
+                {outputLog.filter(entry => entry.value && entry.value.startsWith('Loop var')).length} loop vars
+              </div>
             </div>
             <div className="p-4 font-mono text-sm bg-black text-white rounded-b-lg max-h-48 overflow-auto">
               {outputLog.length > 0 ? (
-                outputLog.map((entry, index) => (
-                  <div key={index} className="mb-2">
-                    <span className="text-green-400">[Step {entry.step}]</span>
-                    <span className="text-gray-400 mx-2">Line {entry.line}:</span>
-                    <span className="text-white">{entry.value}</span>
-                  </div>
-                ))
+                outputLog.map((entry, index) => {
+                  // Check output type
+                  const isLoopVar = entry.value && entry.value.startsWith('Loop var ');
+                  const isCalculation = entry.value && entry.value.includes(' = ') && !entry.value.startsWith('Loop var ');
+                  const isOutputStatement = entry.value && (entry.value.startsWith('cout:') || entry.value.includes('cout') || entry.value.includes('printf') || entry.value.includes('print'));
+                  
+                  // Format the output based on type
+                  let formattedValue = entry.value || '';
+                  let valueClass = 'text-white';
+                  
+                  if (isLoopVar) {
+                    // Extract variable name and value
+                    const match = formattedValue.match(/Loop var (\w+) = (.*)/);
+                    if (match) {
+                      const varName = match[1];
+                      const varValue = match[2];
+                      formattedValue = (
+                        <span>
+                          <span className="text-blue-400">loop:</span> 
+                          <span className="text-yellow-300">{varName}</span>
+                          <span className="text-gray-400"> = </span>
+                          <span className="text-green-300">{varValue}</span>
+                        </span>
+                      );
+                      valueClass = 'text-blue-300';
+                    }
+                  } else if (isCalculation) {
+                    // Highlight calculation assignments
+                    const parts = formattedValue.split(' = ');
+                    if (parts.length >= 2) {
+                      formattedValue = (
+                        <span>
+                          <span className="text-purple-400">{parts[0]}</span>
+                          <span className="text-gray-400"> = </span>
+                          <span className="text-orange-300">{parts.slice(1).join(' = ')}</span>
+                        </span>
+                      );
+                      valueClass = 'text-purple-300';
+                    }
+                  } else if (isOutputStatement) {
+                    // Highlight output statements
+                    if (formattedValue.startsWith('cout:')) {
+                      const match = formattedValue.match(/cout: (.*) \=\> (.*)/);
+                      if (match) {
+                        formattedValue = (
+                          <span>
+                            <span className="text-green-400">cout:</span> 
+                            <span className="text-cyan-300">{match[1]}</span>
+                            <span className="text-gray-400"> {'=>'} </span>
+                            <span className="text-yellow-300">{match[2]}</span>
+                          </span>
+                        );
+                      }
+                    } else {
+                      valueClass = 'text-green-300';
+                    }
+                  }
+                  
+                  return (
+                    <div key={index} className="mb-1">
+                      <span className="text-gray-500 text-xs">[{entry.step}]</span>
+                      <span className="text-gray-400 mx-2">L{entry.line}:</span>
+                      <span className={valueClass}>{formattedValue}</span>
+                    </div>
+                  );
+                })
               ) : (
                 <div className="text-gray-500 italic">No output yet. Run the code to see results.</div>
               )}
