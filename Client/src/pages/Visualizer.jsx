@@ -16,6 +16,8 @@ import DFSVisualizer from '../components/Visualizer_comp/DFSVisualizer';
 import DijkstraVisualizer from '../components/Visualizer_comp/DijkstraVisualizer';
 import KruskalVisualizer from '../components/Visualizer_comp/KruskalVisualizer';
 import PrimVisualizer from '../components/Visualizer_comp/PrimVisualizer';
+import IOVisualizer from '../components/Visualizer_comp/IOVisualizer';
+import CodeVisualizer from '../components/Visualizer_comp/CodeVisualizer';
 import { algorithms } from '../utils/algorithms';
 import { parseInputs } from '../utils/inputParser';
 
@@ -579,6 +581,11 @@ const Visualizer = () => {
   const [steps, setSteps] = useState([]);
   const [heapViewMode, setHeapViewMode] = useState('array'); // 'array' or 'tree'
   const [activeTab, setActiveTab] = useState('dsa'); // 'dsa', 'io', or 'code'
+  const [customCode, setCustomCode] = useState('// Enter your code here\nfunction example() {\n  // Your code\n}');
+  const [customInput, setCustomInput] = useState('');
+  // IO Visualizer states
+  const [ioInputType, setIoInputType] = useState('array');
+  const [ioInputValue, setIoInputValue] = useState('');
   const animationRef = useRef(null);
   const audioContextRef = useRef(null);
 
@@ -1046,56 +1053,150 @@ const Visualizer = () => {
           </div>
         </div>
         
-        <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-0" style={{ height: 'calc(100vh - 160px)' }}>
-          {/* Left Column - Input and Code */}
-          {activeTab === 'dsa' && (
+        <div className={`flex-grow ${activeTab === 'code' ? 'grid grid-cols-1' : 'grid grid-cols-1 lg:grid-cols-2'} gap-0`} style={{ height: 'calc(100vh - 160px)' }}>
+          {/* Left Column - Input and Code for DSA and IO tabs only */}
+          {(activeTab === 'dsa' || activeTab === 'io') && (
             <div className="bg-white border-r border-sky-200 flex flex-col h-full">
-              <div className="p-6 overflow-y-auto flex-grow h-full">
-                <h2 className="text-xl text-blue-800 mb-3">Algorithm & Input</h2>
-                
-                <div className="mb-6">
-                  <AlgorithmSelector
-                    selectedAlgorithm={selectedAlgorithm}
-                    onAlgorithmChange={handleAlgorithmChange}
-                  />
-                </div>
-                
-                {selectedAlgorithm && (
+              {activeTab === 'dsa' && (
+                <div className="p-6 overflow-y-auto flex-grow h-full">
+                  <h2 className="text-xl text-blue-800 mb-3">Algorithm & Input</h2>
+                  
                   <div className="mb-6">
-                    <InputPanel
-                      algorithm={algorithms.find(alg => alg.id === selectedAlgorithm)}
-                      inputValues={inputValues}
-                      onInputChange={handleInputChange}
-                      onLoadExample={loadExample}
-                      onStart={startVisualization}
-                      isVisualizing={isVisualizing}
+                    <AlgorithmSelector
                       selectedAlgorithm={selectedAlgorithm}
+                      onAlgorithmChange={handleAlgorithmChange}
                     />
                   </div>
-                )}
-                
-                {/* Code Display */}
-                {selectedAlgorithm && (
-                  <div className="mt-6 flex-grow flex flex-col">
-                    <h3 className="text-lg text-blue-800 mb-2">Algorithm Code</h3>
-                    <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto font-mono text-sm flex-grow">
-                      {algorithmCodes[selectedAlgorithm]?.split('\n').map((line, index) => (
-                        <div 
-                          key={index} 
-                          className={index === currentLineToHighlight ? 'bg-yellow-500 bg-opacity-30 p-1 rounded code-line-highlight' : ''}
-                        >
-                          <span className="text-gray-500 mr-4 select-none">{index + 1}</span>
-                          {line}
+                  
+                  {selectedAlgorithm && (
+                    <div className="mb-6">
+                      <InputPanel
+                        algorithm={algorithms.find(alg => alg.id === selectedAlgorithm)}
+                        inputValues={inputValues}
+                        onInputChange={handleInputChange}
+                        onLoadExample={loadExample}
+                        onStart={startVisualization}
+                        isVisualizing={isVisualizing}
+                        selectedAlgorithm={selectedAlgorithm}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Code Display */}
+                  {selectedAlgorithm && (
+                    <div className="mt-6 flex-grow flex flex-col">
+                      <h3 className="text-lg text-blue-800 mb-2">Algorithm Code</h3>
+                      <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto font-mono text-sm flex-grow">
+                        {algorithmCodes[selectedAlgorithm]?.split('\n').map((line, index) => (
+                          <div 
+                            key={index} 
+                            className={index === currentLineToHighlight ? 'bg-yellow-500 bg-opacity-30 p-1 rounded code-line-highlight' : ''}
+                          >
+                            <span className="text-gray-500 mr-4 select-none">{index + 1}</span>
+                            {line}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {activeTab === 'io' && (
+                <div className="p-6 overflow-y-auto flex-grow h-full">
+                  <h2 className="text-xl text-blue-800 mb-3">I/O Visualizer</h2>
+                  <div className="flex flex-col h-full">
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Data Type
+                      </label>
+                      <select
+                        value={ioInputType}
+                        onChange={(e) => setIoInputType(e.target.value)}
+                        className="mb-4 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="array">Array/List</option>
+                        <option value="tree">Tree</option>
+                        <option value="graph">Graph</option>
+                      </select>
+                      
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Input Data
+                      </label>
+                      <textarea
+                        value={ioInputValue}
+                        onChange={(e) => setIoInputValue(e.target.value)}
+                        placeholder={
+                          ioInputType === 'array' 
+                            ? 'Enter values separated by commas or spaces (e.g., 1,2,3,4,5 or 1 2 3 4 5)'
+                            : ioInputType === 'tree'
+                            ? 'Nested: A(B(C,D),E) or Edges: A->B,B->C'
+                            : 'Undirected: A,B,C,A-B:5,B-C:3 or Directed: A->B:5,B->C:3'
+                        }
+                        className="flex-grow p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        rows="4"
+                      />
+                      
+                      <div className="mt-2 text-xs text-gray-500">
+                        {ioInputType === 'array' && 'Supports numbers and strings'}
+                        {ioInputType === 'tree' && 'Hierarchical tree structure with parent-child relationships'}
+                        {ioInputType === 'graph' && 'Format: node1,node2,edge1-edge2:weight'}
+                      </div>
+                    </div>
+                    
+                    {/* Examples Section */}
+                    <div className="bg-gray-50 p-4 rounded-lg flex-grow">
+                      <h3 className="font-medium text-gray-800 mb-3">Examples</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Array Example:</div>
+                          <div 
+                            className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
+                            onClick={() => {
+                              setIoInputType('array');
+                              setIoInputValue('5,2,8,1,9,3');
+                            }}
+                          >
+                            5,2,8,1,9,3
+                          </div>
                         </div>
-                      ))}
+                        
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Tree Example:</div>
+                          <div 
+                            className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
+                            onClick={() => {
+                              setIoInputType('tree');
+                              setIoInputValue('A(B(D,E),C(F))');
+                            }}
+                          >
+                            A(B(D,E),C(F))
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">Or: A{'->'}B,B{'->'}C,C{'->'}D</div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Graph Example:</div>
+                          <div 
+                            className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
+                            onClick={() => {
+                              setIoInputType('graph');
+                              setIoInputValue('A,B,C,D,A-B:5,B-C:3,C-D:7');
+                            }}
+                          >
+                            A,B,C,D,A-B:5,B-C:3,C-D:7
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">Or: A{'->'}B:5,B{'->'}C:3,C{'->'}D:7</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
           
-          {/* Right Column - Visualization or Other Content */}
+          {/* Right Column - Visualization or Full-width for Code Visualizer */}
           <div className="bg-white flex flex-col h-full">
             <div className="p-6 overflow-y-auto flex-grow h-full">
               {activeTab === 'dsa' && (
@@ -1167,48 +1268,29 @@ const Visualizer = () => {
               )}
               
               {activeTab === 'io' && (
-                <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                  <div className="max-w-md mx-auto">
-                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                      </svg>
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">I/O Visualizer</h2>
-                    <p className="text-gray-600 mb-6">Interactive Input/Output visualization coming soon...</p>
-                    <div className="bg-gray-100 border border-gray-200 rounded-lg p-6 text-left">
-                      <h3 className="font-medium text-gray-800 mb-2">What to expect:</h3>
-                      <ul className="text-gray-600 text-sm space-y-1">
-                        <li>• Step-by-step visualization of program I/O</li>
-                        <li>• Interactive input simulation</li>
-                        <li>• Output tracing and debugging</li>
-                        <li>• Real-time data flow visualization</li>
-                      </ul>
-                    </div>
+                <div className="h-full flex flex-col">
+                  <h2 className="text-xl text-blue-800 mb-3">I/O Visualization</h2>
+                  <div className="flex-grow">
+                    <IOVisualizer inputType={ioInputType} inputValue={ioInputValue} />
                   </div>
                 </div>
               )}
               
               {activeTab === 'code' && (
-                <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                  <div className="max-w-md mx-auto">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                      </svg>
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Code Visualizer</h2>
-                    <p className="text-gray-600 mb-6">Interactive code execution visualization coming soon...</p>
-                    <div className="bg-gray-100 border border-gray-200 rounded-lg p-6 text-left">
-                      <h3 className="font-medium text-gray-800 mb-2">What to expect:</h3>
-                      <ul className="text-gray-600 text-sm space-y-1">
-                        <li>• Line-by-line code execution</li>
-                        <li>• Variable state tracking</li>
-                        <li>• Call stack visualization</li>
-                        <li>• Memory allocation diagrams</li>
-                      </ul>
-                    </div>
-                  </div>
+                <div className="h-full flex flex-col">
+                  {selectedAlgorithm ? (
+                    <CodeVisualizer 
+                      algorithmId={selectedAlgorithm}
+                      algorithmCode={algorithmCodes[selectedAlgorithm]}
+                      inputData={inputValues}
+                    />
+                  ) : (
+                    <CodeVisualizer 
+                      algorithmId={null}
+                      algorithmCode={customCode}
+                      inputData={customInput}
+                    />
+                  )}
                 </div>
               )}
             </div>
