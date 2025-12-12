@@ -2,6 +2,7 @@ from datetime import datetime
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from contest.views import get_contest_status
 
 from contest.utils.auth import get_user_from_request
 from contest.models import Contest
@@ -21,7 +22,7 @@ class LeaderboardView(APIView):
             return Response({"error": "Contest not found"}, status=404)
 
         # Get contest status from the contest object
-        contest_status = contest.status  # This should be "past", "live", or "upcoming"
+        contest_status = get_contest_status(contest)  # This should be "past", "live", or "upcoming"
         
         # Get current user
         current_user = get_user_from_request(request)

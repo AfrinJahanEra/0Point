@@ -6,7 +6,7 @@ from submission.views import (
     SubmissionListByProblemAPIView,
     SubmissionDetailAPIView,
     ContestSubmissionsAPIView,
-    ContestProblemsListAPIView
+    ContestProblemsListAPIView,
 )
 
 from leaderboard.views import LeaderboardView, FreezeLeaderboardView, RecalculateLeaderboardView
@@ -25,6 +25,10 @@ from .views import (
     UserProblemStatusAPIView,
     ContestProblemTutorialAPIView,  # Import the new view
     ContestEditorialAPIView,  # Import the new v,
+)
+
+from compiler.views import (
+    CodeExecuteAPIView,
 )
 
 # contest/urls.py
@@ -69,4 +73,5 @@ urlpatterns = [
     path('contests/<str:contest_id>/problems/list/', ContestProblemsListAPIView.as_view(), name='contest-problems-list'),
     path('submissions/create/', SubmissionCreateAPIView.as_view(), name='submission-create'),
     path('contests/<str:contest_id>/editorial/', ContestEditorialAPIView.as_view()),
+    path('contests/<str:contest_id>/execute/', CodeExecuteAPIView.as_view(), name='code-execute'),
 ]

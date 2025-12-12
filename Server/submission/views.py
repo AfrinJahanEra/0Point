@@ -12,6 +12,7 @@ from .serializers import SubmissionCreateSerializer, SubmissionSerializer
 from contest.models import Contest, ContestRegistration
 from contest.utils.auth import get_user_from_request
 from account.models import Account
+from contest.views import get_contest_status
 
 class SubmissionCreateAPIView(APIView):
     """Create a new submission for a contest problem"""
@@ -31,7 +32,7 @@ class SubmissionCreateAPIView(APIView):
             contest = serializer.validated_data.get('contest')
             if contest:
                 print(f"DEBUG - Contest ID: {contest.id}")
-                print(f"DEBUG - Contest status: {contest.status}")
+                print(f"DEBUG - Contest status: {get_contest_status(contest)}")
                 print(f"DEBUG - Contest start_time: {contest.start_time}")
                 print(f"DEBUG - Contest duration: {contest.duration}")
                 print(f"DEBUG - Start time tzinfo: {contest.start_time.tzinfo if contest.start_time else None}")
@@ -102,7 +103,7 @@ class SubmissionDetailAPIView(APIView):
             try:
                 contest = submission.contest
                 
-                if contest.status != "past":
+                if get_contest_status(contest) != "past":
                     # For live contests, check if contest has ended
                     if contest.start_time and contest.duration:
                         end_time = contest.start_time + timedelta(minutes=contest.duration * 60)
@@ -179,8 +180,6 @@ class UserSubmissionsAPIView(APIView):
             'limit': limit,
             'skip': skip
         })
-    
-# submission/views.py - Add this new view
 class ContestProblemsListAPIView(APIView):
 
     """Get all problems for a contest (for dropdown)"""
@@ -195,19 +194,19 @@ class ContestProblemsListAPIView(APIView):
         user = get_user_from_request(request)
         can_access = False
         
-        if contest.status == "past":
+        if get_contest_status(contest) == "past":
             can_access = True
-        elif contest.status == "draft":
+        elif get_contest_status(contest) == "draft":
             if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                 can_access = True
-        elif contest.status in ["live", "upcoming", "test"]:
+        elif get_contest_status(contest) in ["live", "upcoming", "test"]:
             if user:
                 is_registered = ContestRegistration.objects.filter(
                     user=user, contest=contest
                 ).first()
                 can_access = bool(is_registered)
         
-        if not can_access and contest.status != "past":
+        if not can_access and get_contest_status(contest) != "past":
             return Response({
                 "error": "Access denied",
                 "message": "You don't have access to this contest"
@@ -242,7 +241,7 @@ class ContestProblemsListAPIView(APIView):
         return Response({
             "contest_id": str(contest.id),
             "contest_title": contest.title,
-            "contest_status": contest.status,
+            "contest_status": get_contest_status(contest),
             "problems": problems_list
         })
     
@@ -376,7 +375,7 @@ class ContestProblemsListAPIView(APIView):
             },
             'total': len(submissions_data),
             'contest_id': str(contest.id),
-            'contest_status': contest.status,
+            'contest_status': get_contest_status(contest),
             'contest_ended': self._is_contest_ended(contest),
             'current_user_id': current_user_id,
             'current_user_name': user.name if user else None
@@ -565,7 +564,7 @@ class ContestSubmissionsAPIView(APIView):
             },
             'total': len(submissions_data),
             'contest_id': str(contest.id),
-            'contest_status': contest.status,
+            'contest_status': get_contest_status(contest),
             'contest_ended': self._is_contest_ended(contest),
             'current_user_id': current_user_id,
             'current_user_name': user.name if user else None
@@ -581,7 +580,7 @@ class ContestSubmissionsAPIView(APIView):
             return True
         
         # Check contest status
-        if contest.status == "past":
+        if get_contest_status(contest) == "past":
             return True
         
         # For live contests, check if contest has ended
@@ -615,7 +614,7 @@ class ContestSubmissionsAPIView(APIView):
     
     def _is_contest_ended(self, contest):
         """Check if contest has ended"""
-        if contest.status == "past":
+        if get_contest_status(contest) == "past":
             return True
         
         if contest.start_time and contest.duration:

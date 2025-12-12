@@ -38,15 +38,14 @@ class Contest(Document):
     platform = StringField()
     testers = ListField(StringField(), default=list)
     test_start_time = DateTimeField()
-    test_duration = FloatField(default=60)
     
     problems = EmbeddedDocumentListField(ContestProblem, default=list)
     created_by = ReferenceField(Account, null=True)
-    status = StringField(choices=["draft", "upcoming", "live", "past", "test"], default="draft")
+    # REMOVE: status = StringField(choices=["draft", "upcoming", "live", "past", "test"], default="draft")
     
     # Add these fields for editorial/tutorial management
-    editorial_published = BooleanField(default=False)  # Add this
-    tutorial_settings = DictField(default={})  # Optional: for additional settings
+    editorial_published = BooleanField(default=False)
+    tutorial_settings = DictField(default={})
 
 class ContestRegistration(Document):
     meta = {'collection': 'contest_registration'}

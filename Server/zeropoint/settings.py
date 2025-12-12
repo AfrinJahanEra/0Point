@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'tutorial',
     'corsheaders',
     'channels',
+    'daphne',
 ]
 
 MIDDLEWARE = [
@@ -64,7 +65,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'zeropoint.wsgi.application'
-ASGI_APPLICATION = 'techsage.asgi.application'
 
 connect(
     db=os.getenv('MONGO_DB_NAME', 'zeropoint'),
@@ -75,16 +75,13 @@ connect(
     # w='majority'
 )
 
-ASGI_APPLICATION = "your_project.asgi.application"
+ASGI_APPLICATION = "zeropoint.asgi.application"
 
-# Redis channel layer
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
             "hosts": [("127.0.0.1", 6379)],
-            "capacity": 1500,
-            "expiry": 10,
         },
     },
 }
