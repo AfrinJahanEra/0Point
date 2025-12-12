@@ -578,11 +578,42 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
   if (externalInputType !== undefined || externalInputValue !== undefined) {
     return (
       <div className="flex flex-col h-full">
-        <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex-grow">
+        <style>
+          {`
+          /* Custom scrollbar styling - ash color and transparent */
+          #io-visualizer-external ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+          }
+          
+          #io-visualizer-external ::-webkit-scrollbar-track {
+            background: transparent;
+            border-radius: 6px;
+          }
+          
+          #io-visualizer-external ::-webkit-scrollbar-thumb {
+            background: #9ca3af; /* ash color */
+            border-radius: 6px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+          }
+          
+          #io-visualizer-external ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* darker ash color on hover */
+            border: 2px solid transparent;
+            background-clip: content-box;
+          }
+          
+          #io-visualizer-external ::-webkit-scrollbar-corner {
+            background: transparent;
+          }
+          `}
+        </style>
+        <div id="io-visualizer-external" className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex-grow">
           <h2 className="text-xl font-bold text-blue-800 mb-4">I/O Visualization</h2>
           <div className="flex-grow p-4 bg-white border border-gray-200 rounded-lg shadow-sm overflow-auto h-full">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Visualization Output</h3>
-            <div className="flex items-center justify-center h-full min-h-[300px]">
+            <div className="flex items-center justify-center h-full min-h-[300px] overflow-auto">
               {renderVisualization()}
             </div>
           </div>
@@ -594,7 +625,38 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
   // Otherwise render the full component with input controls (standalone mode)
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex-grow">
+      <style>
+        {`
+        /* Custom scrollbar styling - ash color and transparent */
+        #io-visualizer ::-webkit-scrollbar {
+          width: 12px;
+          height: 12px;
+        }
+        
+        #io-visualizer ::-webkit-scrollbar-track {
+          background: transparent;
+          border-radius: 6px;
+        }
+        
+        #io-visualizer ::-webkit-scrollbar-thumb {
+          background: #9ca3af; /* ash color */
+          border-radius: 6px;
+          border: 2px solid transparent;
+          background-clip: content-box;
+        }
+        
+        #io-visualizer ::-webkit-scrollbar-thumb:hover {
+          background: #6b7280; /* darker ash color on hover */
+          border: 2px solid transparent;
+          background-clip: content-box;
+        }
+        
+        #io-visualizer ::-webkit-scrollbar-corner {
+          background: transparent;
+        }
+        `}
+      </style>
+      <div id="io-visualizer" className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex-grow">
         <h2 className="text-xl font-bold text-blue-800 mb-4">I/O Visualizer</h2>
         
         <div className="flex flex-col h-full lg:flex-row gap-6">
