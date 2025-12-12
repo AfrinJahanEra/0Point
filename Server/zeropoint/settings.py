@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'announcement',
     'tutorial',
     'corsheaders',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -74,20 +75,34 @@ connect(
     # w='majority'
 )
 
-if os.getenv('DJANGO_ENV') == 'production':
-    REDIS_URL = os.getenv('REDIS_URL') 
-else:
-    REDIS_URL = 'redis://127.0.0.1:6379' 
+ASGI_APPLICATION = "your_project.asgi.application"
 
-
+# Redis channel layer
 CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [REDIS_URL],
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+            "capacity": 1500,
+            "expiry": 10,
         },
     },
 }
+
+# if os.getenv('DJANGO_ENV') == 'production':
+#     REDIS_URL = os.getenv('REDIS_URL') 
+# else:
+#     REDIS_URL = 'redis://127.0.0.1:6379' 
+
+
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             'hosts': [REDIS_URL],
+#         },
+#     },
+# }
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
@@ -114,6 +129,7 @@ cloudinary.config(
     api_secret=os.getenv('CLOUDINARY_API_SECRET'),
     secure=True
 )
+
 
 DATABASES = {
     'default': {

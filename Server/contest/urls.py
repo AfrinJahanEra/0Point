@@ -24,7 +24,7 @@ from .views import (
     ContestProblemDetailAPIView,
     UserProblemStatusAPIView,
     ContestProblemTutorialAPIView,  # Import the new view
-    ContestEditorialAPIView,  # Import the new view
+    ContestEditorialAPIView,  # Import the new v,
 )
 
 # contest/urls.py

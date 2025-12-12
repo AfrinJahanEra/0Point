@@ -57,13 +57,17 @@ class ContestCreateSerializer(serializers.Serializer):
             contest.test_duration = test_duration
 
         for problem_data in problems_data:
-            test_cases_data = problem_data.pop("test_cases", [])
+            pdata = problem_data.copy()
+            test_cases_data = pdata.pop("test_cases", [])
             testcases = [TestCase(**tc) for tc in test_cases_data]
 
             problem = ContestProblem(
-                **problem_data,
+                **pdata,
                 test_cases=testcases
             )
             contest.problems.append(problem)
 
         return contest
+    
+
+    

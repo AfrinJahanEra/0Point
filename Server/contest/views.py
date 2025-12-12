@@ -1,5 +1,4 @@
 # contest/views.py
-# contest/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -874,11 +873,7 @@ class ContestFullCreateAPIView(APIView):
             if 'editorial_published' in request.data:
                 contest.editorial_published = request.data['editorial_published']
 
-        # Ensure tutorials are saved for all problems
-        if 'problems' in request.data:
-            for idx, problem_data in enumerate(request.data['problems']):
-                if idx < len(contest.problems) and 'tutorial' in problem_data:
-                    contest.problems[idx].tutorial = problem_data['tutorial']
+
 
         try:
             contest.save()
@@ -1129,6 +1124,7 @@ class ContestProblemDetailAPIView(APIView):
             problem_data = {
                 "contest_id": str(contest.id),
                 "contest_title": contest.title,
+                "contest_status": contest.status,  # ADD THIS LINE
                 "problem_index": problem.index,
                 "problem_code": problem.index,
                 "title": problem.title,
@@ -1369,5 +1365,7 @@ class ContestEditorialAPIView(APIView):
                 "error": f"Error preparing editorial: {str(e)}",
                 "can_access": False
             }, status=500)
+
+
 
 

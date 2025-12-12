@@ -20,6 +20,9 @@ class LeaderboardView(APIView):
         if not contest:
             return Response({"error": "Contest not found"}, status=404)
 
+        # Get contest status from the contest object
+        contest_status = contest.status  # This should be "past", "live", or "upcoming"
+        
         # Get current user
         current_user = get_user_from_request(request)
         current_user_id = str(current_user.id) if current_user else None
@@ -78,8 +81,7 @@ class LeaderboardView(APIView):
 
         return Response({
             "leaderboard": results,
-     
-            "status": status
+            "contest_status": contest_status  # Return contest status here
         })
     
 class FreezeLeaderboardView(APIView):
