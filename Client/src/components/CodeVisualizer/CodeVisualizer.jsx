@@ -334,22 +334,58 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
           const varName = match[1];
           const value = evaluateExpression(match[2], variablesState);
           
+          // Check if this is a loop variable
+          const isLoopVar = /^(i|j|k|index|count|n|[a-z]Index)$/.test(varName);
+          
           variablesState[varName] = {
             ...variablesState[varName],
             value: value,
             lastModified: step
           };
+          
+          // If this is a loop variable, add to output for tracking
+          if (isLoopVar) {
+            output.push({
+              step,
+              value: `Loop var ${varName} = ${value}`,
+              line: lineIndex + 1
+            });
+          }
         }
       }
       
       // Simulate output
       if (trimmed.includes('cout') || trimmed.includes('printf') || trimmed.includes('print')) {
-        const outputMatch = trimmed.match(/<<\s*(.*?)\s*;|%\w+\s*,\s*(\w+)|print\(([^)]+)\)/);
-        if (outputMatch) {
-          const outputValue = outputMatch[1] || outputMatch[2] || outputMatch[3];
+        // Handle different output formats
+        let outputValue = '';
+        
+        if (trimmed.includes('cout')) {
+          // C++ cout statements
+          const coutMatches = trimmed.match(/<<\s*([^;]+)/g);
+          if (coutMatches) {
+            outputValue = coutMatches.map(match => {
+              const varName = match.split('<<')[1].trim();
+              return evaluateExpression(varName, variablesState);
+            }).join(' ');
+          }
+        } else if (trimmed.includes('printf')) {
+          // C printf statements
+          const printfMatch = trimmed.match(/printf\s*\(\s*"[^"]*"\s*,\s*([^)]+)\s*\)/);
+          if (printfMatch) {
+            outputValue = evaluateExpression(printfMatch[1], variablesState);
+          }
+        } else if (trimmed.includes('print')) {
+          // Python/other print statements
+          const printMatch = trimmed.match(/print\s*\(\s*([^)]+)\s*\)/);
+          if (printMatch) {
+            outputValue = evaluateExpression(printMatch[1], variablesState);
+          }
+        }
+        
+        if (outputValue) {
           output.push({
             step,
-            value: evaluateExpression(outputValue, variablesState),
+            value: outputValue,
             line: lineIndex + 1
           });
         }
@@ -357,6 +393,20 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
       
       // Simulate loops
       if (trimmed.includes('for') || trimmed.includes('while')) {
+        // Extract loop variable if possible
+        const loopVarMatch = trimmed.match(/for\s*\(\s*(?:int|long|float|double)?\s*(\w+)\s*=|for\s+(\w+)\s+in/);
+        if (loopVarMatch) {
+          const loopVar = loopVarMatch[1] || loopVarMatch[2];
+          if (loopVar && variablesState[loopVar]) {
+            // Add loop variable to output for tracking
+            output.push({
+              step,
+              value: `Loop var ${loopVar} = ${variablesState[loopVar].value}`,
+              line: lineIndex + 1
+            });
+          }
+        }
+        
         trace.push({
           step,
           line: lineIndex + 1,
@@ -451,6 +501,12 @@ def tracer(frame, event, arg):
   if event == 'line':
     locals_copy = {k: str(v) for k, v in frame.f_locals.items() if not k.startswith('__')}
     globals_copy = {k: str(v) for k, v in frame.f_globals.items() if not k.startswith('__') and k not in ['tracer', 'traced_print', 'original_print', 'trace', 'output_lines']}
+    
+    # Check for loop variables and add to output
+    for var_name, var_value in {**globals_copy, **locals_copy}.items():
+      if var_name in ['i', 'j', 'k', 'index', 'count', 'n'] or var_name.endswith('Index'):
+        output_lines.append({'line': frame.f_lineno, 'output': f'Loop var {var_name} = {var_value}'})
+    
     stack = []
     current = frame
     while current:
@@ -553,7 +609,15 @@ sys.settrace(tracer)
         const variables = {};
         for (let prop in scope.properties) {
           if (!prop.startsWith('_')) {
-            variables[prop] = String(interpreter.pseudoToNative(scope.properties[prop]));
+            const value = String(interpreter.pseudoToNative(scope.properties[prop]));
+            variables[prop] = value;
+            
+            // Check if this is a loop variable and add to output for tracking
+            if (/^(i|j|k|index|count|n|[a-z]Index)$/.test(prop)) {
+              const state = interpreter.stateStack[interpreter.stateStack.length - 1];
+              const line = state.node.loc ? state.node.loc.start.line : 0;
+              output_lines.push({line, output: `Loop var ${prop} = ${value}`});
+            }
           }
         }
         
@@ -873,11 +937,38 @@ sys.settrace(tracer)
     
     // Create a map of line executions for highlighting
     const lineExecutions = {};
+    const lineOutputs = {};
+    const lineLoopVars = {};
+    
     executionTrace.forEach(step => {
       if (!lineExecutions[step.line]) {
         lineExecutions[step.line] = [];
+        lineOutputs[step.line] = [];
+        lineLoopVars[step.line] = [];
       }
       lineExecutions[step.line].push(step);
+      
+      // Collect outputs for this line
+      if (step.output && step.output.length > 0) {
+        const newOutputs = step.output.filter(out => 
+          !lineOutputs[step.line].includes(out)
+        );
+        lineOutputs[step.line].push(...newOutputs);
+      }
+      
+      // Collect loop variables for this line
+      if (step.variables) {
+        const loopVars = {};
+        Object.entries(step.variables).forEach(([name, value]) => {
+          // Check if this is likely a loop variable (i, j, k, index, count, etc.)
+          if (/^(i|j|k|index|count|n|[a-z]Index)$/.test(name)) {
+            loopVars[name] = value;
+          }
+        });
+        if (Object.keys(loopVars).length > 0) {
+          lineLoopVars[step.line].push(loopVars);
+        }
+      }
     });
     
     return (
@@ -890,6 +981,7 @@ sys.settrace(tracer)
                 <th className="border border-gray-300 px-4 py-2 text-left">Line #</th>
                 <th className="border border-gray-300 px-4 py-2 text-left">Code</th>
                 <th className="border border-gray-300 px-4 py-2 text-left">Executions</th>
+                <th className="border border-gray-300 px-4 py-2 text-left">Loop Vars</th>
                 <th className="border border-gray-300 px-4 py-2 text-left">Variables</th>
                 <th className="border border-gray-300 px-4 py-2 text-left">Output</th>
               </tr>
@@ -898,6 +990,8 @@ sys.settrace(tracer)
               {codeLines.map((line, index) => {
                 const lineNumber = index + 1;
                 const executions = lineExecutions[lineNumber] || [];
+                const outputs = lineOutputs[lineNumber] || [];
+                const loopVarsList = lineLoopVars[lineNumber] || [];
                 const lastExecution = executions[executions.length - 1];
                 
                 // Get variables at this line execution
@@ -925,10 +1019,20 @@ sys.settrace(tracer)
                   }
                 }
                 
+                // Get loop variables for this line
+                let loopVarsDisplay = '';
+                if (loopVarsList.length > 0) {
+                  // Get the latest loop variables
+                  const latestLoopVars = loopVarsList[loopVarsList.length - 1];
+                  loopVarsDisplay = Object.entries(latestLoopVars)
+                    .map(([name, value]) => `${name}=${value}`)
+                    .join(', ');
+                }
+                
                 // Get output at this line
                 let outputDisplay = '';
-                if (lastExecution && lastExecution.output) {
-                  outputDisplay = lastExecution.output.join(', ');
+                if (outputs.length > 0) {
+                  outputDisplay = outputs.join(', ');
                 }
                 
                 return (
@@ -939,6 +1043,7 @@ sys.settrace(tracer)
                     <td className={`border border-gray-300 px-4 py-2 font-mono text-sm ${executionState.currentLine === lineNumber ? 'text-white font-bold' : ''}`}>{lineNumber}</td>
                     <td className={`border border-gray-300 px-4 py-2 font-mono text-sm whitespace-pre ${executionState.currentLine === lineNumber ? 'text-white' : ''}`}>{line || <span className="text-gray-400">&nbsp;</span>}</td>
                     <td className={`border border-gray-300 px-4 py-2 text-center ${executionState.currentLine === lineNumber ? 'text-white' : ''}`}>{executions.length}</td>
+                    <td className={`border border-gray-300 px-4 py-2 text-sm max-w-xs truncate ${executionState.currentLine === lineNumber ? 'text-white' : ''}`} title={loopVarsDisplay}>{loopVarsDisplay}</td>
                     <td className={`border border-gray-300 px-4 py-2 text-sm max-w-xs truncate ${executionState.currentLine === lineNumber ? 'text-white' : ''}`} title={variablesDisplay}>{variablesDisplay}</td>
                     <td className={`border border-gray-300 px-4 py-2 text-sm max-w-xs truncate ${executionState.currentLine === lineNumber ? 'text-white' : ''}`} title={outputDisplay}>{outputDisplay}</td>
                   </tr>
