@@ -1,9 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputValue }) => {
   // Use external props if provided, otherwise use internal state
   const [internalInputType, setInternalInputType] = useState('array');
   const [internalInputValue, setInternalInputValue] = useState('');
+  const [visualizationMode, setVisualizationMode] = useState('default');
+  const [animationSpeed, setAnimationSpeed] = useState(1);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [nodeDetails, setNodeDetails] = useState(null);
+  const [stackData, setStackData] = useState([]);
+  const [queueData, setQueueData] = useState([]);
+  
+  // Ref to track programmatic input updates
+  const isProgrammaticUpdate = useRef(false);
   
   const inputType = externalInputType !== undefined ? externalInputType : internalInputType;
   const inputValue = externalInputValue !== undefined ? externalInputValue : internalInputValue;
@@ -13,754 +23,1373 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
   
   const [parsedData, setParsedData] = useState(null);
   const [error, setError] = useState('');
-
-  // Parse nested tree format: A(B(C,D),E(F))
-  const parseNestedTree = (str) => {
-    const nodes = [];
-    const edges = [];
-    const stack = [];
+  const [metadata, setMetadata] = useState({});
+  
+  // Function to add element to stack or queue
+  const handleAddElement = (value) => {
+    if (!value.trim()) return;
     
-    let i = 0;
-    let currentNode = '';
+    // Parse the value
+    let parsedValue;
+    if (value.toLowerCase() === 'true') {
+      parsedValue = true;
+    } else if (value.toLowerCase() === 'false') {
+      parsedValue = false;
+    } else if (value.toLowerCase() === 'null') {
+      parsedValue = null;
+    } else {
+      // Try to parse as number
+      const num = Number(value);
+      parsedValue = isNaN(num) ? value : num;
+    }
     
-    while (i < str.length) {
-      const char = str[i];
+    if (inputType === 'stack') {
+      // Push to stack (add to end)
+      const newData = [...stackData, parsedValue];
+      setStackData(newData);
       
-      if (char === '(') {
-        if (currentNode) {
-          nodes.push(currentNode);
-          if (stack.length > 0) {
-            edges.push({ from: stack[stack.length - 1], to: currentNode });
-          }
-          stack.push(currentNode);
-          currentNode = '';
-        }
-        i++;
-      } else if (char === ')') {
-        if (currentNode) {
-          nodes.push(currentNode);
-          if (stack.length > 0) {
-            edges.push({ from: stack[stack.length - 1], to: currentNode });
-          }
-          currentNode = '';
-        }
-        stack.pop();
-        i++;
-      } else if (char === ',') {
-        if (currentNode) {
-          nodes.push(currentNode);
-          if (stack.length > 0) {
-            edges.push({ from: stack[stack.length - 1], to: currentNode });
-          }
-          currentNode = '';
-        }
-        i++;
-      } else if (char.match(/[a-zA-Z0-9]/)) {
-        currentNode += char;
-        i++;
-      } else {
-        i++;
+      // Update input value
+      const newInputValue = newData.map(item => {
+        if (item === null) return 'null';
+        if (typeof item === 'string') return `"${item}"`;
+        if (typeof item === 'boolean') return String(item);
+        return String(item);
+      }).join(', ');
+      
+      if (externalInputValue === undefined) {
+        isProgrammaticUpdate.current = true;
+        setInternalInputValue(newInputValue);
+      }
+    } else if (inputType === 'queue') {
+      // Enqueue to queue (add to end)
+      const newData = [...queueData, parsedValue];
+      setQueueData(newData);
+      
+      // Update input value
+      const newInputValue = newData.map(item => {
+        if (item === null) return 'null';
+        if (typeof item === 'string') return `"${item}"`;
+        if (typeof item === 'boolean') return String(item);
+        return String(item);
+      }).join(', ');
+      
+      if (externalInputValue === undefined) {
+        isProgrammaticUpdate.current = true;
+        setInternalInputValue(newInputValue);
       }
     }
-    
-    // Add the last node if exists
-    if (currentNode) {
-      nodes.push(currentNode);
-      if (stack.length > 0) {
-        edges.push({ from: stack[stack.length - 1], to: currentNode });
-      }
-    }
-    
-    // Remove duplicates
-    const uniqueNodes = [...new Set(nodes)];
-    
-    return { nodes: uniqueNodes, edges };
   };
+  
+  const animationRef = useRef(null);
+  const svgRef = useRef(null);
 
-  // Render tree structure with hierarchical layout using SVG like AVL visualizer
-  const renderTreeStructure = (data) => {
-    if (!data || !data.nodes || data.nodes.length === 0) return null;
-    
-    // Build a map of parent-child relationships
-    const childrenMap = {};
-    const parentsMap = {};
-    
-    // Initialize maps
-    data.nodes.forEach(node => {
-      childrenMap[node] = [];
-    });
-    
-    // Populate relationships from edges
-    data.edges.forEach(edge => {
-      if (!childrenMap[edge.from]) childrenMap[edge.from] = [];
-      childrenMap[edge.from].push(edge.to);
-      parentsMap[edge.to] = edge.from;
-    });
-    
-    // Find root nodes (nodes without parents)
-    const rootNodes = data.nodes.filter(node => !parentsMap[node]);
-    
-    // Calculate positions for nodes in a hierarchical layout with proper spacing
-    const nodePositions = {};
-    const nodeSize = 48; // Diameter of node circle
-    const horizontalSpacing = 200; // Base spacing between nodes
-    const verticalSpacing = 120; // Vertical spacing between levels
-    
-    // Calculate subtree widths to prevent overlapping
-    const calculateSubtreeWidth = (node, visited = new Set()) => {
-      if (visited.has(node) || !node) return 0;
-      visited.add(node);
+  // Enhanced parse functions with better error handling
+  const parseArray = (str) => {
+    try {
+      if (!str.trim()) return [];
       
-      const children = childrenMap[node] || [];
-      if (children.length === 0) {
-        return 1; // Leaf node width
+      // Try to parse as JSON first
+      if (str.trim().startsWith('[') && str.trim().endsWith(']')) {
+        try {
+          return JSON.parse(str);
+        } catch (e) {
+          // Continue with other parsing methods
+        }
       }
       
-      // Sum of all children subtree widths
-      let totalWidth = 0;
-      children.forEach(child => {
-        totalWidth += calculateSubtreeWidth(child, new Set(visited));
+      // Parse comma/space separated values
+      const items = str.split(/[,;\s]+/).filter(item => item.trim() !== '');
+      
+      return items.map(item => {
+        const trimmed = item.trim();
+        
+        // Try to parse as number
+        const num = Number(trimmed);
+        if (!isNaN(num) && trimmed !== '') {
+          return num;
+        }
+        
+        // Try to parse as boolean
+        if (trimmed.toLowerCase() === 'true') return true;
+        if (trimmed.toLowerCase() === 'false') return false;
+        
+        // Try to parse as null
+        if (trimmed.toLowerCase() === 'null') return null;
+        
+        // Return as string
+        return trimmed;
       });
-      
-      return Math.max(1, totalWidth); // At least 1 unit wide
-    };
-    
-    // Recursive function to calculate node positions with proper spacing
-    const calculatePositions = (node, x, y, level = 0, visited = new Set(), parentX = null) => {
-      if (visited.has(node) || !node) return;
-      visited.add(node);
-      
-      nodePositions[node] = { x, y };
-      
-      const children = childrenMap[node] || [];
-      const childCount = children.length;
-      
-      if (childCount > 0) {
-        // Calculate total width needed for children
-        let totalChildrenWidth = 0;
-        const childWidths = [];
-        
-        children.forEach(child => {
-          const width = calculateSubtreeWidth(child);
-          childWidths.push(width);
-          totalChildrenWidth += width;
-        });
-        
-        // Position children with proper spacing
-        let currentX = x - (totalChildrenWidth - 1) * horizontalSpacing / 2;
-        
-        children.forEach((child, index) => {
-          const childWidth = childWidths[index];
-          const childX = currentX + (childWidth - 1) * horizontalSpacing / 2;
-          const childY = y + verticalSpacing;
-          
-          calculatePositions(child, childX, childY, level + 1, visited, x);
-          currentX += childWidth * horizontalSpacing;
-        });
-      }
-    };
-    
-    // Calculate positions starting from root nodes
-    rootNodes.forEach((root, index) => {
-      const subtreeWidth = calculateSubtreeWidth(root);
-      const startX = (index - (rootNodes.length - 1) / 2) * Math.max(subtreeWidth, 3) * horizontalSpacing;
-      calculatePositions(root, startX, 60);
-    });
-    
-    // Get bounding box for SVG
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    Object.values(nodePositions).forEach(pos => {
-      minX = Math.min(minX, pos.x);
-      maxX = Math.max(maxX, pos.x);
-      minY = Math.min(minY, pos.y);
-      maxY = Math.max(maxY, pos.y);
-    });
-    
-    // Add padding
-    const padding = 80;
-    const svgWidth = Math.max(600, maxX - minX + padding * 2);
-    const svgHeight = Math.max(500, maxY - minY + padding * 2);
-    
-    // Adjust positions to fit in SVG
-    const offsetX = padding - minX;
-    const offsetY = padding - minY;
-    
-    // Create a unique key based on the data content to force re-render when data changes
-    const dataKey = JSON.stringify({
-      nodes: data.nodes.sort(),
-      edges: data.edges.map(e => `${e.from}-${e.to}`).sort()
-    });
-    
-    return (
-      <div className="flex justify-center w-full overflow-auto p-4">
-        <svg 
-          key={dataKey}
-          width={svgWidth} 
-          height={svgHeight} 
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          className="border border-gray-200 rounded-lg bg-white"
-        >
-          {/* Render edges */}
-          {data.edges.map((edge, index) => {
-            const fromPos = nodePositions[edge.from];
-            const toPos = nodePositions[edge.to];
-            
-            if (!fromPos || !toPos) return null;
-            
-            // Create a unique key based on the edge connection
-            const edgeKey = `${edge.from}-${edge.to}`;
-            
-            return (
-              <line
-                key={edgeKey}
-                x1={fromPos.x + offsetX}
-                y1={fromPos.y + offsetY}
-                x2={toPos.x + offsetX}
-                y2={toPos.y + offsetY}
-                stroke="#9CA3AF"
-                strokeWidth="2"
-                className="transition-all duration-500"
-              />
-            );
-          })}
-          
-          {/* Render nodes */}
-          {data.nodes.map((node, index) => {
-            const pos = nodePositions[node];
-            if (!pos) return null;
-            
-            const x = pos.x + offsetX;
-            const y = pos.y + offsetY;
-            
-            return (
-              <g key={`node-${node}`}>
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={nodeSize / 2}
-                  fill="#10B981"
-                  stroke="#047857"
-                  strokeWidth="2"
-                  className="transition-all duration-500 hover:stroke-blue-500"
-                />
-                <text
-                  x={x}
-                  y={y}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="font-bold text-sm fill-white select-none pointer-events-none"
-                >
-                  {node}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-    );
+    } catch (err) {
+      throw new Error(`Array parsing error: ${err.message}`);
+    }
   };
 
-  // Render graph structure with circular layout
-  const renderGraphStructure = (data) => {
-    if (!data || !data.nodes || data.nodes.length === 0) return null;
-    
-    const nodeCount = data.nodes.length;
-    const centerX = 300;
-    const centerY = 200;
-    const radius = Math.min(200, Math.max(100, nodeCount * 20));
-    
-    // Calculate positions in a circular layout
-    const nodePositions = {};
-    data.nodes.forEach((node, index) => {
-      const angle = (index * 2 * Math.PI) / nodeCount;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-      nodePositions[node] = { x, y };
-    });
-    
-    // Create a unique key based on the data content to force re-render when data changes
-    const dataKey = JSON.stringify({
-      nodes: data.nodes.sort(),
-      edges: data.edges.map(e => `${e.from}-${e.to}`).sort()
-    });
-    
-    return (
-      <div className="flex justify-center w-full overflow-auto p-4">
-        <svg 
-          key={dataKey}
-          width="600" 
-          height="400" 
-          viewBox="0 0 600 400"
-          className="border border-gray-200 rounded-lg bg-white"
-        >
-          {/* Render edges */}
-          {data.edges.map((edge, index) => {
-            const fromPos = nodePositions[edge.from];
-            const toPos = nodePositions[edge.to];
-            
-            if (!fromPos || !toPos) return null;
-            
-            // Create a unique key based on the edge connection
-            const edgeKey = `${edge.from}-${edge.to}`;
-            
-            return (
-              <line
-                key={edgeKey}
-                x1={fromPos.x}
-                y1={fromPos.y}
-                x2={toPos.x}
-                y2={toPos.y}
-                stroke="#9CA3AF"
-                strokeWidth="2"
-                className="transition-all duration-500"
-              />
-            );
-          })}
+  // Parse stack (same as array)
+  const parseStack = parseArray;
+
+  // Parse queue (same as array)
+  const parseQueue = parseArray;
+
+  // Parse linked list
+  const parseLinkedList = (str) => {
+    try {
+      if (!str.trim()) return [];
+      
+      // Try to parse as JSON first
+      if (str.trim().startsWith('[') && str.trim().endsWith(']')) {
+        try {
+          return JSON.parse(str);
+        } catch (e) {
+          // Continue with other parsing methods
+        }
+      }
+      
+      // Parse comma/space separated values
+      const items = str.split(/[,;\s]+/).filter(item => item.trim() !== '');
+      
+      return items.map(item => {
+        const trimmed = item.trim();
+        
+        // Try to parse as number
+        const num = Number(trimmed);
+        if (!isNaN(num) && trimmed !== '') {
+          return num;
+        }
+        
+        // Try to parse as boolean
+        if (trimmed.toLowerCase() === 'true') return true;
+        if (trimmed.toLowerCase() === 'false') return false;
+        
+        // Try to parse as null
+        if (trimmed.toLowerCase() === 'null') return null;
+        
+        // Return as string
+        return trimmed;
+      });
+    } catch (err) {
+      throw new Error(`Linked list parsing error: ${err.message}`);
+    }
+  };
+
+  // Enhanced tree parsing with support for multiple formats
+  const parseTree = (str) => {
+    try {
+      if (!str.trim()) return { nodes: [], edges: [], weights: {} };
+      
+      str = str.trim();
+      
+      // Format 1: JSON format with explicit structure
+      if (str.startsWith('{') && str.endsWith('}')) {
+        try {
+          const data = JSON.parse(str);
+          return {
+            nodes: data.nodes || [],
+            edges: data.edges || [],
+            weights: data.weights || {},
+            root: data.root || null
+          };
+        } catch (e) {
+          // Not valid JSON, continue with other formats
+        }
+      }
+      
+      // Format 2: Nested parentheses format
+      if (str.includes('(') && str.includes(')')) {
+        const nodes = new Map();
+        const edges = [];
+        const weights = {};
+        let nodeId = 0;
+        
+        const parseSubtree = (str, parent = null, level = 0) => {
+          let current = '';
+          const children = [];
+          let i = 0;
           
-          {/* Render nodes */}
-          {data.nodes.map((node, index) => {
-            const pos = nodePositions[node];
-            if (!pos) return null;
+          while (i < str.length) {
+            const char = str[i];
             
-            return (
-              <g key={`node-${node}`}>
-                <circle
-                  cx={pos.x}
-                  cy={pos.y}
-                  r="24"
-                  fill="#10B981"
-                  stroke="#047857"
-                  strokeWidth="2"
-                  className="transition-all duration-500 hover:stroke-blue-500"
-                />
-                <text
-                  x={pos.x}
-                  y={pos.y}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="font-bold text-sm fill-white select-none pointer-events-none"
-                >
-                  {node}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-    );
+            if (char === '(') {
+              if (current.trim()) {
+                const node = current.trim();
+                if (!nodes.has(node)) {
+                  nodes.set(node, { id: nodeId++, label: node, level });
+                }
+                if (parent !== null) {
+                  edges.push({ from: parent, to: node });
+                }
+                
+                // Find matching closing parenthesis
+                let depth = 1;
+                let j = i + 1;
+                while (j < str.length && depth > 0) {
+                  if (str[j] === '(') depth++;
+                  if (str[j] === ')') depth--;
+                  j++;
+                }
+                
+                const subtree = str.substring(i + 1, j - 1);
+                parseSubtree(subtree, node, level + 1);
+                i = j;
+              }
+            } else if (char === ',') {
+              if (current.trim()) {
+                const node = current.trim();
+                if (!nodes.has(node)) {
+                  nodes.set(node, { id: nodeId++, label: node, level });
+                }
+                if (parent !== null) {
+                  edges.push({ from: parent, to: node });
+                }
+                current = '';
+              }
+              i++;
+            } else if (char === ')') {
+              break;
+            } else {
+              current += char;
+              i++;
+            }
+          }
+          
+          // Handle last node
+          if (current.trim()) {
+            const node = current.trim();
+            if (!nodes.has(node)) {
+              nodes.set(node, { id: nodeId++, label: node, level });
+            }
+            if (parent !== null) {
+              edges.push({ from: parent, to: node });
+            }
+          }
+        };
+        
+        parseSubtree(str);
+        
+        return {
+          nodes: Array.from(nodes.values()),
+          edges,
+          weights,
+          root: Array.from(nodes.values())[0]?.label || null
+        };
+      }
+      
+      // Format 3: Edge list format
+      if (str.includes('->') || str.includes('-')) {
+        const nodes = new Map();
+        const edges = [];
+        const weights = {};
+        let nodeId = 0;
+        
+        const items = str.split(',').map(s => s.trim()).filter(s => s);
+        
+        items.forEach(item => {
+          if (item.includes('->')) {
+            // Directed edge
+            const [from, rest] = item.split('->');
+            let to = rest;
+            let weight = 1;
+            
+            if (rest.includes(':')) {
+              const [toPart, weightPart] = rest.split(':');
+              to = toPart;
+              weight = parseFloat(weightPart) || 1;
+            }
+            
+            const fromNode = from.trim();
+            const toNode = to.trim();
+            
+            if (!nodes.has(fromNode)) {
+              nodes.set(fromNode, { id: nodeId++, label: fromNode });
+            }
+            if (!nodes.has(toNode)) {
+              nodes.set(toNode, { id: nodeId++, label: toNode });
+            }
+            
+            edges.push({ from: fromNode, to: toNode, directed: true });
+            weights[`${fromNode}-${toNode}`] = weight;
+          } else if (item.includes('-')) {
+            // Undirected edge
+            const [node1, rest] = item.split('-');
+            let node2 = rest;
+            let weight = 1;
+            
+            if (rest.includes(':')) {
+              const [node2Part, weightPart] = rest.split(':');
+              node2 = node2Part;
+              weight = parseFloat(weightPart) || 1;
+            }
+            
+            const node1Trim = node1.trim();
+            const node2Trim = node2.trim();
+            
+            if (!nodes.has(node1Trim)) {
+              nodes.set(node1Trim, { id: nodeId++, label: node1Trim });
+            }
+            if (!nodes.has(node2Trim)) {
+              nodes.set(node2Trim, { id: nodeId++, label: node2Trim });
+            }
+            
+            edges.push({ from: node1Trim, to: node2Trim, directed: false });
+            weights[`${node1Trim}-${node2Trim}`] = weight;
+          } else {
+            // Single node
+            const node = item.trim();
+            if (!nodes.has(node)) {
+              nodes.set(node, { id: nodeId++, label: node });
+            }
+          }
+        });
+        
+        return {
+          nodes: Array.from(nodes.values()),
+          edges,
+          weights,
+          root: Array.from(nodes.values())[0]?.label || null
+        };
+      }
+      
+      // Format 4: Simple list (treat as linear tree)
+      const simpleNodes = str.split(/[,;\s]+/).filter(s => s.trim());
+      const nodes = simpleNodes.map((label, index) => ({
+        id: index,
+        label,
+        level: 0
+      }));
+      
+      const edges = [];
+      for (let i = 0; i < simpleNodes.length - 1; i++) {
+        edges.push({ from: simpleNodes[i], to: simpleNodes[i + 1] });
+      }
+      
+      return {
+        nodes,
+        edges,
+        weights: {},
+        root: simpleNodes[0] || null
+      };
+      
+    } catch (err) {
+      throw new Error(`Tree parsing error: ${err.message}`);
+    }
+  };
+
+  // Enhanced graph parsing
+  const parseGraph = (str) => {
+    try {
+      if (!str.trim()) return { nodes: [], edges: [], weights: {}, adjacency: {} };
+      
+      str = str.trim();
+      
+      // JSON format
+      if (str.startsWith('{') && str.endsWith('}')) {
+        try {
+          return JSON.parse(str);
+        } catch (e) {
+          // Not valid JSON, continue
+        }
+      }
+      
+      return parseTree(str); // Reuse tree parser for now
+      
+    } catch (err) {
+      throw new Error(`Graph parsing error: ${err.message}`);
+    }
+  };
+
+  // Calculate metadata for visualization
+  const calculateMetadata = (data, type) => {
+    const meta = {
+      type,
+      timestamp: new Date().toISOString(),
+      summary: ''
+    };
+    
+    switch (type) {
+      case 'array':
+      case 'stack':
+      case 'queue':
+      case 'linked-list':
+        meta.count = data.length;
+        meta.min = Math.min(...data.filter(n => typeof n === 'number'));
+        meta.max = Math.max(...data.filter(n => typeof n === 'number'));
+        meta.sum = data.filter(n => typeof n === 'number').reduce((a, b) => a + b, 0);
+        meta.average = meta.count > 0 ? meta.sum / data.filter(n => typeof n === 'number').length : 0;
+        meta.hasStrings = data.some(item => typeof item === 'string');
+        meta.hasNumbers = data.some(item => typeof item === 'number');
+        meta.hasBooleans = data.some(item => typeof item === 'boolean');
+        meta.hasNulls = data.some(item => item === null);
+        
+        // Set appropriate summary based on type
+        if (type === 'stack') {
+          meta.summary = `Stack with ${meta.count} elements`;
+        } else if (type === 'queue') {
+          meta.summary = `Queue with ${meta.count} elements`;
+        } else if (type === 'linked-list') {
+          meta.summary = `Linked List with ${meta.count} elements`;
+        } else {
+          meta.summary = `Array with ${meta.count} elements`;
+        }
+        break;
+        
+      case 'tree':
+      case 'graph':
+        meta.nodeCount = data.nodes.length;
+        meta.edgeCount = data.edges.length;
+        meta.directedEdges = data.edges.filter(e => e.directed).length;
+        meta.undirectedEdges = data.edges.filter(e => !e.directed).length;
+        meta.leafNodes = data.nodes.filter(n => 
+          data.edges.filter(e => e.from === n.label || e.to === n.label).length <= 1
+        ).length;
+        meta.root = data.root;
+        
+        // Calculate degree for each node
+        const degrees = {};
+        data.nodes.forEach(node => {
+          degrees[node.label] = 0;
+        });
+        
+        data.edges.forEach(edge => {
+          degrees[edge.from]++;
+          degrees[edge.to]++;
+        });
+        
+        meta.maxDegree = Math.max(...Object.values(degrees));
+        meta.minDegree = Math.min(...Object.values(degrees));
+        meta.summary = `${type.charAt(0).toUpperCase() + type.slice(1)} with ${meta.nodeCount} nodes and ${meta.edgeCount} edges`;
+        break;
+    }
+    
+    return meta;
   };
 
   // Parse input based on selected type
   const parseInput = (type, value) => {
     setError('');
+    setSelectedNode(null);
+    setNodeDetails(null);
     
     try {
+      let data;
+      
       switch (type) {
         case 'array':
-          if (!value.trim()) {
-            return [];
-          }
-          // Handle both comma-separated and space-separated values
-          const array = value.split(/[, ]+/)
-            .map(item => item.trim())
-            .filter(item => item !== '')
-            .map(item => {
-              // Try to convert to number, if fails keep as string
-              const num = Number(item);
-              return isNaN(num) ? item : num;
-            });
-          return array;
+          data = parseArray(value);
+          break;
+          
+        case 'stack':
+          data = parseStack(value);
+          break;
+          
+        case 'queue':
+          data = parseQueue(value);
+          break;
+          
+        case 'linked-list':
+          data = parseLinkedList(value);
+          break;
           
         case 'tree':
-          if (!value.trim()) {
-            return { nodes: [], edges: [] };
-          }
-          
-          // Parse tree structure with parent-child relationships
-          // Expected format: "A(B(C,D),E(F))" for nested tree or "A->B,A->C" for edges
-          if (value.includes('(') && value.includes(')')) {
-            // Nested tree format: A(B(C,D),E)
-            return parseNestedTree(value);
-          } else if (value.includes('->')) {
-            // Edge format: A->B,B->C
-            const edges = value.split(',').map(item => {
-              const [from, to] = item.split('->').map(s => s.trim());
-              return { from, to };
-            });
-            
-            // Extract unique nodes
-            const nodes = [...new Set(edges.flatMap(edge => [edge.from, edge.to]))];
-            
-            return { nodes, edges };
-          } else {
-            // Simple list format: A,B,C (will create a simple tree)
-            const nodeList = value.split(/[, ]+/).map(item => item.trim()).filter(item => item !== '');
-            if (nodeList.length === 0) return { nodes: [], edges: [] };
-            
-            // Create a simple tree structure (first node as root, others as children)
-            const nodes = nodeList;
-            const edges = [];
-            if (nodes.length > 1) {
-              for (let i = 1; i < nodes.length; i++) {
-                // Connect to previous node (simple linear structure)
-                edges.push({ from: nodes[i-1], to: nodes[i] });
-              }
-            }
-            
-            return { nodes, edges };
-          }
+          data = parseTree(value);
+          break;
           
         case 'graph':
-          if (!value.trim()) {
-            return { nodes: [], edges: [] };
-          }
-          
-          // Parse graph with proper node and edge structure
-          // Expected format: "A,B,C" for nodes and "A-B:5,B-C:3" for weighted edges
-          // Or "A->B:5,B->C:3" for directed weighted edges
-          
-          // Split by commas to get individual items
-          const items = value.split(',').map(item => item.trim()).filter(item => item !== '');
-          
-          // Separate nodes and edges
-          const nodeItems = items.filter(item => !item.includes('->') && !item.includes('-'));
-          const edgeItems = items.filter(item => item.includes('->') || item.includes('-'));
-          
-          // Process edges
-          const graphEdges = edgeItems.map(item => {
-            // Check if it's directed (->) or undirected (-)
-            let from, to, weightStr;
-            if (item.includes('->')) {
-              [from, to] = item.split('->');
-            } else {
-              [from, to] = item.split('-');
-            }
-            
-            from = from.trim();
-            
-            // Check for weight
-            if (to.includes(':')) {
-              [to, weightStr] = to.split(':');
-              to = to.trim();
-            }
-            
-            const weight = weightStr ? parseFloat(weightStr.trim()) : 1;
-            
-            return { 
-              from, 
-              to: to.trim(), 
-              weight: isNaN(weight) ? 1 : weight,
-              directed: item.includes('->')
-            };
-          });
-          
-          // Extract all unique nodes from edges and explicit node list
-          const edgeNodes = [...new Set([
-            ...graphEdges.flatMap(edge => [edge.from, edge.to]),
-            ...nodeItems
-          ])];
-          
-          return { nodes: edgeNodes, edges: graphEdges };
+          data = parseGraph(value);
+          break;
           
         default:
-          return value;
+          data = value;
       }
+      
+      // Calculate metadata
+      const meta = calculateMetadata(data, type);
+      setMetadata(meta);
+      
+      return data;
+      
     } catch (err) {
-      setError('Invalid input format: ' + err.message);
+      setError(`Invalid ${type} format: ${err.message}`);
       return null;
     }
   };
 
+  // Reset stack and queue data when input type changes
+  useEffect(() => {
+    setStackData([]);
+    setQueueData([]);
+  }, [inputType]);
+  
   // Update parsed data when input changes
   useEffect(() => {
-    // Initialize with empty data for each type
+    // Skip parsing if this is a programmatic update
+    if (isProgrammaticUpdate.current) {
+      isProgrammaticUpdate.current = false;
+      return;
+    }
+    
     if (inputValue === undefined || inputValue === '') {
-      switch (inputType) {
-        case 'array':
-          setParsedData([]);
-          break;
-        case 'tree':
-        case 'graph':
-          setParsedData({ nodes: [], edges: [] });
-          break;
-        default:
-          setParsedData(undefined);
+      // For array-like structures, use empty array; for tree/graph, use empty object
+      const isArrayLike = ['array', 'stack', 'queue', 'linked-list'].includes(inputType);
+      const emptyData = isArrayLike ? [] : { nodes: [], edges: [] };
+      setParsedData(emptyData);
+      setMetadata(calculateMetadata(emptyData, inputType));
+      
+      // Initialize stack and queue data only when input type changes
+      if (inputType === 'stack') {
+        setStackData([]);
+      } else if (inputType === 'queue') {
+        setQueueData([]);
       }
     } else {
       const data = parseInput(inputType, inputValue);
       setParsedData(data);
+      
+      // Update stack and queue data only if not manually modified
+      // Check if the parsed data differs from current stack/queue data to avoid overriding manual operations
+      if (inputType === 'stack') {
+        // Convert both arrays to strings for comparison
+        const currentStackStr = JSON.stringify(stackData);
+        const parsedStackStr = JSON.stringify(data);
+        
+        // Only update if they're different (meaning user typed in the input field)
+        if (currentStackStr !== parsedStackStr) {
+          setStackData(data);
+        }
+      } else if (inputType === 'queue') {
+        // Convert both arrays to strings for comparison
+        const currentQueueStr = JSON.stringify(queueData);
+        const parsedQueueStr = JSON.stringify(data);
+        
+        // Only update if they're different (meaning user typed in the input field)
+        if (currentQueueStr !== parsedQueueStr) {
+          setQueueData(data);
+        }
+      }
     }
-  }, [inputType, inputValue]);
+  }, [inputType, inputValue, stackData, queueData, isProgrammaticUpdate]);
+
+  // Enhanced array visualization
+  const renderArrayVisualization = () => {
+    if (!Array.isArray(parsedData)) return null;
+    
+    return (
+      <div className="flex flex-col items-center w-full">
+        <div className="flex flex-wrap gap-2 justify-center mb-6">
+          {parsedData.map((item, index) => (
+            <div 
+              key={index}
+              className={`
+                w-16 h-16 flex flex-col items-center justify-center 
+                border-2 border-gray-400 rounded transition-all duration-300
+                ${selectedNode === index ? 'ring-2 ring-gray-800 scale-110' : ''}
+                bg-white
+              `}
+              onClick={() => {
+                setSelectedNode(index);
+                setNodeDetails({
+                  index,
+                  value: item,
+                  type: typeof item,
+                  isEven: index % 2 === 0,
+                  isFirst: index === 0,
+                  isLast: index === parsedData.length - 1
+                });
+              }}
+            >
+              <span className="font-bold text-lg">
+                {item === null ? 'null' : String(item)}
+              </span>
+              <span className="text-xs text-gray-600 mt-1">[{index}]</span>
+            </div>
+          ))}
+        </div>
+        
+        {/* Array stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
+          <div className="border border-gray-300 p-3 rounded">
+            <div className="text-sm text-gray-600">Length</div>
+            <div className="text-lg font-bold">{parsedData.length}</div>
+          </div>
+          
+          {metadata.hasNumbers && (
+            <>
+              <div className="border border-gray-300 p-3 rounded">
+                <div className="text-sm text-gray-600">Sum</div>
+                <div className="text-lg font-bold">{metadata.sum}</div>
+              </div>
+              <div className="border border-gray-300 p-3 rounded">
+                <div className="text-sm text-gray-600">Avg</div>
+                <div className="text-lg font-bold">{metadata.average.toFixed(2)}</div>
+              </div>
+            </>
+          )}
+          
+          <div className="border border-gray-300 p-3 rounded">
+            <div className="text-sm text-gray-600">Types</div>
+            <div className="text-xs">
+              {metadata.hasNumbers && 'N '}
+              {metadata.hasStrings && 'S '}
+              {metadata.hasBooleans && 'B '}
+              {metadata.hasNulls && 'Null'}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Stack visualization (vertical layout)
+  const renderStackVisualization = () => {
+    // Use stackData for stack operations
+    const displayData = inputType === 'stack' ? stackData : parsedData;
+    
+    if (!Array.isArray(displayData)) return null;
+    
+
+    
+    return (
+      <div className="flex flex-col items-center w-full">
+        <div className="flex flex-col items-center mb-6 w-full max-w-md">
+          {displayData.map((item, index) => (
+            <div 
+              key={index}
+              className={`
+                w-full h-16 flex items-center justify-between px-4
+                border-2 border-gray-400 rounded transition-all duration-300 mb-2
+                ${selectedNode === index ? 'ring-2 ring-gray-800 scale-105' : ''}
+                bg-white
+              `}
+              onClick={() => {
+                setSelectedNode(index);
+                setNodeDetails({
+                  index,
+                  value: item,
+                  type: typeof item,
+                  position: displayData.length - index, // Stack position (top = 1)
+                  isFirst: index === 0,
+                  isLast: index === displayData.length - 1
+                });
+              }}
+            >
+              <div className="flex items-center">
+                <span className="font-bold text-lg">
+                  {item === null ? 'null' : String(item)}
+                </span>
+                <span className="text-xs text-gray-600 ml-2">[{index}]</span>
+              </div>
+              <div className="text-xs text-gray-600">
+                Pos: {displayData.length - index}
+              </div>
+            </div>
+          ))}
+        </div>
+        
+
+        
+        {/* Stack stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
+          <div className="border border-gray-300 p-3 rounded">
+            <div className="text-sm text-gray-600">Size</div>
+            <div className="text-lg font-bold">{stackData.length}</div>
+          </div>
+          
+          {stackData.length > 0 && (
+            <div className="border border-gray-300 p-3 rounded">
+              <div className="text-sm text-gray-600">Top Element</div>
+              <div className="text-lg font-bold">
+                {stackData[stackData.length - 1] === null ? 'null' : String(stackData[stackData.length - 1])}
+              </div>
+            </div>
+          )}
+          
+          <div className="border border-gray-300 p-3 rounded">
+            <div className="text-sm text-gray-600">Bottom Index</div>
+            <div className="text-lg font-bold">0</div>
+          </div>
+          
+          <div className="border border-gray-300 p-3 rounded">
+            <div className="text-sm text-gray-600">Top Index</div>
+            <div className="text-lg font-bold">{stackData.length > 0 ? stackData.length - 1 : 'N/A'}</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Queue visualization (vertical layout)
+  const renderQueueVisualization = () => {
+    // Use queueData for queue operations
+    const displayData = inputType === 'queue' ? queueData : parsedData;
+    
+    if (!Array.isArray(displayData)) return null;
+    
+
+    
+    return (
+      <div className="flex flex-col items-center w-full">
+        <div className="flex flex-col items-center mb-6 w-full max-w-md">
+          {displayData.map((item, index) => (
+            <div 
+              key={index}
+              className={`
+                w-full h-16 flex items-center justify-between px-4
+                border-2 border-gray-400 rounded transition-all duration-300 mb-2
+                ${selectedNode === index ? 'ring-2 ring-gray-800 scale-105' : ''}
+                bg-white
+              `}
+              onClick={() => {
+                setSelectedNode(index);
+                setNodeDetails({
+                  index,
+                  value: item,
+                  type: typeof item,
+                  position: index + 1, // Queue position (front = 1)
+                  isFirst: index === 0,
+                  isLast: index === displayData.length - 1
+                });
+              }}
+            >
+              <div className="flex items-center">
+                <span className="font-bold text-lg">
+                  {item === null ? 'null' : String(item)}
+                </span>
+                <span className="text-xs text-gray-600 ml-2">[{index}]</span>
+              </div>
+              <div className="text-xs text-gray-600">
+                Pos: {index + 1}
+              </div>
+            </div>
+          ))}
+        </div>
+        
+
+        
+        {/* Queue stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
+          <div className="border border-gray-300 p-3 rounded">
+            <div className="text-sm text-gray-600">Size</div>
+            <div className="text-lg font-bold">{queueData.length}</div>
+          </div>
+          
+          {queueData.length > 0 && (
+            <>
+              <div className="border border-gray-300 p-3 rounded">
+                <div className="text-sm text-gray-600">Front Element</div>
+                <div className="text-lg font-bold">
+                  {queueData[0] === null ? 'null' : String(queueData[0])}
+                </div>
+              </div>
+              <div className="border border-gray-300 p-3 rounded">
+                <div className="text-sm text-gray-600">Rear Element</div>
+                <div className="text-lg font-bold">
+                  {queueData[queueData.length - 1] === null ? 'null' : String(queueData[queueData.length - 1])}
+                </div>
+              </div>
+            </>
+          )}
+          
+          <div className="border border-gray-300 p-3 rounded">
+            <div className="text-sm text-gray-600">Front Index</div>
+            <div className="text-lg font-bold">0</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Linked list visualization
+  const renderLinkedListVisualization = () => {
+    if (!Array.isArray(parsedData)) return null;
+    
+    return (
+      <div className="flex flex-col items-center w-full">
+        <div className="flex items-center mb-6 w-full overflow-x-auto py-4">
+          <div className="flex items-center">
+            {parsedData.map((item, index) => (
+              <React.Fragment key={index}>
+                <div 
+                  className={`
+                    w-20 h-16 flex flex-col items-center justify-center
+                    border-2 border-gray-400 rounded transition-all duration-300
+                    ${selectedNode === index ? 'ring-2 ring-gray-800 scale-105' : ''}
+                    bg-white
+                  `}
+                  onClick={() => {
+                    setSelectedNode(index);
+                    setNodeDetails({
+                      index,
+                      value: item,
+                      type: typeof item,
+                      isFirst: index === 0,
+                      isLast: index === parsedData.length - 1,
+                      hasNext: index < parsedData.length - 1
+                    });
+                  }}
+                >
+                  <span className="font-bold text-sm">
+                    {item === null ? 'null' : String(item)}
+                  </span>
+                  <span className="text-xs text-gray-600 mt-1">[{index}]</span>
+                </div>
+                {index < parsedData.length - 1 && (
+                  <div className="mx-2 text-xl font-bold text-gray-500">→</div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+        
+        {/* Linked list stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
+          <div className="border border-gray-300 p-3 rounded">
+            <div className="text-sm text-gray-600">Length</div>
+            <div className="text-lg font-bold">{parsedData.length}</div>
+          </div>
+          
+          {parsedData.length > 0 && (
+            <>
+              <div className="border border-gray-300 p-3 rounded">
+                <div className="text-sm text-gray-600">Head</div>
+                <div className="text-lg font-bold">
+                  {parsedData[0] === null ? 'null' : String(parsedData[0])}
+                </div>
+              </div>
+              <div className="border border-gray-300 p-3 rounded">
+                <div className="text-sm text-gray-600">Tail</div>
+                <div className="text-lg font-bold">
+                  {parsedData[parsedData.length - 1] === null ? 'null' : String(parsedData[parsedData.length - 1])}
+                </div>
+              </div>
+            </>
+          )}
+          
+          <div className="border border-gray-300 p-3 rounded">
+            <div className="text-sm text-gray-600">Operations</div>
+            <div className="text-xs">Insert, Delete, Traverse</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Enhanced tree visualization with better layout
+  const renderTreeVisualization = () => {
+    if (!parsedData || !parsedData.nodes) return null;
+    
+    const { nodes, edges } = parsedData;
+    if (nodes.length === 0) return <div className="text-gray-500">No nodes to display</div>;
+    
+    // Calculate hierarchical layout
+    const calculateTreeLayout = () => {
+      const nodeMap = new Map();
+      const childrenMap = new Map();
+      const levelMap = new Map();
+      
+      // Initialize
+      nodes.forEach(node => {
+        nodeMap.set(node.label, { ...node, x: 0, y: 0 });
+        childrenMap.set(node.label, []);
+      });
+      
+      // Build parent-child relationships
+      edges.forEach(edge => {
+        if (childrenMap.has(edge.from)) {
+          childrenMap.get(edge.from).push(edge.to);
+        }
+      });
+      
+      // Find root (node with no incoming edges)
+      const incomingCount = new Map();
+      nodes.forEach(node => incomingCount.set(node.label, 0));
+      edges.forEach(edge => {
+        incomingCount.set(edge.to, (incomingCount.get(edge.to) || 0) + 1);
+      });
+      
+      const root = nodes.find(node => incomingCount.get(node.label) === 0)?.label || nodes[0]?.label;
+      
+      // Calculate levels (BFS)
+      const queue = [{ node: root, level: 0 }];
+      const visited = new Set();
+      
+      while (queue.length > 0) {
+        const { node, level } = queue.shift();
+        if (visited.has(node)) continue;
+        
+        visited.add(node);
+        levelMap.set(node, level);
+        
+        const children = childrenMap.get(node) || [];
+        children.forEach(child => {
+          queue.push({ node: child, level: level + 1 });
+        });
+      }
+      
+      // Group nodes by level
+      const levels = new Map();
+      levelMap.forEach((level, node) => {
+        if (!levels.has(level)) levels.set(level, []);
+        levels.get(level).push(node);
+      });
+      
+      // Calculate positions
+      const nodeWidth = 60;
+      const nodeHeight = 60;
+      const levelHeight = 120;
+      const padding = 80;
+      
+      levels.forEach((levelNodes, level) => {
+        const totalWidth = levelNodes.length * nodeWidth + (levelNodes.length - 1) * 40;
+        const startX = -totalWidth / 2;
+        
+        levelNodes.forEach((node, index) => {
+          const nodeObj = nodeMap.get(node);
+          nodeObj.x = startX + index * (nodeWidth + 40) + nodeWidth / 2;
+          nodeObj.y = level * levelHeight + padding;
+        });
+      });
+      
+      // Adjust for centering
+      const allNodes = Array.from(nodeMap.values());
+      const minX = Math.min(...allNodes.map(n => n.x));
+      const maxX = Math.max(...allNodes.map(n => n.x));
+      const minY = Math.min(...allNodes.map(n => n.y));
+      const maxY = Math.max(...allNodes.map(n => n.y));
+      
+      const width = Math.max(600, maxX - minX + padding * 2);
+      const height = Math.max(400, maxY - minY + padding * 2);
+      const offsetX = width / 2;
+      const offsetY = padding;
+      
+      allNodes.forEach(node => {
+        node.x += offsetX;
+        node.y += offsetY;
+      });
+      
+      return { nodes: allNodes, edges, width, height };
+    };
+    
+    const layout = calculateTreeLayout();
+    
+    return (
+      <div className="w-full overflow-auto">
+        <svg
+          ref={svgRef}
+          width={layout.width}
+          height={layout.height}
+          viewBox={`0 0 ${layout.width} ${layout.height}`}
+          className="border border-gray-200 rounded-lg bg-white"
+        >
+          {/* Render edges */}
+          {layout.edges.map((edge, index) => {
+            const fromNode = layout.nodes.find(n => n.label === edge.from);
+            const toNode = layout.nodes.find(n => n.label === edge.to);
+            
+            if (!fromNode || !toNode) return null;
+            
+            return (
+              <line
+                key={index}
+                x1={fromNode.x}
+                y1={fromNode.y}
+                x2={toNode.x}
+                y2={toNode.y}
+                stroke="#6B7280"
+                strokeWidth="2"
+                markerEnd={edge.directed ? "url(#arrowhead)" : undefined}
+                className="transition-all duration-300"
+              />
+            );
+          })}
+          
+          {/* Render nodes */}
+          {layout.nodes.map((node, index) => (
+            <g key={index}>
+              <circle
+                cx={node.x}
+                cy={node.y}
+                r="28"
+                fill={selectedNode === node.label ? "#3B82F6" : "#10B981"}
+                stroke={selectedNode === node.label ? "#1D4ED8" : "#047857"}
+                strokeWidth="3"
+                className="cursor-pointer transition-all duration-300 hover:stroke-blue-500 hover:scale-110"
+                onClick={() => {
+                  setSelectedNode(node.label);
+                  setNodeDetails({
+                    label: node.label,
+                    level: node.level || 0,
+                    children: edges.filter(e => e.from === node.label).length,
+                    parents: edges.filter(e => e.to === node.label).length
+                  });
+                }}
+              />
+              <text
+                x={node.x}
+                y={node.y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="font-bold text-sm fill-white select-none pointer-events-none"
+              >
+                {node.label}
+              </text>
+            </g>
+          ))}
+          
+          {/* Arrowhead marker for directed edges */}
+          <defs>
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="7"
+              refX="9"
+              refY="3.5"
+              orient="auto"
+            >
+              <polygon points="0 0, 10 3.5, 0 7" fill="#6B7280" />
+            </marker>
+          </defs>
+        </svg>
+      </div>
+    );
+  };
+
+  // Enhanced graph visualization
+  const renderGraphVisualization = () => {
+    if (!parsedData || !parsedData.nodes) return null;
+    
+    return renderTreeVisualization(); // Reuse tree visualization for now
+  };
 
   // Render visualization based on input type
   const renderVisualization = () => {
     if (error) {
       return (
-        <div className="text-red-500 p-4 bg-red-50 rounded-lg">
-          Error: {error}
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <svg className="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h3 className="font-medium text-red-800">Error Parsing Input</h3>
+              <p className="text-red-600 text-sm mt-1">{error}</p>
+            </div>
+          </div>
         </div>
       );
     }
 
     if (parsedData === null || parsedData === undefined) {
       return (
-        <div className="text-gray-500 italic">
-          Enter data to visualize...
+        <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+          <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p>Enter data to visualize...</p>
         </div>
       );
     }
 
-    switch (inputType) {
-      case 'array':
-        return (
-          <div className="flex flex-col items-center">
-            <h3 className="text-lg font-semibold mb-4">Array Visualization</h3>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {Array.isArray(parsedData) && parsedData.map((item, index) => (
-                <div 
-                  key={index} 
-                  className="w-16 h-16 flex items-center justify-center bg-blue-100 border-2 border-blue-300 rounded-lg shadow"
-                >
-                  <span className="font-medium">{item}</span>
+    return (
+      <div className="w-full">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">
+            {inputType.charAt(0).toUpperCase() + inputType.slice(1)} Visualization
+          </h3>
+          <div className="flex items-center space-x-2">
+            <select
+              value={visualizationMode}
+              onChange={(e) => setVisualizationMode(e.target.value)}
+              className="text-sm p-2 border border-gray-300 rounded-md"
+            >
+              <option value="default">Default View</option>
+              <option value="compact">Compact</option>
+              <option value="detailed">Detailed</option>
+            </select>
+            <button
+              onClick={() => setIsAnimating(!isAnimating)}
+              className={`px-3 py-1 text-sm rounded-md ${isAnimating ? 'bg-yellow-500 text-white' : 'bg-gray-200'}`}
+            >
+              {isAnimating ? 'Stop' : 'Animate'}
+            </button>
+          </div>
+        </div>
+        
+        <div className="mb-4">
+          {inputType === 'array' && renderArrayVisualization()}
+          {inputType === 'stack' && renderStackVisualization()}
+          {inputType === 'queue' && renderQueueVisualization()}
+          {inputType === 'linked-list' && renderLinkedListVisualization()}
+          {inputType === 'tree' && renderTreeVisualization()}
+          {inputType === 'graph' && renderGraphVisualization()}
+        </div>
+        
+        {/* Node Details Panel */}
+        {nodeDetails && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h4 className="font-medium text-gray-800 mb-2">Node Details</h4>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {Object.entries(nodeDetails).map(([key, value]) => (
+                <div key={key} className="flex justify-between">
+                  <span className="text-gray-600 capitalize">{key}:</span>
+                  <span className="font-medium">{String(value)}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-4 text-sm text-gray-600">
-              Length: {Array.isArray(parsedData) ? parsedData.length : 0} elements
-            </div>
           </div>
-        );
+        )}
         
-      case 'tree':
-        return (
-          <div className="flex flex-col items-center">
-            <h3 className="text-lg font-semibold mb-4">Tree Visualization</h3>
-            {parsedData && parsedData.nodes && parsedData.nodes.length > 0 ? (
-              <div className="flex flex-col items-center w-full">
-                {renderTreeStructure(parsedData)}
-                <div className="mt-4 text-sm text-gray-600">
-                  Nodes: {parsedData.nodes.length}, Edges: {parsedData.edges ? parsedData.edges.length : 0}
-                </div>
-              </div>
-            ) : (
-              <div className="text-gray-500">No nodes to display</div>
-            )}
+        {/* Metadata Summary */}
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-blue-800 font-medium">{metadata.summary}</span>
           </div>
-        );
-        
-      case 'graph':
-        return (
-          <div className="flex flex-col items-center">
-            <h3 className="text-lg font-semibold mb-4">Graph Visualization</h3>
-            {parsedData && parsedData.nodes && parsedData.nodes.length > 0 ? (
-              <div className="flex flex-col items-center w-full">
-                {renderGraphStructure(parsedData)}
-                <div className="mt-4 text-sm text-gray-600">
-                  Nodes: {parsedData.nodes.length}, Edges: {parsedData.edges ? parsedData.edges.length : 0}
-                </div>
-              </div>
-            ) : (
-              <div className="text-gray-500">No nodes to display</div>
-            )}
-          </div>
-        );
-        
-      default:
-        return (
-          <div className="whitespace-pre-wrap bg-gray-100 p-4 rounded-lg">
-            {JSON.stringify(parsedData, null, 2)}
-          </div>
-        );
-    }
+        </div>
+      </div>
+    );
   };
 
-  // If external props are provided, only render the visualization (used in split-view)
+  // If external props are provided (split-view mode)
   if (externalInputType !== undefined || externalInputValue !== undefined) {
     return (
       <div className="flex flex-col h-full">
-        <style>
-          {`
-          /* Custom scrollbar styling - ash color and transparent */
-          #io-visualizer-external ::-webkit-scrollbar {
-            width: 12px;
-            height: 12px;
-          }
-          
-          #io-visualizer-external ::-webkit-scrollbar-track {
-            background: transparent;
-            border-radius: 6px;
-          }
-          
-          #io-visualizer-external ::-webkit-scrollbar-thumb {
-            background: #9ca3af; /* ash color */
-            border-radius: 6px;
-            border: 2px solid transparent;
-            background-clip: content-box;
-          }
-          
-          #io-visualizer-external ::-webkit-scrollbar-thumb:hover {
-            background: #6b7280; /* darker ash color on hover */
-            border: 2px solid transparent;
-            background-clip: content-box;
-          }
-          
-          #io-visualizer-external ::-webkit-scrollbar-corner {
-            background: transparent;
-          }
-          `}
-        </style>
-        <div id="io-visualizer-external" className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex-grow">
-          <h2 className="text-xl font-bold text-blue-800 mb-4">I/O Visualization</h2>
-          <div className="flex-grow p-4 bg-white border border-gray-200 rounded-lg shadow-sm overflow-auto h-full">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Visualization Output</h3>
-            <div className="flex items-center justify-center h-full min-h-[300px] overflow-auto">
-              {renderVisualization()}
-            </div>
+        <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex-grow">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-blue-800">I/O Visualization</h2>
+            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+              {inputType.toUpperCase()}
+            </span>
+          </div>
+          <div className="flex-grow overflow-auto h-full">
+            {renderVisualization()}
           </div>
         </div>
       </div>
     );
   }
   
-  // Otherwise render the full component with input controls (standalone mode)
+  // Standalone mode with full controls
   return (
-    <div className="flex flex-col h-full">
-      <style>
-        {`
-        /* Custom scrollbar styling - ash color and transparent */
-        #io-visualizer ::-webkit-scrollbar {
-          width: 12px;
-          height: 12px;
-        }
+    <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm">
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">I/O Visualizer</h2>
+            <p className="text-gray-600 mt-1">Interactive visualization for data structures and algorithms</p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-500">Speed:</span>
+            <input
+              type="range"
+              min="0.5"
+              max="3"
+              step="0.5"
+              value={animationSpeed}
+              onChange={(e) => setAnimationSpeed(parseFloat(e.target.value))}
+              className="w-24"
+            />
+            <span className="text-sm font-medium">{animationSpeed}x</span>
+          </div>
+        </div>
         
-        #io-visualizer ::-webkit-scrollbar-track {
-          background: transparent;
-          border-radius: 6px;
-        }
-        
-        #io-visualizer ::-webkit-scrollbar-thumb {
-          background: #9ca3af; /* ash color */
-          border-radius: 6px;
-          border: 2px solid transparent;
-          background-clip: content-box;
-        }
-        
-        #io-visualizer ::-webkit-scrollbar-thumb:hover {
-          background: #6b7280; /* darker ash color on hover */
-          border: 2px solid transparent;
-          background-clip: content-box;
-        }
-        
-        #io-visualizer ::-webkit-scrollbar-corner {
-          background: transparent;
-        }
-        `}
-      </style>
-      <div id="io-visualizer" className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex-grow">
-        <h2 className="text-xl font-bold text-blue-800 mb-4">I/O Visualizer</h2>
-        
-        <div className="flex flex-col h-full lg:flex-row gap-6">
-          {/* Left Column - Input Section */}
-          <div className="flex flex-col w-full lg:w-1/2">
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data Type
-              </label>
-              <select
-                value={inputType}
-                onChange={(e) => setInputType(e.target.value)}
-                className="mb-4 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="array">Array/List</option>
-                <option value="tree">Tree</option>
-                <option value="graph">Graph</option>
-              </select>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Input Section */}
+          <div className="space-y-6">
+            <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Input Configuration</h3>
               
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Input Data
-              </label>
-              <textarea
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder={
-                  inputType === 'array' 
-                    ? 'Enter values separated by commas or spaces (e.g., 1,2,3,4,5 or 1 2 3 4 5)'
-                    : inputType === 'tree'
-                    ? 'Nested: A(B(C,D),E) or Edges: A->B,B->C'
-                    : 'Undirected: A,B,C,A-B:5,B-C:3 or Directed: A->B:5,B->C:3'
-                }
-                className="flex-grow p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                rows="4"
-              />
-              
-              <div className="mt-2 text-xs text-gray-500">
-                {inputType === 'array' && 'Supports numbers and strings'}
-                {inputType === 'tree' && 'Hierarchical tree structure with parent-child relationships'}
-                {inputType === 'graph' && 'Format: node1,node2,edge1-edge2:weight'}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Data Type
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                    {['array', 'stack', 'queue', 'linked-list', 'tree', 'graph'].map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setInputType(type)}
+                        className={`p-3 rounded-lg text-center transition-all ${inputType === type ? 'bg-blue-500 text-white' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        <div className="font-medium">{type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Add element input for stack and queue */}
+                {(inputType === 'stack' || inputType === 'queue') && (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Enter element to add"
+                      className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddElement(e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                    <button 
+                      onClick={(e) => {
+                        const input = e.target.previousSibling;
+                        handleAddElement(input.value);
+                        input.value = '';
+                      }}
+                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Input Data
+                  </label>
+                  <textarea
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    placeholder={getPlaceholder(inputType)}
+                    className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-32"
+                    rows="4"
+                  />
+                </div>
               </div>
             </div>
             
             {/* Examples Section */}
-            <div className="bg-gray-50 p-4 rounded-lg flex-grow">
-              <h3 className="font-medium text-gray-800 mb-3">Examples</h3>
-              <div className="space-y-3">
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Array Example:</div>
-                  <div 
-                    className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
-                    onClick={() => {
-                      if (externalInputType === undefined) setInternalInputType('array');
-                      if (externalInputValue === undefined) setInternalInputValue('5,2,8,1,9,3');
-                    }}
-                  >
-                    5,2,8,1,9,3
-                  </div>
-                </div>
-                
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Tree Example:</div>
-                  <div 
-                    className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
-                    onClick={() => {
-                      if (externalInputType === undefined) setInternalInputType('tree');
-                      if (externalInputValue === undefined) setInternalInputValue('A(B(D,E),C(F))');
-                    }}
-                  >
-                    A(B(D,E),C(F))
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">Or: A{'->'}B,B{'->'}C,C{'->'}D</div>
-                </div>
-                
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Graph Example:</div>
-                  <div 
-                    className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
-                    onClick={() => {
-                      if (externalInputType === undefined) setInternalInputType('graph');
-                      if (externalInputValue === undefined) setInternalInputValue('A,B,C,D,A-B:5,B-C:3,C-D:7');
-                    }}
-                  >
-                    A,B,C,D,A-B:5,B-C:3,C-D:7
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">Or: A{'->'}B:5,B{'->'}C:3,C{'->'}D:7</div>
-                </div>
+            <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Examples</h3>
+              <div className="grid grid-cols-1 gap-3">
+                <ExampleButton
+                  title="Array Example"
+                  description="Mixed data types array"
+                  data="1, 2, hello, true, null, 3.14"
+                  type="array"
+                  setInputType={setInputType}
+                  setInputValue={setInputValue}
+                  currentType={inputType}
+                  external={externalInputType !== undefined}
+                />
+                <ExampleButton
+                  title="Stack Example"
+                  description="LIFO data structure"
+                  data="1, 2, 3, 4, 5"
+                  type="stack"
+                  setInputType={setInputType}
+                  setInputValue={setInputValue}
+                  currentType={inputType}
+                  external={externalInputType !== undefined}
+                />
+                <ExampleButton
+                  title="Queue Example"
+                  description="FIFO data structure"
+                  data="1, 2, 3, 4, 5"
+                  type="queue"
+                  setInputType={setInputType}
+                  setInputValue={setInputValue}
+                  currentType={inputType}
+                  external={externalInputType !== undefined}
+                />
+                <ExampleButton
+                  title="Linked List Example"
+                  description="Singly linked list"
+                  data="10, 20, 30, 40, 50"
+                  type="linked-list"
+                  setInputType={setInputType}
+                  setInputValue={setInputValue}
+                  currentType={inputType}
+                  external={externalInputType !== undefined}
+                />
+                <ExampleButton
+                  title="Tree Example"
+                  description="Binary tree structure"
+                  data="A(B(D,E),C(F,G))"
+                  type="tree"
+                  setInputType={setInputType}
+                  setInputValue={setInputValue}
+                  currentType={inputType}
+                  external={externalInputType !== undefined}
+                />
+                <ExampleButton
+                  title="Graph Example"
+                  description="Directed weighted graph"
+                  data="A->B:5, B->C:3, C->A:2, D->E:1"
+                  type="graph"
+                  setInputType={setInputType}
+                  setInputValue={setInputValue}
+                  currentType={inputType}
+                  external={externalInputType !== undefined}
+                />
               </div>
             </div>
           </div>
           
-          {/* Right Column - Visualization Section */}
-          <div className="flex flex-col w-full lg:w-1/2">
-            <div className="flex-grow p-4 bg-white border border-gray-200 rounded-lg shadow-sm overflow-auto h-full">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Visualization</h3>
-              <div className="flex items-center justify-center h-full min-h-[300px]">
-                {renderVisualization()}
-              </div>
+          {/* Visualization Section */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-inner p-5 overflow-hidden">
+            <div className="h-full overflow-auto">
+              {renderVisualization()}
+            </div>
+          </div>
+        </div>
+        
+        {/* Footer with info */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <div className="flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Click on elements for detailed information</span>
+            </div>
+            <div>
+              <span className="text-blue-600 font-medium">{metadata.type}</span>
+              <span className="mx-2">•</span>
+              <span>{new Date(metadata.timestamp).toLocaleTimeString()}</span>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
+};
+
+// Helper component for example buttons
+const ExampleButton = ({ title, description, data, type, setInputType, setInputValue, currentType, external }) => (
+  <button
+    onClick={() => {
+      if (!external) {
+        setInputType(type);
+        setInputValue(data);
+      }
+    }}
+    className={`p-4 text-left rounded-lg border transition-all ${currentType === type ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'}`}
+  >
+    <div className="font-medium text-gray-800">{title}</div>
+    <div className="text-sm text-gray-600 mt-1">{description}</div>
+    <div className="text-xs font-mono bg-gray-100 p-2 mt-2 rounded truncate">{data}</div>
+  </button>
+);
+
+// Helper function for placeholders
+const getPlaceholder = (type) => {
+  switch (type) {
+    case 'array':
+      return 'Enter values separated by commas: 1, 2, 3, "hello", true, null';
+    case 'stack':
+      return 'Enter values separated by commas: 1, 2, 3, 4, 5';
+    case 'queue':
+      return 'Enter values separated by commas: 1, 2, 3, 4, 5';
+    case 'linked-list':
+      return 'Enter values separated by commas: 1, 2, 3, 4, 5';
+    case 'tree':
+      return 'Nested format: A(B(C,D),E) or edge format: A->B, B->C, C->D';
+    case 'graph':
+      return 'Edge format: A->B:5, B->C:3, C-D:2 (-> for directed, - for undirected)';
+    default:
+      return 'Enter data...';
+  }
 };
 
 export default IOVisualizer;

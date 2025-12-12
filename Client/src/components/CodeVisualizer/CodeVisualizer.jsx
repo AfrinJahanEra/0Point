@@ -1,789 +1,902 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-const CodeVisualizer = ({ algorithmId, algorithmCode, inputData }) => {
-  const [customCode, setCustomCode] = useState(algorithmCode || '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    int t;\n    cin >> t;\n    while(t--) {\n        int n;\n        cin >> n;\n        vector<int> a(n);\n        for(int i = 0; i < n; i++) {\n            cin >> a[i];\n        }\n        int ans = INT_MAX;\n        for(int i = 0; i < n-1; i++) {\n            ans = min(ans, a[i] * a[i+1]);\n        }\n        cout << ans << endl;\n    }\n    return 0;\n}');
-  const [executionSteps, setExecutionSteps] = useState([]);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
-  const [speed, setSpeed] = useState(1000);
+const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
+  // State management
+  const [code, setCode] = useState(initialCode);
+  const [selectedLanguage, setSelectedLanguage] = useState(language);
+  const [executionState, setExecutionState] = useState({
+    isRunning: false,
+    isPaused: false,
+    currentLine: 0,
+    speed: 1,
+    stepCount: 0
+  });
+  
   const [variables, setVariables] = useState({});
-  const [callStack, setCallStack] = useState(['main']);
-  const [highlightedLines, setHighlightedLines] = useState([1]);
-  const [memoryAllocation, setMemoryAllocation] = useState({});
-  const [programCounter, setProgramCounter] = useState(1);
-  const [output, setOutput] = useState('');
-  const [inputValues, setInputValues] = useState('');
+  const [callStack, setCallStack] = useState([]);
+  const [memoryHeap, setMemoryHeap] = useState([]);
+  const [outputLog, setOutputLog] = useState([]);
+  const [executionTrace, setExecutionTrace] = useState([]);
+  const [dataStructures, setDataStructures] = useState({});
+  const [algorithmInfo, setAlgorithmInfo] = useState(null);
+  const [visualizationType, setVisualizationType] = useState('flow');
+  
+  const codeRef = useRef(null);
+  const executionInterval = useRef(null);
 
-  // Parse code into lines with line numbers
-  const parseCode = (code) => {
-    if (!code) return [];
-    return code.trim().split('\n').map((line, index) => ({
+  // Supported languages and their parsers
+  const languages = {
+    cpp: {
+      name: 'C++',
+      extensions: ['.cpp', '.cc', '.cxx'],
+      keywords: ['#include', 'using namespace', 'int main', 'for', 'while', 'if', 'else', 'class', 'struct']
+    },
+    python: {
+      name: 'Python',
+      extensions: ['.py', '.pyw'],
+      keywords: ['def', 'class', 'import', 'for', 'while', 'if', 'elif', 'else', 'try', 'except']
+    },
+    java: {
+      name: 'Java',
+      extensions: ['.java'],
+      keywords: ['public class', 'static void', 'main', 'for', 'while', 'if', 'else', 'class', 'interface']
+    },
+    javascript: {
+      name: 'JavaScript',
+      extensions: ['.js', '.jsx', '.ts', '.tsx'],
+      keywords: ['function', 'const', 'let', 'var', 'for', 'while', 'if', 'else', 'class', 'async']
+    }
+  };
+
+  // Algorithm detection patterns
+  const algorithmPatterns = {
+    sorting: {
+      keywords: ['sort', 'bubble', 'quick', 'merge', 'insertion', 'selection', 'heap'],
+      type: 'comparison',
+      complexity: 'O(n log n)'
+    },
+    searching: {
+      keywords: ['search', 'binary', 'linear', 'dfs', 'bfs', 'dijkstra'],
+      type: 'search',
+      complexity: 'O(log n)'
+    },
+    dp: {
+      keywords: ['dp', 'dynamic', 'memoization', 'fibonacci', 'knapsack'],
+      type: 'dynamic',
+      complexity: 'O(n^2)'
+    },
+    graph: {
+      keywords: ['graph', 'node', 'edge', 'adjacency', 'shortest path', 'traversal'],
+      type: 'graph',
+      complexity: 'O(V + E)'
+    },
+    tree: {
+      keywords: ['tree', 'node', 'binary', 'bst', 'avl', 'traversal'],
+      type: 'tree',
+      complexity: 'O(log n)'
+    }
+  };
+
+  // Detect algorithm type from code
+  const detectAlgorithm = (code) => {
+    const codeLower = code.toLowerCase();
+    let detected = [];
+    
+    for (const [algo, pattern] of Object.entries(algorithmPatterns)) {
+      if (pattern.keywords.some(keyword => codeLower.includes(keyword))) {
+        detected.push({
+          name: algo,
+          type: pattern.type,
+          complexity: pattern.complexity,
+          confidence: pattern.keywords.filter(k => codeLower.includes(k)).length
+        });
+      }
+    }
+    
+    return detected.length > 0 ? detected.sort((a, b) => b.confidence - a.confidence)[0] : null;
+  };
+
+  // Parse code into structured format
+  const parseCode = (code, language) => {
+    const lines = code.split('\n').map((line, index) => ({
+      id: index,
       lineNumber: index + 1,
       content: line,
-      indent: line.search(/\S/)
+      indent: line.search(/\S/),
+      type: determineLineType(line, language),
+      isExecutable: isLineExecutable(line, language)
+    }));
+    
+    return {
+      lines,
+      functions: extractFunctions(code, language),
+      variables: extractVariables(code, language),
+      complexity: estimateComplexity(code, language)
+    };
+  };
+
+  const determineLineType = (line, language) => {
+    const trimmed = line.trim();
+    
+    // Common patterns across languages
+    if (trimmed.startsWith('//') || trimmed.startsWith('#')) return 'comment';
+    if (trimmed.startsWith('import ') || trimmed.startsWith('#include')) return 'import';
+    if (trimmed.includes('class ') || trimmed.includes('struct ')) return 'definition';
+    if (trimmed.includes('=') && !trimmed.includes('==')) return 'assignment';
+    if (trimmed.includes('if(') || trimmed.includes('if ')) return 'conditional';
+    if (trimmed.includes('for(') || trimmed.includes('for ')) return 'loop';
+    if (trimmed.includes('while(') || trimmed.includes('while ')) return 'loop';
+    if (trimmed.includes('return')) return 'return';
+    if (trimmed.includes('cout') || trimmed.includes('printf') || trimmed.includes('print')) return 'output';
+    if (trimmed.includes('cin') || trimmed.includes('scanf') || trimmed.includes('input')) return 'input';
+    
+    return 'execution';
+  };
+
+  const isLineExecutable = (line, language) => {
+    const trimmed = line.trim();
+    if (trimmed === '') return false;
+    if (trimmed.startsWith('//') || trimmed.startsWith('#')) return false;
+    if (trimmed.startsWith('import ') || trimmed.startsWith('#include')) return false;
+    if (trimmed.startsWith('using ')) return false;
+    
+    return true;
+  };
+
+  const extractFunctions = (code, language) => {
+    const functions = [];
+    const lines = code.split('\n');
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      if (language === 'cpp' || language === 'java') {
+        const funcMatch = line.match(/(\w+)\s+(\w+)\s*\(([^)]*)\)/);
+        if (funcMatch && (line.includes('{') || (i + 1 < lines.length && lines[i + 1].trim().startsWith('{')))) {
+          functions.push({
+            name: funcMatch[2],
+            returnType: funcMatch[1],
+            params: funcMatch[3],
+            line: i + 1
+          });
+        }
+      } else if (language === 'python') {
+        const funcMatch = line.match(/def\s+(\w+)\s*\(([^)]*)\)/);
+        if (funcMatch) {
+          functions.push({
+            name: funcMatch[1],
+            returnType: 'def',
+            params: funcMatch[2],
+            line: i + 1
+          });
+        }
+      } else if (language === 'javascript') {
+        const funcMatch = line.match(/(?:function|const|let|var)\s+(\w+)\s*=\s*\(([^)]*)\)\s*=>/);
+        if (funcMatch) {
+          functions.push({
+            name: funcMatch[1],
+            returnType: 'function',
+            params: funcMatch[2],
+            line: i + 1
+          });
+        }
+      }
+    }
+    
+    return functions;
+  };
+
+  const extractVariables = (code, language) => {
+    const variables = {};
+    const lines = code.split('\n');
+    
+    const patterns = {
+      cpp: /(int|float|double|char|bool|string|auto)\s+(\w+)\s*(?:=\s*([^;]+))?/g,
+      java: /(int|float|double|char|boolean|String)\s+(\w+)\s*(?:=\s*([^;]+))?/g,
+      python: /(\w+)\s*=\s*([^#\n]+)/g,
+      javascript: /(?:const|let|var)\s+(\w+)\s*=\s*([^;]+)/g
+    };
+    
+    lines.forEach((line, index) => {
+      const pattern = patterns[language];
+      if (!pattern) return;
+      
+      let match;
+      while ((match = pattern.exec(line)) !== null) {
+        const varName = match[2] || match[1];
+        const value = match[3] || match[2] || 'undefined';
+        
+        variables[varName] = {
+          name: varName,
+          type: match[1] || 'auto',
+          value: value.trim(),
+          line: index + 1,
+          scope: determineScope(index, lines, language)
+        };
+      }
+    });
+    
+    return variables;
+  };
+
+  const determineScope = (lineIndex, lines, language) => {
+    let scope = 'global';
+    let braceCount = 0;
+    
+    for (let i = 0; i <= lineIndex; i++) {
+      const line = lines[i];
+      if (line.includes('{')) braceCount++;
+      if (line.includes('}')) braceCount--;
+      
+      if (line.includes('main(') || line.includes('def ') || line.includes('function ')) {
+        scope = 'function';
+      }
+      
+      if (line.includes('class ') || line.includes('struct ')) {
+        scope = 'class';
+      }
+    }
+    
+    return scope;
+  };
+
+  const estimateComplexity = (code, language) => {
+    const lines = code.toLowerCase().split('\n');
+    let complexity = 'O(1)';
+    
+    // Simple heuristic-based complexity estimation
+    const hasNestedLoops = (lines.join('').match(/for.*{.*for|while.*{.*for|for.*{.*while/g) || []).length > 0;
+    const hasRecursion = lines.some(line => line.includes('return') && line.includes('('));
+    const hasLoops = lines.some(line => line.includes('for') || line.includes('while'));
+    
+    if (hasNestedLoops) {
+      complexity = 'O(n²)';
+    } else if (hasRecursion) {
+      complexity = 'O(2ⁿ)';
+    } else if (hasLoops) {
+      complexity = 'O(n)';
+    }
+    
+    return complexity;
+  };
+
+  // Initialize code parsing
+  useEffect(() => {
+    if (code.trim()) {
+      const parsed = parseCode(code, selectedLanguage);
+      const algo = detectAlgorithm(code);
+      
+      setAlgorithmInfo({
+        ...algo,
+        parsedCode: parsed
+      });
+      
+      // Initialize variables from parsed code
+      setVariables(parsed.variables);
+    }
+  }, [code, selectedLanguage]);
+
+  // Simulate execution based on language
+  const simulateExecution = () => {
+    const lines = code.split('\n');
+    const trace = [];
+    const variablesState = { ...variables };
+    const heap = [];
+    const output = [];
+    const callStack = ['main'];
+    
+    let lineIndex = 0;
+    let step = 0;
+    
+    // Basic simulation for demonstration
+    while (lineIndex < lines.length && step < 100) {
+      const line = lines[lineIndex];
+      const trimmed = line.trim();
+      
+      // Skip comments and empty lines
+      if (trimmed === '' || trimmed.startsWith('//') || trimmed.startsWith('#')) {
+        lineIndex++;
+        continue;
+      }
+      
+      // Simulate variable assignments
+      if (trimmed.includes('=') && !trimmed.includes('==')) {
+        const match = trimmed.match(/(\w+)\s*=\s*([^;]+)/);
+        if (match) {
+          const varName = match[1];
+          const value = evaluateExpression(match[2], variablesState);
+          
+          variablesState[varName] = {
+            ...variablesState[varName],
+            value: value,
+            lastModified: step
+          };
+        }
+      }
+      
+      // Simulate output
+      if (trimmed.includes('cout') || trimmed.includes('printf') || trimmed.includes('print')) {
+        const outputMatch = trimmed.match(/<<\s*(.*?)\s*;|%\w+\s*,\s*(\w+)|print\(([^)]+)\)/);
+        if (outputMatch) {
+          const outputValue = outputMatch[1] || outputMatch[2] || outputMatch[3];
+          output.push({
+            step,
+            value: outputValue.trim(),
+            line: lineIndex + 1
+          });
+        }
+      }
+      
+      // Simulate loops
+      if (trimmed.includes('for') || trimmed.includes('while')) {
+        // Simplified loop simulation
+        trace.push({
+          step,
+          line: lineIndex + 1,
+          type: 'loop_start',
+          variables: { ...variablesState },
+          description: `Loop iteration at line ${lineIndex + 1}`
+        });
+      }
+      
+      // Simulate conditionals
+      if (trimmed.includes('if')) {
+        trace.push({
+          step,
+          line: lineIndex + 1,
+          type: 'conditional',
+          variables: { ...variablesState },
+          description: `Condition check at line ${lineIndex + 1}`
+        });
+      }
+      
+      trace.push({
+        step,
+        line: lineIndex + 1,
+        type: 'execution',
+        variables: { ...variablesState },
+        description: `Executing line ${lineIndex + 1}`,
+        output: output.length > 0 ? output[output.length - 1] : null
+      });
+      
+      lineIndex++;
+      step++;
+    }
+    
+    return { trace, variables: variablesState, heap, output, callStack };
+  };
+
+  const evaluateExpression = (expr, variables) => {
+    // Very basic expression evaluation
+    try {
+      // Replace variable names with their values
+      let evaluated = expr;
+      Object.entries(variables).forEach(([name, data]) => {
+        const regex = new RegExp(`\\b${name}\\b`, 'g');
+        evaluated = evaluated.replace(regex, data.value);
+      });
+      
+      // Remove any remaining non-numeric characters and evaluate
+      const clean = evaluated.replace(/[^0-9+\-*/().]/g, '');
+      if (clean) {
+        // Use Function constructor for safe evaluation
+        return new Function(`return ${clean}`)();
+      }
+      
+      return expr;
+    } catch {
+      return expr;
+    }
+  };
+
+  // Start/Stop execution
+  const toggleExecution = () => {
+    if (executionState.isRunning) {
+      pauseExecution();
+    } else {
+      startExecution();
+    }
+  };
+
+  const startExecution = () => {
+    const { trace, variables: newVars, heap, output, callStack } = simulateExecution();
+    
+    setExecutionTrace(trace);
+    setVariables(newVars);
+    setMemoryHeap(heap);
+    setOutputLog(output);
+    setCallStack(callStack);
+    
+    setExecutionState(prev => ({
+      ...prev,
+      isRunning: true,
+      currentLine: 0,
+      stepCount: 0
+    }));
+    
+    // Start step-by-step execution
+    executeStepByStep(trace);
+  };
+
+  const pauseExecution = () => {
+    if (executionInterval.current) {
+      clearInterval(executionInterval.current);
+      executionInterval.current = null;
+    }
+    
+    setExecutionState(prev => ({
+      ...prev,
+      isRunning: false,
+      isPaused: true
     }));
   };
 
-  const codeLines = parseCode(customCode);
-
-  // Initialize with sample input data
-  useEffect(() => {
-    if (inputData) {
-      if (typeof inputData === 'string') {
-        setInputValues(inputData);
-      } else if (Array.isArray(inputData)) {
-        setInputValues(inputData.join('\n'));
-      }
-    } else {
-      setInputValues('2\n5\n3 4 2 1 5\n4\n2 3 1 4');
-    }
-  }, [inputData]);
-
-  // Simulate C++ code execution
-  const simulateExecution = () => {
-    const steps = [];
-    let stepCount = 1;
+  const executeStepByStep = (trace) => {
+    let currentStep = 0;
     
-    // Parse input values
-    const inputLines = inputValues.trim().split('\n');
-    let inputIndex = 0;
-    
-    // Variables for simulation
-    let t = 0, n = 0, a = [];
-    let ans = 0;
-    let i = 0;
-    
-    // Memory addresses (simulated)
-    const memory = {
-      't': { type: 'int', value: 0, address: '0x1000' },
-      'n': { type: 'int', value: 0, address: '0x1004' },
-      'a': { type: 'vector<int>', value: [], address: '0x2000' },
-      'ans': { type: 'int', value: 0, address: '0x3000' },
-      'i': { type: 'int', value: 0, address: '0x3004' },
-      'INT_MAX': { type: 'const int', value: 2147483647, address: '0x4000' }
-    };
-    
-    // Step 1: Include statement
-    steps.push({
-      stepNumber: stepCount++,
-      line: 1,
-      description: 'Including header files',
-      variables: {},
-      callStack: ['main'],
-      highlightedLines: [1],
-      memory: { ...memory },
-      programCounter: 1,
-      output: ''
-    });
-    
-    // Step 2: Namespace
-    steps.push({
-      stepNumber: stepCount++,
-      line: 2,
-      description: 'Using standard namespace',
-      variables: {},
-      callStack: ['main'],
-      highlightedLines: [2],
-      memory: { ...memory },
-      programCounter: 2,
-      output: ''
-    });
-    
-    // Step 3: Main function start
-    steps.push({
-      stepNumber: stepCount++,
-      line: 4,
-      description: 'Entering main function',
-      variables: {},
-      callStack: ['main'],
-      highlightedLines: [4],
-      memory: { ...memory },
-      programCounter: 4,
-      output: ''
-    });
-    
-    // Step 4: Reading t
-    if (inputIndex < inputLines.length) {
-      t = parseInt(inputLines[inputIndex++]);
-      memory['t'].value = t;
-      
-      steps.push({
-        stepNumber: stepCount++,
-        line: 5,
-        description: `Reading number of test cases: t = ${t}`,
-        variables: { t },
-        callStack: ['main'],
-        highlightedLines: [5],
-        memory: { ...memory },
-        programCounter: 5,
-        output: ''
-      });
-    }
-    
-    // Step 5: While loop start
-    steps.push({
-      stepNumber: stepCount++,
-      line: 6,
-      description: `Starting while loop (t = ${t})`,
-      variables: { t },
-      callStack: ['main'],
-      highlightedLines: [6],
-      memory: { ...memory },
-      programCounter: 6,
-      output: ''
-    });
-    
-    let testCaseCount = 1;
-    
-    while (t > 0 && inputIndex < inputLines.length) {
-      // Step: Inside while loop
-      steps.push({
-        stepNumber: stepCount++,
-        line: 6,
-        description: `Test case ${testCaseCount}, t = ${t}`,
-        variables: { t },
-        callStack: ['main'],
-        highlightedLines: [6],
-        memory: { ...memory },
-        programCounter: 6,
-        output: ''
-      });
-      
-      // Step: Reading n
-      if (inputIndex < inputLines.length) {
-        n = parseInt(inputLines[inputIndex++]);
-        memory['n'].value = n;
-        
-        steps.push({
-          stepNumber: stepCount++,
-          line: 7,
-          description: `Reading array size: n = ${n}`,
-          variables: { t, n },
-          callStack: ['main'],
-          highlightedLines: [7],
-          memory: { ...memory },
-          programCounter: 7,
-          output: ''
-        });
+    executionInterval.current = setInterval(() => {
+      if (currentStep >= trace.length) {
+        pauseExecution();
+        return;
       }
       
-      // Step: Creating vector
-      steps.push({
-        stepNumber: stepCount++,
-        line: 8,
-        description: `Creating vector<int> a of size ${n}`,
-        variables: { t, n },
-        callStack: ['main'],
-        highlightedLines: [8],
-        memory: { ...memory },
-        programCounter: 8,
-        output: ''
-      });
+      const step = trace[currentStep];
       
-      // Read array elements
-      a = [];
-      if (inputIndex < inputLines.length) {
-        const elements = inputLines[inputIndex++].split(' ').map(Number);
-        a = elements.slice(0, n);
-        memory['a'].value = [...a];
-        
-        steps.push({
-          stepNumber: stepCount++,
-          line: 9,
-          description: `Reading array elements: [${a.join(', ')}]`,
-          variables: { t, n, a: [...a] },
-          callStack: ['main'],
-          highlightedLines: [9],
-          memory: { ...memory },
-          programCounter: 9,
-          output: ''
-        });
-        
-        // For loop to show element reading
-        for (let idx = 0; idx < n; idx++) {
-          memory['i'].value = idx;
-          
-          steps.push({
-            stepNumber: stepCount++,
-            line: 10,
-            description: `Reading a[${idx}] = ${a[idx]}`,
-            variables: { t, n, a: [...a], i: idx },
-            callStack: ['main'],
-            highlightedLines: [10],
-            memory: { ...memory },
-            programCounter: 10,
-            output: ''
-          });
-        }
-      }
+      setExecutionState(prev => ({
+        ...prev,
+        currentLine: step.line,
+        stepCount: currentStep
+      }));
       
-      // Step: Initialize ans with INT_MAX
-      ans = 2147483647;
-      memory['ans'].value = ans;
+      setVariables(step.variables);
       
-      steps.push({
-        stepNumber: stepCount++,
-        line: 12,
-        description: `Initializing ans = INT_MAX (${ans})`,
-        variables: { t, n, a: [...a], ans },
-        callStack: ['main'],
-        highlightedLines: [12],
-        memory: { ...memory },
-        programCounter: 12,
-        output: ''
-      });
-      
-      // Step: For loop to find min product
-      steps.push({
-        stepNumber: stepCount++,
-        line: 13,
-        description: `Starting loop to find minimum product of adjacent elements`,
-        variables: { t, n, a: [...a], ans },
-        callStack: ['main'],
-        highlightedLines: [13],
-        memory: { ...memory },
-        programCounter: 13,
-        output: ''
-      });
-      
-      for (i = 0; i < n - 1; i++) {
-        memory['i'].value = i;
-        
-        steps.push({
-          stepNumber: stepCount++,
-          line: 13,
-          description: `Loop iteration ${i + 1}/${n - 1}, i = ${i}`,
-          variables: { t, n, a: [...a], ans, i },
-          callStack: ['main'],
-          highlightedLines: [13],
-          memory: { ...memory },
-          programCounter: 13,
-          output: ''
-        });
-        
-        const product = a[i] * a[i + 1];
-        
-        steps.push({
-          stepNumber: stepCount++,
-          line: 14,
-          description: `Calculating product: a[${i}] * a[${i + 1}] = ${a[i]} * ${a[i + 1]} = ${product}`,
-          variables: { t, n, a: [...a], ans, i, product },
-          callStack: ['main'],
-          highlightedLines: [14],
-          memory: { ...memory },
-          programCounter: 14,
-          output: ''
-        });
-        
-        if (product < ans) {
-          ans = product;
-          memory['ans'].value = ans;
-          
-          steps.push({
-            stepNumber: stepCount++,
-            line: 14,
-            description: `Updating ans = min(${ans}, ${product}) = ${product}`,
-            variables: { t, n, a: [...a], ans, i, product },
-            callStack: ['main'],
-            highlightedLines: [14],
-            memory: { ...memory },
-            programCounter: 14,
-            output: ''
-          });
-        } else {
-          steps.push({
-            stepNumber: stepCount++,
-            line: 14,
-            description: `ans remains ${ans} (${product} is not smaller)`,
-            variables: { t, n, a: [...a], ans, i, product },
-            callStack: ['main'],
-            highlightedLines: [14],
-            memory: { ...memory },
-            programCounter: 14,
-            output: ''
-          });
-        }
-      }
-      
-      // Step: Output result
-      steps.push({
-        stepNumber: stepCount++,
-        line: 15,
-        description: `Outputting result: ${ans}`,
-        variables: { t, n, a: [...a], ans },
-        callStack: ['main'],
-        highlightedLines: [15],
-        memory: { ...memory },
-        programCounter: 15,
-        output: `${steps[steps.length - 1]?.output || ''}${ans}\n`
-      });
-      
-      // Step: Decrement t
-      t--;
-      memory['t'].value = t;
-      testCaseCount++;
-      
-      steps.push({
-        stepNumber: stepCount++,
-        line: 6,
-        description: `Decrementing t to ${t}`,
-        variables: { t, n, a: [...a], ans },
-        callStack: ['main'],
-        highlightedLines: [6],
-        memory: { ...memory },
-        programCounter: 6,
-        output: `${steps[steps.length - 1]?.output || ''}`
-      });
-    }
-    
-    // Step: Return statement
-    steps.push({
-      stepNumber: stepCount++,
-      line: 17,
-      description: 'Returning from main function',
-      variables: { t, n, a: [...a], ans },
-      callStack: ['main'],
-      highlightedLines: [17],
-      memory: { ...memory },
-      programCounter: 17,
-      output: steps[steps.length - 1]?.output || ''
-    });
-    
-    // Step: Program end
-    steps.push({
-      stepNumber: stepCount++,
-      line: 18,
-      description: 'Program execution completed',
-      variables: { t, n, a: [...a], ans },
-      callStack: [],
-      highlightedLines: [18],
-      memory: { ...memory },
-      programCounter: 18,
-      output: steps[steps.length - 1]?.output || ''
-    });
-    
-    return steps;
+      currentStep++;
+    }, 1000 / executionState.speed);
   };
 
-  // Initialize execution steps
-  useEffect(() => {
-    const steps = simulateExecution();
-    setExecutionSteps(steps);
-    setCurrentStep(0);
-    setIsRunning(false);
-    
-    if (steps.length > 0) {
-      const firstStep = steps[0];
-      setVariables(firstStep.variables || {});
-      setCallStack(firstStep.callStack || []);
-      setHighlightedLines(firstStep.highlightedLines || []);
-      setMemoryAllocation(firstStep.memory || {});
-      setProgramCounter(firstStep.programCounter || 1);
-      setOutput(firstStep.output || '');
+  const resetExecution = () => {
+    if (executionInterval.current) {
+      clearInterval(executionInterval.current);
+      executionInterval.current = null;
     }
-  }, [customCode, inputValues]);
-
-  // Run/pause execution
-  const toggleExecution = () => {
-    setIsRunning(!isRunning);
-  };
-
-  // Reset visualization
-  const resetVisualization = () => {
-    setCurrentStep(0);
-    setIsRunning(false);
+    
+    setExecutionState({
+      isRunning: false,
+      isPaused: false,
+      currentLine: 0,
+      speed: 1,
+      stepCount: 0
+    });
+    
     setVariables({});
-    setCallStack(['main']);
-    setHighlightedLines([1]);
-    setMemoryAllocation({});
-    setProgramCounter(1);
-    setOutput('');
+    setCallStack([]);
+    setMemoryHeap([]);
+    setOutputLog([]);
+    setExecutionTrace([]);
   };
 
-  // Step forward
-  const stepForward = () => {
-    if (currentStep < executionSteps.length - 1) {
-      setCurrentStep(currentStep + 1);
-      updateStateFromStep(currentStep + 1);
+  const handleCodePaste = (event) => {
+    const pastedCode = event.clipboardData.getData('text');
+    setCode(pastedCode);
+    
+    // Try to detect language from file extension or content
+    detectLanguageFromCode(pastedCode);
+  };
+
+  const detectLanguageFromCode = (code) => {
+    const codeLower = code.toLowerCase();
+    
+    if (codeLower.includes('#include') || codeLower.includes('using namespace')) {
+      setSelectedLanguage('cpp');
+    } else if (codeLower.includes('def ') || codeLower.includes('import ') || codeLower.includes('print(')) {
+      setSelectedLanguage('python');
+    } else if (codeLower.includes('public class') || codeLower.includes('static void main')) {
+      setSelectedLanguage('java');
+    } else if (codeLower.includes('function') || codeLower.includes('const ') || codeLower.includes('let ')) {
+      setSelectedLanguage('javascript');
     }
   };
 
-  // Step backward
-  const stepBackward = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-      updateStateFromStep(currentStep - 1);
+  // Render visualizations based on algorithm type
+  const renderAlgorithmVisualization = () => {
+    if (!algorithmInfo) return null;
+    
+    switch (algorithmInfo.type) {
+      case 'comparison':
+        return renderSortingVisualization();
+      case 'search':
+        return renderSearchVisualization();
+      case 'graph':
+        return renderGraphVisualization();
+      case 'tree':
+        return renderTreeVisualization();
+      default:
+        return renderGenericVisualization();
     }
   };
 
-  // Update state based on current step
-  const updateStateFromStep = (stepIndex) => {
-    const step = executionSteps[stepIndex];
-    if (step) {
-      setVariables(step.variables || {});
-      setCallStack(step.callStack || []);
-      setHighlightedLines(step.highlightedLines || []);
-      setMemoryAllocation(step.memory || {});
-      setProgramCounter(step.programCounter || 1);
-      setOutput(step.output || '');
-    }
-  };
-
-  // Auto-play functionality
-  useEffect(() => {
-    let interval;
-    if (isRunning && currentStep < executionSteps.length - 1) {
-      interval = setInterval(() => {
-        setCurrentStep(prev => {
-          const next = prev + 1;
-          updateStateFromStep(next);
-          if (next >= executionSteps.length - 1) {
-            setIsRunning(false);
-          }
-          return next;
-        });
-      }, speed);
-    }
-    return () => clearInterval(interval);
-  }, [isRunning, executionSteps, speed]);
-
-  // Render memory visualization
-  const renderMemoryVisualization = () => {
+  const renderSortingVisualization = () => {
+    // Extract array data from variables
+    const arrayVars = Object.entries(variables).filter(([_, data]) => 
+      data.value.includes('[') || Array.isArray(data.value)
+    );
+    
     return (
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <h3 className="font-semibold text-gray-800 mb-2">Memory Allocation</h3>
-        {Object.keys(memoryAllocation).length > 0 ? (
-          <div className="space-y-2">
-            <div className="grid grid-cols-4 gap-2 text-xs font-semibold bg-gray-200 p-2 rounded">
-              <div>Variable</div>
-              <div>Type</div>
-              <div>Address</div>
-              <div>Value</div>
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <h3 className="font-semibold text-lg mb-4">Sorting Visualization</h3>
+        <div className="space-y-4">
+          {arrayVars.map(([name, data]) => (
+            <div key={name}>
+              <div className="flex justify-between mb-2">
+                <span className="font-mono font-medium">{name}</span>
+                <span className="text-sm text-gray-600">Size: {data.value}</span>
+              </div>
+              <div className="flex items-end h-32 border border-gray-300 p-2 rounded">
+                {renderArrayBars(data.value)}
+              </div>
             </div>
-            {Object.entries(memoryAllocation).map(([key, value]) => (
-              <div key={key} className="grid grid-cols-4 gap-2 text-sm p-2 border-b border-gray-200 hover:bg-gray-100">
-                <div className="font-mono font-medium text-blue-600">{key}</div>
-                <div className="text-gray-600">{value.type}</div>
-                <div className="font-mono text-green-600">{value.address}</div>
-                <div className="font-mono">
-                  {value.type === 'array' || value.type === 'vector<int>'
-                    ? `[${value.value.join(', ')}]`
-                    : String(value.value)}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500 text-sm">No memory allocated</p>
-        )}
+          ))}
+        </div>
       </div>
     );
   };
 
-  // Render call stack
-  const renderCallStack = () => {
+  const renderArrayBars = (arrayExpr) => {
+    // Parse array expression and generate bars
+    const match = arrayExpr.match(/\[([^\]]+)\]/);
+    if (!match) return null;
+    
+    const elements = match[1].split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v));
+    const maxVal = Math.max(...elements);
+    
+    return elements.map((value, index) => (
+      <div
+        key={index}
+        className="flex-1 mx-1 bg-blue-500 hover:bg-blue-600 transition-all"
+        style={{
+          height: `${(value / maxVal) * 100}%`,
+          backgroundColor: executionState.currentLine === index + 1 ? '#10B981' : '#3B82F6'
+        }}
+        title={`${name}[${index}] = ${value}`}
+      >
+        <div className="text-xs text-white text-center mt-1">{value}</div>
+      </div>
+    ));
+  };
+
+  const renderGraphVisualization = () => {
     return (
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <h3 className="font-semibold text-gray-800 mb-2">Call Stack</h3>
-        {callStack.length > 0 ? (
-          <div className="space-y-1">
-            {callStack.map((func, index) => (
-              <div
-                key={index}
-                className={`font-mono text-sm px-3 py-2 rounded ${
-                  index === callStack.length - 1
-                    ? 'bg-green-100 border-l-4 border-green-500'
-                    : 'bg-white border border-gray-200'
-                }`}
-              >
-                <span className="text-gray-500 mr-2">{callStack.length - index}.</span>
-                {func}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500 text-sm">Call stack is empty</p>
-        )}
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <h3 className="font-semibold text-lg mb-4">Graph Visualization</h3>
+        <svg width="100%" height="300" className="border border-gray-300 rounded">
+          <circle cx="100" cy="150" r="20" fill="#3B82F6" />
+          <text x="100" y="150" textAnchor="middle" fill="white">A</text>
+          <circle cx="200" cy="100" r="20" fill="#10B981" />
+          <text x="200" y="100" textAnchor="middle" fill="white">B</text>
+          <circle cx="300" cy="150" r="20" fill="#8B5CF6" />
+          <text x="300" y="150" textAnchor="middle" fill="white">C</text>
+          <line x1="100" y1="150" x2="200" y2="100" stroke="#6B7280" strokeWidth="2" />
+          <line x1="200" y1="100" x2="300" y2="150" stroke="#6B7280" strokeWidth="2" />
+          <line x1="300" y1="150" x2="100" y2="150" stroke="#6B7280" strokeWidth="2" />
+        </svg>
       </div>
     );
   };
 
-  // Render current step info
-  const renderStepInfo = () => {
-    const currentStepData = executionSteps[currentStep] || {};
+  const renderTreeVisualization = () => {
     return (
-      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <h3 className="font-semibold text-blue-800 mb-2">Step Information</h3>
-        <p className="text-sm text-blue-700 mb-3">
-          {currentStepData.description || 'No step information available'}
-        </p>
-        <div className="grid grid-cols-3 gap-2 text-xs text-blue-600">
-          <div className="bg-white p-2 rounded border border-blue-100">
-            <div className="font-semibold">Line</div>
-            <div>{currentStepData.line || 'N/A'}</div>
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <h3 className="font-semibold text-lg mb-4">Tree Visualization</h3>
+        <div className="flex flex-col items-center">
+          {/* Root */}
+          <div className="w-12 h-12 flex items-center justify-center bg-green-500 text-white rounded-full mb-8">
+            R
           </div>
-          <div className="bg-white p-2 rounded border border-blue-100">
-            <div className="font-semibold">Step</div>
-            <div>{currentStep + 1} / {executionSteps.length}</div>
-          </div>
-          <div className="bg-white p-2 rounded border border-blue-100">
-            <div className="font-semibold">PC</div>
-            <div>{programCounter}</div>
+          {/* Children */}
+          <div className="flex space-x-8">
+            <div className="flex flex-col items-center">
+              <div className="w-10 h-10 flex items-center justify-center bg-blue-500 text-white rounded-full mb-4">
+                L
+              </div>
+              <div className="text-xs text-gray-600">Left Child</div>
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="w-10 h-10 flex items-center justify-center bg-blue-500 text-white rounded-full mb-4">
+                R
+              </div>
+              <div className="text-xs text-gray-600">Right Child</div>
+            </div>
           </div>
         </div>
       </div>
     );
   };
 
-  // Render variable table
-  const renderVariableTable = () => {
-    const varEntries = Object.entries(variables);
-    if (varEntries.length === 0) {
-      return (
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-          <h3 className="font-semibold text-gray-800 mb-2">Variables</h3>
-          <p className="text-gray-500 text-sm">No variables defined</p>
-        </div>
-      );
-    }
-
+  const renderGenericVisualization = () => {
     return (
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <h3 className="font-semibold text-gray-800 mb-2">Variables</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="bg-gray-200">
-                <th className="py-2 px-3 text-left">Name</th>
-                <th className="py-2 px-3 text-left">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {varEntries.map(([key, value]) => (
-                <tr key={key} className="border-b border-gray-200 hover:bg-gray-100">
-                  <td className="py-2 px-3 font-mono font-medium text-blue-600">{key}</td>
-                  <td className="py-2 px-3 font-mono">
-                    {Array.isArray(value) ? `[${value.join(', ')}]` : String(value)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <h3 className="font-semibold text-lg mb-4">Execution Flow</h3>
+        <div className="space-y-2">
+          {executionTrace.slice(-10).map((step, index) => (
+            <div
+              key={index}
+              className={`p-3 rounded border ${
+                step.line === executionState.currentLine
+                  ? 'bg-blue-50 border-blue-200'
+                  : 'bg-gray-50 border-gray-200'
+              }`}
+            >
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Line {step.line}</span>
+                <span className="text-gray-600">Step {step.step}</span>
+              </div>
+              <div className="text-xs text-gray-600 mt-1">{step.description}</div>
+            </div>
+          ))}
         </div>
       </div>
     );
   };
 
   return (
-    <div id="code-visualizer" className="flex flex-col h-full">
-      <style>
-        {`
-        /* Custom scrollbar styling - ash color and transparent */
-        #code-visualizer ::-webkit-scrollbar {
-          width: 12px;
-          height: 12px;
-        }
-        
-        #code-visualizer ::-webkit-scrollbar-track {
-          background: transparent;
-          border-radius: 6px;
-        }
-        
-        #code-visualizer ::-webkit-scrollbar-thumb {
-          background: #9ca3af; /* ash color */
-          border-radius: 6px;
-          border: 2px solid transparent;
-          background-clip: content-box;
-        }
-        
-        #code-visualizer ::-webkit-scrollbar-thumb:hover {
-          background: #6b7280; /* darker ash color on hover */
-          border: 2px solid transparent;
-          background-clip: content-box;
-        }
-        
-        #code-visualizer ::-webkit-scrollbar-corner {
-          background: transparent;
-        }
-        `}
-      </style>
-      {/* Controls Bar - Top */}
-      <div className="bg-white p-4 rounded-t-lg border-b border-gray-200 mb-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={toggleExecution}
-            className={`px-5 py-2.5 rounded-md font-medium flex items-center gap-2 ${
-              isRunning
-                ? 'bg-red-500 hover:bg-red-600 text-white'
-                : 'bg-blue-800 hover:bg-blue-900 text-white'
-            }`}
-          >
-            {isRunning ? (
-              <>
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                Pause
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                </svg>
-                Run
-              </>
-            )}
-          </button>
-
-          <div className="flex gap-2">
-            <button
-              onClick={stepBackward}
-              disabled={currentStep === 0}
-              className="px-4 py-2.5 bg-blue-800 hover:bg-blue-900 text-white rounded-md font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Prev
-            </button>
-
-            <button
-              onClick={stepForward}
-              disabled={currentStep >= executionSteps.length - 1}
-              className="px-4 py-2.5 bg-blue-800 hover:bg-blue-900 text-white rounded-md font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              </svg>
-            </button>
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 p-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Advanced Code Visualizer</h1>
+            <p className="text-gray-600">Paste any algorithm code to visualize its execution</p>
           </div>
-
-          <button
-            onClick={resetVisualization}
-            className="px-4 py-2.5 bg-blue-800 hover:bg-blue-900 text-white rounded-md font-medium flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-            </svg>
-            Reset
-          </button>
-
-          <div className="flex items-center gap-2 ml-auto">
-            <label className="text-sm text-gray-700">Speed:</label>
+          
+          <div className="flex flex-wrap gap-2">
             <select
-              value={speed}
-              onChange={(e) => setSpeed(Number(e.target.value))}
-              className="p-2 border border-gray-300 rounded text-sm bg-white focus:ring-blue-500 focus:border-blue-500"
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
             >
-              <option value="2000">0.5x</option>
-              <option value="1000">1x</option>
-              <option value="500">2x</option>
-              <option value="250">4x</option>
+              {Object.entries(languages).map(([key, lang]) => (
+                <option key={key} value={key}>{lang.name}</option>
+              ))}
+            </select>
+            
+            <select
+              value={visualizationType}
+              onChange={(e) => setVisualizationType(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="flow">Execution Flow</option>
+              <option value="memory">Memory View</option>
+              <option value="graph">Graph View</option>
+              <option value="tree">Tree View</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex flex-col lg:flex-row flex-grow gap-4">
-        {/* Left Panel - Code */}
-        <div className="lg:w-2/3 flex flex-col">
-          <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto font-mono text-sm flex-grow">
-            <div className="space-y-1">
-              {codeLines.map((line) => (
-                <div
-                  key={line.lineNumber}
-                  className={`flex ${
-                    highlightedLines.includes(line.lineNumber)
-                      ? 'bg-yellow-500 bg-opacity-20 border-l-4 border-yellow-500 pl-2'
-                      : ''
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+        {/* Left Panel - Code Editor */}
+        <div className="flex flex-col h-full">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm flex-1 flex flex-col">
+            <div className="border-b border-gray-200 p-4">
+              <div className="flex justify-between items-center">
+                <h2 className="font-semibold text-gray-800">Code Editor</h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => document.getElementById('fileInput').click()}
+                    className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                  >
+                    Load File
+                  </button>
+                  <input
+                    id="fileInput"
+                    type="file"
+                    className="hidden"
+                    accept=".cpp,.py,.java,.js,.ts,.txt"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => setCode(event.target.result);
+                        reader.readAsText(file);
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-auto">
+              <textarea
+                ref={codeRef}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                onPaste={handleCodePaste}
+                placeholder={`Paste your ${languages[selectedLanguage].name} code here...\nOr try these examples:\n\n1. Bubble Sort\n2. Binary Search\n3. Graph BFS\n4. Tree Traversal`}
+                className="w-full h-full p-6 font-mono text-sm bg-gray-900 text-gray-100 resize-none focus:outline-none"
+                spellCheck="false"
+                rows={20}
+              />
+            </div>
+            
+            {/* Algorithm Detection Info */}
+            {algorithmInfo && (
+              <div className="border-t border-gray-200 p-4 bg-blue-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-medium text-blue-800">Detected:</span>
+                    <span className="ml-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                      {algorithmInfo.name.toUpperCase()} ALGORITHM
+                    </span>
+                    <span className="ml-4 text-sm text-gray-600">
+                      Estimated Complexity: {algorithmInfo.complexity}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {algorithmInfo.parsedCode?.lines.length} lines, {
+                      Object.keys(algorithmInfo.parsedCode?.variables || {}).length
+                    } variables
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Control Panel */}
+          <div className="mt-4 bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={toggleExecution}
+                  className={`px-6 py-3 rounded-md font-medium flex items-center gap-2 ${
+                    executionState.isRunning
+                      ? 'bg-red-500 hover:bg-red-600 text-white'
+                      : 'bg-blue-800 hover:bg-blue-900 text-white'
                   }`}
                 >
-                  <span className="text-gray-500 mr-4 w-8 select-none text-right">
-                    {line.lineNumber}
-                  </span>
-                  <span
-                    className="flex-grow"
-                    style={{ paddingLeft: `${line.indent * 8}px` }}
+                  {executionState.isRunning ? (
+                    <>
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      Pause Execution
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                      </svg>
+                      Start Execution
+                    </>
+                  )}
+                </button>
+                
+                <button
+                  onClick={resetExecution}
+                  className="px-6 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-md font-medium flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                  </svg>
+                  Reset
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <div>
+                  <label className="text-sm text-gray-600 mr-2">Speed:</label>
+                  <select
+                    value={executionState.speed}
+                    onChange={(e) => setExecutionState(prev => ({ ...prev, speed: Number(e.target.value) }))}
+                    className="px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    {line.content}
-                  </span>
+                    <option value="0.5">0.5x</option>
+                    <option value="1">1x</option>
+                    <option value="2">2x</option>
+                    <option value="4">4x</option>
+                  </select>
                 </div>
-              ))}
+                
+                <div className="text-sm text-gray-600">
+                  Step: {executionState.stepCount} / {executionTrace.length}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right Panel - Visualization Panels */}
-        <div className="lg:w-1/3 space-y-4">
-          {/* Step Information */}
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h3 className="font-semibold text-blue-800 mb-2">Currently executed line</h3>
-            <p className="text-sm text-blue-700 mb-2">
-              {executionSteps[currentStep]?.description || 'Program not started'}
-            </p>
-            <div className="text-xs text-blue-600">
-              <span className="font-semibold">Step:</span> {currentStep + 1} of {executionSteps.length}
-            </div>
+        {/* Right Panel - Visualizations */}
+        <div className="flex flex-col h-full gap-6">
+          {/* Algorithm Visualization */}
+          <div className="flex-1">
+            {renderAlgorithmVisualization()}
           </div>
-
-          {/* Variables */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h3 className="font-semibold text-gray-800 mb-2">Variables</h3>
-            {Object.keys(variables).length > 0 ? (
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {Object.entries(variables).map(([key, value]) => (
-                  <div key={key} className="flex justify-between items-center border-b border-gray-200 pb-2 last:border-0">
-                    <span className="font-mono text-blue-600">{key}</span>
-                    <span className="font-mono bg-white px-2 py-1 rounded border">
-                      {Array.isArray(value) ? `[${value.join(', ')}]` : String(value)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm">No variables defined</p>
-            )}
-          </div>
-
-          {/* Input/Output */}
-          <div className="grid grid-cols-1 gap-4">
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h3 className="font-semibold text-gray-800 mb-2">Sample Input</h3>
-              <div className="w-full h-24 font-mono text-sm p-3 border border-gray-300 rounded-md bg-white overflow-auto">
-                <pre className="whitespace-pre-wrap text-sm">{inputValues}</pre>
-              </div>
+          
+          {/* Variable Inspector */}
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div className="border-b border-gray-200 p-4">
+              <h2 className="font-semibold text-gray-800">Variable Inspector</h2>
             </div>
-
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h3 className="font-semibold text-gray-800 mb-2">Code Output</h3>
-              <div className="w-full h-24 font-mono text-sm p-3 border border-gray-300 rounded-md bg-white overflow-auto">
-                <pre className="whitespace-pre-wrap text-sm">{output}</pre>
-              </div>
-            </div>
-          </div>
-
-          {/* Memory Allocation */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h3 className="font-semibold text-gray-800 mb-2">Memory Allocation</h3>
-            {Object.keys(memoryAllocation).length > 0 ? (
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {Object.entries(memoryAllocation).map(([key, value]) => (
-                  <div key={key} className="grid grid-cols-3 gap-2 text-sm p-2 border-b border-gray-200 hover:bg-gray-100 last:border-0">
-                    <div className="font-mono font-medium text-blue-600">{key}</div>
-                    <div className="font-mono text-green-600">{value.address}</div>
-                    <div className="font-mono truncate">
-                      {value.type === 'array' || value.type === 'vector<int>'
-                        ? `[${value.value.join(', ')}]`
-                        : String(value.value)}
+            <div className="p-4 overflow-auto max-h-64">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(variables).map(([name, data]) => (
+                  <div
+                    key={name}
+                    className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-mono font-medium text-blue-600">{name}</div>
+                        <div className="text-xs text-gray-500">{data.type} · Line {data.line}</div>
+                      </div>
+                      <div className="font-mono bg-gray-100 px-3 py-1 rounded text-sm">
+                        {data.value}
+                      </div>
                     </div>
+                    <div className="text-xs text-gray-600 mt-2">Scope: {data.scope}</div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="text-gray-500 text-sm">No memory allocated</p>
-            )}
+            </div>
+          </div>
+          
+          {/* Output Console */}
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div className="border-b border-gray-200 p-4">
+              <h2 className="font-semibold text-gray-800">Output Console</h2>
+            </div>
+            <div className="p-4 font-mono text-sm bg-gray-900 text-gray-100 rounded-b-lg max-h-48 overflow-auto">
+              {outputLog.length > 0 ? (
+                outputLog.map((entry, index) => (
+                  <div key={index} className="mb-2">
+                    <span className="text-green-400">[Step {entry.step}]</span>
+                    <span className="text-gray-400 mx-2">Line {entry.line}:</span>
+                    <span className="text-white">{entry.value}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-gray-500 italic">No output yet. Run the code to see results.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Stats */}
+      <div className="bg-white border-t border-gray-200 p-4">
+        <div className="flex flex-wrap justify-between items-center text-sm text-gray-600">
+          <div className="flex gap-6">
+            <div>
+              <span className="font-medium">Current Line:</span>
+              <span className="ml-2 font-mono bg-gray-100 px-2 py-1 rounded">
+                {executionState.currentLine || '--'}
+              </span>
+            </div>
+            <div>
+              <span className="font-medium">Call Stack:</span>
+              <span className="ml-2">
+                {callStack.length > 0 ? callStack.join(' → ') : 'empty'}
+              </span>
+            </div>
+            <div>
+              <span className="font-medium">Memory Usage:</span>
+              <span className="ml-2">
+                {memoryHeap.length} objects
+              </span>
+            </div>
+          </div>
+          
+          <div>
+            <span className="font-medium">Status:</span>
+            <span className={`ml-2 px-3 py-1 rounded-full text-xs ${
+              executionState.isRunning
+                ? 'bg-green-100 text-green-800'
+                : executionState.isPaused
+                ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-gray-100 text-gray-800'
+            }`}>
+              {executionState.isRunning ? 'Running' : executionState.isPaused ? 'Paused' : 'Ready'}
+            </span>
           </div>
         </div>
       </div>
@@ -791,4 +904,138 @@ const CodeVisualizer = ({ algorithmId, algorithmCode, inputData }) => {
   );
 };
 
-export default CodeVisualizer;
+// Example usage with predefined algorithms
+const exampleAlgorithms = {
+  bubbleSort: `// Bubble Sort in C++
+#include <iostream>
+using namespace std;
+
+void bubbleSort(int arr[], int n) {
+    for (int i = 0; i < n-1; i++) {
+        for (int j = 0; j < n-i-1; j++) {
+            if (arr[j] > arr[j+1]) {
+                // Swap arr[j] and arr[j+1]
+                int temp = arr[j];
+                arr[j] = arr[j+1];
+                arr[j+1] = temp;
+            }
+        }
+    }
+}
+
+int main() {
+    int arr[] = {64, 34, 25, 12, 22, 11, 90};
+    int n = sizeof(arr)/sizeof(arr[0]);
+    
+    bubbleSort(arr, n);
+    
+    cout << "Sorted array: ";
+    for (int i = 0; i < n; i++) {
+        cout << arr[i] << " ";
+    }
+    return 0;
+}`,
+
+  binarySearch: `// Binary Search in Python
+def binary_search(arr, target):
+    left = 0
+    right = len(arr) - 1
+    
+    while left <= right:
+        mid = (left + right) // 2
+        
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            left = mid + 1
+        else:
+            right = mid - 1
+    
+    return -1
+
+# Example usage
+arr = [2, 3, 4, 10, 40]
+target = 10
+
+result = binary_search(arr, target)
+if result != -1:
+    print(f"Element found at index {result}")
+else:
+    print("Element not found")`,
+
+  bfs: `// BFS in Java
+import java.util.*;
+
+class Graph {
+    private int V;
+    private LinkedList<Integer> adj[];
+    
+    Graph(int v) {
+        V = v;
+        adj = new LinkedList[v];
+        for (int i = 0; i < v; ++i)
+            adj[i] = new LinkedList();
+    }
+    
+    void addEdge(int v, int w) {
+        adj[v].add(w);
+    }
+    
+    void BFS(int s) {
+        boolean visited[] = new boolean[V];
+        LinkedList<Integer> queue = new LinkedList<>();
+        
+        visited[s] = true;
+        queue.add(s);
+        
+        while (queue.size() != 0) {
+            s = queue.poll();
+            System.out.print(s + " ");
+            
+            Iterator<Integer> i = adj[s].listIterator();
+            while (i.hasNext()) {
+                int n = i.next();
+                if (!visited[n]) {
+                    visited[n] = true;
+                    queue.add(n);
+                }
+            }
+        }
+    }
+}`,
+
+  quickSort: `// Quick Sort in JavaScript
+function quickSort(arr, left = 0, right = arr.length - 1) {
+    if (left < right) {
+        const pivotIndex = partition(arr, left, right);
+        quickSort(arr, left, pivotIndex - 1);
+        quickSort(arr, pivotIndex + 1, right);
+    }
+    return arr;
+}
+
+function partition(arr, left, right) {
+    const pivot = arr[right];
+    let i = left - 1;
+    
+    for (let j = left; j < right; j++) {
+        if (arr[j] < pivot) {
+            i++;
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+    }
+    
+    [arr[i + 1], arr[right]] = [arr[right], arr[i + 1]];
+    return i + 1;
+}
+
+// Example usage
+const arr = [10, 7, 8, 9, 1, 5];
+console.log("Original array:", arr);
+quickSort(arr);
+console.log("Sorted array:", arr);`
+};
+
+// Main export with example integration
+export default AdvancedCodeVisualizer;
+export { exampleAlgorithms };

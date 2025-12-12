@@ -1116,6 +1116,9 @@ const Visualizer = () => {
                         className="mb-4 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value="array">Array/List</option>
+                        <option value="stack">Stack</option>
+                        <option value="queue">Queue</option>
+                        <option value="linked-list">Linked List</option>
                         <option value="tree">Tree</option>
                         <option value="graph">Graph</option>
                       </select>
@@ -1129,6 +1132,12 @@ const Visualizer = () => {
                         placeholder={
                           ioInputType === 'array' 
                             ? 'Enter values separated by commas or spaces (e.g., 1,2,3,4,5 or 1 2 3 4 5)'
+                            : ioInputType === 'stack'
+                            ? 'Enter values separated by commas (e.g., 1,2,3,4,5)'
+                            : ioInputType === 'queue'
+                            ? 'Enter values separated by commas (e.g., 1,2,3,4,5)'
+                            : ioInputType === 'linked-list'
+                            ? 'Enter values separated by commas (e.g., 10,20,30,40,50)'
                             : ioInputType === 'tree'
                             ? 'Nested: A(B(C,D),E) or Edges: A->B,B->C'
                             : 'Undirected: A,B,C,A-B:5,B-C:3 or Directed: A->B:5,B->C:3'
@@ -1139,6 +1148,9 @@ const Visualizer = () => {
                       
                       <div className="mt-2 text-xs text-gray-500">
                         {ioInputType === 'array' && 'Supports numbers and strings'}
+                        {ioInputType === 'stack' && 'LIFO data structure'}
+                        {ioInputType === 'queue' && 'FIFO data structure'}
+                        {ioInputType === 'linked-list' && 'Linear collection of elements'}
                         {ioInputType === 'tree' && 'Hierarchical tree structure with parent-child relationships'}
                         {ioInputType === 'graph' && 'Format: node1,node2,edge1-edge2:weight'}
                       </div>
@@ -1158,6 +1170,45 @@ const Visualizer = () => {
                             }}
                           >
                             5,2,8,1,9,3
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Stack Example:</div>
+                          <div 
+                            className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
+                            onClick={() => {
+                              setIoInputType('stack');
+                              setIoInputValue('1,2,3,4,5');
+                            }}
+                          >
+                            1,2,3,4,5
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Queue Example:</div>
+                          <div 
+                            className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
+                            onClick={() => {
+                              setIoInputType('queue');
+                              setIoInputValue('1,2,3,4,5');
+                            }}
+                          >
+                            1,2,3,4,5
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Linked List Example:</div>
+                          <div 
+                            className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
+                            onClick={() => {
+                              setIoInputType('linked-list');
+                              setIoInputValue('10,20,30,40,50');
+                            }}
+                          >
+                            10,20,30,40,50
                           </div>
                         </div>
                         
