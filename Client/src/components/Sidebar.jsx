@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Trophy, 
   Calendar, 
@@ -8,10 +8,12 @@ import {
   Play, 
   Eye, 
   ChevronRight,
-  Code2
+  Code2,
+  Plus
 } from 'lucide-react';
 
 const Sidebar = () => {
+  const navigate = useNavigate();
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
     days: 5,
@@ -196,11 +198,29 @@ const Sidebar = () => {
                 <div className="text-xs text-gray-500">Seconds</div>
               </div>
             </div>
-            <button className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200">
+            <button 
+              onClick={() => navigate('/contest/1/register')}
+              className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200"
+            >
               Register Now
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Host Your Contest CTA */}
+      <div className="bg-gradient-to-br from-blue-800 to-blue-600 rounded-lg p-4 text-white">
+        <h3 className="font-semibold text-sm mb-2">Host Your Contest</h3>
+        <p className="text-xs opacity-90 mb-3">
+          Create and manage your own coding contests for the community.
+        </p>
+        <button 
+          onClick={() => navigate('/create-contest')}
+          className="w-full bg-white text-blue-800 py-2 rounded text-xs font-semibold hover:bg-gray-100 transition-colors duration-200 flex items-center justify-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Create Contest
+        </button>
       </div>
 
       {/* Recommended Problem Sets */}
