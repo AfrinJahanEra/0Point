@@ -7,7 +7,6 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
-import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css'; // ← Fixed!
 
@@ -109,70 +108,6 @@ const CreateBlog = () => {
       {children}
     </h3>
   ),
-// UL = bullet lists
-  ul: ({ children }) => (
-    <ul className="my-6 space-y-3 list-none pl-0">
-      {children}
-    </ul>
-  ),
-
-  // OL = numbered lists (let browser handle numbers)
-  ol: ({ children }) => (
-    <ol className="my-6 space-y-3 list-decimal pl-8">
-      {children}
-    </ol>
-  ),
-
-  // THE CORRECT li COMPONENT (THIS ONE WORKS)
-  li: ({ children, checked, ordered, ...props }) => {
-    const isTask = checked !== null && typeof checked === 'boolean';
-
-    // TASK LIST ITEM: - [ ] or - [x]
-    if (isTask) {
-      return (
-        <li className="flex items-start gap-3 -ml-1 my-2">
-          <input
-            type="checkbox"
-            checked={checked}
-            readOnly
-            className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-default"
-          />
-          <span className={`flex-1 ${checked ? 'line-through text-gray-500' : ''}`}>
-            {children}
-          </span>
-        </li>
-      );
-    }
-
-    // ORDERED LIST (numbered) → use native numbering
-    if (ordered) {
-      return (
-        <li className="leading-relaxed pl-2">
-          {children}
-        </li>
-      );
-    }
-
-    // UNORDERED LIST (bullets) → custom pretty bullets
-    // Get nesting depth from indentation
-    const indentLevel = props.node?.position?.start?.column 
-      ? Math.floor((props.node.position.start.column - 1) / 2) 
-      : 0;
-
-    const bullets = ['•', '◦', '▪', '▫'];
-    const colors = ['text-blue-600', 'text-purple-600', 'text-pink-600', 'text-green-600'];
-    const bullet = bullets[indentLevel % 4] || '•';
-    const color = colors[indentLevel % 4] || 'text-blue-600';
-
-    return (
-      <li className="flex items-start gap-3 leading-relaxed">
-        <span className={`font-bold text-xl ${color} select-none pt-0.5`}>
-          {bullet}
-        </span>
-        <span className="flex-1">{children}</span>
-      </li>
-    );
-  },
 };
 
   return (
@@ -231,12 +166,12 @@ const CreateBlog = () => {
                 ) : (
                   <div className="w-full p-4 border border-gray-300 rounded-md bg-white min-h-[300px] prose prose-sm max-w-none">
                     <ReactMarkdown
-  remarkPlugins={[remarkMath, remarkGfm]}
-  rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
-  components={customComponents}
->
-  {content}
-</ReactMarkdown>
+                      remarkPlugins={[remarkMath]}
+                      rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                      components={customComponents}
+                    >
+                      {content}
+                    </ReactMarkdown>
                   </div>
                 )}
               </div>
