@@ -108,6 +108,30 @@ const CreateBlog = () => {
       {children}
     </h3>
   ),
+  ol: ({ depth, ...props }) => {
+  const isTopLevel = depth === 0;
+  return (
+    <ol
+      className={`
+        my-5 space-y-3
+        ${isTopLevel
+          ? 'list-decimal ml-9 text-lg marker:font-bold marker:text-blue-800'
+          : 'list-decimal ml-8 text-base marker:font-medium marker:text-blue-600'
+        }
+      `}
+      {...props}
+    />
+  );
+},
+
+li: ({ ordered, children, ...props }) => (
+  <li
+    className="leading-relaxed text-gray-800 pl-2 hover:text-gray-900 transition-colors"
+    {...props}
+  >
+    <span className="drop-cap:inline">{children}</span>
+  </li>
+),
 };
 
   return (
