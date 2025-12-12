@@ -1,14 +1,76 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsPDF from 'jspdf';
+import { Maximize, Minimize } from 'lucide-react';
 
 const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [rotationPhase, setRotationPhase] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isFloating, setIsFloating] = useState(false);
   const visualizationRef = useRef(null);
   const currentStepRef = useRef(null);
   const hasCompletedRef = useRef(false);
+  const [speed, setSpeed] = useState(2000); // Default 2 seconds
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenContainerRef = useRef(null);
+  const svgRef = useRef(null);
 
-  // Auto-advance every 2 seconds automatically
+  // State for individual node dragging
+  const [draggedNodes, setDraggedNodes] = useState({});
+  const [currentlyDraggingNode, setCurrentlyDraggingNode] = useState(null);
+
+  // Handle mouse down for individual node dragging
+  const handleNodeMouseDown = useCallback((nodeValue, initialX, initialY, e) => {
+    e.stopPropagation();
+    setIsDragging(true);
+    setCurrentlyDraggingNode(nodeValue);
+    setDraggedNodes(prev => ({
+      ...prev,
+      [nodeValue]: {
+        offsetX: e.clientX - initialX,
+        offsetY: e.clientY - initialY,
+        startX: initialX,
+        startY: initialY
+      }
+    }));
+  }, []);
+
+  // Handle mouse move for individual node dragging
+  const handleNodeMouseMove = useCallback((e) => {
+    if (!isDragging || !currentlyDraggingNode) return;
+    
+    setDraggedNodes(prev => ({
+      ...prev,
+      [currentlyDraggingNode]: {
+        ...prev[currentlyDraggingNode],
+        startX: e.clientX - prev[currentlyDraggingNode].offsetX,
+        startY: e.clientY - prev[currentlyDraggingNode].offsetY
+      }
+    }));
+  }, [isDragging, currentlyDraggingNode]);
+
+  // Handle mouse up for individual node dragging
+  const handleNodeMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setCurrentlyDraggingNode(null);
+  }, []);
+
+  // Add event listeners for individual node dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleNodeMouseMove);
+      document.addEventListener('mouseup', handleNodeMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleNodeMouseMove);
+      document.removeEventListener('mouseup', handleNodeMouseUp);
+    };
+  }, [isDragging, handleNodeMouseMove, handleNodeMouseUp]);
+
+  // Auto-advance based on speed setting
   useEffect(() => {
     if (isPlaying && steps && steps.length > 0) {
       const interval = setInterval(() => {
@@ -17,11 +79,11 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         } else {
           if (onStop) onStop();
         }
-      }, 2000);
+      }, speed);
       
       return () => clearInterval(interval);
     }
-  }, [steps, currentStep, onNext, isPlaying, onStop]);
+  }, [steps, currentStep, onNext, isPlaying, onStop, speed]);
 
   // Handle rotation phases for AVL trees
   useEffect(() => {
@@ -66,6 +128,26 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
       }
     };
   }, [currentStep, steps]);
+
+  // Handle fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+      setIsFullscreen(!!fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
 
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
@@ -202,41 +284,21 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   // Function to get node styling based on state
   const getNodeStyle = (stepData, nodeValue) => {
     if (!stepData) {
-      return "w-10 h-10 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-white text-black border-gray-400";
+      return "w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-white text-black border-gray-400";
     }
     
-    let baseStyle = "w-10 h-10 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 ";
+    let baseStyle = "w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 ";
     
-    if (stepData.insertedValue !== undefined && stepData.insertedValue === nodeValue) {
+    if (stepData.inserted !== undefined && stepData.inserted === nodeValue) {
       baseStyle += "animate-pulse scale-110 ";
     }
     
-    if (stepData.insertedValue !== undefined && stepData.insertedValue === nodeValue) {
+    if (stepData.inserted !== undefined && stepData.inserted === nodeValue) {
       baseStyle += "bg-blue-500 text-white border-blue-600";
     } else if (stepData.comparing !== undefined && stepData.comparing === nodeValue) {
       baseStyle += "bg-gray-300 text-black border-gray-700";
     } else if (stepData.found !== undefined && stepData.found === nodeValue) {
       baseStyle += "bg-green-500 text-white border-green-600";
-    } else if (isRotationStep(stepData) && getRotationNodeValue(stepData) === nodeValue) {
-      if (rotationPhase === 'breaking') {
-        baseStyle += "bg-yellow-500 text-white border-yellow-600 animate-pulse opacity-70";
-      } else if (rotationPhase === 'rotating') {
-        const rotationType = getRotationType(stepData);
-        if (rotationType === 'left' || rotationType === 'right') {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-spin";
-        } else {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-pulse";
-        }
-      } else if (rotationPhase === 'attaching') {
-        baseStyle += "bg-green-500 text-white border-green-600 animate-bounce";
-      } else {
-        const rotationType = getRotationType(stepData);
-        if (rotationType === 'left' || rotationType === 'right') {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-spin";
-        } else {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-pulse";
-        }
-      }
     } else {
       baseStyle += "bg-white text-black border-gray-400";
     }
@@ -257,29 +319,29 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     if (operation === 'start') {
       return 'Starting AVL tree visualization...';
     } else if (operation === 'insert_root') {
-      return `Inserting root node with value ${stepData.insertedValue}`;
+      return `Inserting root node with value ${stepData.inserted}`;
     } else if (operation === 'insert_start') {
-      return `Starting insertion of value ${stepData.insertedValue}`;
+      return `Starting insertion of value ${stepData.inserted}`;
     } else if (operation === 'traverse') {
-      return `Traversing to insert ${stepData.insertedValue}, currently at node ${stepData.comparing}`;
+      return `Traversing to insert ${stepData.inserted}, currently at node ${stepData.comparing}`;
     } else if (operation === 'insert') {
-      return `Inserting node with value ${stepData.insertedValue} as child of ${stepData.comparing}`;
+      return `Inserting node with value ${stepData.inserted} as child of ${stepData.comparing}`;
     } else if (operation === 'after_insert') {
-      return `Value ${stepData.insertedValue} inserted successfully`;
+      return `Value ${stepData.inserted} inserted successfully`;
     } else if (operation === 'duplicate') {
-      return `Value ${stepData.insertedValue} already exists in tree`;
+      return `Value ${stepData.inserted} already exists in tree`;
     } else if (operation === 'rotate') {
       const phaseDescription = rotationPhase ? 
         `Phase: ${rotationPhase.charAt(0).toUpperCase() + rotationPhase.slice(1)}` : 
         'Starting rotation';
         
-      if (stepData.rotation === 'left') {
+      if (stepData.rotationType === 'left') {
         return `Left rotation at node ${stepData.comparing} - Right subtree is heavier. ${phaseDescription}`;
-      } else if (stepData.rotation === 'right') {
+      } else if (stepData.rotationType === 'right') {
         return `Right rotation at node ${stepData.comparing} - Left subtree is heavier. ${phaseDescription}`;
-      } else if (stepData.rotation === 'leftright') {
+      } else if (stepData.rotationType === 'leftright') {
         return `Left-right rotation at node ${stepData.comparing} - Left-right imbalance. ${phaseDescription}`;
-      } else if (stepData.rotation === 'rightleft') {
+      } else if (stepData.rotationType === 'rightleft') {
         return `Right-left rotation at node ${stepData.comparing} - Right-left imbalance. ${phaseDescription}`;
       }
       return `Balancing tree at node ${stepData.comparing}. ${phaseDescription}`;
@@ -293,16 +355,6 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   // Function to check if current step is a rotation
   const isRotationStep = (stepData) => {
     return stepData && stepData.operation === 'rotate';
-  };
-  
-  // Function to get rotation type
-  const getRotationType = (stepData) => {
-    return stepData && stepData.rotation ? stepData.rotation : null;
-  };
-  
-  // Function to get rotation node value
-  const getRotationNodeValue = (stepData) => {
-    return stepData && stepData.comparing ? stepData.comparing : null;
   };
 
   // Recursive function to find path from root to target node
@@ -324,75 +376,42 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     return null;
   };
 
-  // Recursive function to render AVL tree nodes
-  const renderTreeNode = (node, x, y, level = 0, isLeft = false, parentX = null, parentY = null, traversalPath = []) => {
-    if (!node) {
-      return null;
-    }
+  // Recursive function to render tree nodes with elastic dragging support
+  const renderTreeNode = (node, x, y, level = 0, isLeftChild = false, parentX = null, parentY = null, traversalPath = [], comparingNode = null, insertedNode = null, isRotation = false, rotationNode = null, rotationType = null) => {
+    if (!node) return null;
     
-    const nodeId = `${level}-${x}-${y}`;
-    const nodeSize = 30;
-    const horizontalSpacing = Math.max(150 / (level + 1), 60);
+    const nodeSize = 40;
+    // ADJUSTED: Dynamic horizontal spacing based on tree height to accommodate taller trees
+    const treeHeight = calculateTreeHeight(node);
+    const baseHorizontalSpacing = 200;
+    const adjustedHorizontalSpacing = Math.max(baseHorizontalSpacing / (1 + treeHeight * 0.1), 50); // Reduce spacing for taller trees
+    const horizontalSpacing = Math.max(adjustedHorizontalSpacing / (level + 1), 40); // Minimum spacing
     const verticalSpacing = 80;
     
-    const currentStepData = steps && steps[currentStep];
-    const isRotation = isRotationStep(currentStepData);
-    const rotationType = getRotationType(currentStepData);
-    const rotationNodeValue = getRotationNodeValue(currentStepData);
+    // Get dragged position if exists
+    const draggedPosition = draggedNodes[node.value];
+    const actualX = draggedPosition ? draggedPosition.startX : x;
+    const actualY = draggedPosition ? draggedPosition.startY : y;
     
-    const isRotationNode = node.value === rotationNodeValue;
-    const isRotationRelated = isRotation && (isRotationNode || 
-      (node.left && node.left.value === rotationNodeValue) || 
-      (node.right && node.right.value === rotationNodeValue));
-    
+    // Check if this node is in the traversal path
     const isInTraversalPath = traversalPath.includes(node.value);
-    const isComparingNode = currentStepData && currentStepData.comparing === node.value;
-    const isInsertedNode = currentStepData && currentStepData.insertedValue === node.value;
     
-    let nodeClass = "cursor-pointer hover:stroke-blue-500 transition-all duration-500";
+    // Check if this is the comparing node
+    const isComparingNode = comparingNode && comparingNode === node.value;
     
-    if (isInTraversalPath) {
-      nodeClass += " fill-blue-200 stroke-blue-500 traversal-highlight";
-    } else if (isRotation && isRotationNode) {
-      if (rotationPhase === 'breaking') {
-        nodeClass += " fill-yellow-500 stroke-yellow-600 animate-pulse opacity-70";
-      } else if (rotationPhase === 'rotating') {
-        nodeClass += " fill-purple-500 stroke-purple-600";
-        if (rotationType === 'left' || rotationType === 'right') {
-          nodeClass += " animate-spin";
-        } else {
-          nodeClass += " animate-pulse";
-        }
-      } else if (rotationPhase === 'attaching') {
-        nodeClass += " fill-green-500 stroke-green-600 animate-bounce";
-      } else {
-        nodeClass += " fill-purple-500 stroke-purple-600";
-        if (rotationType === 'left' || rotationType === 'right') {
-          nodeClass += " animate-spin";
-        } else {
-          nodeClass += " animate-pulse";
-        }
-      }
-    } else if (isComparingNode) {
-      nodeClass += " fill-gray-300 stroke-gray-700 animate-pulse";
-    } else if (isInsertedNode) {
-      nodeClass += " fill-blue-500 stroke-blue-600";
-    } else {
-      nodeClass += " fill-white stroke-gray-400";
-    }
+    // Check if this is the inserted node
+    const isInsertedNode = insertedNode && insertedNode === node.value;
     
-    if (isRotation && isRotationRelated && !isRotationNode) {
-      if (rotationPhase === 'breaking') {
-        nodeClass += " opacity-50";
-      } else if (rotationPhase === 'rotating') {
-        nodeClass += " animate-pulse";
-      } else if (rotationPhase === 'attaching') {
-        nodeClass += " animate-bounce";
-      }
-    }
+    // Check if this is a rotation node
+    const isRotationNode = rotationNode && rotationNode === node.value;
+    
+    // Check if this node is related to rotation
+    const isRotationRelated = isRotation && (isRotationNode || 
+      (node.left && node.left.value === rotationNode) || 
+      (node.right && node.right.value === rotationNode));
     
     return (
-      <g key={nodeId}>
+      <g key={`${level}-${x}-${y}`}>
         {/* Render connections to children first */}
         {node.left && renderTreeNode(
           node.left, 
@@ -400,9 +419,14 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           y + verticalSpacing, 
           level + 1, 
           true, 
-          x, 
-          y,
-          traversalPath
+          actualX, 
+          actualY,
+          traversalPath,
+          comparingNode,
+          insertedNode,
+          isRotation,
+          rotationNode,
+          rotationType
         )}
         {node.right && renderTreeNode(
           node.right, 
@@ -410,76 +434,87 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           y + verticalSpacing, 
           level + 1, 
           false, 
-          x, 
-          y,
-          traversalPath
+          actualX, 
+          actualY,
+          traversalPath,
+          comparingNode,
+          insertedNode,
+          isRotation,
+          rotationNode,
+          rotationType
         )}
         
         {/* Render connection line to parent */}
         {parentX !== null && parentY !== null && (
           <line
-            x1={x}
-            y1={y}
+            x1={actualX}
+            y1={actualY}
             x2={parentX}
             y2={parentY}
             stroke={isInTraversalPath ? "#3B82F6" : "#9CA3AF"}
-            strokeWidth={isInTraversalPath ? "3" : "2"}
-            className={isRotationRelated ? "transition-all duration-500 " + (rotationPhase === 'breaking' ? 'stroke-dashed stroke-yellow-500 opacity-50' : rotationPhase === 'attaching' ? 'stroke-green-500 animate-pulse' : 'stroke-purple-500') : (isInTraversalPath ? 'path-connection' : 'stroke-gray-400')}
+            strokeWidth="2"
+            className="floating-animation delay-3"
           />
         )}
         
-        {/* Render node circle */}
-        <circle
-          cx={x}
-          cy={y}
-          r={nodeSize / 2}
-          fill={isInTraversalPath ? "#BFDBFE" : (isInsertedNode ? "#3B82F6" : (isComparingNode ? "#D1D5DB" : "#FFFFFF"))}
-          stroke={isInTraversalPath ? "#3B82F6" : (isInsertedNode ? "#2563EB" : (isComparingNode ? "#374151" : "#9CA3AF"))}
-          strokeWidth="2"
-          className={nodeClass}
-          onMouseEnter={() => setHoveredNode(node.value)}
-          onMouseLeave={() => setHoveredNode(null)}
-        />
-        
-        {/* Render node value */}
-        <text
-          x={x}
-          y={y + 5}
-          textAnchor="middle"
-          className={`font-bold ${isInTraversalPath ? 'text-blue-800' : (isInsertedNode ? 'text-white' : (isComparingNode ? 'text-black' : 'text-black'))}`}
+        {/* Render node circle with enhanced floating animation */}
+        <g 
+          onMouseDown={(e) => handleNodeMouseDown(node.value, actualX, actualY, e)}
+          className="cursor-move floating-animation glowing delay-3"
         >
-          {node.value}
-        </text>
-        
-        {/* Render height for AVL trees */}
-        {node.height && (
-          <text
-            x={x}
-            y={y - 20}
-            textAnchor="middle"
-            className="text-xs text-gray-500"
-          >
-            h:{node.height}
-          </text>
-        )}
+          <g transform={`translate(${actualX}, ${actualY})`}>
+            <circle
+              r={nodeSize / 2}
+              fill={isInTraversalPath ? "#BFDBFE" : (isInsertedNode ? "#3B82F6" : (isComparingNode ? "#D1D5DB" : "#FFFFFF"))}
+              stroke={isInTraversalPath ? "#3B82F6" : (isInsertedNode ? "#2563EB" : (isComparingNode ? "#374151" : "#9CA3AF"))}
+              strokeWidth="2"
+              className={`hover:stroke-blue-500 transition-all duration-500 ${level % 4 === 0 ? 'delay-1' : level % 4 === 1 ? 'delay-2' : level % 4 === 2 ? 'delay-3' : 'delay-4'}`}
+              onMouseEnter={() => setHoveredNode(node.value)}
+              onMouseLeave={() => setHoveredNode(null)}
+            />
+            
+            {/* Render node value - no animation */}
+            <text
+              x="0"
+              y="0"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="font-bold text-xs select-none"
+              fill={isInTraversalPath ? "#1E40AF" : (isInsertedNode ? "#FFFFFF" : (isComparingNode ? "#1F2937" : "#4B5563"))}
+            >
+              {node.value}
+            </text>
+            
+            {/* Render height value for AVL nodes - no animation */}
+            <text
+              x="0"
+              y={nodeSize / 2 + 12}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="font-medium text-xs select-none"
+              fill="#6B7280"
+            >
+              h:{node.height}
+            </text>
+          </g>
+        </g>
         
         {/* Render rotation indicator */}
         {isRotation && isRotationNode && (
-          <g>
+          <g transform={`translate(${actualX}, ${actualY})`}>
             <rect
-              x={x - 30}
-              y={y + 20}
+              x={-30}
+              y={20}
               width="60"
               height="20"
               rx="3"
               fill={rotationPhase === 'breaking' ? "#F59E0B" : rotationPhase === 'rotating' ? "#8B5CF6" : rotationPhase === 'attaching' ? "#10B981" : "#6366F1"}
-              className="opacity-20"
+              className="opacity-20 floating-animation"
             />
             <text
-              x={x}
-              y={y + 35}
+              y={35}
               textAnchor="middle"
-              className="text-xs font-bold fill-white"
+              className="text-xs font-bold fill-white floating-text"
             >
               {rotationPhase ? rotationPhase.toUpperCase() : 'ROTATING'}
             </text>
@@ -488,21 +523,20 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         
         {/* Render rotation type */}
         {isRotation && isRotationNode && (
-          <g>
+          <g transform={`translate(${actualX}, ${actualY})`}>
             <rect
-              x={x - 25}
-              y={y + 40}
+              x={-25}
+              y={40}
               width="50"
               height="15"
               rx="3"
               fill="#3B82F6"
-              className="opacity-20"
+              className="opacity-20 floating-animation"
             />
             <text
-              x={x}
-              y={y + 50}
+              y={50}
               textAnchor="middle"
-              className="text-xs font-bold fill-white"
+              className="text-xs font-bold fill-white floating-text"
             >
               {rotationType ? rotationType.toUpperCase() : 'ROTATE'}
             </text>
@@ -512,9 +546,127 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     );
   };
 
+  // ADDED: Helper function to calculate tree height
+  const calculateTreeHeight = (node) => {
+    if (!node) return 0;
+    return 1 + Math.max(calculateTreeHeight(node.left), calculateTreeHeight(node.right));
+  };
+
+  // ADDED: Function to calculate appropriate zoom level based on tree height
+  const calculateZoomLevel = (tree) => {
+    if (!tree) return 1;
+    
+    const height = calculateTreeHeight(tree);
+    // For trees with height > 4, we gradually zoom out
+    if (height > 4) {
+      return Math.max(0.7, 1 - (height - 4) * 0.1); // Cap at 30% zoom out
+    }
+    return 1; // Normal zoom for shorter trees
+  };
+
+  // Handle mouse down for dragging
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return; // Only left mouse button
+    setIsDragging(true);
+    const rect = svgRef.current.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+    e.preventDefault();
+  }, [position]);
+
+  // Handle mouse move for dragging
+  const handleMouseMove = useCallback((e) => {
+    if (!isDragging) return;
+    setPosition({
+      x: e.clientX - dragOffset.x,
+      y: e.clientY - dragOffset.y
+    });
+  }, [isDragging, dragOffset]);
+
+  // Handle mouse up for dragging
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Add event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  // Toggle fullscreen mode using Fullscreen API
+  const toggleFullscreen = () => {
+    if (!fullscreenContainerRef.current) return;
+
+    if (!isFullscreen) {
+      // Enter fullscreen
+      const element = fullscreenContainerRef.current;
+      if (element.requestFullscreen) {
+        element.requestFullscreen();
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+      } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
+      }
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  };
+
+  // Toggle floating mode
+  const toggleFloating = () => {
+    setIsFloating(!isFloating);
+    // Reset position to center when toggling
+    if (!isFloating) {
+      setTimeout(() => {
+        const container = fullscreenContainerRef.current;
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          setPosition({
+            x: containerRect.width / 2,
+            y: containerRect.height / 2
+          });
+        }
+      }, 10);
+    }
+  };
+
+  // Handle speed change
+  const handleSpeedChange = (newSpeed) => {
+    setSpeed(newSpeed);
+  };
+
+  // Reset all node positions to their original structure
+  const resetStructure = () => {
+    setDraggedNodes({});
+    setCurrentlyDraggingNode(null);
+  };
+
   if (!data || !steps || steps.length === 0) return null;
 
+  // Check if visualization has completed (safety check)
   const isCompleted = steps.length > 0 && currentStep === steps.length - 1 && !isPlaying;
+  // Ensure currentStep doesn't exceed steps length
   const safeCurrentStep = Math.min(currentStep, Math.max(0, steps.length - 1));
   const currentStepData = steps[safeCurrentStep];
   
@@ -532,9 +684,10 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   }
 
   return (
-    <div className="mt-2">
-      <style jsx>{`
-        .traversal-highlight {
+    <div id="avl-visualizer" className="mt-2">
+      <style>
+        {`
+        #avl-visualizer .traversal-highlight {
           animation: traversal-pulse 1s ease-in-out;
         }
         
@@ -544,7 +697,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           100% { transform: scale(1); }
         }
         
-        .path-connection {
+        #avl-visualizer .path-connection {
           stroke-dasharray: 5,5;
           animation: path-dash 2s linear infinite;
         }
@@ -554,12 +707,159 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             stroke-dashoffset: -10;
           }
         }
-      `}</style>
+        
+        /* Custom scrollbar styling - transparent by default, grey on hover */
+        #avl-visualizer ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        
+        #avl-visualizer ::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        
+        #avl-visualizer ::-webkit-scrollbar-thumb {
+          background: transparent;
+          border-radius: 4px;
+        }
+        
+        #avl-visualizer ::-webkit-scrollbar-thumb:hover {
+          background: rgba(128, 128, 128, 0.5);
+        }
+        
+        /* Show scrollbar on hover */
+        #avl-visualizer *:hover::-webkit-scrollbar-thumb {
+          background: rgba(128, 128, 128, 0.3);
+        }
+        
+        #avl-visualizer *:hover::-webkit-scrollbar-thumb:hover {
+          background: rgba(128, 128, 128, 0.5);
+        }
+        
+        /* Hide scrollbars in fullscreen mode */
+        #avl-visualizer .fullscreen-container::-webkit-scrollbar {
+          display: none;
+        }
+        
+        #avl-visualizer .fullscreen-container {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        
+        /* Additional scrollbar hiding for fullscreen */
+        #avl-visualizer .fullscreen-container::-webkit-scrollbar-thumb,
+        #avl-visualizer .fullscreen-container::-webkit-scrollbar-track,
+        #avl-visualizer .fullscreen-container::-webkit-scrollbar-corner {
+          display: none;
+        }
+        
+        /* Faster floating animation for water-like effect - for nodes and edges */
+        @keyframes float {
+          0% {
+            transform: translateY(0px) translateX(0px);
+          }
+          25% {
+            transform: translateY(-4px) translateX(1px);
+          }
+          50% {
+            transform: translateY(-2px) translateX(0px);
+          }
+          75% {
+            transform: translateY(-3px) translateX(0.5px);
+          }
+          100% {
+            transform: translateY(0px) translateX(0px);
+          }
+        }
+        
+        /* Screen floating animation for entire tree structure */
+        @keyframes screen-float {
+          0% {
+            transform: translateX(0px);
+          }
+          25% {
+            transform: translateX(10px);
+          }
+          50% {
+            transform: translateX(0px);
+          }
+          75% {
+            transform: translateX(-10px);
+          }
+          100% {
+            transform: translateX(0px);
+          }
+        }
+        
+        @keyframes glow {
+          0% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+          50% {
+            filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.4));
+          }
+          100% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+        }
+        
+        .floating-animation {
+          animation: float 3s ease-in-out infinite;
+        }
+        
+        .screen-floating {
+          animation: screen-float 8s ease-in-out infinite;
+        }
+        
+        .glowing {
+          animation: glow 2s ease-in-out infinite;
+        }
+        
+        /* Staggered animations */
+        .delay-1 {
+          animation-delay: 0.1s;
+        }
+        
+        .delay-2 {
+          animation-delay: 0.2s;
+        }
+        
+        .delay-3 {
+          animation-delay: 0.3s;
+        }
+        
+        .delay-4 {
+          animation-delay: 0.4s;
+        }
+        `}
+      </style>
       
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">AVL Tree Visualization</h3>
-        <div className="flex gap-2">
-          {/* ADDED: Download PDF Button */}
+        <div className="flex gap-2 items-center">
+          {/* Speed Control */}
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-gray-700">Speed:</span>
+            <select 
+              value={speed} 
+              onChange={(e) => handleSpeedChange(Number(e.target.value))}
+              className="px-2 py-1 border border-gray-300 rounded text-sm"
+            >
+              <option value={500}>Fast (0.5s)</option>
+              <option value={1000}>Medium (1s)</option>
+              <option value={2000}>Slow (2s)</option>
+              <option value={3000}>Very Slow (3s)</option>
+            </select>
+          </div>
+          
+          {/* Reset Structure Button */}
+          <button 
+            onClick={resetStructure}
+            className="px-3 py-1 bg-blue-800 text-white rounded text-sm font-medium hover:bg-blue-900 transition-colors flex items-center"
+          >
+            Reset Structure
+          </button>
+
           <button 
             onClick={downloadStepsAsPDF}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
@@ -581,9 +881,21 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         </div>
       </div>
       
-      <div className="bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto">
-        <div className="mb-6 bg-white p-3 border-2 border-gray-300">
-          <h4 className="text-sm font-bold text-black mb-2 flex items-center">
+      <div 
+        ref={fullscreenContainerRef}
+        className={`bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto relative group ${isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-black border-0 p-0 m-0 fullscreen-container overflow-hidden' : ''}`}
+      >
+        {/* Fullscreen icon positioned like YouTube */}
+        <button
+          onClick={toggleFullscreen}
+          className="absolute top-2 right-2 p-1 bg-black bg-opacity-50 text-white rounded hover:bg-opacity-75 transition-all opacity-0 hover:opacity-100 group-hover:opacity-100 z-10"
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+          {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+        </button>
+        
+        <div className={`mb-6 bg-white p-3 border-2 border-gray-300 ${isFullscreen ? '!border-0 !p-0' : ''}`}>
+          <h4 className={`text-sm font-bold text-black mb-2 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
             <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center text-xs mr-2">
               {safeCurrentStep + 1}
             </span>
@@ -593,10 +905,16 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             </span>
           </h4>
           
-          <div className="flex justify-center items-center mb-3 overflow-auto py-2 max-h-[500px]">
+          {/* MODIFIED: Only tree floats, not the entire background */}
+          <div className={`flex justify-center items-center mb-3 overflow-hidden py-2 max-h-[500px] ${isFullscreen ? 'scale-125' : ''}`}>
             {currentStepData ? (
-              <div className="w-full min-h-[400px] flex items-center justify-center overflow-auto">
-                <svg width="100%" height="500" className="border border-gray-200 rounded min-w-[600px]" viewBox="0 0 600 500">
+              <div className="w-full min-h-[400px] flex items-center justify-center overflow-hidden relative">
+                <svg 
+                  width="100%" 
+                  height="500" 
+                  className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`} 
+                  viewBox={`0 0 ${600 * calculateZoomLevel(currentStepData.tree)} 500`}
+                >
                   <defs>
                     <marker 
                       id="arrowhead" 
@@ -610,8 +928,32 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
                     </marker>
                   </defs>
                   
-                  {renderTreeNode(currentStepData.tree, 300, 100, 0, false, null, null, traversalPath)}
+                  {isFloating ? (
+                    <g 
+                      ref={svgRef}
+                      transform={`translate(${position.x - 300 * calculateZoomLevel(currentStepData.tree)}, ${position.y - 250})`}
+                      onMouseDown={handleMouseDown}
+                      className="cursor-move screen-floating"
+                    >
+                      {renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)}
+                    </g>
+                  ) : (
+                    <g className="screen-floating">
+                      {renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)}
+                    </g>
+                  )}
                 </svg>
+
+                {isFloating && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <button 
+                      onClick={toggleFloating}
+                      className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                    >
+                      Dock Tree
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center text-gray-500 py-10">
@@ -620,14 +962,14 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             )}
           </div>
           
-          <div className="text-center p-2 bg-white border border-gray-200">
+          <div className={`text-center p-2 bg-white border border-gray-200 ${isFullscreen ? 'hidden' : ''}`}>
             <p className="font-semibold text-black text-sm">
               {getOperationDescription(currentStepData)}
             </p>
             {traversalPath.length > 0 && (
-              <p className="text-xs text-blue-600 mt-1">
-                Traversal Path: {traversalPath.join(' → ')}
-              </p>
+              <div className="mt-1 text-xs text-blue-600">
+                Path: {traversalPath.join(' → ')}
+              </div>
             )}
           </div>
         </div>
@@ -637,12 +979,13 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         <h4 className="text-md font-bold text-blue-800 mb-3">All Steps:</h4>
         <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
           {steps.map((step, index) => {
+            // Build traversal path for this step
             const stepTraversalPath = [];
-            if (step.traversalPath) {
+            if (step && step.traversalPath) {
               stepTraversalPath.push(...step.traversalPath);
-            } else if (step.path) {
+            } else if (step && step.path) {
               stepTraversalPath.push(...step.path);
-            } else if (step.operation === 'traverse' && step.comparing && step.tree) {
+            } else if (step && step.operation === 'traverse' && step.comparing && step.tree) {
               const fullPath = findPathToNode(step.tree, step.comparing);
               if (fullPath) {
                 stepTraversalPath.push(...fullPath);
@@ -652,7 +995,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             return (
               <div 
                 key={index}
-                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}
+                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-80 shadow-sm' : 'bg-white border-gray-300'}`}
                 id={`step-${index}`}
               >
                 <div className="flex justify-between items-start">

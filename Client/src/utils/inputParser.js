@@ -31,6 +31,34 @@ export const parseInputs = (algorithmId, inputValues) => {
     }
   }
   
+  // Handle graph algorithms
+  const graphAlgorithms = ['bfs', 'dfs'];
+  
+  if (graphAlgorithms.includes(algorithmId)) {
+    // Parse edges
+    const edges = inputValues[0]?.split(',').filter(e => e && e.includes('-')) || ['A-B', 'B-C'];
+    // Parse start node
+    const startNode = inputValues[1] || 'A';
+    return { edges, startNode };
+  }
+  
+  // Handle weighted graph algorithms
+  const weightedGraphAlgorithms = ['dijkstra', 'kruskal', 'prim'];
+  
+  if (weightedGraphAlgorithms.includes(algorithmId)) {
+    // Parse weighted edges
+    const weightedEdges = inputValues[0]?.split(',').filter(e => e && e.split('-').length === 3) || ['A-B-5', 'B-C-3'];
+    
+    if (algorithmId === 'kruskal') {
+      // Kruskal doesn't need a start node
+      return { weightedEdges };
+    } else {
+      // Dijkstra and Prim need a start node
+      const startNode = inputValues[1] || 'A';
+      return { weightedEdges, startNode };
+    }
+  }
+  
   switch (algorithmId) {
 
     

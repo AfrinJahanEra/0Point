@@ -1,14 +1,98 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
+import { Maximize, Minimize } from 'lucide-react';
 
 const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop, onNext, onPrev, onRestart }) => {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [rotationPhase, setRotationPhase] = useState(null);
-  const visualizationRef = useRef(null);
-  const currentStepRef = useRef(null);
-  const hasCompletedRef = useRef(false);
+  const [draggedNode, setDraggedNode] = useState(null);
+  const [nodePositions, setNodePositions] = useState({});
+  const [isDragging, setIsDragging] = useState(false);
+  const [speed, setSpeed] = useState(2000);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const fullscreenContainerRef = useRef(null);
+  const containerRef = useRef(null);
+  const dragConstraintsRef = useRef(null);
+  const [isFloating, setIsFloating] = useState(false);
+  const [position, setPosition] = useState({ x: 300, y: 250 });
+  const svgRef = useRef(null);
 
-  // Auto-advance every 2 seconds automatically
+  // State for individual node dragging
+  const [draggedNodes, setDraggedNodes] = useState({});
+  const [currentlyDraggingNode, setCurrentlyDraggingNode] = useState(null);
+
+  // Handle mouse down for individual node dragging
+  const handleNodeMouseDown = useCallback((nodeValue, initialX, initialY, e) => {
+    e.stopPropagation();
+    setIsDragging(true);
+    setCurrentlyDraggingNode(nodeValue);
+    setDraggedNodes(prev => ({
+      ...prev,
+      [nodeValue]: {
+        offsetX: e.clientX - initialX,
+        offsetY: e.clientY - initialY,
+        startX: initialX,
+        startY: initialY
+      }
+    }));
+  }, []);
+
+  // Handle mouse move for individual node dragging
+  const handleNodeMouseMove = useCallback((e) => {
+    if (!isDragging || !currentlyDraggingNode) return;
+    
+    setDraggedNodes(prev => ({
+      ...prev,
+      [currentlyDraggingNode]: {
+        ...prev[currentlyDraggingNode],
+        startX: e.clientX - prev[currentlyDraggingNode].offsetX,
+        startY: e.clientY - prev[currentlyDraggingNode].offsetY
+      }
+    }));
+  }, [isDragging, currentlyDraggingNode]);
+
+  // Handle mouse up for individual node dragging
+  const handleNodeMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setCurrentlyDraggingNode(null);
+  }, []);
+
+  // Add event listeners for individual node dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleNodeMouseMove);
+      document.addEventListener('mouseup', handleNodeMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleNodeMouseMove);
+      document.removeEventListener('mouseup', handleNodeMouseUp);
+    };
+  }, [isDragging, handleNodeMouseMove, handleNodeMouseUp]);
+
+  // Handle fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+      setIsFullscreen(!!fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Auto-advance based on speed setting
   useEffect(() => {
     if (isPlaying && steps && steps.length > 0) {
       const interval = setInterval(() => {
@@ -17,11 +101,11 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         } else {
           if (onStop) onStop();
         }
-      }, 2000);
+      }, speed);
       
       return () => clearInterval(interval);
     }
-  }, [steps, currentStep, onNext, isPlaying, onStop]);
+  }, [steps, currentStep, onNext, isPlaying, onStop, speed]);
 
   // Handle rotation phases for AVL trees
   useEffect(() => {
@@ -67,6 +151,82 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     };
   }, [currentStep, steps]);
 
+  // Initialize node positions when tree changes
+  useEffect(() => {
+    if (steps && steps[currentStep] && steps[currentStep].tree) {
+      initializeNodePositions(steps[currentStep].tree);
+    }
+  }, [currentStep, steps]);
+
+  // Initialize node positions recursively
+  const initializeNodePositions = (node, level = 0, x = 300, y = 100) => {
+    if (!node) return;
+
+    setNodePositions(prev => ({
+      ...prev,
+      [node.value]: { x, y, level }
+    }));
+
+    const horizontalSpacing = Math.max(150 / (level + 1), 40);
+    const verticalSpacing = 80;
+
+    if (node.left) {
+      initializeNodePositions(node.left, level + 1, x - horizontalSpacing, y + verticalSpacing);
+    }
+    if (node.right) {
+      initializeNodePositions(node.right, level + 1, x + horizontalSpacing, y + verticalSpacing);
+    }
+  };
+
+  // Handle drag start
+  const handleDragStart = (event, nodeValue) => {
+    setIsDragging(true);
+    setDraggedNode(nodeValue);
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const startX = event.clientX - rect.left;
+    const startY = event.clientY - rect.top;
+    const nodePos = nodePositions[nodeValue];
+    
+    setDragOffset({
+      x: startX - nodePos.x,
+      y: startY - nodePos.y
+    });
+  };
+
+  // Handle drag end
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    setDraggedNode(null);
+  };
+
+  // Handle drag - move all nodes together
+  const handleDrag = (event, nodeValue) => {
+    if (!isDragging) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    const newX = mouseX - dragOffset.x;
+    const newY = mouseY - dragOffset.y;
+
+    const deltaX = newX - nodePositions[nodeValue].x;
+    const deltaY = newY - nodePositions[nodeValue].y;
+
+    // Move all nodes by the same delta
+    const newPositions = { ...nodePositions };
+    Object.keys(newPositions).forEach(nodeId => {
+      newPositions[nodeId] = {
+        ...newPositions[nodeId],
+        x: newPositions[nodeId].x + deltaX,
+        y: newPositions[nodeId].y + deltaY
+      };
+    });
+
+    setNodePositions(newPositions);
+  };
+
   // Function to download all steps as PDF with visual representations
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
@@ -75,99 +235,61 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       format: 'a4'
     });
     
-    // Add title
     doc.setFontSize(22);
     doc.text('Tree Visualization Steps', 148.5, 15, null, null, 'center');
     
-    // Add steps with visual representations - one step per page
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index];
       
-      // Add a new page for each step (except the first one)
       if (index > 0) {
         doc.addPage();
       }
       
-      // Add step header
       doc.setFontSize(16);
       doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
       
       doc.setFontSize(12);
       doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
       
-      // Add a visual representation of the tree
       if (step.tree || step.operation) {
-        // Draw tree visualization based on algorithm type
-        if (isTrieVisualization(step)) {
-          // For Trie, calculate bounding box and scale
-          const bbox = calculateTrieBoundingBox(step.tree || { children: {}, isEnd: false });
-          const pageWidth = 297; // A4 landscape width in mm
-          const pageHeight = 210; // A4 landscape height in mm
-          const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
-          const availableHeight = pageHeight - 60; // Leave space for header and footer
-          
-          // Calculate scale to fit
-          const scaleX = availableWidth / bbox.width;
-          const scaleY = availableHeight / bbox.height;
-          const scale = Math.min(scaleX, scaleY, 1); // Don't upscale
-          
-          // Calculate position to center
-          const treeWidth = bbox.width * scale;
-          const treeHeight = bbox.height * scale;
-          const x = (pageWidth - treeWidth) / 2 - bbox.minX * scale;
-          const y = (availableHeight - treeHeight) / 2 + 50 - bbox.minY * scale; // +50 for header space
-          
-          // For Trie, center it better on the page
-          drawTrieInPDF(doc, step.tree || { children: {}, isEnd: false }, '', x, y, 0, scale);
-        } else {
-          // For other trees, calculate bounding box and scale
-          const bbox = calculateTreeBoundingBox(step.tree);
-          const pageWidth = 297; // A4 landscape width in mm
-          const pageHeight = 210; // A4 landscape height in mm
-          const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
-          const availableHeight = pageHeight - 60; // Leave space for header and footer
-          
-          // Calculate scale to fit
-          const scaleX = availableWidth / bbox.width;
-          const scaleY = availableHeight / bbox.height;
-          const scale = Math.min(scaleX, scaleY, 1); // Don't upscale
-          
-          // Calculate position to center
-          const treeWidth = bbox.width * scale;
-          const treeHeight = bbox.height * scale;
-          const x = (pageWidth - treeWidth) / 2 - bbox.minX * scale;
-          const y = (availableHeight - treeHeight) / 2 + 50 - bbox.minY * scale; // +50 for header space
-          
-          // For other trees, center it better on the page
-          drawTreeInPDF(doc, step.tree, x, y, 0, null, null, scale);
-        }
+        const bbox = calculateTreeBoundingBox(step.tree);
+        const pageWidth = 297;
+        const pageHeight = 210;
+        const availableWidth = pageWidth - 40;
+        const availableHeight = pageHeight - 60;
+        
+        const scaleX = availableWidth / bbox.width;
+        const scaleY = availableHeight / bbox.height;
+        const scale = Math.min(scaleX, scaleY, 1);
+        
+        const treeWidth = bbox.width * scale;
+        const treeHeight = bbox.height * scale;
+        const x = (pageWidth - treeWidth) / 2 - bbox.minX * scale;
+        const y = (availableHeight - treeHeight) / 2 + 50 - bbox.minY * scale;
+        
+        drawTreeInPDF(doc, step.tree, x, y, 0, null, null, scale);
       } else {
         doc.text('Empty tree', 148.5, 105, null, null, 'center');
       }
       
-      // Add a small delay to prevent UI blocking
       await new Promise(resolve => setTimeout(resolve, 10));
     }
     
-    // Save the PDF
     doc.save('tree-steps.pdf');
   };
   
-  // Helper function to calculate tree bounding box
   const calculateTreeBoundingBox = (node, level = 0, x = 0, y = 0, bbox = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }) => {
     if (!node) return bbox;
     
-    const nodeSize = 6; // Diameter of node circle
+    const nodeSize = 6;
     const horizontalSpacing = Math.max(50 / (level + 1), 20);
     const verticalSpacing = 25;
     
-    // Update bounding box
     bbox.minX = Math.min(bbox.minX, x - nodeSize/2);
     bbox.maxX = Math.max(bbox.maxX, x + nodeSize/2);
     bbox.minY = Math.min(bbox.minY, y - nodeSize/2);
     bbox.maxY = Math.max(bbox.maxY, y + nodeSize/2);
     
-    // Process children
     if (node.left) {
       calculateTreeBoundingBox(node.left, level + 1, x - horizontalSpacing, y + verticalSpacing, bbox);
     }
@@ -175,44 +297,12 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       calculateTreeBoundingBox(node.right, level + 1, x + horizontalSpacing, y + verticalSpacing, bbox);
     }
     
-    // Add some padding
     bbox.width = bbox.maxX - bbox.minX + 20;
     bbox.height = bbox.maxY - bbox.minY + 20;
     
     return bbox;
   };
   
-  // Helper function to calculate trie bounding box
-  const calculateTrieBoundingBox = (node, prefix = '', level = 0, x = 0, y = 0, bbox = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }) => {
-    if (!node) return bbox;
-    
-    const nodeSize = 10; // Diameter of node circle
-    const verticalSpacing = 40;
-    const horizontalSpacing = Math.max(60 / (level + 1), 25);
-    
-    // Update bounding box
-    bbox.minX = Math.min(bbox.minX, x - nodeSize/2);
-    bbox.maxX = Math.max(bbox.maxX, x + nodeSize/2);
-    bbox.minY = Math.min(bbox.minY, y - nodeSize/2);
-    bbox.maxY = Math.max(bbox.maxY, y + nodeSize/2);
-    
-    // Process children
-    const children = node.children ? Object.keys(node.children) : [];
-    children.forEach((char, index) => {
-      const child = node.children[char];
-      const childX = x + (index - (children.length - 1) / 2) * horizontalSpacing;
-      const childY = y + verticalSpacing;
-      calculateTrieBoundingBox(child, prefix + char, level + 1, childX, childY, bbox);
-    });
-    
-    // Add some padding
-    bbox.width = bbox.maxX - bbox.minX + 20;
-    bbox.height = bbox.maxY - bbox.minY + 20;
-    
-    return bbox;
-  };
-  
-  // Helper function to draw tree in PDF
   const drawTreeInPDF = (doc, node, x, y, level = 0, parentX = null, parentY = null, scale = 1) => {
     if (!node) return;
     
@@ -220,7 +310,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     const horizontalSpacing = Math.max(50 / (level + 1), 20) * scale;
     const verticalSpacing = 25 * scale;
     
-    // Draw connections to children
     if (node.left) {
       drawTreeInPDF(doc, node.left, x - horizontalSpacing, y + verticalSpacing, level + 1, x, y, scale);
     }
@@ -228,137 +317,28 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       drawTreeInPDF(doc, node.right, x + horizontalSpacing, y + verticalSpacing, level + 1, x, y, scale);
     }
     
-    // Draw connection line to parent
     if (parentX !== null && parentY !== null) {
-      doc.setDrawColor(156, 163, 175); // gray-400
+      doc.setDrawColor(156, 163, 175);
       doc.setLineWidth(0.5 * scale);
       doc.line(x, y, parentX, parentY);
     }
     
-    // Draw node circle
-    doc.setFillColor(255, 255, 255); // white
-    doc.setDrawColor(156, 163, 175); // gray-400
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(156, 163, 175);
     doc.setLineWidth(0.5 * scale);
     doc.circle(x, y, nodeSize, 'FD');
     
-    // Draw node value
     doc.setFontSize(6 * scale);
-    doc.setTextColor(0, 0, 0); // black
+    doc.setTextColor(0, 0, 0);
     doc.text(String(node.value), x, y + 2 * scale, null, null, 'center');
     
-    // Draw height for AVL trees
     if (node.height) {
       doc.setFontSize(5 * scale);
-      doc.setTextColor(107, 114, 128); // gray-500
+      doc.setTextColor(107, 114, 128);
       doc.text(`h:${node.height}`, x, y - 8 * scale, null, null, 'center');
     }
   };
-  
-  // Helper function to draw trie in PDF
-  const drawTrieInPDF = (doc, node, prefix = '', x = 105, y = 45, level = 0, scale = 1) => {
-    if (!node) return;
-    
-    const nodeSize = 5 * scale; // Increased node size
-    const verticalSpacing = 40 * scale; // Increased spacing
-    const horizontalSpacing = Math.max(60 / (level + 1), 25) * scale; // Increased horizontal spacing
-    
-    // Get the character for this node (last character of prefix, or 'root' for root)
-    const nodeLabel = prefix ? prefix.slice(-1) : 'root';
-    
-    // Draw node circle
-    if (node.isEnd) {
-      doc.setFillColor(16, 185, 129); // green-500
-    } else {
-      doc.setFillColor(255, 255, 255); // white
-    }
-    doc.setDrawColor(156, 163, 175); // gray-400
-    doc.setLineWidth(0.7 * scale); // Slightly thicker lines
-    doc.circle(x, y, nodeSize, 'FD');
-    
-    // Draw node value
-    doc.setFontSize(8 * scale); // Larger font
-    doc.setTextColor(0, 0, 0); // black
-    doc.text(nodeLabel, x, y + 2 * scale, null, null, 'center');
-    
-    // Draw end marker for end nodes
-    if (node.isEnd) {
-      doc.setFontSize(6 * scale);
-      doc.setTextColor(16, 185, 129); // green-500
-      doc.text('END', x, y - 10 * scale, null, null, 'center'); // Moved further up
-    }
-    
-    // Draw children
-    const children = node.children ? Object.keys(node.children) : [];
-    children.forEach((char, index) => {
-      const child = node.children[char];
-      const childX = x + (index - (children.length - 1) / 2) * horizontalSpacing;
-      const childY = y + verticalSpacing;
-      
-      // Connection line
-      doc.setDrawColor(156, 163, 175); // gray-400
-      doc.setLineWidth(0.7 * scale);
-      doc.line(x, y + nodeSize, childX, childY - nodeSize); // Adjusted line endpoints
-      
-      // Character label on the line
-      doc.setFontSize(7 * scale);
-      doc.setTextColor(59, 130, 246); // blue-600
-      doc.text(char, (x + childX) / 2, (y + childY) / 2 - 3 * scale, null, null, 'center'); // Moved up slightly
-      
-      // Child node
-      drawTrieInPDF(doc, child, prefix + char, childX, childY, level + 1, scale);
-    });
-  };
 
-  // Function to get node styling based on state
-  const getNodeStyle = (stepData, nodeValue) => {
-    if (!stepData) {
-      return "w-10 h-10 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-white text-black border-gray-400";
-    }
-    
-    let baseStyle = "w-10 h-10 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 ";
-    
-    if (stepData.insertedValue !== undefined && stepData.insertedValue === nodeValue) {
-      baseStyle += "animate-pulse scale-110 ";
-    }
-    
-    if (stepData.insertedValue !== undefined && stepData.insertedValue === nodeValue) {
-      baseStyle += "bg-blue-500 text-white border-blue-600";
-    } else if (stepData.comparing !== undefined && stepData.comparing === nodeValue) {
-      baseStyle += "bg-gray-300 text-black border-gray-700";
-    } else if (stepData.found !== undefined && stepData.found === nodeValue) {
-      baseStyle += "bg-green-500 text-white border-green-600";
-    } else if (isRotationStep(stepData) && getRotationNodeValue(stepData) === nodeValue) {
-      if (rotationPhase === 'breaking') {
-        baseStyle += "bg-yellow-500 text-white border-yellow-600 animate-pulse opacity-70";
-      } else if (rotationPhase === 'rotating') {
-        const rotationType = getRotationType(stepData);
-        if (rotationType === 'left' || rotationType === 'right') {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-spin";
-        } else {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-pulse";
-        }
-      } else if (rotationPhase === 'attaching') {
-        baseStyle += "bg-green-500 text-white border-green-600 animate-bounce";
-      } else {
-        const rotationType = getRotationType(stepData);
-        if (rotationType === 'left' || rotationType === 'right') {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-spin";
-        } else {
-          baseStyle += "bg-purple-500 text-white border-purple-600 animate-pulse";
-        }
-      }
-    } else {
-      baseStyle += "bg-white text-black border-gray-400";
-    }
-    
-    if (hoveredNode === nodeValue) {
-      baseStyle += " transform scale-110 shadow-lg ";
-    }
-    
-    return baseStyle;
-  };
-
-  // Function to get operation description
   const getOperationDescription = (stepData) => {
     if (!stepData) return 'Processing...';
     
@@ -393,12 +373,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         return `Right-left rotation at node ${stepData.comparing} - Right-left imbalance. ${phaseDescription}`;
       }
       return `Balancing tree at node ${stepData.comparing}. ${phaseDescription}`;
-    } else if (operation === 'insert_start') {
-      return `Starting insertion of word "${stepData.insertedWord}"`;
-    } else if (operation === 'create_node') {
-      return `Creating node for character '${stepData.currentChar}' in path "${stepData.path}"`;
-    } else if (operation === 'mark_end') {
-      return `Marking end of word "${stepData.insertedWord}" at character '${stepData.currentChar}'`;
     } else if (operation === 'complete') {
       return 'Tree construction complete!';
     } else {
@@ -406,29 +380,18 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     }
   };
   
-  // Function to check if current step is a rotation
   const isRotationStep = (stepData) => {
     return stepData && stepData.operation === 'rotate';
   };
   
-  // Function to get rotation type
   const getRotationType = (stepData) => {
     return stepData && stepData.rotation ? stepData.rotation : null;
   };
   
-  // Function to get rotation node value
   const getRotationNodeValue = (stepData) => {
     return stepData && stepData.comparing ? stepData.comparing : null;
   };
 
-  // Function to check if this is a Trie visualization
-  const isTrieVisualization = (stepData) => {
-    // Since we now have separate components for each tree type, 
-    // this component should only handle BST and AVL trees
-    return false;
-  };
-
-  // Recursive function to find path from root to target node
   const findPathToNode = (node, targetValue, path = []) => {
     if (!node) return null;
     
@@ -447,271 +410,192 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     return null;
   };
 
-  // Recursive function to render BST/AVL tree nodes
-  const renderTreeNode = (node, x, y, level = 0, isLeft = false, parentX = null, parentY = null, traversalPath = []) => {
-    if (!node) {
-      return null;
-    }
+  // Recursive function to render tree nodes with elastic dragging support
+  const renderTreeNode = (node, x, y, level = 0, isDragging = false, parentX = null, parentY = null, traversalPath = []) => {
+    if (!node) return null;
     
-    const nodeId = `${level}-${x}-${y}`;
-    const nodeSize = 30;
-    const horizontalSpacing = Math.max(150 / (level + 1), 60);
-    const verticalSpacing = 80;
-    
+    const nodeId = node.value;
     const currentStepData = steps && steps[currentStep];
     const isRotation = isRotationStep(currentStepData);
     const rotationType = getRotationType(currentStepData);
     const rotationNodeValue = getRotationNodeValue(currentStepData);
     
     const isRotationNode = node.value === rotationNodeValue;
-    const isRotationRelated = isRotation && (isRotationNode || 
-      (node.left && node.left.value === rotationNodeValue) || 
-      (node.right && node.right.value === rotationNodeValue));
-    
-    const isInTraversalPath = traversalPath.includes(node.value);
+    const isInTraversalPath = traversalPath.includes(node.value) || false;
     const isComparingNode = currentStepData && currentStepData.comparing === node.value;
     const isInsertedNode = currentStepData && currentStepData.insertedValue === node.value;
     
-    let nodeClass = "cursor-pointer hover:stroke-blue-500 transition-all duration-500";
+    // Get dragged position if exists
+    const draggedPosition = draggedNodes[nodeId];
+    const actualX = draggedPosition ? draggedPosition.startX : (nodePositions[nodeId] ? nodePositions[nodeId].x : x);
+    const actualY = draggedPosition ? draggedPosition.startY : (nodePositions[nodeId] ? nodePositions[nodeId].y : y);
     
+    // Node styling based on state
+    let nodeStyle = {};
     if (isInTraversalPath) {
-      nodeClass += " fill-blue-200 stroke-blue-500 traversal-highlight";
+      nodeStyle = { backgroundColor: '#BFDBFE', borderColor: '#3B82F6' };
+    } else if (isInsertedNode) {
+      nodeStyle = { backgroundColor: '#3B82F6', borderColor: '#2563EB', color: 'white' };
+    } else if (isComparingNode) {
+      nodeStyle = { backgroundColor: '#D1D5DB', borderColor: '#374151' };
     } else if (isRotation && isRotationNode) {
       if (rotationPhase === 'breaking') {
-        nodeClass += " fill-yellow-500 stroke-yellow-600 animate-pulse opacity-70";
+        nodeStyle = { backgroundColor: '#F59E0B', borderColor: '#D97706', color: 'white' };
       } else if (rotationPhase === 'rotating') {
-        nodeClass += " fill-purple-500 stroke-purple-600";
-        if (rotationType === 'left' || rotationType === 'right') {
-          nodeClass += " animate-spin";
-        } else {
-          nodeClass += " animate-pulse";
-        }
+        nodeStyle = { backgroundColor: '#8B5CF6', borderColor: '#7C3AED', color: 'white' };
       } else if (rotationPhase === 'attaching') {
-        nodeClass += " fill-green-500 stroke-green-600 animate-bounce";
+        nodeStyle = { backgroundColor: '#10B981', borderColor: '#059669', color: 'white' };
       } else {
-        nodeClass += " fill-purple-500 stroke-purple-600";
-        if (rotationType === 'left' || rotationType === 'right') {
-          nodeClass += " animate-spin";
-        } else {
-          nodeClass += " animate-pulse";
-        }
+        nodeStyle = { backgroundColor: '#6366F1', borderColor: '#4F46E5', color: 'white' };
       }
-    } else if (isComparingNode) {
-      nodeClass += " fill-gray-300 stroke-gray-700 animate-pulse";
-    } else if (isInsertedNode) {
-      nodeClass += " fill-blue-500 stroke-blue-600";
     } else {
-      nodeClass += " fill-white stroke-gray-400";
+      nodeStyle = { backgroundColor: 'white', borderColor: '#9CA3AF', color: 'black' };
     }
-    
-    if (isRotation && isRotationRelated && !isRotationNode) {
-      if (rotationPhase === 'breaking') {
-        nodeClass += " opacity-50";
-      } else if (rotationPhase === 'rotating') {
-        nodeClass += " animate-pulse";
-      } else if (rotationPhase === 'attaching') {
-        nodeClass += " animate-bounce";
-      }
-    }
-    
+
     return (
-      <g key={nodeId}>
-        {/* Render connections to children first */}
-        {node.left && renderTreeNode(
-          node.left, 
-          x - horizontalSpacing, 
-          y + verticalSpacing, 
-          level + 1, 
-          true, 
-          x, 
-          y,
-          traversalPath
-        )}
-        {node.right && renderTreeNode(
-          node.right, 
-          x + horizontalSpacing, 
-          y + verticalSpacing, 
-          level + 1, 
-          false, 
-          x, 
-          y,
-          traversalPath
-        )}
-        
+      <React.Fragment key={nodeId}>
         {/* Render connection line to parent */}
         {parentX !== null && parentY !== null && (
           <line
-            x1={x}
-            y1={y}
+            x1={actualX}
+            y1={actualY}
             x2={parentX}
             y2={parentY}
             stroke={isInTraversalPath ? "#3B82F6" : "#9CA3AF"}
-            strokeWidth={isInTraversalPath ? "3" : "2"}
-            className={isRotationRelated ? "transition-all duration-500 " + (rotationPhase === 'breaking' ? 'stroke-dashed stroke-yellow-500 opacity-50' : rotationPhase === 'attaching' ? 'stroke-green-500 animate-pulse' : 'stroke-purple-500') : (isInTraversalPath ? 'path-connection' : 'stroke-gray-400')}
+            strokeWidth="2"
+            className="floating-animation delay-3"
           />
         )}
-        
-        {/* Render node circle */}
-        <circle
-          cx={x}
-          cy={y}
-          r={nodeSize / 2}
-          fill={isInTraversalPath ? "#BFDBFE" : (isInsertedNode ? "#3B82F6" : (isComparingNode ? "#D1D5DB" : "#FFFFFF"))}
-          stroke={isInTraversalPath ? "#3B82F6" : (isInsertedNode ? "#2563EB" : (isComparingNode ? "#374151" : "#9CA3AF"))}
-          strokeWidth="2"
-          className={nodeClass}
-          onMouseEnter={() => setHoveredNode(node.value)}
-          onMouseLeave={() => setHoveredNode(null)}
-        />
-        
-        {/* Render node value */}
-        <text
-          x={x}
-          y={y + 5}
-          textAnchor="middle"
-          className={`font-bold ${isInTraversalPath ? 'text-blue-800' : (isInsertedNode ? 'text-white' : (isComparingNode ? 'text-black' : 'text-black'))}`}
+
+        {/* Render node as motion div with enhanced floating animation */}
+        <motion.div
+          className={`node absolute w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm cursor-move select-none transition-all duration-200 ${
+            isBeingDragged ? 'shadow-2xl scale-110' : 'hover:scale-105 hover:shadow-lg'
+          } ${isRotationNode ? 'animate-pulse' : 'floating-animation glowing delay-1'}`}
+          style={{
+            left: actualX - 24,
+            top: actualY - 24,
+            ...nodeStyle
+          }}
+          drag
+          dragConstraints={dragConstraintsRef}
+          dragElastic={0}
+          onDragStart={(event, info) => handleNodeMouseDown(nodeId, actualX, actualY, event)}
+          onDrag={(event, info) => {
+            // Update dragged node position
+            setDraggedNodes(prev => ({
+              ...prev,
+              [nodeId]: {
+                ...prev[nodeId],
+                startX: info.point.x - prev[nodeId].offsetX,
+                startY: info.point.y - prev[nodeId].offsetY
+              }
+            }));
+          }}
+          onDragEnd={() => {
+            setIsDragging(false);
+            setCurrentlyDraggingNode(null);
+          }}
         >
-          {node.value}
-        </text>
-        
-        {/* Render height for AVL trees */}
-        {node.height && (
-          <text
-            x={x}
-            y={y - 20}
-            textAnchor="middle"
-            className="text-xs text-gray-500"
-          >
-            h:{node.height}
-          </text>
-        )}
-        
-        {/* Render rotation indicator */}
-        {isRotation && isRotationNode && (
-          <g>
-            <rect
-              x={x - 30}
-              y={y + 20}
-              width="60"
-              height="20"
-              rx="3"
-              fill={rotationPhase === 'breaking' ? "#F59E0B" : rotationPhase === 'rotating' ? "#8B5CF6" : rotationPhase === 'attaching' ? "#10B981" : "#6366F1"}
-              className="opacity-20"
-            />
-            <text
-              x={x}
-              y={y + 35}
-              textAnchor="middle"
-              className="text-xs font-bold fill-white"
-            >
-              {rotationPhase ? rotationPhase.toUpperCase() : 'ROTATING'}
-            </text>
-          </g>
-        )}
-        
-        {/* Render rotation type */}
-        {isRotation && isRotationNode && (
-          <g>
-            <rect
-              x={x - 25}
-              y={y + 40}
-              width="50"
-              height="15"
-              rx="3"
-              fill="#3B82F6"
-              className="opacity-20"
-            />
-            <text
-              x={x}
-              y={y + 50}
-              textAnchor="middle"
-              className="text-xs font-bold fill-white"
-            >
-              {rotationType ? rotationType.toUpperCase() : 'ROTATE'}
-            </text>
-          </g>
-        )}
-      </g>
+          <span>{nodeData.value}</span>
+        </motion.div>
+
+        {/* Render children */}
+        {node.left && renderTreeNode(node.left, x - 150 / (level + 1), y + 80, level + 1, isDragging, actualX, actualY, traversalPath)}
+        {node.right && renderTreeNode(node.right, x + 150 / (level + 1), y + 80, level + 1, isDragging, actualX, actualY, traversalPath)}
+      </React.Fragment>
     );
   };
 
-  // Function to render trie nodes
-  const renderTrieNode = (node, prefix = '', x = 300, y = 50, level = 0) => {
-    if (!node) return null;
-    
-    const nodeId = `${prefix}-${level}`;
-    const nodeSize = 30;
-    const verticalSpacing = 70;
-    const horizontalSpacing = Math.max(200 / (level + 1), 80);
-    
-    const nodeLabel = prefix ? prefix.slice(-1) : 'root';
-    
-    return (
-      <g key={nodeId}>
-        <circle
-          cx={x}
-          cy={y}
-          r={nodeSize / 2}
-          fill={node.isEnd ? "#10B981" : "#FFFFFF"}
-          stroke="#9CA3AF"
-          strokeWidth="2"
-          className="cursor-pointer hover:stroke-blue-500 transition-all duration-300 drop-shadow-sm"
-          onMouseEnter={() => setHoveredNode(prefix || 'root')}
-          onMouseLeave={() => setHoveredNode(null)}
-        />
-        
-        <text
-          x={x}
-          y={y + 5}
-          textAnchor="middle"
-          className="font-bold text-black text-base drop-shadow-sm"
-        >
-          {nodeLabel}
-        </text>
-        
-        {node.isEnd && (
-          <text
-            x={x}
-            y={y - 25}
-            textAnchor="middle"
-            className="text-xs text-green-600 font-bold drop-shadow-sm"
-          >
-            END
-          </text>
-        )}
-        
-        {node.children && Object.keys(node.children).map((char, index) => {
-          const child = node.children[char];
-          const childX = x + (index - (Object.keys(node.children).length - 1) / 2) * horizontalSpacing;
-          const childY = y + verticalSpacing;
-          
-          return (
-            <g key={`${nodeId}-${char}`}>
-              <line
-                x1={x}
-                y1={y + nodeSize / 2}
-                x2={childX}
-                y2={childY - nodeSize / 2}
-                stroke="#9CA3AF"
-                strokeWidth="2"
-                markerEnd="url(#arrowhead)"
-              />
-              
-              <text
-                x={(x + childX) / 2}
-                y={(y + childY) / 2 - 10}
-                textAnchor="middle"
-                className="text-sm text-blue-600 font-bold bg-white px-1 rounded"
-              >
-                {char}
-              </text>
-              
-              {renderTrieNode(child, prefix + char, childX, childY, level + 1)}
-            </g>
-          );
-        })}
-      </g>
-    );
+  const toggleFullscreen = () => {
+    if (!fullscreenContainerRef.current) return;
+
+    if (!isFullscreen) {
+      const element = fullscreenContainerRef.current;
+      if (element.requestFullscreen) {
+        element.requestFullscreen();
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+      } else if (element.msRequestFullscreen) {
+        element.msRequestfullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  };
+
+  const handleSpeedChange = (newSpeed) => {
+    setSpeed(newSpeed);
+  };
+
+  // Reset all node positions to their original structure
+  const resetStructure = () => {
+    setDraggedNodes({});
+    setCurrentlyDraggingNode(null);
+  };
+
+  // Toggle floating mode
+  const toggleFloating = () => {
+    setIsFloating(!isFloating);
+    // Reset position to center when toggling
+    if (!isFloating) {
+      setTimeout(() => {
+        const container = fullscreenContainerRef.current;
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          setPosition({
+            x: containerRect.width / 2,
+            y: containerRect.height / 2
+          });
+        }
+      }, 10);
+    }
+  };
+
+  const handleMouseDown = (event) => {
+    event.stopPropagation();
+    const svgRect = svgRef.current.getBoundingClientRect();
+    const startX = event.clientX - svgRect.left;
+    const startY = event.clientY - svgRect.top;
+
+    const handleMouseMove = (event) => {
+      const newX = event.clientX - svgRect.left;
+      const newY = event.clientY - svgRect.top;
+
+      setPosition({
+        x: position.x + (newX - startX),
+        y: position.y + (newY - startY)
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const calculateZoomLevel = (tree) => {
+    const bbox = calculateTreeBoundingBox(tree);
+    const containerWidth = 600;
+    const containerHeight = 500;
+
+    const scaleX = containerWidth / bbox.width;
+    const scaleY = containerHeight / bbox.height;
+
+    return Math.min(scaleX, scaleY, 1);
   };
 
   if (!data || !steps || steps.length === 0) return null;
@@ -720,7 +604,6 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
   const safeCurrentStep = Math.min(currentStep, Math.max(0, steps.length - 1));
   const currentStepData = steps[safeCurrentStep];
   
-  // Build traversal path for current step
   const traversalPath = [];
   if (currentStepData && currentStepData.traversalPath) {
     traversalPath.push(...currentStepData.traversalPath);
@@ -733,20 +616,15 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     }
   }
 
-  // Determine if we should render Trie or BST/AVL
-  const shouldRenderTrie = isTrieVisualization(currentStepData);
-
   return (
-    <div className="mt-2">
-      <style jsx>{`
-        .traversal-highlight {
-          animation: traversal-pulse 1s ease-in-out;
-        }
-        
-        @keyframes traversal-pulse {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-          100% { transform: scale(1); }
+    <div id="tree-visualizer" className="mt-2">
+      <style>
+        {`
+        .node {
+          user-select: none;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
         }
         
         .path-connection {
@@ -759,12 +637,114 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             stroke-dashoffset: -10;
           }
         }
-      `}</style>
+        
+        /* Faster floating animation for water-like effect - for nodes and edges */
+        @keyframes float {
+          0% {
+            transform: translateY(0px) translateX(0px);
+          }
+          25% {
+            transform: translateY(-4px) translateX(1px);
+          }
+          50% {
+            transform: translateY(-2px) translateX(0px);
+          }
+          75% {
+            transform: translateY(-3px) translateX(0.5px);
+          }
+          100% {
+            transform: translateY(0px) translateX(0px);
+          }
+        }
+        
+        /* Screen floating animation for entire tree structure */
+        @keyframes screen-float {
+          0% {
+            transform: translateX(0px);
+          }
+          25% {
+            transform: translateX(10px);
+          }
+          50% {
+            transform: translateX(0px);
+          }
+          75% {
+            transform: translateX(-10px);
+          }
+          100% {
+            transform: translateX(0px);
+          }
+        }
+        
+        @keyframes glow {
+          0% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+          50% {
+            filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.4));
+          }
+          100% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+        }
+        
+        .floating-animation {
+          animation: float 3s ease-in-out infinite;
+        }
+        
+        .screen-floating {
+          animation: screen-float 8s ease-in-out infinite;
+        }
+        
+        .glowing {
+          animation: glow 2s ease-in-out infinite;
+        }
+        
+        /* Staggered animations */
+        .delay-1 {
+          animation-delay: 0.1s;
+        }
+        
+        .delay-2 {
+          animation-delay: 0.2s;
+        }
+        
+        .delay-3 {
+          animation-delay: 0.3s;
+        }
+        
+        .delay-4 {
+          animation-delay: 0.4s;
+        }
+        `}
+      </style>
       
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg text-blue-800">Tree Visualization</h3>
-        <div className="flex gap-2">
-          {/* ADDED: Download PDF Button */}
+        <div className="flex gap-2 items-center">
+          {/* Speed Control */}
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-gray-700">Speed:</span>
+            <select 
+              value={speed} 
+              onChange={(e) => handleSpeedChange(Number(e.target.value))}
+              className="px-2 py-1 border border-gray-300 rounded text-sm"
+            >
+              <option value={500}>Fast (0.5s)</option>
+              <option value={1000}>Medium (1s)</option>
+              <option value={2000}>Slow (2s)</option>
+              <option value={3000}>Very Slow (3s)</option>
+            </select>
+          </div>
+          
+          {/* Reset Structure Button */}
+          <button 
+            onClick={resetStructure}
+            className="px-3 py-1 bg-blue-800 text-white rounded text-sm font-medium hover:bg-blue-900 transition-colors flex items-center"
+          >
+            Reset Structure
+          </button>
+
           <button 
             onClick={downloadStepsAsPDF}
             className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center"
@@ -786,9 +766,20 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         </div>
       </div>
       
-      <div className="bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto">
-        <div className="mb-6 bg-white p-3 border-2 border-gray-300">
-          <h4 className="text-sm font-bold text-black mb-2 flex items-center">
+      <div 
+        ref={fullscreenContainerRef}
+        className={`group bg-white p-4 border border-gray-200 mb-4 max-h-[90vh] overflow-auto relative ${isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-black border-0 p-0 m-0 fullscreen-container overflow-hidden' : ''}`}
+      >
+        <button 
+          onClick={toggleFullscreen}
+          className="absolute top-4 right-4 bg-black bg-opacity-70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-opacity-90 z-10"
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+          {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+        </button>
+        
+        <div className={`mb-6 bg-white p-3 border-2 border-gray-300 ${isFullscreen ? '!border-0 !p-0' : ''}`}>
+          <h4 className={`text-sm font-bold text-black mb-2 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
             <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center text-xs mr-2">
               {safeCurrentStep + 1}
             </span>
@@ -798,10 +789,15 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             </span>
           </h4>
           
-          <div className="flex justify-center items-center mb-3 overflow-auto py-2 max-h-[500px]">
+          <div className={`flex justify-center items-center mb-3 overflow-hidden py-2 max-h-[500px] ${isFullscreen ? 'scale-125' : ''}`}>
             {currentStepData ? (
-              <div className="w-full min-h-[400px] flex items-center justify-center overflow-auto">
-                <svg width="100%" height="500" className="border border-gray-200 rounded min-w-[600px]" viewBox="0 0 600 500">
+              <div className="w-full min-h-[400px] flex items-center justify-center overflow-hidden relative">
+                <svg 
+                  width="100%" 
+                  height="500" 
+                  className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`} 
+                  viewBox={`0 0 ${600 * calculateZoomLevel(currentStepData.tree)} 500`}
+                >
                   <defs>
                     <marker 
                       id="arrowhead" 
@@ -815,13 +811,32 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                     </marker>
                   </defs>
                   
-                  {/* FIXED: Only render Trie if it's actually a Trie visualization */}
-                  {shouldRenderTrie ? (
-                    renderTrieNode(currentStepData.tree || { children: {}, isEnd: false }, '', 350, 80)
+                  {isFloating ? (
+                    <g 
+                      ref={svgRef}
+                      transform={`translate(${position.x - 300 * calculateZoomLevel(currentStepData.tree)}, ${position.y - 250})`}
+                      onMouseDown={handleMouseDown}
+                      className="cursor-move screen-floating"
+                    >
+                      {renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)}
+                    </g>
                   ) : (
-                    renderTreeNode(currentStepData.tree, 300, 100, 0, false, null, null, traversalPath)
+                    <g className="screen-floating">
+                      {renderTreeNode(currentStepData.tree, 300 * calculateZoomLevel(currentStepData.tree), 100, 0, false, null, null, traversalPath)}
+                    </g>
                   )}
                 </svg>
+                
+                {isFloating && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <button 
+                      onClick={toggleFloating}
+                      className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                    >
+                      Dock Tree
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center text-gray-500 py-10">
@@ -830,7 +845,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             )}
           </div>
           
-          <div className="text-center p-2 bg-white border border-gray-200">
+          <div className={`text-center p-2 bg-white border border-gray-200 ${isFullscreen ? 'hidden' : ''}`}>
             <p className="font-semibold text-black text-sm">
               {getOperationDescription(currentStepData)}
             </p>
@@ -843,6 +858,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         </div>
       </div>
       
+      {/* Steps list remains the same */}
       <div className="mt-6 border border-gray-200 p-4 bg-white">
         <h4 className="text-md font-bold text-blue-800 mb-3">All Steps:</h4>
         <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
@@ -859,13 +875,10 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
               }
             }
             
-            // Trie visualization is handled by separate component
-                        const isStepTrie = false;
-            
             return (
               <div 
                 key={index}
-                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}
+                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-5 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}
                 id={`step-${index}`}
               >
                 <div className="flex justify-between items-start">
@@ -890,8 +903,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                               </marker>
                             </defs>
                             
-                            {/* Render BST/AVL tree nodes (Trie is handled by separate component) */}
-                            {renderTreeNode(step.tree, 200, 80, 0, false, null, null, stepTraversalPath)}
+                            {renderStaticTreeNode(step.tree, 200, 80)}
                           </svg>
                         </div>
                       ) : (
@@ -914,6 +926,51 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         </div>
       </div>
     </div>
+  );
+};
+
+// Helper function for static tree rendering in step list
+const renderStaticTreeNode = (node, x, y, level = 0, parentX = null, parentY = null) => {
+  if (!node) return null;
+  
+  const nodeSize = 20;
+  const horizontalSpacing = Math.max(80 / (level + 1), 30);
+  const verticalSpacing = 50;
+
+  return (
+    <g key={`${level}-${x}-${y}`}>
+      {node.left && renderStaticTreeNode(node.left, x - horizontalSpacing, y + verticalSpacing, level + 1, x, y)}
+      {node.right && renderStaticTreeNode(node.right, x + horizontalSpacing, y + verticalSpacing, level + 1, x, y)}
+      
+      {parentX !== null && parentY !== null && (
+        <line
+          x1={x}
+          y1={y}
+          x2={parentX}
+          y2={parentY}
+          stroke="#9CA3AF"
+          strokeWidth="2"
+        />
+      )}
+      
+      <circle
+        cx={x}
+        cy={y}
+        r={nodeSize / 2}
+        fill="#FFFFFF"
+        stroke="#9CA3AF"
+        strokeWidth="2"
+      />
+      
+      <text
+        x={x}
+        y={y + 4}
+        textAnchor="middle"
+        className="font-bold text-black text-sm"
+      >
+        {node.value}
+      </text>
+    </g>
   );
 };
 
