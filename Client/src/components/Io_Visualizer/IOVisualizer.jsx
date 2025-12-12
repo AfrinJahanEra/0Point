@@ -1496,7 +1496,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
           </div>
         </div>
       )}
-      <style jsx>{`
+      <style>{`
         @keyframes uniquePulse {
           0% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.1); opacity: 0.7; box-shadow: 0 0 10px rgba(0, 31, 63, 0.5); }

@@ -4,6 +4,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
   // State management
   const [code, setCode] = useState(initialCode);
   const [selectedLanguage, setSelectedLanguage] = useState(language);
+  const [stdinInput, setStdinInput] = useState('');
   const [executionState, setExecutionState] = useState({
     isRunning: false,
     isPaused: false,
@@ -23,28 +24,43 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
   
   const codeRef = useRef(null);
   const executionInterval = useRef(null);
+  const pyodideRef = useRef(null);
+
+  // Load Pyodide for Python execution
+  useEffect(() => {
+    const loadPyodideLib = async () => {
+      let pyodidePKG = await import('https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.mjs');
+      const pyodide = await pyodidePKG.loadPyodide();
+      pyodideRef.current = pyodide;
+    };
+    loadPyodideLib();
+  }, []);
 
   // Supported languages and their parsers
   const languages = {
     cpp: {
       name: 'C++',
       extensions: ['.cpp', '.cc', '.cxx'],
-      keywords: ['#include', 'using namespace', 'int main', 'for', 'while', 'if', 'else', 'class', 'struct']
+      keywords: ['#include', 'using namespace', 'int main', 'for', 'while', 'if', 'else', 'class', 'struct'],
+      executionSupported: false
     },
     python: {
       name: 'Python',
       extensions: ['.py', '.pyw'],
-      keywords: ['def', 'class', 'import', 'for', 'while', 'if', 'elif', 'else', 'try', 'except']
+      keywords: ['def', 'class', 'import', 'for', 'while', 'if', 'elif', 'else', 'try', 'except'],
+      executionSupported: true
     },
     java: {
       name: 'Java',
       extensions: ['.java'],
-      keywords: ['public class', 'static void', 'main', 'for', 'while', 'if', 'else', 'class', 'interface']
+      keywords: ['public class', 'static void', 'main', 'for', 'while', 'if', 'else', 'class', 'interface'],
+      executionSupported: false
     },
     javascript: {
       name: 'JavaScript',
       extensions: ['.js', '.jsx', '.ts', '.tsx'],
-      keywords: ['function', 'const', 'let', 'var', 'for', 'while', 'if', 'else', 'class', 'async']
+      keywords: ['function', 'const', 'let', 'var', 'for', 'while', 'if', 'else', 'class', 'async'],
+      executionSupported: true
     }
   };
 
@@ -389,6 +405,67 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
     }
   };
 
+  const executePythonCode = async () => {
+    try {
+      const py = pyodideRef.current;
+      if (!py) throw new Error('Pyodide not loaded');
+      
+      await py.loadPackagesFromImports(code);
+      
+      py.runPython(`
+import sys
+from io import StringIO
+sys.stdin = StringIO('''${stdinInput.replace(/'/g, "\\'")}''')
+sys.stdout = StringIO()
+sys.stderr = StringIO()
+`);
+      
+      await py.runPythonAsync(code);
+      
+      const stdout = py.runPython('sys.stdout.getvalue()');
+      const stderr = py.runPython('sys.stderr.getvalue()');
+      
+      const output = stderr ? `Error: ${stderr}` : stdout;
+      
+      setOutputLog([{ step: 0, value: output, line: 0 }]);
+      
+      // Get globals
+      const globals = py.globals.toJs({ dict_converter: Object.fromEntries });
+      const userVars = {};
+      for (const [key, value] of globals) {
+        if (!key.startsWith('_') && key !== 'sys' && key !== 'StringIO') {
+          userVars[key] = { name: key, value: value.toString(), type: typeof value, scope: 'global' };
+        }
+      }
+      setVariables(userVars);
+      
+    } catch (err) {
+      setOutputLog([{ step: 0, value: `Execution error: ${err.message}`, line: 0 }]);
+    }
+  };
+
+  const executeJavascriptCode = () => {
+    try {
+      let log = '';
+      const oldConsoleLog = console.log;
+      console.log = (...args) => { log += args.join(' ') + '\n'; };
+      
+      const inputLines = stdinInput.split('\n');
+      let inputIndex = 0;
+      globalThis.readLine = () => inputLines[inputIndex++] || '';
+      
+      new Function(code)();
+      
+      console.log = oldConsoleLog;
+      
+      setOutputLog([{ step: 0, value: log, line: 0 }]);
+      
+      // Variables not easily extractable from eval, use parsed
+    } catch (err) {
+      setOutputLog([{ step: 0, value: `Execution error: ${err.message}`, line: 0 }]);
+    }
+  };
+
   // Start/Stop execution
   const toggleExecution = () => {
     if (executionState.isRunning) {
@@ -398,24 +475,26 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
     }
   };
 
-  const startExecution = () => {
-    const { trace, variables: newVars, heap, output, callStack } = simulateExecution();
+  const startExecution = async () => {
+    setExecutionState(prev => ({ ...prev, isRunning: true, currentLine: 0, stepCount: 0 }));
     
-    setExecutionTrace(trace);
-    setVariables(newVars);
-    setMemoryHeap(heap);
-    setOutputLog(output);
-    setCallStack(callStack);
+    if (languages[selectedLanguage].executionSupported) {
+      if (selectedLanguage === 'python') {
+        await executePythonCode();
+      } else if (selectedLanguage === 'javascript') {
+        executeJavascriptCode();
+      }
+    } else {
+      const { trace, variables: newVars, heap, output, callStack } = simulateExecution();
+      setExecutionTrace(trace);
+      setVariables(newVars);
+      setMemoryHeap(heap);
+      setOutputLog(output);
+      setCallStack(callStack);
+      executeStepByStep(trace);
+    }
     
-    setExecutionState(prev => ({
-      ...prev,
-      isRunning: true,
-      currentLine: 0,
-      stepCount: 0
-    }));
-    
-    // Start step-by-step execution
-    executeStepByStep(trace);
+    setExecutionState(prev => ({ ...prev, isRunning: false }));
   };
 
   const pauseExecution = () => {
@@ -479,7 +558,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
     const pastedCode = event.clipboardData.getData('text');
     setCode(pastedCode);
     
-    // Try to detect language from file extension or content
+    // Try to detect language from code
     detectLanguageFromCode(pastedCode);
   };
 
@@ -552,16 +631,30 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
     return elements.map((value, index) => (
       <div
         key={index}
-        className="flex-1 mx-1 bg-blue-500 hover:bg-blue-600 transition-all"
+        className="flex-1 mx-1 bg-[#001F3F] hover:bg-[#001F3F]/80 transition-all"
         style={{
-          height: `${(value / maxVal) * 100}%`,
-          backgroundColor: executionState.currentLine === index + 1 ? '#10B981' : '#3B82F6'
+          height: `${(value / maxVal) * 100}%`
         }}
-        title={`${name}[${index}] = ${value}`}
+        title={`${value}`}
       >
         <div className="text-xs text-white text-center mt-1">{value}</div>
       </div>
     ));
+  };
+
+  const renderSearchVisualization = () => {
+    return (
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <h3 className="font-semibold text-lg mb-4">Search Visualization</h3>
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(variables).map(([name, data]) => (
+            <div key={name} className="p-2 bg-gray-50 border border-gray-200 rounded">
+              <div className="font-mono">{name} = {data.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   const renderGraphVisualization = () => {
@@ -569,15 +662,15 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
       <div className="p-4 bg-white border border-gray-200 rounded-lg">
         <h3 className="font-semibold text-lg mb-4">Graph Visualization</h3>
         <svg width="100%" height="300" className="border border-gray-300 rounded">
-          <circle cx="100" cy="150" r="20" fill="#3B82F6" />
+          <circle cx="100" cy="150" r="20" fill="#001F3F" stroke="black" />
           <text x="100" y="150" textAnchor="middle" fill="white">A</text>
-          <circle cx="200" cy="100" r="20" fill="#10B981" />
+          <circle cx="200" cy="100" r="20" fill="#001F3F" stroke="black" />
           <text x="200" y="100" textAnchor="middle" fill="white">B</text>
-          <circle cx="300" cy="150" r="20" fill="#8B5CF6" />
+          <circle cx="300" cy="150" r="20" fill="#001F3F" stroke="black" />
           <text x="300" y="150" textAnchor="middle" fill="white">C</text>
-          <line x1="100" y1="150" x2="200" y2="100" stroke="#6B7280" strokeWidth="2" />
-          <line x1="200" y1="100" x2="300" y2="150" stroke="#6B7280" strokeWidth="2" />
-          <line x1="300" y1="150" x2="100" y2="150" stroke="#6B7280" strokeWidth="2" />
+          <line x1="100" y1="150" x2="200" y2="100" stroke="black" strokeWidth="2" />
+          <line x1="200" y1="100" x2="300" y2="150" stroke="black" strokeWidth="2" />
+          <line x1="300" y1="150" x2="100" y2="150" stroke="black" strokeWidth="2" />
         </svg>
       </div>
     );
@@ -589,19 +682,19 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
         <h3 className="font-semibold text-lg mb-4">Tree Visualization</h3>
         <div className="flex flex-col items-center">
           {/* Root */}
-          <div className="w-12 h-12 flex items-center justify-center bg-green-500 text-white rounded-full mb-8">
+          <div className="w-12 h-12 flex items-center justify-center bg-[#001F3F] text-white rounded-full mb-8 border border-black">
             R
           </div>
           {/* Children */}
           <div className="flex space-x-8">
             <div className="flex flex-col items-center">
-              <div className="w-10 h-10 flex items-center justify-center bg-blue-500 text-white rounded-full mb-4">
+              <div className="w-10 h-10 flex items-center justify-center bg-[#001F3F] text-white rounded-full mb-4 border border-black">
                 L
               </div>
               <div className="text-xs text-gray-600">Left Child</div>
             </div>
             <div className="flex flex-col items-center">
-              <div className="w-10 h-10 flex items-center justify-center bg-blue-500 text-white rounded-full mb-4">
+              <div className="w-10 h-10 flex items-center justify-center bg-[#001F3F] text-white rounded-full mb-4 border border-black">
                 R
               </div>
               <div className="text-xs text-gray-600">Right Child</div>
@@ -622,7 +715,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
               key={index}
               className={`p-3 rounded border ${
                 step.line === executionState.currentLine
-                  ? 'bg-blue-50 border-blue-200'
+                  ? 'bg-[#001F3F]/10 border-[#001F3F]/20'
                   : 'bg-gray-50 border-gray-200'
               }`}
             >
@@ -641,7 +734,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-4">
+      <div className="bg-white border-b border-black p-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Advanced Code Visualizer</h1>
@@ -652,7 +745,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
             <select
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-black rounded-md focus:ring-2 focus:ring-[#001F3F]"
             >
               {Object.entries(languages).map(([key, lang]) => (
                 <option key={key} value={key}>{lang.name}</option>
@@ -662,7 +755,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
             <select
               value={visualizationType}
               onChange={(e) => setVisualizationType(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-black rounded-md focus:ring-2 focus:ring-[#001F3F]"
             >
               <option value="flow">Execution Flow</option>
               <option value="memory">Memory View</option>
@@ -712,20 +805,38 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 onPaste={handleCodePaste}
-                placeholder={`Paste your ${languages[selectedLanguage].name} code here...\nOr try these examples:\n\n1. Bubble Sort\n2. Binary Search\n3. Graph BFS\n4. Tree Traversal`}
-                className="w-full h-full p-6 font-mono text-sm bg-gray-900 text-gray-100 resize-none focus:outline-none"
+                placeholder={`Paste your ${languages[selectedLanguage].name} code here...
+Or try these examples:
+
+1. Bubble Sort
+2. Binary Search
+3. Graph BFS
+4. Tree Traversal`}
+                className="w-full h-full p-6 font-mono text-sm bg-black text-white resize-none focus:outline-none"
                 spellCheck="false"
                 rows={20}
               />
             </div>
             
+            {/* Program Input */}
+            <div className="border-t border-gray-200 p-4 bg-gray-50">
+              <h3 className="font-medium text-gray-800 mb-2">Program Input (stdin)</h3>
+              <textarea
+                value={stdinInput}
+                onChange={(e) => setStdinInput(e.target.value)}
+                placeholder="Enter input for the program (one line per input)"
+                className="w-full h-24 p-4 font-mono text-sm bg-black text-white rounded-lg focus:outline-none"
+                rows="4"
+              />
+            </div>
+            
             {/* Algorithm Detection Info */}
-            {algorithmInfo && (
-              <div className="border-t border-gray-200 p-4 bg-blue-50">
+            {algorithmInfo && algorithmInfo.name ? (
+              <div className="border-t border-gray-200 p-4 bg-[#001F3F]/5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-medium text-blue-800">Detected:</span>
-                    <span className="ml-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    <span className="font-medium text-[#001F3F]">Detected:</span>
+                    <span className="ml-2 px-3 py-1 bg-[#001F3F] text-white rounded-full text-sm">
                       {algorithmInfo.name.toUpperCase()} ALGORITHM
                     </span>
                     <span className="ml-4 text-sm text-gray-600">
@@ -733,13 +844,19 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
                     </span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    {algorithmInfo.parsedCode?.lines.length} lines, {
+                    {algorithmInfo.parsedCode?.lines.length || 0} lines, {
                       Object.keys(algorithmInfo.parsedCode?.variables || {}).length
                     } variables
                   </div>
                 </div>
               </div>
-            )}
+            ) : code.trim() ? (
+              <div className="border-t border-gray-200 p-4 bg-gray-50">
+                <span className="text-sm text-gray-600 italic">
+                  No known algorithm pattern detected
+                </span>
+              </div>
+            ) : null}
           </div>
           
           {/* Control Panel */}
@@ -751,7 +868,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
                   className={`px-6 py-3 rounded-md font-medium flex items-center gap-2 ${
                     executionState.isRunning
                       ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-blue-800 hover:bg-blue-900 text-white'
+                      : 'bg-[#001F3F] hover:bg-[#001F3F]/80 text-white'
                   }`}
                 >
                   {executionState.isRunning ? (
@@ -773,7 +890,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
                 
                 <button
                   onClick={resetExecution}
-                  className="px-6 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-md font-medium flex items-center gap-2"
+                  className="px-6 py-3 bg-black hover:bg-black/80 text-white rounded-md font-medium flex items-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
@@ -788,7 +905,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
                   <select
                     value={executionState.speed}
                     onChange={(e) => setExecutionState(prev => ({ ...prev, speed: Number(e.target.value) }))}
-                    className="px-3 py-2 border border-gray-300 rounded-md"
+                    className="px-3 py-2 border border-black rounded-md"
                   >
                     <option value="0.5">0.5x</option>
                     <option value="1">1x</option>
@@ -826,7 +943,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
                   >
                     <div className="flex justify-between items-start">
                       <div>
-                        <div className="font-mono font-medium text-blue-600">{name}</div>
+                        <div className="font-mono font-medium text-[#001F3F]">{name}</div>
                         <div className="text-xs text-gray-500">{data.type} · Line {data.line}</div>
                       </div>
                       <div className="font-mono bg-gray-100 px-3 py-1 rounded text-sm">
@@ -845,7 +962,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
             <div className="border-b border-gray-200 p-4">
               <h2 className="font-semibold text-gray-800">Output Console</h2>
             </div>
-            <div className="p-4 font-mono text-sm bg-gray-900 text-gray-100 rounded-b-lg max-h-48 overflow-auto">
+            <div className="p-4 font-mono text-sm bg-black text-white rounded-b-lg max-h-48 overflow-auto">
               {outputLog.length > 0 ? (
                 outputLog.map((entry, index) => (
                   <div key={index} className="mb-2">
@@ -868,7 +985,7 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
           <div className="flex gap-6">
             <div>
               <span className="font-medium">Current Line:</span>
-              <span className="ml-2 font-mono bg-gray-100 px-2 py-1 rounded">
+              <span className="ml-2 px-2 py-1 bg-gray-100 rounded font-mono">
                 {executionState.currentLine || '--'}
               </span>
             </div>
@@ -1033,7 +1150,204 @@ function partition(arr, left, right) {
 const arr = [10, 7, 8, 9, 1, 5];
 console.log("Original array:", arr);
 quickSort(arr);
-console.log("Sorted array:", arr);`
+console.log("Sorted array:", arr);`,
+
+  dijkstra: `// Dijkstra's Algorithm in Python
+import heapq
+
+def dijkstra(graph, start):
+    distances = {node: float('infinity') for node in graph}
+    distances[start] = 0
+    pq = [(0, start)]
+    
+    while pq:
+        current_distance, current_node = heapq.heappop(pq)
+        
+        if current_distance > distances[current_node]:
+            continue
+        
+        for neighbor, weight in graph[current_node].items():
+            distance = current_distance + weight
+            if distance < distances[neighbor]:
+                distances[neighbor] = distance
+                heapq.heappush(pq, (distance, neighbor))
+    
+    return distances
+
+# Example graph
+graph = {
+    'A': {'B': 1, 'C': 4},
+    'B': {'A': 1, 'C': 2, 'D': 5},
+    'C': {'A': 4, 'B': 2, 'D': 1},
+    'D': {'B': 5, 'C': 1}
+}
+
+print(dijkstra(graph, 'A'))`,
+
+  mergeSort: `// Merge Sort in C++
+#include <iostream>
+#include <vector>
+using namespace std;
+
+void merge(vector<int>& arr, int left, int mid, int right) {
+    int n1 = mid - left + 1;
+    int n2 = right - mid;
+    
+    vector<int> L(n1), R(n2);
+    
+    for (int i = 0; i < n1; i++)
+        L[i] = arr[left + i];
+    for (int j = 0; j < n2; j++)
+        R[j] = arr[mid + 1 + j];
+    
+    int i = 0, j = 0, k = left;
+    
+    while (i < n1 && j < n2) {
+        if (L[i] <= R[j]) {
+            arr[k] = L[i];
+            i++;
+        } else {
+            arr[k] = R[j];
+            j++;
+        }
+        k++;
+    }
+    
+    while (i < n1) {
+        arr[k] = L[i];
+        i++;
+        k++;
+    }
+    
+    while (j < n2) {
+        arr[k] = R[j];
+        j++;
+        k++;
+    }
+}
+
+void mergeSort(vector<int>& arr, int left, int right) {
+    if (left >= right) return;
+    
+    int mid = left + (right - left) / 2;
+    mergeSort(arr, left, mid);
+    mergeSort(arr, mid + 1, right);
+    merge(arr, left, mid, right);
+}
+
+int main() {
+    vector<int> arr = {12, 11, 13, 5, 6, 7};
+    mergeSort(arr, 0, arr.size() - 1);
+    
+    cout << "Sorted array: ";
+    for (int num : arr) {
+        cout << num << " ";
+    }
+    return 0;
+}`,
+
+  avlTree: `// AVL Tree in Java
+class AVLNode {
+    int key, height;
+    AVLNode left, right;
+    
+    AVLNode(int d) {
+        key = d;
+        height = 1;
+    }
+}
+
+class AVLTree {
+    AVLNode root;
+    
+    int height(AVLNode N) {
+        if (N == null) return 0;
+        return N.height;
+    }
+    
+    int max(int a, int b) {
+        return (a > b) ? a : b;
+    }
+    
+    AVLNode rightRotate(AVLNode y) {
+        AVLNode x = y.left;
+        AVLNode T2 = x.right;
+        x.right = y;
+        y.left = T2;
+        y.height = max(height(y.left), height(y.right)) + 1;
+        x.height = max(height(x.left), height(x.right)) + 1;
+        return x;
+    }
+    
+    AVLNode leftRotate(AVLNode x) {
+        AVLNode y = x.right;
+        AVLNode T2 = y.left;
+        y.left = x;
+        x.right = T2;
+        x.height = max(height(x.left), height(x.right)) + 1;
+        y.height = max(height(y.left), height(y.right)) + 1;
+        return y;
+    }
+    
+    int getBalance(AVLNode N) {
+        if (N == null) return 0;
+        return height(N.left) - height(N.right);
+    }
+    
+    AVLNode insert(AVLNode node, int key) {
+        if (node == null) return new AVLNode(key);
+        
+        if (key < node.key)
+            node.left = insert(node.left, key);
+        else if (key > node.key)
+            node.right = insert(node.right, key);
+        else
+            return node;
+        
+        node.height = 1 + max(height(node.left), height(node.right));
+        
+        int balance = getBalance(node);
+        
+        if (balance > 1 && key < node.left.key)
+            return rightRotate(node);
+        
+        if (balance < -1 && key > node.right.key)
+            return leftRotate(node);
+        
+        if (balance > 1 && key > node.left.key) {
+            node.left = leftRotate(node.left);
+            return rightRotate(node);
+        }
+        
+        if (balance < -1 && key < node.right.key) {
+            node.right = rightRotate(node.right);
+            return leftRotate(node);
+        }
+        
+        return node;
+    }
+}`,
+
+  knapsack: `// 0/1 Knapsack in Python
+def knapsack(weights, values, capacity):
+    n = len(values)
+    dp = [[0 for _ in range(capacity + 1)] for _ in range(n + 1)]
+    
+    for i in range(1, n + 1):
+        for w in range(1, capacity + 1):
+            if weights[i-1] <= w:
+                dp[i][w] = max(values[i-1] + dp[i-1][w-weights[i-1]], dp[i-1][w])
+            else:
+                dp[i][w] = dp[i-1][w]
+    
+    return dp[n][capacity]
+
+# Example
+weights = [1, 3, 4, 5]
+values = [1, 4, 5, 7]
+capacity = 7
+
+print(f"Maximum value: {knapsack(weights, values, capacity)}")`
 };
 
 // Main export with example integration
