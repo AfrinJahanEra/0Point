@@ -73,15 +73,86 @@ const CreateBlog = () => {
   const togglePreview = () => setShowPreview(!showPreview);
 
   const customComponents = {
-    spoiler: ({ summary, children }) => (
-      <details className="my-2">
-        <summary className="cursor-pointer text-blue-600 hover:underline">
-          {summary || 'Spoiler'}
-        </summary>
-        <div className="pl-4 border-l-4 border-gray-300">{children}</div>
-      </details>
-    ),
-  };
+  spoiler: ({ summary, children }) => (
+    <details className="my-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
+      <summary className="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900 list-none">
+        <span className="inline-block mr-2">▶</span>
+        {summary || 'Solution / Spoiler'}
+      </summary>
+      <div className="mt-3 pl-8 border-l-4 border-blue-400">{children}</div>
+    </details>
+  ),
+
+  // Enhanced headings with anchor links (Codeforces style)
+  h1: ({ children }) => {
+    const id = children ? String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
+    return (
+      <h1 id={id} className="text-3xl font-bold mt-10 mb-6 text-blue-900 border-b-2 border-blue-300 pb-3 group">
+        <a href={`#${id}`} className="opacity-0 group-hover:opacity-100 mr-3 text-blue-600">§</a>
+        {children}
+      </h1>
+    );
+  },
+  h2: ({ children }) => {
+    const id = children ? String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
+    return (
+      <h2 id={id} className="text-2xl font-bold mt-8 mb-4 text-gray-800 group flex items-center">
+        <a href={`#${id}`} className="opacity-0 group-hover:opacity-100 mr-2 text-blue-600 text-lg">§</a>
+        {children}
+      </h2>
+    );
+  },
+  h3: ({ children }) => (
+    <h3 className="text-xl font-semibold mt-7 mb-3 text-gray-700 flex items-center group">
+      <span className="opacity-0 group-hover:opacity-100 mr-2 text-blue-500 text-sm">›</span>
+      {children}
+    </h3>
+  ),
+
+  // Optional: better spacing
+  ul: ({ children }) => <ul className="my-5 space-y-2">{children}</ul>,
+  ol: ({ children }) => <ol className="my-5 space-y-2 pl-6 list-decimal">{children}</ol>,
+
+  li: ({ node, checked, children, ...props }) => {
+    // This is the key: only treat as task list if `checked` is boolean (true/false)
+    const isTaskItem = checked !== null && checked !== undefined;
+
+    if (isTaskItem) {
+      // This is a real task list item: - [ ] or - [x]
+      return (
+        <li className="flex items-start gap-3 my-2">
+          <input
+            type="checkbox"
+            checked={checked}
+            readOnly
+            className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+          />
+          <span className={checked ? "line-through text-gray-500" : ""}>
+            {children}
+          </span>
+        </li>
+      );
+    }
+
+    // Regular list item (bullet or numbered)
+    const depth = node.position?.start?.column 
+      ? Math.floor((node.position.start.column - 1) / 2) 
+      : 0;
+
+    const bullets = ['•', '◦', '▪', '▫'];
+    const bullet = bullets[depth % 4] || '•';
+    const colors = ['text-blue-600', 'text-purple-600', 'text-pink-600', 'text-green-600'];
+
+    return (
+      <li className="flex items-start gap-3 leading-relaxed">
+        <span className={`font-bold text-lg ${colors[depth % 4] || 'text-blue-600'} pt-0.5`}>
+          {bullet}
+        </span>
+        <span className="flex-1">{children}</span>
+      </li>
+    );
+  },
+};
 
   return (
     <div className="min-h-screen bg-gray-50">
