@@ -250,10 +250,6 @@ const Contests = () => {
     }
   };
 
-  const handleCardClick = (contest) => {
-    handleContestEntry(contest.id, contest.status);
-  };
-
   const handleDraftEdit = (contestId, e) => {
     e.stopPropagation();
     navigate(`/contests/${contestId}/edit`);
@@ -378,7 +374,19 @@ const Contests = () => {
                       </div>
 
                       <div className="flex flex-col space-y-2 ml-4" onClick={(e) => e.stopPropagation()}>
-                        {contest.status === 'upcoming' && (
+                        {contest.status === 'draft' ? (
+                          // Draft contest buttons: Edit and Publish
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={(e) => handleDraftEdit(contest.id, e)}
+                              className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-1"
+                            >
+                              <Edit className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                          </div>
+                        ) : contest.status === 'upcoming' ? (
+                          // Upcoming contest buttons
                           registeredContests.includes(contest.id) ? (
                             <span className="px-3 py-1.5 bg-gray-300 text-gray-600 rounded text-xs font-medium">Registered</span>
                           ) : (
@@ -390,9 +398,8 @@ const Contests = () => {
                               <span>Register</span>
                             </button>
                           )
-                        )}
-                        
-                        {contest.status === 'live' && (
+                        ) : contest.status === 'live' ? (
+                          // Live contest buttons
                           registeredContests.includes(contest.id) ? (
                             <button
                               onClick={() => handleContestEntry(contest.id, 'live')}
@@ -410,16 +417,15 @@ const Contests = () => {
                               <span>Live</span>
                             </button>
                           )
-                        )}
-                        
-                        {contest.status === 'past' && (
+                        ) : contest.status === 'past' ? (
+                          // Past contest buttons
                           <button 
                             onClick={() => handleContestEntry(contest.id, 'past')}
                             className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200"
                           >
                             View
                           </button>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>

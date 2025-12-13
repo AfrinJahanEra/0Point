@@ -340,7 +340,7 @@ const handleSaveDraft = async () => {
     description: contestData.description || "",
     start_time: contestData.startTime ? contestData.startTime + ":00Z" : null,
     duration: parseFloat(contestData.duration) || 3.0,
-    type: contestData.type === "both" ? "individual" : contestData.type,
+    type: contestData.type,
     platform: contestData.platform,
     problems: formattedProblems,
     status: "draft",
@@ -510,7 +510,7 @@ const handlePublishContest = async (type) => {
       description: contestData.description || "",
       start_time: contestData.startTime + ":00Z",
       duration: parseFloat(contestData.duration) || 3.0,
-      type: contestData.type === "both" ? "individual" : contestData.type,
+      type: contestData.type,
       platform: contestData.platform,
       problems: formattedProblems,
       status: type === "test" ? "test" : "upcoming",
@@ -530,7 +530,6 @@ const handlePublishContest = async (type) => {
       payload.test_duration = publishSettings.testDuration;
       payload.type = "test";
     } else {
-      payload.type = "final";
     }
 
     console.log("Publishing contest:", payload);
