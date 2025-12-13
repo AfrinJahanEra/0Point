@@ -639,8 +639,11 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 border-2 border-black rounded transition-all duration-300
                 ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-110' : ''}
                 bg-white hover:bg-gray-100
-                ${isAnimating ? 'animate-uniquePulse' : ''}
+                ${isAnimating ? 'animate-puddingWave' : ''}
               `}
+              style={{
+                animationDelay: isAnimating ? `${index * 0.1}s` : '0s'
+              }}
               onClick={() => {
                 setSelectedNode(index);
                 setNodeDetails({
@@ -713,8 +716,11 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 border-2 border-black rounded transition-all duration-300 mb-2
                 ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-105' : ''}
                 bg-white hover:bg-gray-100
-                ${isAnimating && index === 0 ? 'animate-uniqueSlideIn' : ''}
+                ${isAnimating ? 'animate-puddingWave' : ''}
               `}
+              style={{
+                animationDelay: isAnimating ? `${index * 0.1}s` : '0s'
+              }}
               onClick={() => {
                 setSelectedNode(index);
                 setNodeDetails({
@@ -788,8 +794,11 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 border-2 border-black rounded transition-all duration-300 mb-2
                 ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-105' : ''}
                 bg-white hover:bg-gray-100
-                ${isAnimating && index === displayData.length - 1 ? 'animate-uniqueSlideIn' : ''}
+                ${isAnimating ? 'animate-puddingWave' : ''}
               `}
+              style={{
+                animationDelay: isAnimating ? `${index * 0.1}s` : '0s'
+              }}
               onClick={() => {
                 setSelectedNode(index);
                 setNodeDetails({
@@ -864,8 +873,11 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                     border-2 border-black rounded transition-all duration-300
                     ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-105' : ''}
                     bg-white hover:bg-gray-100
-                    ${isAnimating ? 'animate-uniqueChain' : ''}
+                    ${isAnimating ? 'animate-puddingWave' : ''}
                   `}
+                  style={{
+                    animationDelay: isAnimating ? `${index * 0.1}s` : '0s'
+                  }}
                   onClick={() => {
                     setSelectedNode(index);
                     setNodeDetails({
@@ -1587,6 +1599,18 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
           70% { r: 30; opacity: 0.8; }
           100% { r: 28; opacity: 1; }
         }
+        @keyframes puddingEffect {
+          0% { transform: scale(1); box-shadow: 0 0 0 rgba(0, 31, 63, 0.5); }
+          30% { transform: scale(1.05); box-shadow: 0 0 15px rgba(0, 31, 63, 0.7); }
+          60% { transform: scale(0.98); box-shadow: 0 0 10px rgba(0, 31, 63, 0.6); }
+          100% { transform: scale(1); box-shadow: 0 0 5px rgba(0, 31, 63, 0.5); }
+        }
+        @keyframes puddingWave {
+          0% { transform: translateY(0) scale(1); box-shadow: 0 0 0 rgba(0, 31, 63, 0); }
+          30% { transform: translateY(-8px) scale(1.02); box-shadow: 0 5px 15px rgba(0, 31, 63, 0.4); }
+          70% { transform: translateY(3px) scale(0.98); box-shadow: 0 2px 8px rgba(0, 31, 63, 0.3); }
+          100% { transform: translateY(0) scale(1); box-shadow: 0 0 5px rgba(0, 31, 63, 0.2); }
+        }
         .animate-uniquePulse {
           animation: uniquePulse 0.6s ease-in-out;
         }
@@ -1601,6 +1625,12 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         }
         .animate-uniqueGrow {
           animation: uniqueGrow 0.7s ease-out;
+        }
+        .animate-puddingEffect {
+          animation: puddingEffect 0.6s ease-out;
+        }
+        .animate-puddingWave {
+          animation: puddingWave 1.2s ease-out;
         }
       `}</style>
     </div>
