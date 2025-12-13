@@ -51,4 +51,3 @@ class ContestRegistration(Document):
     meta = {'collection': 'contest_registration'}
     contest = ReferenceField(Contest)
     user = ReferenceField(Account)
-

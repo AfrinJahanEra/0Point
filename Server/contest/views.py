@@ -687,7 +687,72 @@ class ContestPublishAPIView(APIView):
         # Get current status
         current_status = get_contest_status(contest)
         
-        # If contest is currently a draft, check if it can be made active
+        # FIRST, update the contest with request data
+        # Update start_time if provided
+        if 'start_time' in request.data:
+            try:
+                contest.start_time = datetime.fromisoformat(request.data['start_time'].replace('Z', '+00:00'))
+            except Exception as e:
+                return Response({"error": f"Invalid start_time format: {str(e)}"}, status=400)
+        
+        # Update duration if provided
+        if 'duration' in request.data:
+            contest.duration = request.data['duration']
+        
+        # Update type if provided
+        if 'type' in request.data:
+            contest.type = request.data['type']
+        
+        # Update platform if provided
+        if 'platform' in request.data:
+            contest.platform = request.data['platform']
+        
+        # Update problems if provided (though usually they're already there)
+        if 'problems' in request.data and request.data['problems']:
+            # Handle problems update similar to ContestUpdateAPIView
+            existing_problems = {p.index: p for p in contest.problems}
+            new_problems = []
+            
+            for problem_data in request.data['problems']:
+                problem_index = problem_data.get('index')
+                
+                if problem_index in existing_problems:
+                    # Update existing problem
+                    existing_problem = existing_problems[problem_index]
+                    
+                    # Preserve tutorial if not provided
+                    if 'tutorial' not in problem_data and hasattr(existing_problem, 'tutorial'):
+                        problem_data['tutorial'] = existing_problem.tutorial
+                    
+                    test_cases_data = problem_data.pop('test_cases', [])
+                    tutorial = problem_data.pop('tutorial', existing_problem.tutorial if hasattr(existing_problem, 'tutorial') else '')
+                    
+                    testcases = [TestCase(**tc) for tc in test_cases_data]
+                    
+                    # Update fields
+                    for key, value in problem_data.items():
+                        setattr(existing_problem, key, value)
+                    
+                    existing_problem.test_cases = testcases
+                    existing_problem.tutorial = tutorial
+                    new_problems.append(existing_problem)
+                else:
+                    # Create new problem
+                    test_cases_data = problem_data.pop('test_cases', [])
+                    tutorial = problem_data.pop('tutorial', '')
+                    
+                    testcases = [TestCase(**tc) for tc in test_cases_data]
+                    
+                    problem = ContestProblem(
+                        **problem_data,
+                        test_cases=testcases,
+                        tutorial=tutorial
+                    )
+                    new_problems.append(problem)
+            
+            contest.problems = new_problems
+        
+        # NOW check if contest can be made active
         if current_status == "draft":
             required_fields = ["start_time", "duration", "type", "platform", "problems"]
             missing_fields = [f for f in required_fields if not getattr(contest, f)]
@@ -704,15 +769,13 @@ class ContestPublishAPIView(APIView):
                 if not testers or not test_start_time:
                     return Response({"error": "Test contest requires testers and test start time"}, status=400)
                 
-                # Convert test_start_time string to datetime if needed
                 try:
                     if isinstance(test_start_time, str):
-                        test_start_time = datetime.fromisoformat(test_start_time.replace('Z', '+00:00'))
+                        contest.test_start_time = datetime.fromisoformat(test_start_time.replace('Z', '+00:00'))
                 except Exception as e:
                     return Response({"error": f"Invalid test start time format: {str(e)}"}, status=400)
                 
                 contest.testers = testers
-                contest.test_start_time = test_start_time
         
         # Update editorial published status if provided
         if 'editorial_published' in request.data:
@@ -734,7 +797,7 @@ class ContestPublishAPIView(APIView):
             })
         except Exception as e:
             return Response({"error": f"Failed to save contest: {str(e)}"}, status=400)
-                      
+
 from datetime import datetime, timedelta
 import pytz
 
@@ -1399,7 +1462,6 @@ class ContestEditorialAPIView(APIView):
                 "error": f"Error preparing editorial: {str(e)}",
                 "can_access": False
             }, status=500)
-
 
 
 
