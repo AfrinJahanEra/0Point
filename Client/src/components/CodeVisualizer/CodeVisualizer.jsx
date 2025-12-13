@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
-  // State management
+  // Enhanced State management
   const [code, setCode] = useState(initialCode);
   const [selectedLanguage, setSelectedLanguage] = useState(language);
   const [stdinInput, setStdinInput] = useState('');
@@ -10,7 +10,9 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
     isPaused: false,
     currentLine: 0,
     speed: 1,
-    stepCount: 0
+    stepCount: 0,
+    iteration: 0,
+    totalIterations: 0
   });
   
   const [variables, setVariables] = useState({});
@@ -21,102 +23,158 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
   const [dataStructures, setDataStructures] = useState({});
   const [algorithmInfo, setAlgorithmInfo] = useState(null);
   const [visualizationType, setVisualizationType] = useState('flow');
+  const [loopTracker, setLoopTracker] = useState({
+    currentLoops: [],
+    iterations: {},
+    maxIterations: 1000 // Safety limit
+  });
   
   const codeRef = useRef(null);
   const executionInterval = useRef(null);
   const pyodideRef = useRef(null);
   const jsInterpreterLoaded = useRef(false);
+  const traceIndexRef = useRef(0);
+  const loopCountersRef = useRef({});
 
   // Load Pyodide for Python execution
   useEffect(() => {
     const loadPyodideLib = async () => {
-      let pyodidePKG = await import('https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.mjs');
-      const pyodide = await pyodidePKG.loadPyodide();
-      pyodideRef.current = pyodide;
+      try {
+        let pyodidePKG = await import('https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.mjs');
+        const pyodide = await pyodidePKG.loadPyodide();
+        pyodideRef.current = pyodide;
+        console.log('Pyodide loaded successfully');
+      } catch (error) {
+        console.error('Failed to load Pyodide:', error);
+      }
     };
-    loadPyodideLib();
+    
+    if (!pyodideRef.current) {
+      loadPyodideLib();
+    }
 
     // Load JSInterpreter
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/js-interpreter@1.10.1/interpreter.js';
-    script.onload = () => {
-      jsInterpreterLoaded.current = true;
-    };
-    document.body.appendChild(script);
+    if (!jsInterpreterLoaded.current) {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/js-interpreter@1.10.1/interpreter.js';
+      script.onload = () => {
+        jsInterpreterLoaded.current = true;
+        console.log('JS Interpreter loaded successfully');
+      };
+      script.onerror = () => {
+        console.error('Failed to load JS Interpreter');
+      };
+      document.body.appendChild(script);
+    }
+
     return () => {
-      document.body.removeChild(script);
+      if (executionInterval.current) {
+        clearInterval(executionInterval.current);
+      }
     };
   }, []);
 
-  // Supported languages and their parsers
+  // Enhanced languages configuration
   const languages = {
     cpp: {
       name: 'C++',
       extensions: ['.cpp', '.cc', '.cxx'],
       keywords: ['#include', 'using namespace', 'int main', 'for', 'while', 'if', 'else', 'class', 'struct'],
-      executionSupported: false
+      executionSupported: false,
+      loopPatterns: [
+        { pattern: /for\s*\(\s*(?:int|long|float|double)?\s*(\w+)\s*=/, varIndex: 1 },
+        { pattern: /while\s*\(([^)]+)\)/, varIndex: null },
+        { pattern: /do\s*\{/, varIndex: null }
+      ]
     },
     python: {
       name: 'Python',
       extensions: ['.py', '.pyw'],
       keywords: ['def', 'class', 'import', 'for', 'while', 'if', 'elif', 'else', 'try', 'except'],
-      executionSupported: true
+      executionSupported: true,
+      loopPatterns: [
+        { pattern: /for\s+(\w+)\s+in/, varIndex: 1 },
+        { pattern: /while\s+([^:]+):/, varIndex: null }
+      ]
     },
     java: {
       name: 'Java',
       extensions: ['.java'],
       keywords: ['public class', 'static void', 'main', 'for', 'while', 'if', 'else', 'class', 'interface'],
-      executionSupported: false
+      executionSupported: false,
+      loopPatterns: [
+        { pattern: /for\s*\(\s*(?:int|long|float|double)?\s*(\w+)\s*=/, varIndex: 1 },
+        { pattern: /while\s*\(([^)]+)\)/, varIndex: null },
+        { pattern: /do\s*\{/, varIndex: null }
+      ]
     },
     javascript: {
       name: 'JavaScript',
       extensions: ['.js', '.jsx', '.ts', '.tsx'],
       keywords: ['function', 'const', 'let', 'var', 'for', 'while', 'if', 'else', 'class', 'async'],
-      executionSupported: true
+      executionSupported: true,
+      loopPatterns: [
+        { pattern: /for\s*\(\s*(?:let|const|var)?\s*(\w+)\s*[=;]/, varIndex: 1 },
+        { pattern: /for\s*\(\s*(\w+)\s+of/, varIndex: 1 },
+        { pattern: /for\s*\(\s*(\w+)\s+in/, varIndex: 1 },
+        { pattern: /while\s*\(([^)]+)\)/, varIndex: null }
+      ]
     }
   };
 
-  // Algorithm detection patterns
+  // Enhanced algorithm detection patterns
   const algorithmPatterns = {
     sorting: {
       keywords: ['sort', 'bubble', 'quick', 'merge', 'insertion', 'selection', 'heap'],
       type: 'comparison',
-      complexity: 'O(n log n)'
+      complexity: 'O(n log n)',
+      loopIntensive: true
     },
     searching: {
       keywords: ['search', 'binary', 'linear', 'dfs', 'bfs', 'dijkstra'],
       type: 'search',
-      complexity: 'O(log n)'
+      complexity: 'O(log n)',
+      loopIntensive: true
     },
     dp: {
       keywords: ['dp', 'dynamic', 'memoization', 'fibonacci', 'knapsack'],
       type: 'dynamic',
-      complexity: 'O(n^2)'
+      complexity: 'O(n^2)',
+      loopIntensive: true
     },
     graph: {
       keywords: ['graph', 'node', 'edge', 'adjacency', 'shortest path', 'traversal'],
       type: 'graph',
-      complexity: 'O(V + E)'
+      complexity: 'O(V + E)',
+      loopIntensive: true
     },
     tree: {
       keywords: ['tree', 'node', 'binary', 'bst', 'avl', 'traversal'],
       type: 'tree',
-      complexity: 'O(log n)'
+      complexity: 'O(log n)',
+      loopIntensive: true
     }
   };
 
-  // Detect algorithm type from code
+  // Enhanced algorithm detection
   const detectAlgorithm = (code) => {
     const codeLower = code.toLowerCase();
     let detected = [];
     
     for (const [algo, pattern] of Object.entries(algorithmPatterns)) {
-      if (pattern.keywords.some(keyword => codeLower.includes(keyword))) {
+      const matches = pattern.keywords.filter(keyword => {
+        const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+        return regex.test(codeLower);
+      });
+      
+      if (matches.length > 0) {
         detected.push({
           name: algo,
           type: pattern.type,
           complexity: pattern.complexity,
-          confidence: pattern.keywords.filter(k => codeLower.includes(k)).length
+          confidence: matches.length,
+          loopIntensive: pattern.loopIntensive,
+          matchedKeywords: matches
         });
       }
     }
@@ -124,39 +182,149 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
     return detected.length > 0 ? detected.sort((a, b) => b.confidence - a.confidence)[0] : null;
   };
 
-  // Parse code into structured format
+  // Enhanced parse code function
   const parseCode = (code, language) => {
-    const lines = code.split('\n').map((line, index) => ({
-      id: index,
-      lineNumber: index + 1,
-      content: line,
-      indent: line.search(/\S/),
-      type: determineLineType(line, language),
-      isExecutable: isLineExecutable(line, language)
-    }));
+    const lines = code.split('\n').map((line, index) => {
+      const trimmed = line.trim();
+      const lineObj = {
+        id: index,
+        lineNumber: index + 1,
+        content: line,
+        indent: line.search(/\S/),
+        type: determineLineType(line, language),
+        isExecutable: isLineExecutable(line, language),
+        isLoopLine: isLoopLine(line, language),
+        loopDepth: 0
+      };
+      
+      // Detect loops and extract loop variables
+      if (lineObj.isLoopLine) {
+        const loopVars = extractLoopVariables(line, language);
+        if (loopVars.length > 0) {
+          lineObj.loopVariables = loopVars;
+        }
+      }
+      
+      return lineObj;
+    });
+    
+    // Calculate loop depth
+    let currentDepth = 0;
+    const loopStack = [];
+    
+    lines.forEach((line, index) => {
+      if (line.isLoopLine) {
+        currentDepth++;
+        loopStack.push({ line: index, depth: currentDepth });
+        line.loopDepth = currentDepth;
+      } else if (line.content.includes('}') || line.content.includes('end') || line.content.trim().endsWith(':')) {
+        // Check if we're ending a loop
+        if (loopStack.length > 0 && loopStack[loopStack.length - 1].depth === currentDepth) {
+          loopStack.pop();
+          currentDepth = Math.max(0, currentDepth - 1);
+        }
+      }
+      line.loopDepth = currentDepth;
+    });
     
     return {
       lines,
       functions: extractFunctions(code, language),
       variables: extractVariables(code, language),
-      complexity: estimateComplexity(code, language)
+      complexity: estimateComplexity(code, language),
+      loops: detectLoops(code, language)
     };
+  };
+
+  const isLoopLine = (line, language) => {
+    const trimmed = line.trim();
+    const patterns = languages[language]?.loopPatterns || [];
+    
+    return patterns.some(pattern => pattern.pattern.test(trimmed));
+  };
+
+  const extractLoopVariables = (line, language) => {
+    const trimmed = line.trim();
+    const patterns = languages[language]?.loopPatterns || [];
+    const variables = [];
+    
+    patterns.forEach(pattern => {
+      const match = trimmed.match(pattern.pattern);
+      if (match && pattern.varIndex !== null) {
+        const varName = match[pattern.varIndex];
+        if (varName) {
+          variables.push(varName);
+        }
+      }
+    });
+    
+    return variables;
+  };
+
+  const detectLoops = (code, language) => {
+    const lines = code.split('\n');
+    const loops = [];
+    let loopId = 0;
+    
+    lines.forEach((line, index) => {
+      if (isLoopLine(line, language)) {
+        const loopVars = extractLoopVariables(line, language);
+        loops.push({
+          id: loopId++,
+          startLine: index + 1,
+          endLine: findLoopEnd(lines, index, language),
+          variables: loopVars,
+          iterations: 0,
+          content: line.trim()
+        });
+      }
+    });
+    
+    return loops;
+  };
+
+  const findLoopEnd = (lines, startIndex, language) => {
+    let braceCount = 0;
+    let indentLevel = lines[startIndex].search(/\S/);
+    
+    for (let i = startIndex; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Count braces for languages that use them
+      if (language === 'cpp' || language === 'java' || language === 'javascript') {
+        const openBraces = (line.match(/{/g) || []).length;
+        const closeBraces = (line.match(/}/g) || []).length;
+        braceCount += openBraces - closeBraces;
+        
+        if (braceCount === 0 && i > startIndex) {
+          return i + 1;
+        }
+      } else if (language === 'python') {
+        // Python uses indentation
+        const currentIndent = line.search(/\S/);
+        if (i > startIndex && currentIndent <= indentLevel && line.trim() !== '') {
+          return i;
+        }
+      }
+    }
+    
+    return lines.length;
   };
 
   const determineLineType = (line, language) => {
     const trimmed = line.trim();
     
-    // Common patterns across languages
+    // Enhanced type detection
     if (trimmed.startsWith('//') || trimmed.startsWith('#')) return 'comment';
     if (trimmed.startsWith('import ') || trimmed.startsWith('#include')) return 'import';
     if (trimmed.includes('class ') || trimmed.includes('struct ')) return 'definition';
-    if (trimmed.includes('=') && !trimmed.includes('==')) return 'assignment';
-    if (trimmed.includes('if(') || trimmed.includes('if ')) return 'conditional';
-    if (trimmed.includes('for(') || trimmed.includes('for ')) return 'loop';
-    if (trimmed.includes('while(') || trimmed.includes('while ')) return 'loop';
+    if (trimmed.includes('=') && !trimmed.includes('==') && !trimmed.includes('!=')) return 'assignment';
+    if (trimmed.includes('if(') || trimmed.includes('if ') || trimmed.includes('if:')) return 'conditional';
+    if (isLoopLine(line, language)) return 'loop';
     if (trimmed.includes('return')) return 'return';
-    if (trimmed.includes('cout') || trimmed.includes('printf') || trimmed.includes('print')) return 'output';
-    if (trimmed.includes('cin') || trimmed.includes('scanf') || trimmed.includes('input')) return 'input';
+    if (trimmed.includes('cout') || trimmed.includes('printf') || trimmed.includes('print(')) return 'output';
+    if (trimmed.includes('cin') || trimmed.includes('scanf') || trimmed.includes('input(')) return 'input';
+    if (trimmed.includes('function') || trimmed.includes('def ')) return 'function';
     
     return 'execution';
   };
@@ -166,62 +334,21 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
     if (trimmed === '') return false;
     if (trimmed.startsWith('//') || trimmed.startsWith('#')) return false;
     if (trimmed.startsWith('import ') || trimmed.startsWith('#include')) return false;
-    if (trimmed.startsWith('using ')) return false;
+    if (trimmed.startsWith('using ') || trimmed.startsWith('package ')) return false;
+    if (trimmed.startsWith('import ')) return false;
     
     return true;
   };
 
-  const extractFunctions = (code, language) => {
-    const functions = [];
-    const lines = code.split('\n');
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      
-      if (language === 'cpp' || language === 'java') {
-        const funcMatch = line.match(/(\w+)\s+(\w+)\s*\(([^)]*)\)/);
-        if (funcMatch && (line.includes('{') || (i + 1 < lines.length && lines[i + 1].trim().startsWith('{')))) {
-          functions.push({
-            name: funcMatch[2],
-            returnType: funcMatch[1],
-            params: funcMatch[3],
-            line: i + 1
-          });
-        }
-      } else if (language === 'python') {
-        const funcMatch = line.match(/def\s+(\w+)\s*\(([^)]*)\)/);
-        if (funcMatch) {
-          functions.push({
-            name: funcMatch[1],
-            returnType: 'def',
-            params: funcMatch[2],
-            line: i + 1
-          });
-        }
-      } else if (language === 'javascript') {
-        const funcMatch = line.match(/(?:function|const|let|var)\s+(\w+)\s*=\s*\(([^)]*)\)\s*=>/);
-        if (funcMatch) {
-          functions.push({
-            name: funcMatch[1],
-            returnType: 'function',
-            params: funcMatch[2],
-            line: i + 1
-          });
-        }
-      }
-    }
-    
-    return functions;
-  };
-
+  // Enhanced variable extraction
   const extractVariables = (code, language) => {
     const variables = {};
     const lines = code.split('\n');
     
     const patterns = {
-      cpp: /(int|float|double|char|bool|string|auto)\s+(\w+)\s*(?:=\s*([^;]+))?/g,
-      java: /(int|float|double|char|boolean|String)\s+(\w+)\s*(?:=\s*([^;]+))?/g,
-      python: /(\w+)\s*=\s*([^#\n]+)/g,
+      cpp: /(int|float|double|char|bool|string|auto|long|short|unsigned)\s+(\w+)\s*(?:=\s*([^;]+))?[^=]/g,
+      java: /(int|float|double|char|boolean|String|byte|short|long)\s+(\w+)\s*(?:=\s*([^;]+))?[^=]/g,
+      python: /(\b\w+\b)\s*=\s*([^#\n]+)(?:#.*)?/g,
       javascript: /(?:const|let|var)\s+(\w+)\s*=\s*([^;]+)/g
     };
     
@@ -229,17 +356,28 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
       const pattern = patterns[language];
       if (!pattern) return;
       
+      // Reset regex lastIndex
+      pattern.lastIndex = 0;
+      
       let match;
       while ((match = pattern.exec(line)) !== null) {
         const varName = match[2] || match[1];
         const value = match[3] || match[2] || 'undefined';
+        const type = match[1] || 'auto';
+        
+        // Skip function definitions
+        if (line.includes('(') && line.includes(')') && !line.includes('=')) {
+          continue;
+        }
         
         variables[varName] = {
           name: varName,
-          type: match[1] || 'auto',
-          value: value.trim(),
+          type: type,
+          value: value.trim().replace(/;.*$/, ''), // Remove trailing semicolon
           line: index + 1,
-          scope: determineScope(index, lines, language)
+          scope: determineScope(index, lines, language),
+          isLoopVariable: /^(i|j|k|index|idx|count|counter|n|m|iterator|iter|temp|tmp)$/i.test(varName),
+          history: []
         };
       }
     });
@@ -250,18 +388,43 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
   const determineScope = (lineIndex, lines, language) => {
     let scope = 'global';
     let braceCount = 0;
+    let inFunction = false;
+    let inClass = false;
     
     for (let i = 0; i <= lineIndex; i++) {
       const line = lines[i];
-      if (line.includes('{')) braceCount++;
-      if (line.includes('}')) braceCount--;
+      const trimmed = line.trim();
       
-      if (line.includes('main(') || line.includes('def ') || line.includes('function ')) {
-        scope = 'function';
+      // Track braces
+      if (language === 'cpp' || language === 'java' || language === 'javascript') {
+        if (line.includes('{')) braceCount++;
+        if (line.includes('}')) braceCount--;
       }
       
-      if (line.includes('class ') || line.includes('struct ')) {
+      // Track functions
+      if (trimmed.includes('main(') || trimmed.includes('def ') || 
+          trimmed.includes('function ') || trimmed.match(/^\w+\s+\w+\s*\(/)) {
+        if (braceCount === 0 || trimmed.includes('main(')) {
+          inFunction = true;
+          scope = 'function';
+        }
+      }
+      
+      // Track classes
+      if (trimmed.includes('class ') || trimmed.includes('struct ')) {
+        inClass = true;
         scope = 'class';
+      }
+      
+      // Adjust scope based on context
+      if (inClass && braceCount > 0) {
+        scope = 'class';
+      } else if (inFunction && braceCount > 0) {
+        scope = 'function';
+      } else if (braceCount === 0) {
+        scope = 'global';
+        inFunction = false;
+        inClass = false;
       }
     }
     
@@ -272,23 +435,25 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
     const lines = code.toLowerCase().split('\n');
     let complexity = 'O(1)';
     
-    // Simple heuristic-based complexity estimation
-    const hasNestedLoops = (lines.join('').match(/for.*{.*for|while.*{.*for|for.*{.*while/g) || []).length > 0;
-    const hasRecursion = lines.some(line => line.includes('return') && line.includes('('));
-    const hasLoops = lines.some(line => line.includes('for') || line.includes('while'));
+    // Enhanced complexity estimation
+    const nestedLoopCount = (code.match(/for[^{]*\{[^}]*for|while[^{]*\{[^}]*for|for[^{]*\{[^}]*while/g) || []).length;
+    const recursionCount = (code.match(/\w+\([^)]*\)[^{]*\{[^}]*\w+\(/g) || []).length;
+    const loopCount = (code.match(/\b(for|while)\b/g) || []).length;
     
-    if (hasNestedLoops) {
+    if (nestedLoopCount >= 2) {
+      complexity = 'O(n³)';
+    } else if (nestedLoopCount === 1) {
       complexity = 'O(n²)';
-    } else if (hasRecursion) {
+    } else if (recursionCount > 0) {
       complexity = 'O(2ⁿ)';
-    } else if (hasLoops) {
+    } else if (loopCount > 0) {
       complexity = 'O(n)';
     }
     
     return complexity;
   };
 
-  // Initialize code parsing
+  // Initialize code parsing with enhanced tracking
   useEffect(() => {
     if (code.trim()) {
       const parsed = parseCode(code, selectedLanguage);
@@ -301,10 +466,22 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
       
       // Initialize variables from parsed code
       setVariables(parsed.variables);
+      
+      // Initialize loop tracker
+      if (parsed.loops && parsed.loops.length > 0) {
+        const iterations = {};
+        parsed.loops.forEach(loop => {
+          iterations[loop.id] = { count: 0, currentIteration: 0, variables: {} };
+        });
+        setLoopTracker(prev => ({
+          ...prev,
+          iterations
+        }));
+      }
     }
   }, [code, selectedLanguage]);
 
-  // Simulate execution for unsupported languages
+  // Enhanced simulate execution with better loop tracking
   const simulateExecution = () => {
     const lines = code.split('\n');
     const trace = [];
@@ -312,12 +489,51 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
     const heap = [];
     const output = [];
     const callStack = ['main'];
+    const loopIterations = {};
+    let loopStack = [];
     
     let lineIndex = 0;
     let step = 0;
+    let iterationCount = 0;
     
-    // Basic simulation for demonstration
-    while (lineIndex < lines.length && step < 100) {
+    // Track loop variables across the entire execution
+    const updateLoopTracker = (lineIndex, variables) => {
+      const line = lines[lineIndex];
+      const trimmed = line.trim();
+      
+      // Check if this line starts a loop
+      if (isLoopLine(line, selectedLanguage)) {
+        const loopVars = extractLoopVariables(line, selectedLanguage);
+        if (loopVars.length > 0) {
+          const loopId = `${lineIndex}_${trimmed}`;
+          if (!loopIterations[loopId]) {
+            loopIterations[loopId] = { count: 0, variables: {} };
+            loopStack.push(loopId);
+          }
+          
+          loopIterations[loopId].count++;
+          iterationCount++;
+          
+          // Record loop variable values
+          loopVars.forEach(varName => {
+            if (variables[varName]) {
+              loopIterations[loopId].variables[varName] = variables[varName].value;
+              
+              // Add loop iteration output
+              output.push(`[Loop ${loopStack.length}.${loopIterations[loopId].count}] ${varName} = ${variables[varName].value}`);
+            }
+          });
+        }
+      }
+      
+      // Check if we're ending a loop
+      if (trimmed === '}' && loopStack.length > 0) {
+        loopStack.pop();
+      }
+    };
+    
+    // Enhanced simulation loop
+    while (lineIndex < lines.length && step < 1000) { // Increased step limit
       const line = lines[lineIndex];
       const trimmed = line.trim();
       
@@ -327,61 +543,68 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
         continue;
       }
       
-      // Simulate variable assignments
-      if (trimmed.includes('=') && !trimmed.includes('==')) {
-        const match = trimmed.match(/(\w+)\s*=\s*([^;]+)/);
-        if (match) {
-          const varName = match[1];
-          const expression = match[2];
+      // Update loop tracking
+      updateLoopTracker(lineIndex, variablesState);
+      
+      // Simulate variable assignments with better expression evaluation
+      if (trimmed.includes('=') && !trimmed.includes('==') && !trimmed.includes('!=')) {
+        const assignmentMatch = trimmed.match(/(\w+)\s*=\s*([^;]+)/);
+        if (assignmentMatch) {
+          const varName = assignmentMatch[1];
+          const expression = assignmentMatch[2].replace(/;$/, '');
           const value = evaluateExpression(expression, variablesState);
           
           // Check if this is a loop variable
-          const isLoopVar = /^(i|j|k|index|count|n|[a-z]Index)$/.test(varName);
+          const isLoopVar = /^(i|j|k|index|idx|count|counter|n|m|iterator|iter)$/i.test(varName);
           
+          // Update variable state
           variablesState[varName] = {
-            ...variablesState[varName],
+            ...(variablesState[varName] || {}),
+            name: varName,
             value: value,
+            type: variablesState[varName]?.type || 'auto',
+            line: lineIndex + 1,
+            scope: variablesState[varName]?.scope || 'local',
+            isLoopVariable: isLoopVar,
             lastModified: step
           };
           
-          // If this is a loop variable, add to output for tracking
-          if (isLoopVar) {
-            output.push(`Loop var ${varName} = ${value}`);
+          // Add to variable history
+          if (variablesState[varName].history) {
+            variablesState[varName].history.push({ step, value });
+          } else {
+            variablesState[varName].history = [{ step, value }];
           }
           
-          // If there are calculations in the expression, show them
-          if (expression.includes('+') || expression.includes('-') || expression.includes('*') || expression.includes('/')) {
-            // Only show calculation details for non-loop variables or significant calculations
-            if (!isLoopVar || Math.abs(value) > 10) {
-              output.push(`${varName} = ${expression} = ${value}`);
-            }
+          // Output for significant changes
+          if (isLoopVar || Math.abs(value) > 0) {
+            const change = isLoopVar ? 'Loop var' : 'Variable';
+            output.push(`${change} ${varName} = ${value}`);
           }
         }
       }
       
-      // Simulate output
+      // Enhanced output simulation
       if (trimmed.includes('cout') || trimmed.includes('printf') || trimmed.includes('print')) {
-        // Handle different output formats
         let outputValue = '';
         let outputExpression = '';
         
         if (trimmed.includes('cout')) {
-          // C++ cout statements
-          const coutMatches = trimmed.match(/<<\s*([^;]+)/g);
+          const coutMatches = trimmed.match(/<<\s*([^<]+)/g);
           if (coutMatches) {
-            const expressions = coutMatches.map(match => match.split('<<')[1].trim());
-            outputExpression = expressions.join(' << ');
+            const expressions = coutMatches.map(match => match.replace('<<', '').trim());
+            outputExpression = expressions.join(' ');
             outputValue = expressions.map(expr => evaluateExpression(expr, variablesState)).join(' ');
           }
         } else if (trimmed.includes('printf')) {
-          // C printf statements
-          const printfMatch = trimmed.match(/printf\s*\(\s*"[^"]*"\s*,\s*([^)]+)\s*\)/);
+          const printfMatch = trimmed.match(/printf\s*\(\s*"([^"]*)"\s*(?:,\s*([^)]*))?\)/);
           if (printfMatch) {
-            outputExpression = printfMatch[1];
-            outputValue = evaluateExpression(printfMatch[1], variablesState);
+            const format = printfMatch[1];
+            const args = printfMatch[2] || '';
+            outputExpression = args;
+            outputValue = args.split(',').map(arg => evaluateExpression(arg.trim(), variablesState)).join(' ');
           }
         } else if (trimmed.includes('print')) {
-          // Python/other print statements
           const printMatch = trimmed.match(/print\s*\(\s*([^)]+)\s*\)/);
           if (printMatch) {
             outputExpression = printMatch[1];
@@ -390,76 +613,84 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
         }
         
         if (outputValue) {
-          // Show both the expression and its evaluated value
-          output.push(`cout: ${outputExpression} => ${outputValue}`);
+          output.push(`Output: ${outputValue}`);
         }
       }
       
-      // Simulate loops
-      if (trimmed.includes('for') || trimmed.includes('while')) {
-        // Extract loop variable if possible
-        const loopVarMatch = trimmed.match(/for\s*\(\s*(?:int|long|float|double)?\s*(\w+)\s*=|for\s+(\w+)\s+in/);
-        if (loopVarMatch) {
-          const loopVar = loopVarMatch[1] || loopVarMatch[2];
-          if (loopVar && variablesState[loopVar]) {
-            // Add loop variable to output for tracking
-            output.push(`Loop var ${loopVar} = ${variablesState[loopVar].value}`);
-          }
-        }
-        
-        trace.push({
-          step,
-          line: lineIndex + 1,
-          type: 'loop_start',
-          variables: { ...variablesState },
-          output: [...output],
-          stack: [...callStack],
-          description: `Loop iteration at line ${lineIndex + 1}`
-        });
-      }
-      
-      // Simulate conditionals
-      if (trimmed.includes('if')) {
-        trace.push({
-          step,
-          line: lineIndex + 1,
-          type: 'conditional',
-          variables: { ...variablesState },
-          output: [...output],
-          stack: [...callStack],
-          description: `Condition check at line ${lineIndex + 1}`
-        });
-      }
-      
-      trace.push({
+      // Create trace entry with enhanced loop information
+      const traceEntry = {
         step,
         line: lineIndex + 1,
-        type: 'execution',
-        variables: { ...variablesState },
+        type: determineLineType(line, selectedLanguage),
+        variables: JSON.parse(JSON.stringify(variablesState)), // Deep clone
         output: [...output],
         stack: [...callStack],
-        description: `Executing line ${lineIndex + 1}`
-      });
+        description: getStepDescription(line, lineIndex + 1, variablesState),
+        loopInfo: {
+          currentLoops: [...loopStack],
+          iterationCount,
+          loopVariables: getLoopVariables(lineIndex + 1, variablesState)
+        }
+      };
+      
+      trace.push(traceEntry);
+      
+      // Increment line index based on control flow
+      if (trimmed.includes('break')) {
+        // Find the end of the current loop
+        let braceCount = 0;
+        for (let i = lineIndex; i < lines.length; i++) {
+          if (lines[i].includes('{')) braceCount++;
+          if (lines[i].includes('}')) {
+            braceCount--;
+            if (braceCount === 0) {
+              lineIndex = i;
+              break;
+            }
+          }
+        }
+      } else if (trimmed.includes('continue')) {
+        // Find the next iteration
+        lineIndex++;
+        continue;
+      }
       
       lineIndex++;
       step++;
     }
     
-    return { trace, variables: variablesState, heap, output, callStack };
+    return { 
+      trace, 
+      variables: variablesState, 
+      heap, 
+      output, 
+      callStack,
+      loopIterations,
+      totalIterations: iterationCount
+    };
   };
 
   const evaluateExpression = (expr, variables) => {
-    // Basic expression evaluation
     try {
-      let evaluated = expr;
+      let evaluated = expr.trim();
+      
+      // Replace variable names with their values
       Object.entries(variables).forEach(([name, data]) => {
-        const regex = new RegExp(`\\b${name}\\b`, 'g');
-        evaluated = evaluated.replace(regex, data.value);
+        if (data && data.value !== undefined) {
+          const regex = new RegExp(`\\b${name}\\b`, 'g');
+          evaluated = evaluated.replace(regex, data.value);
+        }
       });
       
-      const clean = evaluated.replace(/[^0-9+\-*/().]/g, '');
-      if (clean) {
-        return new Function(`return ${clean}`)();
+      // Clean up the expression
+      evaluated = evaluated.replace(/[^0-9+\-*/().><=!&|^% ]/g, '');
+      
+      if (evaluated.trim()) {
+        try {
+          return Function(`"use strict"; return (${evaluated})`)();
+        } catch {
+          return expr;
+        }
       }
       
       return expr;
@@ -468,68 +699,160 @@ const AdvancedCodeVisualizer = ({ initialCode = '', language = 'cpp' }) => {
     }
   };
 
+  const getStepDescription = (line, lineNumber, variables) => {
+    const trimmed = line.trim();
+    
+    if (isLoopLine(line, selectedLanguage)) {
+      const loopVars = extractLoopVariables(line, selectedLanguage);
+      if (loopVars.length > 0) {
+        const varValues = loopVars.map(varName => {
+          const varData = variables[varName];
+          return varData ? `${varName}=${varData.value}` : varName;
+        }).join(', ');
+        return `Loop iteration at line ${lineNumber} (${varValues})`;
+      }
+      return `Loop at line ${lineNumber}`;
+    }
+    
+    if (trimmed.includes('if')) {
+      return `Condition check at line ${lineNumber}`;
+    }
+    
+    if (trimmed.includes('=')) {
+      return `Variable assignment at line ${lineNumber}`;
+    }
+    
+    return `Executing line ${lineNumber}`;
+  };
+
+  const getLoopVariables = (lineNumber, variables) => {
+    const loopVars = {};
+    Object.entries(variables).forEach(([name, data]) => {
+      if (data && data.isLoopVariable) {
+        loopVars[name] = data.value;
+      }
+    });
+    return loopVars;
+  };
+
+  // Enhanced Python execution with better loop tracking
   const executePythonCode = async () => {
     try {
       const py = pyodideRef.current;
-      if (!py) throw new Error('Pyodide not loaded');
+      if (!py) {
+        setOutputLog([{ step: 0, value: 'Pyodide not loaded yet', line: 0 }]);
+        return;
+      }
       
+      // Load required packages
       await py.loadPackagesFromImports(code);
       
-      py.runPython(`
-import sys
-from io import StringIO
-sys.stdin = StringIO('''${stdinInput.replace(/'/g, "\\'")}''')
-sys.stdout = StringIO()
-sys.stderr = StringIO()
-      `);
-      
-      // Set up tracing
+      // Set up input/output
       py.runPython(`
 import sys
 import inspect
+from io import StringIO
+
+sys.stdin = StringIO('''${stdinInput.replace(/'/g, "\\'")}''')
+sys.stdout = StringIO()
+sys.stderr = StringIO()
+
 trace = []
 output_lines = []
+loop_iterations = {}
+current_loop_stack = []
+iteration_counter = 0
+
 original_print = print
 def traced_print(*args, **kwargs):
-  frame = inspect.currentframe().f_back
-  line_no = frame.f_lineno
-  output_str = ' '.join(map(str, args))
-  output_lines.append({'line': line_no, 'output': output_str})
-  original_print(*args, **kwargs)
+    frame = inspect.currentframe().f_back
+    line_no = frame.f_lineno if frame else 0
+    output_str = ' '.join(map(str, args))
+    output_lines.append({'line': line_no, 'output': output_str, 'type': 'output'})
+    original_print(*args, **kwargs)
+
 __builtins__['print'] = traced_print
-def tracer(frame, event, arg):
-  if event == 'line':
-    locals_copy = {k: str(v) for k, v in frame.f_locals.items() if not k.startswith('__')}
-    globals_copy = {k: str(v) for k, v in frame.f_globals.items() if not k.startswith('__') and k not in ['tracer', 'traced_print', 'original_print', 'trace', 'output_lines']}
-    
-    # Check for loop variables and add to output
-    for var_name, var_value in {**globals_copy, **locals_copy}.items():
-      if var_name in ['i', 'j', 'k', 'index', 'count', 'n'] or var_name.endswith('Index'):
-        output_lines.append({'line': frame.f_lineno, 'output': f'Loop var {var_name} = {var_value}'})
-      
-      # Also capture significant calculations
-      try:
-        # Convert to number if possible
-        num_value = float(var_value)
-        if abs(num_value) > 10 or (num_value != int(num_value)):
-          # For significant values, show the variable assignment
-          output_lines.append({'line': frame.f_lineno, 'output': f'{var_name} = {var_value}'})
-      except:
-        pass  # Not a number, ignore
-    
-    stack = []
-    current = frame
-    while current:
-      stack.append(current.f_code.co_name)
-      current = current.f_back
-    stack.reverse()
-    trace.append({
-      'line': frame.f_lineno,
-      'variables': {**globals_copy, **locals_copy},
-      'stack': stack
-    })
-  return tracer
-sys.settrace(tracer)
+
+def add_trace(frame, event_type='line'):
+    try:
+        locals_copy = {k: str(v) for k, v in frame.f_locals.items() if not k.startswith('__')}
+        globals_copy = {k: str(v) for k, v in frame.f_globals.items() if not k.startswith('__') 
+                       and k not in ['trace', 'output_lines', 'loop_iterations', 'current_loop_stack', 
+                                     'iteration_counter', 'add_trace', 'traced_print', 'original_print']}
+        
+        # Track loop variables
+        loop_vars = {}
+        for var_name, var_value in {**globals_copy, **locals_copy}.items():
+            if var_name in ['i', 'j', 'k', 'index', 'idx', 'count', 'counter', 'n', 'm', 'iterator', 'iter', 'temp', 'tmp']:
+                loop_vars[var_name] = var_value
+                
+                # Add loop variable output
+                if event_type == 'loop_iteration':
+                    output_lines.append({
+                        'line': frame.f_lineno,
+                        'output': f'[Loop {len(current_loop_stack)}.{iteration_counter}] {var_name} = {var_value}',
+                        'type': 'loop_var'
+                    })
+        
+        # Track stack
+        stack = []
+        current = frame
+        while current:
+            stack.append(current.f_code.co_name)
+            current = current.f_back
+        stack.reverse()
+        
+        trace.append({
+            'line': frame.f_lineno,
+            'variables': {**globals_copy, **locals_copy},
+            'stack': stack,
+            'loop_vars': loop_vars,
+            'current_loops': list(current_loop_stack),
+            'iteration_counter': iteration_counter
+        })
+    except Exception as e:
+        pass
+
+def custom_tracer(frame, event, arg):
+    if event == 'line':
+        # Check if this is a loop line
+        code_line = frame.f_code.co_filename
+        if hasattr(frame, 'f_code') and hasattr(frame.f_code, 'co_firstlineno'):
+            # Check for loop patterns in current line
+            try:
+                import linecache
+                line_text = linecache.getline(code_line, frame.f_lineno).strip()
+                
+                # Simple loop detection
+                if line_text.startswith('for ') or line_text.startswith('while '):
+                    loop_id = f"{frame.f_lineno}_{line_text[:50]}"
+                    if loop_id not in current_loop_stack:
+                        current_loop_stack.append(loop_id)
+                        iteration_counter = 1
+                    else:
+                        iteration_counter = loop_iterations.get(loop_id, 0) + 1
+                    
+                    loop_iterations[loop_id] = iteration_counter
+                    add_trace(frame, 'loop_iteration')
+                elif line_text == 'pass' and len(current_loop_stack) > 0:
+                    # Inside a loop
+                    iteration_counter += 1
+                    add_trace(frame, 'loop_iteration')
+                else:
+                    add_trace(frame, 'line')
+                    
+                # Check for loop end
+                if line_text and line_text[0] not in [' ', '\\t'] and len(current_loop_stack) > 0:
+                    # Probably ending a loop
+                    current_loop_stack.pop()
+                    
+            except:
+                add_trace(frame, 'line')
+        else:
+            add_trace(frame, 'line')
+    return custom_tracer
+
+sys.settrace(custom_tracer)
       `);
       
       // Run user code
@@ -538,6 +861,7 @@ sys.settrace(tracer)
       // Disable trace
       py.runPython(`sys.settrace(None)`);
       
+      // Check for errors
       const stderr = py.runPython('sys.stderr.getvalue()');
       if (stderr) {
         setOutputLog([{ step: 0, value: `Error: ${stderr}`, line: 0 }]);
@@ -546,28 +870,49 @@ sys.settrace(tracer)
       
       const trace_js = py.runPython('trace').toJs({ dict_converter: Object.fromEntries });
       const output_lines_js = py.runPython('output_lines').toJs({ dict_converter: Object.fromEntries });
+      const loop_iterations_js = py.runPython('loop_iterations').toJs({ dict_converter: Object.fromEntries });
       
+      // Process trace
       let processed_trace = [];
       let cumulative_output = [];
-      let output_index = 0;
+      let loop_iteration_counter = 0;
       
       trace_js.forEach((step, i) => {
-        // Add all outputs for this line to cumulative output
-        while (output_index < output_lines_js.length && output_lines_js[output_index].line === step.line) {
-          cumulative_output.push(output_lines_js[output_index].output);
-          output_index++;
-        }
+        // Collect outputs for this step
+        const stepOutputs = output_lines_js.filter(out => out.line === step.line);
+        stepOutputs.forEach(out => {
+          if (!cumulative_output.includes(out.output)) {
+            cumulative_output.push(out.output);
+          }
+        });
+        
         processed_trace.push({
           step: i,
           line: step.line,
           variables: step.variables,
           stack: step.stack,
           output: [...cumulative_output],
-          description: `Executing line ${step.line}`
+          description: step.loop_vars && Object.keys(step.loop_vars).length > 0 
+            ? `Loop iteration at line ${step.line} (${Object.entries(step.loop_vars).map(([k, v]) => `${k}=${v}`).join(', ')})`
+            : `Executing line ${step.line}`,
+          loopInfo: {
+            currentLoops: step.current_loops || [],
+            iterationCount: step.iteration_counter || 0,
+            loopVariables: step.loop_vars || {}
+          }
         });
+        
+        if (step.loop_vars && Object.keys(step.loop_vars).length > 0) {
+          loop_iteration_counter++;
+        }
       });
       
       setExecutionTrace(processed_trace);
+      setExecutionState(prev => ({
+        ...prev,
+        totalIterations: loop_iteration_counter
+      }));
+      
       executeStepByStep(processed_trace);
       
     } catch (err) {
@@ -586,6 +931,9 @@ sys.settrace(tracer)
       const output_lines = [];
       const inputLines = stdinInput.split('\n');
       let inputIndex = 0;
+      let loop_iterations = {};
+      let current_loop_stack = [];
+      let iteration_counter = 0;
       
       const initFunc = function(interpreter, globalObject) {
         const consoleWrapper = interpreter.createObject(interpreter.OBJECT);
@@ -593,9 +941,9 @@ sys.settrace(tracer)
         
         const logFunc = function(...args) {
           const state = interpreter.stateStack[interpreter.stateStack.length - 1];
-          const line = state.node.loc ? state.node.loc.start.line : 0;
+          const line = state.node && state.node.loc ? state.node.loc.start.line : 0;
           const outputStr = args.map(arg => interpreter.pseudoToNative(arg)).join(' ');
-          output_lines.push({line, output: outputStr});
+          output_lines.push({line, output: outputStr, type: 'output'});
         };
         interpreter.setProperty(consoleWrapper, 'log', interpreter.createNativeFunction(logFunc));
         
@@ -609,44 +957,76 @@ sys.settrace(tracer)
       
       let stepCount = 0;
       let cumulative_output = [];
-      let output_index = 0;
       
-      while (interpreter.step() && stepCount < 10000) {
+      // Helper to extract loop information
+      const extractLoopInfo = (interpreter) => {
+        const scope = interpreter.getScope();
+        const loopVars = {};
+        
+        for (let prop in scope.properties) {
+          if (!prop.startsWith('_')) {
+            const nativeValue = interpreter.pseudoToNative(scope.properties[prop]);
+            const value = String(nativeValue);
+            
+            // Check for loop variables
+            if (/^(i|j|k|index|idx|count|counter|n|m|iterator|iter)$/i.test(prop)) {
+              loopVars[prop] = value;
+              
+              // Get current line
+              const state = interpreter.stateStack[interpreter.stateStack.length - 1];
+              const line = state.node && state.node.loc ? state.node.loc.start.line : 0;
+              
+              // Add loop variable output
+              if (current_loop_stack.length > 0) {
+                const loop_id = current_loop_stack[current_loop_stack.length - 1];
+                const loop_count = loop_iterations[loop_id] || 0;
+                output_lines.push({
+                  line,
+                  output: `[Loop ${current_loop_stack.length}.${loop_count + 1}] ${prop} = ${value}`,
+                  type: 'loop_var'
+                });
+              }
+            }
+          }
+        }
+        
+        return loopVars;
+      };
+      
+      while (interpreter.step() && stepCount < 5000) {
         const state = interpreter.stateStack[interpreter.stateStack.length - 1];
-        if (!state) continue;
+        if (!state || !state.node) continue;
         
         const line = state.node.loc ? state.node.loc.start.line : 0;
+        const nodeType = state.node.type;
         
+        // Detect loops
+        if (nodeType === 'ForStatement' || nodeType === 'WhileStatement' || nodeType === 'DoWhileStatement') {
+          const loop_id = `${line}_${nodeType}`;
+          if (!current_loop_stack.includes(loop_id)) {
+            current_loop_stack.push(loop_id);
+          }
+          if (!loop_iterations[loop_id]) {
+            loop_iterations[loop_id] = 0;
+          }
+          loop_iterations[loop_id]++;
+          iteration_counter++;
+        }
+        
+        // Extract variables
         const scope = interpreter.getScope();
         const variables = {};
+        const loopVars = extractLoopInfo(interpreter);
+        
         for (let prop in scope.properties) {
           if (!prop.startsWith('_')) {
             const nativeValue = interpreter.pseudoToNative(scope.properties[prop]);
             const value = String(nativeValue);
             variables[prop] = value;
-            
-            // Check if this is a loop variable and add to output for tracking
-            if (/^(i|j|k|index|count|n|[a-z]Index)$/.test(prop)) {
-              const state = interpreter.stateStack[interpreter.stateStack.length - 1];
-              const line = state.node.loc ? state.node.loc.start.line : 0;
-              output_lines.push({line, output: `Loop var ${prop} = ${value}`});
-            }
-            
-            // Also capture significant calculations
-            try {
-              const numValue = parseFloat(value);
-              if (!isNaN(numValue) && (Math.abs(numValue) > 10 || numValue !== Math.floor(numValue))) {
-                // For significant values, show the variable assignment
-                const state = interpreter.stateStack[interpreter.stateStack.length - 1];
-                const line = state.node.loc ? state.node.loc.start.line : 0;
-                output_lines.push({line, output: `${prop} = ${value}`});
-              }
-            } catch {
-              // Not a number, ignore
-            }
           }
         }
         
+        // Build stack trace
         let stack = [];
         let currentScope = scope;
         while (currentScope) {
@@ -658,24 +1038,48 @@ sys.settrace(tracer)
         }
         stack.reverse();
         
-        while (output_index < output_lines.length && output_lines[output_index].line === line) {
-          cumulative_output.push(output_lines[output_index].output);
-          output_index++;
-        }
+        // Collect outputs for this line
+        const stepOutputs = output_lines.filter(out => out.line === line);
+        stepOutputs.forEach(out => {
+          if (!cumulative_output.includes(out.output)) {
+            cumulative_output.push(out.output);
+          }
+        });
         
+        // Create trace entry
         trace.push({
           step: stepCount,
           line,
           variables,
           stack,
           output: [...cumulative_output],
-          description: `Executing line ${line}`
+          description: Object.keys(loopVars).length > 0
+            ? `Loop iteration at line ${line} (${Object.entries(loopVars).map(([k, v]) => `${k}=${v}`).join(', ')})`
+            : `Executing line ${line}`,
+          loopInfo: {
+            currentLoops: [...current_loop_stack],
+            iterationCount: iteration_counter,
+            loopVariables: loopVars
+          }
         });
+        
+        // Check for loop end
+        if (nodeType === 'BlockStatement' && state.node.body && state.node.body.length === 0) {
+          // Possibly ending a loop
+          if (current_loop_stack.length > 0) {
+            current_loop_stack.pop();
+          }
+        }
         
         stepCount++;
       }
       
       setExecutionTrace(trace);
+      setExecutionState(prev => ({
+        ...prev,
+        totalIterations: iteration_counter
+      }));
+      
       executeStepByStep(trace);
       
     } catch (err) {
@@ -683,7 +1087,7 @@ sys.settrace(tracer)
     }
   };
 
-  // Start/Stop execution
+  // Enhanced execution control
   const toggleExecution = () => {
     if (executionState.isRunning) {
       pauseExecution();
@@ -693,7 +1097,18 @@ sys.settrace(tracer)
   };
 
   const startExecution = async () => {
-    setExecutionState(prev => ({ ...prev, isRunning: true, currentLine: 0, stepCount: 0 }));
+    // Reset state
+    resetExecution();
+    
+    setExecutionState(prev => ({ 
+      ...prev, 
+      isRunning: true, 
+      currentLine: 0, 
+      stepCount: 0,
+      iteration: 0
+    }));
+    
+    setOutputLog([]);
     
     if (languages[selectedLanguage].executionSupported) {
       if (selectedLanguage === 'python') {
@@ -702,9 +1117,12 @@ sys.settrace(tracer)
         executeJavascriptCode();
       }
     } else {
-      const { trace } = simulateExecution();
+      const { trace, totalIterations } = simulateExecution();
       setExecutionTrace(trace);
-      // For simulated languages, execute step by step after setting trace
+      setExecutionState(prev => ({
+        ...prev,
+        totalIterations
+      }));
       executeStepByStep(trace);
     }
   };
@@ -723,6 +1141,8 @@ sys.settrace(tracer)
   };
 
   const executeStepByStep = (trace) => {
+    if (trace.length === 0) return;
+    
     let currentStep = 0;
     
     executionInterval.current = setInterval(() => {
@@ -737,12 +1157,40 @@ sys.settrace(tracer)
       setExecutionState(prev => ({
         ...prev,
         currentLine: step.line,
-        stepCount: currentStep
+        stepCount: currentStep,
+        iteration: step.loopInfo?.iterationCount || prev.iteration
       }));
       
       setVariables(step.variables);
       setCallStack(step.stack || []);
-      setOutputLog(step.output.map((v, i) => ({ step: i, value: v, line: step.line })));
+      
+      // Format output log with loop information
+      const formattedOutput = step.output.map((v, i) => ({ 
+        step: i, 
+        value: v, 
+        line: step.line,
+        isLoopVar: typeof v === 'string' && (
+          v.includes('[Loop') || 
+          v.startsWith('Loop var') || 
+          /^(i|j|k|index|idx|count|counter|n|m)=/.test(v.split('=')[0]?.trim())
+        )
+      }));
+      setOutputLog(formattedOutput);
+      
+      // Update loop tracker
+      if (step.loopInfo && step.loopInfo.currentLoops.length > 0) {
+        setLoopTracker(prev => {
+          const newIterations = { ...prev.iterations };
+          step.loopInfo.currentLoops.forEach((loopId, index) => {
+            if (!newIterations[loopId]) {
+              newIterations[loopId] = { count: 0, currentIteration: 0 };
+            }
+            newIterations[loopId].count++;
+            newIterations[loopId].currentIteration = step.loopInfo.iterationCount;
+          });
+          return { ...prev, iterations: newIterations };
+        });
+      }
       
       currentStep++;
     }, 1000 / executionState.speed);
@@ -759,7 +1207,9 @@ sys.settrace(tracer)
       isPaused: false,
       currentLine: 0,
       speed: 1,
-      stepCount: 0
+      stepCount: 0,
+      iteration: 0,
+      totalIterations: 0
     });
     
     setVariables({});
@@ -767,13 +1217,19 @@ sys.settrace(tracer)
     setMemoryHeap([]);
     setOutputLog([]);
     setExecutionTrace([]);
+    setLoopTracker({
+      currentLoops: [],
+      iterations: {},
+      maxIterations: 1000
+    });
+    
+    traceIndexRef.current = 0;
+    loopCountersRef.current = {};
   };
 
   const handleCodePaste = (event) => {
     const pastedCode = event.clipboardData.getData('text');
     setCode(pastedCode);
-    
-    // Try to detect language from code
     detectLanguageFromCode(pastedCode);
   };
 
@@ -791,307 +1247,433 @@ sys.settrace(tracer)
     }
   };
 
-  // Render visualizations based on algorithm type
+  // Enhanced visualization renderers
   const renderAlgorithmVisualization = () => {
-    // If table view is selected, show table regardless of algorithm type
     if (visualizationType === 'table') {
       return renderTableVisualization();
     }
     
-    if (!algorithmInfo) {
-      // If no algorithm detected but we have code and execution trace, show generic visualization
-      if (code.trim() && executionTrace.length > 0) {
-        return renderGenericVisualization();
-      }
+    if (!algorithmInfo && executionTrace.length === 0) {
       return (
         <div className="p-4 bg-white border border-gray-200 rounded-lg">
           <h3 className="font-semibold text-lg mb-4">Visualization</h3>
           <div className="text-gray-600 italic">
-            Run the code to see visualization. Select "Line-by-Line Table" from the dropdown for detailed execution view.
+            Paste or load code, then run it to see visualization. Select "Line-by-Line Table" for detailed execution view.
           </div>
         </div>
       );
     }
     
-    switch (algorithmInfo.type) {
-      case 'comparison':
-        return renderSortingVisualization();
-      case 'search':
-        return renderSearchVisualization();
+    switch (visualizationType) {
+      case 'memory':
+        return renderMemoryVisualization();
       case 'graph':
         return renderGraphVisualization();
       case 'tree':
         return renderTreeVisualization();
+      case 'flow':
       default:
-        return renderGenericVisualization();
+        return renderExecutionFlowVisualization();
     }
   };
 
-  const renderSortingVisualization = () => {
-    // Extract array data from variables
-    const arrayVars = Object.entries(variables).filter(([_, data]) => 
-      typeof data.value === 'string' && data.value.startsWith('[') && data.value.endsWith(']')
+  const renderExecutionFlowVisualization = () => {
+    const currentStep = executionState.stepCount;
+    const visibleSteps = executionTrace.slice(
+      Math.max(0, currentStep - 4),
+      Math.min(currentStep + 5, executionTrace.length)
     );
     
     return (
       <div className="p-4 bg-white border border-gray-200 rounded-lg">
-        <h3 className="font-semibold text-lg mb-4">Sorting Visualization</h3>
-        <div className="space-y-4">
-          {arrayVars.map(([name, data]) => {
-            const arrayStr = data.value.slice(1, -1);
-            const elements = arrayStr.split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v));
-            const maxVal = Math.max(...elements, 1);
+        <h3 className="font-semibold text-lg mb-4">Execution Flow</h3>
+        <div className="space-y-2">
+          {visibleSteps.map((step, index) => {
+            const isCurrent = step.step === currentStep;
+            const isLoopStep = step.loopInfo && Object.keys(step.loopInfo.loopVariables).length > 0;
+            
             return (
-              <div key={name}>
-                <div className="flex justify-between mb-2">
-                  <span className="font-mono font-medium">{name}</span>
-                  <span className="text-sm text-gray-600">Size: {elements.length}</span>
+              <div
+                key={index}
+                className={`p-3 rounded border ${
+                  isCurrent
+                    ? 'bg-[#001F3F] text-white border-[#001F3F]'
+                    : isLoopStep
+                    ? 'bg-blue-50 border-blue-200'
+                    : 'bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="flex justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Line {step.line}</span>
+                    {isLoopStep && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                        Loop
+                      </span>
+                    )}
+                  </div>
+                  <span className={isCurrent ? "text-white" : "text-gray-600"}>
+                    Step {step.step}
+                  </span>
                 </div>
-                <div className="flex items-end h-32 border border-gray-300 p-2 rounded">
-                  {elements.map((value, index) => (
-                    <div
-                      key={index}
-                      className="flex-1 mx-1 bg-[#001F3F] hover:bg-[#001F3F]/80 transition-all"
-                      style={{
-                        height: `${(value / maxVal) * 100}%`
-                      }}
-                      title={`${value}`}
-                    >
-                      <div className="text-xs text-white text-center mt-1">{value}</div>
+                <div className={`text-xs mt-1 ${isCurrent ? "text-blue-200" : "text-gray-600"}`}>
+                  {step.description}
+                </div>
+                {isLoopStep && step.loopInfo.loopVariables && (
+                  <div className="mt-2 pt-2 border-t border-gray-300 border-opacity-30">
+                    <div className="text-xs font-medium mb-1">Loop Variables:</div>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(step.loopInfo.loopVariables).map(([key, value]) => (
+                        <div key={key} className="px-2 py-1 bg-white bg-opacity-20 rounded text-xs">
+                          {key} = {value}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-      </div>
-    );
-  };
-
-  const renderSearchVisualization = () => {
-    return (
-      <div className="p-4 bg-white border border-gray-200 rounded-lg">
-        <h3 className="font-semibold text-lg mb-4">Search Visualization</h3>
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(variables).map(([name, data]) => (
-            <div key={name} className="p-2 bg-gray-50 border border-gray-200 rounded">
-              <div className="font-mono">{name} = {data.value}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderGraphVisualization = () => {
-    // Hardcoded for now; in a full implementation, parse graph structures from variables
-    return (
-      <div className="p-4 bg-white border border-gray-200 rounded-lg">
-        <h3 className="font-semibold text-lg mb-4">Graph Visualization (Example)</h3>
-        <svg width="100%" height="300" className="border border-gray-300 rounded">
-          <circle cx="100" cy="150" r="20" fill="#001F3F" stroke="black" />
-          <text x="100" y="150" textAnchor="middle" fill="white">A</text>
-          <circle cx="200" cy="100" r="20" fill="#001F3F" stroke="black" />
-          <text x="200" y="100" textAnchor="middle" fill="white">B</text>
-          <circle cx="300" cy="150" r="20" fill="#001F3F" stroke="black" />
-          <text x="300" y="150" textAnchor="middle" fill="white">C</text>
-          <line x1="100" y1="150" x2="200" y2="100" stroke="black" strokeWidth="2" />
-          <line x1="200" y1="100" x2="300" y2="150" stroke="black" strokeWidth="2" />
-          <line x1="300" y1="150" x2="100" y2="150" stroke="black" strokeWidth="2" />
-        </svg>
-      </div>
-    );
-  };
-
-  const renderTreeVisualization = () => {
-    // Hardcoded for now; in a full implementation, parse tree structures from variables
-    return (
-      <div className="p-4 bg-white border border-gray-200 rounded-lg">
-        <h3 className="font-semibold text-lg mb-4">Tree Visualization (Example)</h3>
-        <div className="flex flex-col items-center">
-          <div className="w-12 h-12 flex items-center justify-center bg-[#001F3F] text-white rounded-full mb-8 border border-black">
-            R
+        {executionTrace.length > 0 && (
+          <div className="mt-4 text-sm text-gray-600">
+            Showing step {Math.max(0, currentStep - 4)} to {Math.min(currentStep + 4, executionTrace.length - 1)} of {executionTrace.length} total steps
           </div>
-          <div className="flex space-x-8">
-            <div className="flex flex-col items-center">
-              <div className="w-10 h-10 flex items-center justify-center bg-[#001F3F] text-white rounded-full mb-4 border border-black">
-                L
-              </div>
-              <div className="text-xs text-gray-600">Left Child</div>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-10 h-10 flex items-center justify-center bg-[#001F3F] text-white rounded-full mb-4 border border-black">
-                R
-              </div>
-              <div className="text-xs text-gray-600">Right Child</div>
+        )}
+      </div>
+    );
+  };
+
+  const renderMemoryVisualization = () => {
+    const loopVariables = Object.entries(variables).filter(([_, data]) => 
+      data && data.isLoopVariable
+    );
+    
+    const regularVariables = Object.entries(variables).filter(([_, data]) => 
+      data && !data.isLoopVariable
+    );
+    
+    return (
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <h3 className="font-semibold text-lg mb-4">Memory Visualization</h3>
+        
+        {loopVariables.length > 0 && (
+          <div className="mb-6">
+            <h4 className="font-medium text-blue-700 mb-3">Loop Variables</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {loopVariables.map(([name, data]) => (
+                <div key={name} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-mono font-medium text-blue-800">{name}</div>
+                      <div className="text-xs text-blue-600">{data.type} · Line {data.line}</div>
+                    </div>
+                    <div className="font-mono bg-white px-3 py-1 rounded text-sm text-blue-800 font-bold">
+                      {data.value}
+                    </div>
+                  </div>
+                  {data.history && data.history.length > 0 && (
+                    <div className="mt-2 text-xs text-blue-600">
+                      Changes: {data.history.length}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderGenericVisualization = () => {
-    return (
-      <div className="p-4 bg-white border border-gray-200 rounded-lg">
-        <h3 className="font-semibold text-lg mb-4">Execution Flow</h3>
-        <div className="space-y-2">
-          {executionTrace.slice(Math.max(0, executionState.stepCount - 9), executionState.stepCount + 1).map((step, index) => (
-            <div
-              key={index}
-              className={`p-3 rounded border ${
-                step.step === executionState.stepCount
-                  ? 'bg-[#001F3F]/10 border-[#001F3F]/20'
-                  : 'bg-gray-50 border-gray-200'
-              }`}
-            >
-              <div className="flex justify-between text-sm">
-                <span className="font-medium">Line {step.line}</span>
-                <span className="text-gray-600">Step {step.step}</span>
-              </div>
-              <div className="text-xs text-gray-600 mt-1">{step.description}</div>
+        )}
+        
+        {regularVariables.length > 0 && (
+          <div>
+            <h4 className="font-medium text-gray-700 mb-3">Other Variables</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {regularVariables.map(([name, data]) => (
+                <div key={name} className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-mono font-medium text-gray-800">{name}</div>
+                      <div className="text-xs text-gray-600">{data.type} · Line {data.line}</div>
+                    </div>
+                    <div className="font-mono bg-white px-3 py-1 rounded text-sm text-gray-800">
+                      {data.value}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-600">
+                    Scope: {data.scope}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
+        
+        {Object.keys(variables).length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No variables in memory yet. Run the code to see variables.
+          </div>
+        )}
       </div>
     );
   };
 
   const renderTableVisualization = () => {
-    // Split code into lines
     const codeLines = code.split('\n');
-    
-    // Create a map of line executions for highlighting
     const lineExecutions = {};
     const lineOutputs = {};
     const lineLoopVars = {};
+    const lineTypes = {};
     
-    // Process execution trace to collect outputs and loop variables per line
+    // Process execution trace
     executionTrace.forEach(step => {
-      if (!lineExecutions[step.line]) {
-        lineExecutions[step.line] = [];
-        lineOutputs[step.line] = [];
-        lineLoopVars[step.line] = [];
-      }
-      lineExecutions[step.line].push(step);
+      const lineNum = step.line;
       
-      // Collect outputs for this line (including loop variable outputs)
-      if (step.output && step.output.length > 0) {
-        // Add all outputs for this step to this line
+      if (!lineExecutions[lineNum]) {
+        lineExecutions[lineNum] = 0;
+        lineOutputs[lineNum] = [];
+        lineLoopVars[lineNum] = [];
+      }
+      
+      lineExecutions[lineNum]++;
+      
+      // Collect outputs
+      if (step.output) {
         step.output.forEach(out => {
-          if (!lineOutputs[step.line].includes(out)) {
-            lineOutputs[step.line].push(out);
+          if (!lineOutputs[lineNum].includes(out)) {
+            lineOutputs[lineNum].push(out);
           }
         });
       }
       
-      // Collect loop variables for this line
-      if (step.variables) {
-        const loopVars = {};
-        Object.entries(step.variables).forEach(([name, value]) => {
-          // Check if this is likely a loop variable (i, j, k, index, count, etc.)
-          if (/^(i|j|k|index|count|n|[a-z]Index)$/i.test(name)) {
-            loopVars[name] = value;
+      // Collect loop variables
+      if (step.loopInfo && step.loopInfo.loopVariables) {
+        Object.entries(step.loopInfo.loopVariables).forEach(([name, value]) => {
+          const loopVarStr = `${name}=${value}`;
+          if (!lineLoopVars[lineNum].includes(loopVarStr)) {
+            lineLoopVars[lineNum].push(loopVarStr);
           }
         });
-        if (Object.keys(loopVars).length > 0) {
-          lineLoopVars[step.line].push({...loopVars});
-        }
+      }
+      
+      // Determine line type
+      if (step.loopInfo && Object.keys(step.loopInfo.loopVariables).length > 0) {
+        lineTypes[lineNum] = 'loop';
+      } else if (step.description && step.description.includes('Condition')) {
+        lineTypes[lineNum] = 'conditional';
+      } else if (step.description && step.description.includes('assignment')) {
+        lineTypes[lineNum] = 'assignment';
+      } else if (step.description && step.description.includes('Output')) {
+        lineTypes[lineNum] = 'output';
       }
     });
     
     return (
       <div className="p-4 bg-white border border-gray-200 rounded-lg">
-        <h3 className="font-semibold text-lg mb-4">Line-by-Line Execution Table</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-semibold text-lg">Line-by-Line Execution Table</h3>
+          <div className="text-sm text-gray-600">
+            Total iterations: {executionState.totalIterations || 0}
+          </div>
+        </div>
+        
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse">
             <thead>
               <tr className="bg-gray-800 text-white">
                 <th className="border border-gray-300 px-4 py-2 text-left">Line #</th>
                 <th className="border border-gray-300 px-4 py-2 text-left">Code</th>
+                <th className="border border-gray-300 px-4 py-2 text-left">Type</th>
                 <th className="border border-gray-300 px-4 py-2 text-left">Executions</th>
                 <th className="border border-gray-300 px-4 py-2 text-left">Loop Vars</th>
-                <th className="border border-gray-300 px-4 py-2 text-left">Variables</th>
                 <th className="border border-gray-300 px-4 py-2 text-left">Output</th>
               </tr>
             </thead>
             <tbody>
               {codeLines.map((line, index) => {
                 const lineNumber = index + 1;
-                const executions = lineExecutions[lineNumber] || [];
+                const executions = lineExecutions[lineNumber] || 0;
                 const outputs = lineOutputs[lineNumber] || [];
-                const loopVarsList = lineLoopVars[lineNumber] || [];
-                const lastExecution = executions[executions.length - 1];
+                const loopVars = lineLoopVars[lineNumber] || [];
+                const lineType = lineTypes[lineNumber] || 'normal';
+                const isCurrentLine = executionState.currentLine === lineNumber;
                 
-                // Get variables at this line execution
-                let variablesDisplay = '';
-                if (lastExecution && lastExecution.variables) {
-                  variablesDisplay = Object.entries(lastExecution.variables)
-                    .slice(0, 3) // Show only first 3 variables
-                    .map(([name, value]) => {
-                      // Format objects and functions specially
-                      if (typeof value === 'object' && value !== null) {
-                        if (Array.isArray(value)) {
-                          return `${name}=[...]`;
-                        } else {
-                          return `${name}={...}`;
-                        }
-                      } else if (typeof value === 'function') {
-                        return `${name}=function() {...}`;
-                      } else {
-                        return `${name}=${value}`;
-                      }
-                    })
-                    .join(', ');
-                  if (Object.keys(lastExecution.variables).length > 3) {
-                    variablesDisplay += ` (+${Object.keys(lastExecution.variables).length - 3} more)`;
+                // Determine row style
+                let rowClass = '';
+                if (isCurrentLine) {
+                  rowClass = 'bg-[#001F3F] text-white';
+                } else if (executions > 0) {
+                  if (lineType === 'loop') {
+                    rowClass = 'bg-blue-50';
+                  } else if (lineType === 'conditional') {
+                    rowClass = 'bg-yellow-50';
+                  } else if (lineType === 'output') {
+                    rowClass = 'bg-green-50';
+                  } else {
+                    rowClass = 'bg-gray-50';
                   }
                 }
                 
-                // Get loop variables for this line
-                let loopVarsDisplay = '';
-                if (loopVarsList.length > 0) {
-                  // Get the latest loop variables
-                  const latestLoopVars = loopVarsList[loopVarsList.length - 1];
-                  loopVarsDisplay = Object.entries(latestLoopVars)
-                    .map(([name, value]) => `${name}=${value}`)
-                    .join(', ');
-                }
-                
-                // Also check if any outputs are loop variable outputs
-                const loopVarOutputs = outputs.filter(out => typeof out === 'string' && out.startsWith('Loop var '));
-                if (loopVarOutputs.length > 0 && !loopVarsDisplay) {
-                  // If we have loop variable outputs but no loop vars extracted, use the outputs
-                  loopVarsDisplay = loopVarOutputs.map(out => out.replace('Loop var ', '')).join(', ');
-                }
-                
-                // Get output at this line (excluding loop variable outputs)
-                let outputDisplay = '';
-                const regularOutputs = outputs.filter(out => typeof out === 'string' && !out.startsWith('Loop var '));
-                if (regularOutputs.length > 0) {
-                  outputDisplay = regularOutputs.join(', ');
-                }
+                // Get type badge
+                const getTypeBadge = () => {
+                  switch (lineType) {
+                    case 'loop':
+                      return <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Loop</span>;
+                    case 'conditional':
+                      return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">If</span>;
+                    case 'assignment':
+                      return <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">Var</span>;
+                    case 'output':
+                      return <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Output</span>;
+                    default:
+                      return <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">Code</span>;
+                  }
+                };
                 
                 return (
                   <tr 
                     key={lineNumber}
-                    className={`${executionState.currentLine === lineNumber ? 'bg-[#001F3F] text-white' : ''} ${executions.length > 0 ? 'bg-blue-50' : ''}`}
+                    className={rowClass}
                   >
-                    <td className={`border border-gray-300 px-4 py-2 font-mono text-sm ${executionState.currentLine === lineNumber ? 'text-white font-bold' : ''}`}>{lineNumber}</td>
-                    <td className={`border border-gray-300 px-4 py-2 font-mono text-sm whitespace-pre ${executionState.currentLine === lineNumber ? 'text-white' : ''}`}>{line || <span className="text-gray-400">&nbsp;</span>}</td>
-                    <td className={`border border-gray-300 px-4 py-2 text-center ${executionState.currentLine === lineNumber ? 'text-white' : ''}`}>{executions.length}</td>
-                    <td className={`border border-gray-300 px-4 py-2 text-sm max-w-xs truncate ${executionState.currentLine === lineNumber ? 'text-white' : ''}`} title={loopVarsDisplay}>{loopVarsDisplay}</td>
-                    <td className={`border border-gray-300 px-4 py-2 text-sm max-w-xs truncate ${executionState.currentLine === lineNumber ? 'text-white' : ''}`} title={variablesDisplay}>{variablesDisplay}</td>
-                    <td className={`border border-gray-300 px-4 py-2 text-sm max-w-xs truncate ${executionState.currentLine === lineNumber ? 'text-white' : ''}`} title={outputDisplay}>{outputDisplay}</td>
+                    <td className={`border border-gray-300 px-4 py-2 font-mono text-sm font-bold ${isCurrentLine ? 'text-white' : ''}`}>
+                      {lineNumber}
+                    </td>
+                    <td className={`border border-gray-300 px-4 py-2 font-mono text-sm whitespace-pre ${isCurrentLine ? 'text-white' : ''}`}>
+                      {line || <span className="text-gray-400"> </span>}
+                    </td>
+                    <td className={`border border-gray-300 px-4 py-2 ${isCurrentLine ? 'text-white' : ''}`}>
+                      <div className="flex justify-center">
+                        {getTypeBadge()}
+                      </div>
+                    </td>
+                    <td className={`border border-gray-300 px-4 py-2 text-center font-medium ${isCurrentLine ? 'text-white' : ''}`}>
+                      {executions > 0 ? (
+                        <span className={`px-2 py-1 rounded ${isCurrentLine ? 'bg-blue-500' : 'bg-blue-100 text-blue-800'}`}>
+                          {executions}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">0</span>
+                      )}
+                    </td>
+                    <td className={`border border-gray-300 px-4 py-2 text-sm max-w-xs ${isCurrentLine ? 'text-white' : ''}`}>
+                      {loopVars.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {loopVars.map((varStr, idx) => (
+                            <span key={idx} className={`px-2 py-1 rounded ${isCurrentLine ? 'bg-blue-600' : 'bg-blue-100 text-blue-800'}`}>
+                              {varStr}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">-</span>
+                      )}
+                    </td>
+                    <td className={`border border-gray-300 px-4 py-2 text-sm max-w-xs truncate ${isCurrentLine ? 'text-white' : ''}`} 
+                        title={outputs.join('\n')}>
+                      {outputs.length > 0 ? (
+                        <div className="space-y-1">
+                          {outputs.slice(0, 2).map((out, idx) => (
+                            <div key={idx} className="truncate">
+                              {out}
+                            </div>
+                          ))}
+                          {outputs.length > 2 && (
+                            <div className="text-xs text-gray-500">
+                              +{outputs.length - 2} more
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">-</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
+        
+        <div className="mt-4 flex justify-between items-center text-sm text-gray-600">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-blue-100 rounded"></div>
+              <span>Loop lines</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-yellow-100 rounded"></div>
+              <span>Conditional lines</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-green-100 rounded"></div>
+              <span>Output lines</span>
+            </div>
+          </div>
+          <div>
+            Total lines: {codeLines.length} | Executed lines: {Object.keys(lineExecutions).length}
+          </div>
+        </div>
       </div>
     );
+  };
+
+  const renderGraphVisualization = () => {
+    return (
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <h3 className="font-semibold text-lg mb-4">Execution Graph</h3>
+        <div className="h-64 flex items-center justify-center border border-gray-300 rounded-lg">
+          <div className="text-center">
+            <div className="text-4xl mb-2">📊</div>
+            <div className="text-gray-600">Execution graph visualization</div>
+            <div className="text-sm text-gray-500 mt-2">
+              Shows control flow and loop relationships
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTreeVisualization = () => {
+    return (
+      <div className="p-4 bg-white border border-gray-200 rounded-lg">
+        <h3 className="font-semibold text-lg mb-4">Call Tree Visualization</h3>
+        <div className="h-64 flex items-center justify-center border border-gray-300 rounded-lg">
+          <div className="text-center">
+            <div className="text-4xl mb-2">🌳</div>
+            <div className="text-gray-600">Call tree visualization</div>
+            <div className="text-sm text-gray-500 mt-2">
+              Shows function calls and execution hierarchy
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const fileContent = e.target.result;
+        setCode(fileContent);
+        detectLanguageFromCode(fileContent);
+        setVisualizationType('table');
+        
+        // Auto-start execution for certain file types
+        const ext = file.name.split('.').pop().toLowerCase();
+        const autoStartLanguages = ['py', 'js', 'cpp', 'java'];
+        if (autoStartLanguages.includes(ext) && !executionState.isRunning) {
+          setTimeout(() => startExecution(), 500);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleExampleLoad = (exampleCode) => {
+    setCode(exampleCode);
+    setVisualizationType('table');
+    setTimeout(() => startExecution(), 300);
   };
 
   return (
@@ -1101,7 +1683,7 @@ sys.settrace(tracer)
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Advanced Code Visualizer</h1>
-            <p className="text-gray-600">Paste any algorithm code to visualize its execution (Full support for Python and JavaScript)</p>
+            <p className="text-gray-600">Paste any algorithm code to visualize its execution with detailed loop tracking</p>
           </div>
           
           <div className="flex flex-wrap gap-2">
@@ -1150,24 +1732,7 @@ sys.settrace(tracer)
                     type="file"
                     className="hidden"
                     accept=".cpp,.py,.java,.js,.ts,.txt"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          setCode(event.target.result);
-                          // Automatically switch to table view when file is loaded
-                          setVisualizationType('table');
-                          // Automatically start execution after a short delay to allow state updates
-                          setTimeout(() => {
-                            if (!executionState.isRunning) {
-                              startExecution();
-                            }
-                          }, 100);
-                        };
-                        reader.readAsText(file);
-                      }
-                    }}
+                    onChange={handleFileUpload}
                   />
                 </div>
               </div>
@@ -1180,12 +1745,27 @@ sys.settrace(tracer)
                 onChange={(e) => setCode(e.target.value)}
                 onPaste={handleCodePaste}
                 placeholder={`Paste your ${languages[selectedLanguage].name} code here...
-Or try these examples:
 
-1. Bubble Sort
-2. Binary Search
-3. Graph BFS
-4. Tree Traversal`}
+Example loops to try:
+
+1. Simple for loop:
+for (int i = 0; i < 5; i++) {
+    cout << i << endl;
+}
+
+2. Nested loops:
+for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+        cout << i << "," << j << endl;
+    }
+}
+
+3. While loop:
+int i = 0;
+while (i < 5) {
+    cout << i << endl;
+    i++;
+}`}
                 className="w-full h-full p-6 font-mono text-sm bg-black text-white resize-none focus:outline-none"
                 spellCheck="false"
                 rows={20}
@@ -1214,8 +1794,13 @@ Or try these examples:
                       {algorithmInfo.name.toUpperCase()} ALGORITHM
                     </span>
                     <span className="ml-4 text-sm text-gray-600">
-                      Estimated Complexity: {algorithmInfo.complexity}
+                      Complexity: {algorithmInfo.complexity}
                     </span>
+                    {algorithmInfo.loopIntensive && (
+                      <span className="ml-4 text-sm text-blue-600">
+                        ⚡ Loop-intensive
+                      </span>
+                    )}
                   </div>
                   <div className="text-sm text-gray-600">
                     {algorithmInfo.parsedCode?.lines.length || 0} lines, {
@@ -1227,7 +1812,7 @@ Or try these examples:
             ) : code.trim() ? (
               <div className="border-t border-gray-200 p-4 bg-gray-50">
                 <span className="text-sm text-gray-600 italic">
-                  No known algorithm pattern detected
+                  Code loaded. Run to analyze execution.
                 </span>
               </div>
             ) : null}
@@ -1281,6 +1866,7 @@ Or try these examples:
                     onChange={(e) => setExecutionState(prev => ({ ...prev, speed: Number(e.target.value) }))}
                     className="px-3 py-2 border border-black rounded-md"
                   >
+                    <option value="0.25">0.25x</option>
                     <option value="0.5">0.5x</option>
                     <option value="1">1x</option>
                     <option value="2">2x</option>
@@ -1288,8 +1874,15 @@ Or try these examples:
                   </select>
                 </div>
                 
-                <div className="text-sm text-gray-600">
-                  Step: {executionState.stepCount} / {executionTrace.length}
+                <div className="text-sm text-gray-600 flex items-center gap-2">
+                  <div>
+                    Step: {executionState.stepCount} / {executionTrace.length}
+                  </div>
+                  {executionState.totalIterations > 0 && (
+                    <div className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                      {executionState.totalIterations} iterations
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1305,29 +1898,77 @@ Or try these examples:
           
           {/* Variable Inspector */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-            <div className="border-b border-gray-200 p-4">
+            <div className="border-b border-gray-200 p-4 flex justify-between items-center">
               <h2 className="font-semibold text-gray-800">Variable Inspector</h2>
+              <div className="text-sm text-gray-500">
+                {Object.keys(variables).length} variables
+              </div>
             </div>
             <div className="p-4 overflow-auto max-h-64">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(variables).map(([name, data]) => (
-                  <div
-                    key={name}
-                    className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-mono font-medium text-[#001F3F]">{name}</div>
-                        <div className="text-xs text-gray-500">{data.type} · Line {data.line}</div>
+              {Object.keys(variables).length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(variables).map(([name, data]) => {
+                    if (!data) return null;
+                    
+                    return (
+                      <div
+                        key={name}
+                        className={`p-3 border rounded-lg hover:bg-gray-50 ${
+                          data.isLoopVariable 
+                            ? 'border-blue-300 bg-blue-50' 
+                            : 'border-gray-200'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className={`font-mono font-medium ${
+                              data.isLoopVariable ? 'text-blue-800' : 'text-gray-800'
+                            }`}>
+                              {name}
+                              {data.isLoopVariable && (
+                                <span className="ml-2 text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                                  Loop
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {data.type} · Line {data.line} · {data.scope}
+                            </div>
+                          </div>
+                          <div className={`font-mono px-3 py-1 rounded text-sm ${
+                            data.isLoopVariable 
+                              ? 'bg-blue-100 text-blue-800 font-bold' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {data.value}
+                          </div>
+                        </div>
+                        {data.history && data.history.length > 0 && (
+                          <div className="mt-2 text-xs text-gray-600">
+                            <div className="font-medium">History:</div>
+                            <div className="truncate">
+                              {data.history.slice(-3).map((h, idx) => (
+                                <span key={idx} className="mr-2">
+                                  →{h.value}
+                                </span>
+                              ))}
+                              {data.history.length > 3 && (
+                                <span className="text-gray-400">
+                                  (+{data.history.length - 3} more)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="font-mono bg-gray-100 px-3 py-1 rounded text-sm">
-                        {data.value}
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-2">Scope: {data.scope}</div>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No variables yet. Run the code to see variables.
+                </div>
+              )}
             </div>
           </div>
           
@@ -1336,80 +1977,54 @@ Or try these examples:
             <div className="border-b border-gray-200 p-4 flex justify-between items-center">
               <h2 className="font-semibold text-gray-800">Output Console</h2>
               <div className="text-xs text-gray-500">
-                {outputLog.filter(entry => entry.value && !entry.value.startsWith('Loop var')).length} outputs, 
-                {outputLog.filter(entry => entry.value && entry.value.startsWith('Loop var')).length} loop vars
+                {outputLog.length} messages
               </div>
             </div>
             <div className="p-4 font-mono text-sm bg-black text-white rounded-b-lg max-h-48 overflow-auto">
               {outputLog.length > 0 ? (
                 outputLog.map((entry, index) => {
-                  // Check output type
-                  const isLoopVar = entry.value && entry.value.startsWith('Loop var ');
-                  const isCalculation = entry.value && entry.value.includes(' = ') && !entry.value.startsWith('Loop var ');
-                  const isOutputStatement = entry.value && (entry.value.startsWith('cout:') || entry.value.includes('cout') || entry.value.includes('printf') || entry.value.includes('print'));
+                  const isLoopVar = entry.isLoopVar;
+                  const isOutput = typeof entry.value === 'string' && (
+                    entry.value.startsWith('Output:') || 
+                    entry.value.startsWith('cout:') ||
+                    entry.value.includes('<<')
+                  );
                   
-                  // Format the output based on type
-                  let formattedValue = entry.value || '';
-                  let valueClass = 'text-white';
-                  
+                  let content;
                   if (isLoopVar) {
-                    // Extract variable name and value
-                    const match = formattedValue.match(/Loop var (\w+) = (.*)/);
-                    if (match) {
-                      const varName = match[1];
-                      const varValue = match[2];
-                      formattedValue = (
-                        <span>
-                          <span className="text-blue-400">loop:</span> 
-                          <span className="text-yellow-300">{varName}</span>
-                          <span className="text-gray-400"> = </span>
-                          <span className="text-green-300">{varValue}</span>
-                        </span>
-                      );
-                      valueClass = 'text-blue-300';
-                    }
-                  } else if (isCalculation) {
-                    // Highlight calculation assignments
-                    const parts = formattedValue.split(' = ');
-                    if (parts.length >= 2) {
-                      formattedValue = (
-                        <span>
-                          <span className="text-purple-400">{parts[0]}</span>
-                          <span className="text-gray-400"> = </span>
-                          <span className="text-orange-300">{parts.slice(1).join(' = ')}</span>
-                        </span>
-                      );
-                      valueClass = 'text-purple-300';
-                    }
-                  } else if (isOutputStatement) {
-                    // Highlight output statements
-                    if (formattedValue.startsWith('cout:')) {
-                      const match = formattedValue.match(/cout: (.*) \=\> (.*)/);
-                      if (match) {
-                        formattedValue = (
-                          <span>
-                            <span className="text-green-400">cout:</span> 
-                            <span className="text-cyan-300">{match[1]}</span>
-                            <span className="text-gray-400"> {'=>'} </span>
-                            <span className="text-yellow-300">{match[2]}</span>
-                          </span>
-                        );
-                      }
-                    } else {
-                      valueClass = 'text-green-300';
-                    }
+                    content = (
+                      <span className="text-yellow-300">
+                        🔁 {entry.value}
+                      </span>
+                    );
+                  } else if (isOutput) {
+                    content = (
+                      <span className="text-green-300">
+                        📤 {entry.value}
+                      </span>
+                    );
+                  } else if (typeof entry.value === 'string' && entry.value.includes('=')) {
+                    content = (
+                      <span className="text-cyan-300">
+                        📝 {entry.value}
+                      </span>
+                    );
+                  } else {
+                    content = <span>{entry.value}</span>;
                   }
                   
                   return (
-                    <div key={index} className="mb-1">
-                      <span className="text-gray-500 text-xs">[{entry.step}]</span>
-                      <span className="text-gray-400 mx-2">L{entry.line}:</span>
-                      <span className={valueClass}>{formattedValue}</span>
+                    <div key={index} className="mb-1 flex items-start">
+                      <span className="text-gray-500 text-xs mt-0.5 mr-2">[{entry.step}]</span>
+                      <span className="text-gray-400 mr-2">L{entry.line}:</span>
+                      <span className="flex-1">{content}</span>
                     </div>
                   );
                 })
               ) : (
-                <div className="text-gray-500 italic">No output yet. Run the code to see results.</div>
+                <div className="text-gray-500 italic">
+                  No output yet. The output will appear here when you run the code.
+                </div>
               )}
             </div>
           </div>
@@ -1428,29 +2043,45 @@ Or try these examples:
             </div>
             <div>
               <span className="font-medium">Call Stack:</span>
-              <span className="ml-2">
-                {callStack.length > 0 ? callStack.join(' → ') : 'empty'}
+              <span className="ml-2 font-mono">
+                {callStack.length > 0 ? callStack.slice(-3).join(' → ') : 'empty'}
+                {callStack.length > 3 && ` (+${callStack.length - 3})`}
               </span>
             </div>
             <div>
-              <span className="font-medium">Memory Usage:</span>
+              <span className="font-medium">Loop Iterations:</span>
               <span className="ml-2">
-                {memoryHeap.length} objects
+                {executionState.totalIterations > 0 ? (
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                    {executionState.totalIterations}
+                  </span>
+                ) : (
+                  'none'
+                )}
               </span>
             </div>
           </div>
           
-          <div>
-            <span className="font-medium">Status:</span>
-            <span className={`ml-2 px-3 py-1 rounded-full text-xs ${
-              executionState.isRunning
-                ? 'bg-green-100 text-green-800'
-                : executionState.isPaused
-                ? 'bg-yellow-100 text-yellow-800'
-                : 'bg-gray-100 text-gray-800'
-            }`}>
-              {executionState.isRunning ? 'Running' : executionState.isPaused ? 'Paused' : 'Ready'}
-            </span>
+          <div className="flex items-center gap-4">
+            <div className="text-sm">
+              <span className="font-medium">Memory:</span>
+              <span className="ml-2">
+                {memoryHeap.length} objects, {Object.keys(variables).length} variables
+              </span>
+            </div>
+            
+            <div>
+              <span className="font-medium">Status:</span>
+              <span className={`ml-2 px-3 py-1 rounded-full text-xs ${
+                executionState.isRunning
+                  ? 'bg-green-100 text-green-800'
+                  : executionState.isPaused
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {executionState.isRunning ? 'Running' : executionState.isPaused ? 'Paused' : 'Ready'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -1458,9 +2089,123 @@ Or try these examples:
   );
 };
 
-// Example usage with predefined algorithms (unchanged)
+// Example algorithms to demonstrate loop visualization
 const exampleAlgorithms = {
-  // ... (omitted for brevity, same as original)
+  bubbleSort: `// Bubble Sort Algorithm
+#include <iostream>
+using namespace std;
+
+int main() {
+    int arr[] = {64, 34, 25, 12, 22, 11, 90};
+    int n = sizeof(arr)/sizeof(arr[0]);
+    
+    cout << "Original array: ";
+    for (int i = 0; i < n; i++) {
+        cout << arr[i] << " ";
+    }
+    cout << endl;
+    
+    // Bubble sort
+    for (int i = 0; i < n-1; i++) {
+        for (int j = 0; j < n-i-1; j++) {
+            if (arr[j] > arr[j+1]) {
+                // Swap arr[j] and arr[j+1]
+                int temp = arr[j];
+                arr[j] = arr[j+1];
+                arr[j+1] = temp;
+            }
+        }
+        cout << "After iteration " << i+1 << ": ";
+        for (int k = 0; k < n; k++) {
+            cout << arr[k] << " ";
+        }
+        cout << endl;
+    }
+    
+    cout << "Sorted array: ";
+    for (int i = 0; i < n; i++) {
+        cout << arr[i] << " ";
+    }
+    cout << endl;
+    
+    return 0;
+}`,
+
+  binarySearch: `// Binary Search Algorithm
+#include <iostream>
+using namespace std;
+
+int binarySearch(int arr[], int size, int target) {
+    int left = 0;
+    int right = size - 1;
+    int iterations = 0;
+    
+    while (left <= right) {
+        iterations++;
+        int mid = left + (right - left) / 2;
+        
+        cout << "Iteration " << iterations << ": ";
+        cout << "left=" << left << ", right=" << right << ", mid=" << mid;
+        cout << ", arr[mid]=" << arr[mid] << endl;
+        
+        if (arr[mid] == target) {
+            cout << "Found at index " << mid << " after " << iterations << " iterations" << endl;
+            return mid;
+        }
+        
+        if (arr[mid] < target) {
+            left = mid + 1;
+            cout << "Target is in right half" << endl;
+        } else {
+            right = mid - 1;
+            cout << "Target is in left half" << endl;
+        }
+    }
+    
+    cout << "Target not found after " << iterations << " iterations" << endl;
+    return -1;
+}
+
+int main() {
+    int arr[] = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};
+    int size = sizeof(arr)/sizeof(arr[0]);
+    int target = 23;
+    
+    cout << "Array: ";
+    for (int i = 0; i < size; i++) {
+        cout << arr[i] << " ";
+    }
+    cout << endl;
+    cout << "Searching for: " << target << endl;
+    
+    int result = binarySearch(arr, size, target);
+    
+    return 0;
+}`,
+
+  fibonacci: `// Fibonacci Sequence with Loop
+#include <iostream>
+using namespace std;
+
+int main() {
+    int n = 10;
+    cout << "Fibonacci sequence for first " << n << " numbers:" << endl;
+    
+    int a = 0, b = 1;
+    cout << a << " " << b << " ";
+    
+    for (int i = 2; i < n; i++) {
+        int next = a + b;
+        cout << next << " ";
+        a = b;
+        b = next;
+        
+        cout << "[a=" << a << ", b=" << b << ", i=" << i << "]" << endl;
+    }
+    
+    cout << endl;
+    return 0;
+}`
 };
 
 export default AdvancedCodeVisualizer;

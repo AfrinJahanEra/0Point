@@ -45,8 +45,8 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
     }
     
     if (inputType === 'stack') {
-      // Push to stack (add to end)
-      const newData = [...stackData, parsedValue];
+      // Push to stack (add to beginning for proper stack behavior)
+      const newData = [parsedValue, ...stackData];
       setStackData(newData);
       
       // Update input value
@@ -67,6 +67,56 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
     } else if (inputType === 'queue') {
       // Enqueue to queue (add to end)
       const newData = [...queueData, parsedValue];
+      setQueueData(newData);
+      
+      // Update input value
+      const newInputValue = newData.map(item => {
+        if (item === null) return 'null';
+        if (typeof item === 'string') return `"${item}"`;
+        if (typeof item === 'boolean') return String(item);
+        return String(item);
+      }).join(', ');
+      
+      if (externalInputValue === undefined) {
+        isProgrammaticUpdate.current = true;
+        setInternalInputValue(newInputValue);
+      }
+      // Trigger animation
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 1000 / animationSpeed);
+    }
+  };
+  
+  // Function to remove element from stack (pop)
+  const handlePopElement = () => {
+    if (inputType === 'stack' && stackData.length > 0) {
+      // Remove the first element (top of stack)
+      const newData = stackData.slice(1);
+      setStackData(newData);
+      
+      // Update input value
+      const newInputValue = newData.map(item => {
+        if (item === null) return 'null';
+        if (typeof item === 'string') return `"${item}"`;
+        if (typeof item === 'boolean') return String(item);
+        return String(item);
+      }).join(', ');
+      
+      if (externalInputValue === undefined) {
+        isProgrammaticUpdate.current = true;
+        setInternalInputValue(newInputValue);
+      }
+      // Trigger animation
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 1000 / animationSpeed);
+    }
+  };
+  
+  // Function to remove element from queue (dequeue)
+  const handleDequeueElement = () => {
+    if (inputType === 'queue' && queueData.length > 0) {
+      // Remove the first element (front of queue)
+      const newData = queueData.slice(1);
       setQueueData(newData);
       
       // Update input value
@@ -654,7 +704,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
     
     return (
       <div className="flex flex-col items-center w-full">
-        <div className="flex flex-col items-center mb-6 w-full max-w-md">
+        <div className="flex flex-col-reverse items-center mb-6 w-full max-w-md">
           {displayData.map((item, index) => (
             <div 
               key={index}
@@ -663,7 +713,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 border-2 border-black rounded transition-all duration-300 mb-2
                 ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-105' : ''}
                 bg-white hover:bg-gray-100
-                ${isAnimating && index === displayData.length - 1 ? 'animate-uniqueSlideIn' : ''}
+                ${isAnimating && index === 0 ? 'animate-uniqueSlideIn' : ''}
               `}
               onClick={() => {
                 setSelectedNode(index);
@@ -671,7 +721,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                   index,
                   value: item,
                   type: typeof item,
-                  position: displayData.length - index, // Stack position (top = 1)
+                  position: index + 1, // Stack position (top = 1)
                   isFirst: index === 0,
                   isLast: index === displayData.length - 1
                 });
@@ -684,7 +734,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 <span className="text-xs text-gray-600 ml-2">[{index}]</span>
               </div>
               <div className="text-xs text-gray-600">
-                Pos: {displayData.length - index}
+                Pos: {index + 1}
               </div>
             </div>
           ))}
@@ -701,19 +751,19 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
             <div className="border border-black p-3 rounded bg-white">
               <div className="text-sm text-gray-600">Top Element</div>
               <div className="text-lg font-bold text-black">
-                {stackData[stackData.length - 1] === null ? 'null' : String(stackData[stackData.length - 1])}
+                {stackData[0] === null ? 'null' : String(stackData[0])}
               </div>
             </div>
           )}
           
           <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Bottom Index</div>
-            <div className="text-lg font-bold text-black">0</div>
+            <div className="text-lg font-bold text-black">{stackData.length > 0 ? stackData.length - 1 : 'N/A'}</div>
           </div>
           
           <div className="border border-black p-3 rounded bg-white">
             <div className="text-sm text-gray-600">Top Index</div>
-            <div className="text-lg font-bold text-black">{stackData.length > 0 ? stackData.length - 1 : 'N/A'}</div>
+            <div className="text-lg font-bold text-black">0</div>
           </div>
         </div>
       </div>
@@ -1201,7 +1251,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
       return (
         <div className="flex flex-col items-center justify-center h-64 text-gray-400">
           <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 11-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <p>Enter data to visualize...</p>
         </div>
@@ -1370,6 +1420,22 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                     >
                       Add
                     </button>
+                    {inputType === 'stack' && stackData.length > 0 && (
+                      <button 
+                        onClick={handlePopElement}
+                        className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                      >
+                        Pop
+                      </button>
+                    )}
+                    {inputType === 'queue' && queueData.length > 0 && (
+                      <button 
+                        onClick={handleDequeueElement}
+                        className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                      >
+                        Dequeue
+                      </button>
+                    )}
                   </div>
                 )}
                 
@@ -1570,7 +1636,7 @@ const getPlaceholder = (type) => {
     case 'linked-list':
       return 'Enter values separated by commas: 1, 2, 3, 4, 5';
     case 'tree':
-      return 'Nested format: A(B(C,D),E) or edge format: A->B, B->C, C->D';
+      return 'Nested format: A(B(C,D),E) or edge format: A->B, B->C, C-D';
     case 'graph':
       return 'Edge format: A->B:5, B->C:3, C-D:2 (-> for directed, - for undirected)';
     default:
