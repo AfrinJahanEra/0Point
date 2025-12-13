@@ -29,6 +29,13 @@ import {
   AlertCircle,
   HelpCircle
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import rehypeHighlight from 'rehype-highlight';
+import rehypeRaw from 'rehype-raw';
+import 'katex/dist/katex.min.css';
+import 'highlight.js/styles/github.css';
 
 const CreateContest = () => {
   const navigate = useNavigate();
@@ -69,6 +76,98 @@ const CreateContest = () => {
   });
   const [testInvites, setTestInvites] = useState('');
   const [publishErrors, setPublishErrors] = useState({});
+
+  const customComponents = {
+  h1: ({ children }) => (
+    <h1 className="text-2xl font-bold mt-6 mb-4 text-blue-900 border-b border-blue-200 pb-2">
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="text-xl font-bold mt-5 mb-3 text-gray-800">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="text-lg font-semibold mt-4 mb-2 text-gray-700">
+      {children}
+    </h3>
+  ),
+  p: ({ children }) => (
+    <p className="my-3 text-gray-700 leading-relaxed">
+      {children}
+    </p>
+  ),
+  ul: ({ children }) => (
+    <ul className="my-4 ml-6 list-disc space-y-2 text-gray-700">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-4 ml-6 list-decimal space-y-2 text-gray-700">
+      {children}
+    </ol>
+  ),
+  code: ({ inline, className, children, ...props }) => {
+    const match = /language-(\w+)/.exec(className || '');
+    return !inline && match ? (
+      <div className="my-4 rounded-md overflow-hidden">
+        <div className="bg-gray-800 text-gray-300 text-xs px-4 py-2 font-mono">
+          {match[1]}
+        </div>
+        <pre className="bg-gray-900 text-gray-100 p-4 overflow-x-auto text-sm">
+          <code className={className} {...props}>
+            {children}
+          </code>
+        </pre>
+      </div>
+    ) : (
+      <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
+        {children}
+      </code>
+    );
+  },
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-4 border-blue-400 pl-4 py-2 my-4 bg-blue-50 italic text-gray-700">
+      {children}
+    </blockquote>
+  ),
+  table: ({ children }) => (
+    <div className="overflow-x-auto my-6">
+      <table className="min-w-full divide-y divide-gray-200 border border-gray-300">
+        {children}
+      </table>
+    </div>
+  ),
+  tr: ({ children }) => (
+    <tr className="divide-x divide-gray-200">{children}</tr>
+  ),
+  th: ({ children }) => (
+    <th className="px-4 py-3 bg-gray-100 text-left text-sm font-semibold text-gray-700">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="px-4 py-3 text-sm text-gray-700 border-t border-gray-200">
+      {children}
+    </td>
+  ),
+  a: ({ href, children }) => (
+    <a href={href} className="text-blue-600 hover:text-blue-800 hover:underline">
+      {children}
+    </a>
+  ),
+  spoiler: ({ children, summary }) => (
+    <details className="my-4 bg-gray-50 border border-gray-300 rounded-lg">
+      <summary className="cursor-pointer px-4 py-3 font-medium text-gray-700 hover:bg-gray-100">
+        {summary || 'Solution / Spoiler'}
+      </summary>
+      <div className="px-4 py-3 border-t border-gray-300 bg-white">
+        {children}
+      </div>
+    </details>
+  )
+};
 
   // Add this useEffect to fetch contest data when in edit mode
 useEffect(() => {
@@ -252,15 +351,21 @@ const renderTutorialTab = () => {
                 <h1 className="text-xl font-bold mb-4">Tutorial Preview</h1>
                 <div className="border rounded-lg p-4 bg-gray-50 min-h-[400px]">
                   {currentProblem.tutorial ? (
-                    <pre className="whitespace-pre-wrap font-mono text-sm">
-                      {currentProblem.tutorial}
-                    </pre>
-                  ) : (
-                    <div className="text-center py-20 text-gray-500">
-                      <GraduationCap className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>No tutorial content yet. Switch to edit mode to write a tutorial.</p>
-                    </div>
-                  )}
+  <div className="prose prose-sm max-w-none">
+    <ReactMarkdown
+      remarkPlugins={[remarkMath]}
+      rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+      components={customComponents}
+    >
+      {currentProblem.tutorial}
+    </ReactMarkdown>
+  </div>
+) : (
+  <div className="text-center py-20 text-gray-500">
+    <GraduationCap className="w-12 h-12 mx-auto mb-4 opacity-50" />
+    <p>No tutorial content yet. Switch to edit mode to write a tutorial.</p>
+  </div>
+)}
                 </div>
                 <div className="mt-4 text-sm text-gray-600">
                   <p><strong>Note:</strong> This is a basic preview. For full Markdown rendering, you would need to install and use a Markdown renderer like <code>react-markdown</code>.</p>
@@ -310,8 +415,8 @@ const renderTutorialTab = () => {
 };
 
   // Function to save draft (update if in edit mode)
-// CreateContest.jsx
-const handleSaveDraft = async () => {
+
+  const handleSaveDraft = async () => {
   if (!contestData.title.trim()) {
     alert("Please enter a contest title before saving draft");
     return;
@@ -325,7 +430,7 @@ const handleSaveDraft = async () => {
     memory_limit_mb: parseInt(problem.memoryLimit) || 256,
     tags: problem.tags,
     difficulty: problem.difficulty || "Medium",
-    tutorial: problem.tutorial || "", // IMPORTANT: Include tutorial
+    tutorial: problem.tutorial || "",
     test_cases: problem.testCases.map((tc) => ({
       input: tc.input,
       output: tc.output,
@@ -338,7 +443,7 @@ const handleSaveDraft = async () => {
   const payload = {
     title: contestData.title,
     description: contestData.description || "",
-    start_time: contestData.startTime ? contestData.startTime + ":00Z" : null,
+    start_time: contestData.startTime ? contestData.startTime + ":00Z" : null, // This can be null for draft
     duration: parseFloat(contestData.duration) || 3.0,
     type: contestData.type,
     platform: contestData.platform,
@@ -355,7 +460,7 @@ const handleSaveDraft = async () => {
     
     if (editMode && contestId) {
       url = `http://localhost:8000/contests/${contestId}/update/`;
-      method = "PATCH";
+      method = "PATCH";  // Or "PUT" depending on your backend
     }
 
     const response = await fetch(url, {
@@ -378,7 +483,10 @@ const handleSaveDraft = async () => {
     alert(editMode ? "Draft updated successfully!" : "Draft saved successfully!");
     
     // If this was a new contest creation (not edit mode), navigate to the new contest
-
+    if (!editMode && data.id) {
+      navigate(`/contests/${data.id}/edit/`);
+    }
+    
   } catch (err) {
     console.error("Request failed:", err);
     alert("Could not reach server.");
@@ -448,7 +556,6 @@ const handleSaveDraft = async () => {
     return Object.keys(newErrors).length === 0;
   };
 
-// CreateContest.jsx
 const handlePublishContest = async (type) => {
   // Validate contest data
   if (!contestData.title.trim()) {
@@ -485,7 +592,11 @@ const handlePublishContest = async (type) => {
   }
 
   try {
-    // Format problems with tutorials
+    let payload;
+    let url;
+    let method;
+
+    // Format problems (common for both edit and create modes)
     const formattedProblems = problems.map((problem) => ({
       index: problem.problemIndex,
       title: problem.title,
@@ -494,7 +605,7 @@ const handlePublishContest = async (type) => {
       memory_limit_mb: parseInt(problem.memoryLimit) || 256,
       tags: problem.tags,
       difficulty: problem.difficulty || "Medium",
-      tutorial: problem.tutorial || "", // IMPORTANT: Include tutorial
+      tutorial: problem.tutorial || "",
       test_cases: problem.testCases.map((tc) => ({
         input: tc.input,
         output: tc.output,
@@ -504,44 +615,61 @@ const handlePublishContest = async (type) => {
       })),
     }));
 
-    // Prepare the payload
-    const payload = {
-      title: contestData.title,
-      description: contestData.description || "",
-      start_time: contestData.startTime + ":00Z",
-      duration: parseFloat(contestData.duration) || 3.0,
-      type: contestData.type,
-      platform: contestData.platform,
-      problems: formattedProblems,
-      status: type === "test" ? "test" : "upcoming",
-      visibility: publishSettings.visibility,
-      registration_required: publishSettings.registrationRequired,
-      email_notifications: publishSettings.emailNotifications,
-      leaderboard_public: publishSettings.leaderboardPublic,
-      allow_practice: publishSettings.allowPractice,
-      rating_changes: publishSettings.ratingChanges,
-      editorial_published: publishSettings.editorialPublished
-    };
-
-    // Add test contest data if applicable
-    if (type === "test") {
-      payload.testers = publishSettings.testers.map(t => t.email);
-      payload.test_start_time = publishSettings.testStartTime + ":00Z";
-      payload.test_duration = publishSettings.testDuration;
-      payload.type = "test";
+    if (editMode && contestId) {
+      // EDIT MODE: Send COMPLETE contest data including problems
+      payload = {
+        title: contestData.title,
+        description: contestData.description || "",
+        start_time: contestData.startTime + ":00Z",
+        duration: parseFloat(contestData.duration) || 3.0,
+        type: contestData.type,
+        platform: contestData.platform,
+        problems: formattedProblems,  // ← THIS IS CRITICAL!
+        editorial_published: publishSettings.editorialPublished
+      };
+      
+      // Add test contest data if applicable
+      if (type === "test") {
+        payload.convert_to_test = true;
+        payload.testers = publishSettings.testers.map(t => t.email);
+        payload.testStartTime = publishSettings.testStartTime + ":00Z";
+      }
+      
+      url = `http://localhost:8000/contests/${contestId}/publish/`;
+      method = "POST";
     } else {
+      // CREATE NEW MODE: Send full contest data
+      payload = {
+        title: contestData.title,
+        description: contestData.description || "",
+        start_time: contestData.startTime + ":00Z",
+        duration: parseFloat(contestData.duration) || 3.0,
+        type: contestData.type,
+        platform: contestData.platform,
+        problems: formattedProblems,
+        status: type === "test" ? "test" : "upcoming",
+        visibility: publishSettings.visibility,
+        registration_required: publishSettings.registrationRequired,
+        email_notifications: publishSettings.emailNotifications,
+        leaderboard_public: publishSettings.leaderboardPublic,
+        allow_practice: publishSettings.allowPractice,
+        rating_changes: publishSettings.ratingChanges,
+        editorial_published: publishSettings.editorialPublished
+      };
+
+      // Add test contest data if applicable
+      if (type === "test") {
+        payload.testers = publishSettings.testers.map(t => t.email);
+        payload.test_start_time = publishSettings.testStartTime + ":00Z";
+        payload.test_duration = publishSettings.testDuration;
+        payload.type = "test";
+      }
+
+      url = "http://localhost:8000/contests/create-full/";
+      method = "POST";
     }
 
     console.log("Publishing contest:", payload);
-
-    let url = "http://localhost:8000/contests/create-full/";
-    let method = "POST";
-    
-    if (editMode && contestId) {
-      // For updating and publishing, use the publish endpoint
-      url = `http://localhost:8000/contests/${contestId}/publish/`;
-      method = "POST";
-    }
 
     const response = await fetch(url, {
       method: method,
