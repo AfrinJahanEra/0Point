@@ -31,23 +31,14 @@ from compiler.views import (
     CodeExecuteAPIView,
 )
 
-# contest/urls.py
-# contest/urls.py
-from django.urls import path
-from .views import (
-    ContestAnnouncementsAPIView,
-    ContestListCreateAPIView,
-    ContestDetailAPIView,
-    ContestRegisterAPIView,
-    MyContestRegistrationsAPIView,
-    ContestFullCreateAPIView,
-    ContestPublishAPIView,
-    ContestUpdateAPIView,
-    ContestProblemsAPIView,
-    ContestProblemDetailAPIView,
-    UserProblemStatusAPIView,
-    ContestProblemTutorialAPIView,
-    ContestEditorialAPIView,
+from discussion.views import (
+    DiscussionListCreateAPIView,
+    DiscussionDetailAPIView,
+    DiscussionVoteAPIView,
+    DiscussionSaveAPIView,
+    CommentListCreateAPIView,
+    CommentDetailAPIView,
+    MySavedDiscussionsAPIView
 )
 
 urlpatterns = [
@@ -74,4 +65,15 @@ urlpatterns = [
     path('submissions/create/', SubmissionCreateAPIView.as_view(), name='submission-create'),
     path('contests/<str:contest_id>/editorial/', ContestEditorialAPIView.as_view()),
     path('contests/<str:contest_id>/execute/', CodeExecuteAPIView.as_view(), name='code-execute'),
+
+    # Discussion endpoints
+    path('contests/<contest_id>/discussions/', DiscussionListCreateAPIView.as_view(), name='contest-discussions'),
+    path('contests/<contest_id>/discussions/<discussion_id>/', DiscussionDetailAPIView.as_view(), name='discussion-detail'),
+    path('contests/<contest_id>/discussions/<discussion_id>/vote/', DiscussionVoteAPIView.as_view(), name='discussion-vote'),
+    path('contests/<contest_id>/discussions/<discussion_id>/save/', DiscussionSaveAPIView.as_view(), name='discussion-save'),
+    # Discussion Comment endpoints
+    path('contests/<contest_id>/discussions/<discussion_id>/comments/', CommentListCreateAPIView.as_view(), name='discussion-comments'),
+    path('contests/<contest_id>/discussions/<discussion_id>/comments/<comment_id>/', CommentDetailAPIView.as_view(), name='comment-detail'),
+    # User saved discussions
+    path('discussions/saved/', MySavedDiscussionsAPIView.as_view(), name='my-saved-discussions'),
 ]
