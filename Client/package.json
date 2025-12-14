@@ -11,9 +11,13 @@
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.6",
+    "@monaco-editor/react": "^4.7.0",
+    "acorn": "^8.15.0",
     "axios": "^1.11.0",
     "canvas-confetti": "^1.9.4",
     "d3": "^7.9.0",
+    "escodegen": "^2.1.0",
+    "estraverse": "^5.3.0",
     "framer-motion": "^12.23.24",
     "html2pdf.js": "^0.10.3",
     "jspdf": "^3.0.4",

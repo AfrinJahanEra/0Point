@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import AlgorithmSelector from '../components/AlgorithmSelector';
 import InputPanel from '../components/InputPanel';
-
-
 import SequentialSortingVisualizer from '../components/Visualizer_comp/SequentialSortingVisualizer';
 import HeapTreeVisualizer from '../components/Visualizer_comp/HeapTreeVisualizer';
 import SearchVisualizer from '../components/Visualizer_comp/SearchVisualizer';
@@ -16,8 +14,8 @@ import DFSVisualizer from '../components/Visualizer_comp/DFSVisualizer';
 import DijkstraVisualizer from '../components/Visualizer_comp/DijkstraVisualizer';
 import KruskalVisualizer from '../components/Visualizer_comp/KruskalVisualizer';
 import PrimVisualizer from '../components/Visualizer_comp/PrimVisualizer';
-import IOVisualizer from '../components/Visualizer_comp/IOVisualizer';
-import CodeVisualizer from '../components/Visualizer_comp/CodeVisualizer';
+import IOVisualizer from '../components/Io_Visualizer/IOVisualizer';
+import CodeVisualizer from '../components/CodeVisualizer/CodeVisualizer';
 import { algorithms } from '../utils/algorithms';
 import { parseInputs } from '../utils/inputParser';
 
@@ -754,8 +752,8 @@ const Visualizer = () => {
                   type="button"
                   className={`px-4 py-2 text-sm font-medium rounded-l-lg border ${
                     heapViewMode === 'array'
-                      ? 'bg-blue-800 text-white border-blue-800'
-                      : 'bg-white text-blue-800 border-blue-200 hover:bg-blue-50'
+                      ? 'bg-[#001F3F] text-white border-[#001F3F]'
+                      : 'bg-white text-[#001F3F] border-gray-200 hover:bg-gray-50'
                   }`}
                   onClick={() => setHeapViewMode('array')}
                 >
@@ -765,8 +763,8 @@ const Visualizer = () => {
                   type="button"
                   className={`px-4 py-2 text-sm font-medium rounded-r-md border ${
                     heapViewMode === 'tree'
-                      ? 'bg-blue-800 text-white border-blue-800'
-                      : 'bg-white text-blue-800 border-blue-200 hover:bg-blue-50'
+                      ? 'bg-[#001F3F] text-white border-[#001F3F]'
+                      : 'bg-white text-[#001F3F] border-gray-200 hover:bg-gray-50'
                   }`}
                   onClick={() => setHeapViewMode('tree')}
                 >
@@ -840,7 +838,7 @@ const Visualizer = () => {
     switch (selectedAlgorithm) {
       case 'bubble-sort':
         if (stepData.comparing && stepData.comparing.length > 0) {
-          return 5; // Comparing elements
+          return 5; // Partitioning
         } else if (stepData.swapping && stepData.swapping.length > 0) {
           return 6; // Swapping elements
         }
@@ -1022,30 +1020,30 @@ const Visualizer = () => {
   const currentLineToHighlight = getCurrentLineToHighlight();
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen bg-white">
       <div className="flex-grow flex flex-col">
-        <div className="text-center py-4 bg-white border-b border-gray-200">
-          <h1 className="text-3xl font-bold text-blue-800 mb-1">0Point Visualizer</h1>
-          <p className="text-blue-800 text-base">Watch algorithms come to life with interactive visualizations</p>
+        <div className="text-center py-4 bg-[#001F3F] border-b border-black">
+          <h1 className="text-3xl font-bold text-white mb-1">0Point Visualizer</h1>
+          <p className="text-white text-base">Watch algorithms come to life with interactive visualizations</p>
           
           {/* Navbar for Visualizer Sections */}
           <div className="flex justify-center mt-4">
-            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            <div className="flex space-x-1 bg-black p-1 rounded-lg">
               <button
                 onClick={() => setActiveTab('dsa')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'dsa' ? 'bg-white text-blue-800 shadow' : 'text-gray-600 hover:text-gray-900'}`}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300 ${activeTab === 'dsa' ? 'bg-white text-[#001F3F] shadow' : 'text-gray-300 hover:text-white'}`}
               >
                 DSA Visualizer
               </button>
               <button
                 onClick={() => setActiveTab('io')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'io' ? 'bg-white text-blue-800 shadow' : 'text-gray-600 hover:text-gray-900'}`}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300 ${activeTab === 'io' ? 'bg-white text-[#001F3F] shadow' : 'text-gray-300 hover:text-white'}`}
               >
                 I/O Visualizer
               </button>
               <button
                 onClick={() => setActiveTab('code')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'code' ? 'bg-white text-blue-800 shadow' : 'text-gray-600 hover:text-gray-900'}`}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300 ${activeTab === 'code' ? 'bg-white text-[#001F3F] shadow' : 'text-gray-300 hover:text-white'}`}
               >
                 Code Visualizer
               </button>
@@ -1056,10 +1054,10 @@ const Visualizer = () => {
         <div className={`flex-grow ${activeTab === 'code' ? 'grid grid-cols-1' : 'grid grid-cols-1 lg:grid-cols-2'} gap-0`} style={{ height: 'calc(100vh - 160px)' }}>
           {/* Left Column - Input and Code for DSA and IO tabs only */}
           {(activeTab === 'dsa' || activeTab === 'io') && (
-            <div className="bg-white border-r border-sky-200 flex flex-col h-full">
+            <div className="bg-white border-r border-black flex flex-col h-full">
               {activeTab === 'dsa' && (
                 <div className="p-6 overflow-y-auto flex-grow h-full">
-                  <h2 className="text-xl text-blue-800 mb-3">Algorithm & Input</h2>
+                  <h2 className="text-xl text-[#001F3F] mb-3">Algorithm & Input</h2>
                   
                   <div className="mb-6">
                     <AlgorithmSelector
@@ -1085,12 +1083,12 @@ const Visualizer = () => {
                   {/* Code Display */}
                   {selectedAlgorithm && (
                     <div className="mt-6 flex-grow flex flex-col">
-                      <h3 className="text-lg text-blue-800 mb-2">Algorithm Code</h3>
-                      <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto font-mono text-sm flex-grow">
+                      <h3 className="text-lg text-[#001F3F] mb-2">Algorithm Code</h3>
+                      <div className="bg-black text-white p-4 rounded-lg overflow-x-auto font-mono text-sm flex-grow">
                         {algorithmCodes[selectedAlgorithm]?.split('\n').map((line, index) => (
                           <div 
                             key={index} 
-                            className={index === currentLineToHighlight ? 'bg-yellow-500 bg-opacity-30 p-1 rounded code-line-highlight' : ''}
+                            className={index === currentLineToHighlight ? 'bg-[#001F3F] p-1 rounded code-line-highlight animate-uniqueCodeHighlight' : ''}
                           >
                             <span className="text-gray-500 mr-4 select-none">{index + 1}</span>
                             {line}
@@ -1104,7 +1102,7 @@ const Visualizer = () => {
               
               {activeTab === 'io' && (
                 <div className="p-6 overflow-y-auto flex-grow h-full">
-                  <h2 className="text-xl text-blue-800 mb-3">I/O Visualizer</h2>
+                  <h2 className="text-xl text-[#001F3F] mb-3">I/O Visualizer</h2>
                   <div className="flex flex-col h-full">
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1113,9 +1111,12 @@ const Visualizer = () => {
                       <select
                         value={ioInputType}
                         onChange={(e) => setIoInputType(e.target.value)}
-                        className="mb-4 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        className="mb-4 p-2 border border-black rounded-md focus:ring-[#001F3F] focus:border-[#001F3F]"
                       >
                         <option value="array">Array/List</option>
+                        <option value="stack">Stack</option>
+                        <option value="queue">Queue</option>
+                        <option value="linked-list">Linked List</option>
                         <option value="tree">Tree</option>
                         <option value="graph">Graph</option>
                       </select>
@@ -1129,16 +1130,25 @@ const Visualizer = () => {
                         placeholder={
                           ioInputType === 'array' 
                             ? 'Enter values separated by commas or spaces (e.g., 1,2,3,4,5 or 1 2 3 4 5)'
+                            : ioInputType === 'stack'
+                            ? 'Enter values separated by commas (e.g., 1,2,3,4,5)'
+                            : ioInputType === 'queue'
+                            ? 'Enter values separated by commas (e.g., 1,2,3,4,5)'
+                            : ioInputType === 'linked-list'
+                            ? 'Enter values separated by commas (e.g., 10,20,30,40,50)'
                             : ioInputType === 'tree'
                             ? 'Nested: A(B(C,D),E) or Edges: A->B,B->C'
                             : 'Undirected: A,B,C,A-B:5,B-C:3 or Directed: A->B:5,B->C:3'
                         }
-                        className="flex-grow p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        className="flex-grow p-3 border border-black rounded-md focus:ring-[#001F3F] focus:border-[#001F3F]"
                         rows="4"
                       />
                       
                       <div className="mt-2 text-xs text-gray-500">
                         {ioInputType === 'array' && 'Supports numbers and strings'}
+                        {ioInputType === 'stack' && 'LIFO data structure'}
+                        {ioInputType === 'queue' && 'FIFO data structure'}
+                        {ioInputType === 'linked-list' && 'Linear collection of elements'}
                         {ioInputType === 'tree' && 'Hierarchical tree structure with parent-child relationships'}
                         {ioInputType === 'graph' && 'Format: node1,node2,edge1-edge2:weight'}
                       </div>
@@ -1146,7 +1156,7 @@ const Visualizer = () => {
                     
                     {/* Examples Section */}
                     <div className="bg-gray-50 p-4 rounded-lg flex-grow">
-                      <h3 className="font-medium text-gray-800 mb-3">Examples</h3>
+                      <h3 className="font-medium text-black mb-3">Examples</h3>
                       <div className="space-y-3">
                         <div>
                           <div className="text-sm font-medium text-gray-700">Array Example:</div>
@@ -1158,6 +1168,45 @@ const Visualizer = () => {
                             }}
                           >
                             5,2,8,1,9,3
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Stack Example:</div>
+                          <div 
+                            className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
+                            onClick={() => {
+                              setIoInputType('stack');
+                              setIoInputValue('1,2,3,4,5');
+                            }}
+                          >
+                            1,2,3,4,5
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Queue Example:</div>
+                          <div 
+                            className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
+                            onClick={() => {
+                              setIoInputType('queue');
+                              setIoInputValue('1,2,3,4,5');
+                            }}
+                          >
+                            1,2,3,4,5
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Linked List Example:</div>
+                          <div 
+                            className="text-sm bg-white p-2 mt-1 rounded border cursor-pointer hover:bg-gray-100"
+                            onClick={() => {
+                              setIoInputType('linked-list');
+                              setIoInputValue('10,20,30,40,50');
+                            }}
+                          >
+                            10,20,30,40,50
                           </div>
                         </div>
                         
@@ -1201,14 +1250,14 @@ const Visualizer = () => {
             <div className="p-6 overflow-y-auto flex-grow h-full">
               {activeTab === 'dsa' && (
                 <>
-                  <h2 className="text-xl text-blue-800 mb-3">Visualization</h2>
+                  <h2 className="text-xl text-[#001F3F] mb-3">Visualization</h2>
                   {renderVisualization()}
                   
                   {!selectedAlgorithm && (
-                    <div className="border border-gray-400 p-6 mt-6 bg-white">
+                    <div className="border border-black p-6 mt-6 bg-white">
                       <div className="flex flex-col md:flex-row items-center">
                         <div className="mb-4 md:mb-0 md:mr-6">
-                          <div className="w-16 h-20 bg-white border border-gray-400 flex items-center justify-center">
+                          <div className="w-16 h-20 bg-white border border-black flex items-center justify-center">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
@@ -1269,7 +1318,7 @@ const Visualizer = () => {
               
               {activeTab === 'io' && (
                 <div className="h-full flex flex-col">
-                  <h2 className="text-xl text-blue-800 mb-3">I/O Visualization</h2>
+                  <h2 className="text-xl text-[#001F3F] mb-3">I/O Visualization</h2>
                   <div className="flex-grow">
                     <IOVisualizer inputType={ioInputType} inputValue={ioInputValue} />
                   </div>
@@ -1298,6 +1347,16 @@ const Visualizer = () => {
         </div>
       </div>
 
+      <style>{`
+        @keyframes uniqueCodeHighlight {
+          0% { opacity: 0; transform: scale(0.98); }
+          50% { opacity: 1; transform: scale(1.02); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        .code-line-highlight {
+          animation: uniqueCodeHighlight 0.5s ease-in-out;
+        }
+      `}</style>
     </div>
   );
 };
