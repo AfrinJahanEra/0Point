@@ -49,245 +49,85 @@ const LoopVisualizer = () => {
   };
 
   // Simulate code compilation and line-by-line execution
-  const simulateCompilation = () => {
-    if (!uploadedCode) {
-      alert('Please upload a code file first');
-      return;
+const simulateCompilation = async () => {
+  if (!uploadedCode) {
+    alert("Upload code first");
+    return;
+  }
+
+  setIsProcessing(true);
+
+  try {
+    const response = await fetch("http://127.0.0.1:8000/api/execute/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        language: "python",
+        code: uploadedCode
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || "Execution failed");
     }
 
-    setIsProcessing(true);
+    const data = await response.json();
+
+    // Convert backend steps → frontend format
+    const mappedIterations = data.steps.map((step, index) => ({
+      step: index + 1,
+      executingLine: step.line,
+      description: step.description,
+      variables: Object.entries(step.variables).map(
+        ([name, value]) => ({
+          name,
+          type: typeof value,
+          value
+        })
+      )
+    }));
+
+    setIterations(mappedIterations);
+    // Set variables to all unique variables across all steps
+    const allUniqueVariables = [];
+    const variableNames = new Set();
     
-    // Simulate processing delay
-    setTimeout(() => {
-      try {
-        // Extract line-by-line execution data
-        const extractedData = extractLineExecutionData(uploadedCode);
-        setVariables(extractedData.variables);
-        setIterations(extractedData.iterations);
-        setOutput(extractedData.output);
-        setFinalOutput(extractedData.finalOutput);
-        setExecutingLine(extractedData.initialLine);
-        setCurrentStep(0);
-      } catch (error) {
-        console.error('Compilation simulation error:', error);
-        setOutput(['Error in code compilation simulation: ' + error.message]);
-        setFinalOutput('Error occurred during simulation');
-      } finally {
-        setIsProcessing(false);
-      }
-    }, 1500);
-  };
+    mappedIterations.forEach(iteration => {
+      iteration.variables.forEach(variable => {
+        if (!variableNames.has(variable.name)) {
+          variableNames.add(variable.name);
+          allUniqueVariables.push(variable);
+        }
+      });
+    });
+    
+    setVariables(allUniqueVariables);
+    setOutput(
+      data.steps.map((s, i) => [
+        `Step ${i + 1}: ${s.description}`,
+        ...Object.entries(s.variables).map(
+          ([k, v]) => `${k} = ${v}`
+        )
+      ])
+    );
+
+    setFinalOutput(data.final_output);
+    setCurrentStep(0);
+    setExecutingLine(mappedIterations[0]?.executingLine ?? -1);
+  } catch (error) {
+    console.error(error);
+    alert(error.message);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
 
   // Extract line-by-line execution data
-  const extractLineExecutionData = (code) => {
-    const lines = code.split('\n');
-    const variables = [];
-    const iterations = [];
-    const output = [];
-    
-    // Sample variable tracking for the example code
-    if (code.includes('int n = 5, sum = 0;')) {
-      // Initial variables state
-      const initialVariables = [
-        { name: 'n', type: 'int', value: 5 },
-        { name: 'sum', type: 'int', value: 0 },
-        { name: 'i', type: 'int', value: '?' }
-      ];
-      
-      // Create execution steps for each line
-      const executionSteps = [
-        { line: 1, description: "Include iostream library", variables: [...initialVariables] },
-        { line: 2, description: "Use std namespace", variables: [...initialVariables] },
-        { line: 4, description: "Start of main function", variables: [...initialVariables] },
-        { line: 5, description: "Declare and initialize variables n=5, sum=0", variables: [...initialVariables] },
-        { line: 7, description: "Start for loop: initialize i=1", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 0 },
-          { name: 'i', type: 'int', value: 1 }
-        ]},
-        { line: 7, description: "Check condition: i<=n (1<=5) = true", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 0 },
-          { name: 'i', type: 'int', value: 1 }
-        ]},
-        { line: 8, description: "Execute loop body: sum += i (0+1=1)", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 1 },
-          { name: 'i', type: 'int', value: 1 }
-        ]},
-        { line: 8, description: "Increment i: i++ (1->2)", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 1 },
-          { name: 'i', type: 'int', value: 2 }
-        ]},
-        { line: 7, description: "Check condition: i<=n (2<=5) = true", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 1 },
-          { name: 'i', type: 'int', value: 2 }
-        ]},
-        { line: 8, description: "Execute loop body: sum += i (1+2=3)", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 3 },
-          { name: 'i', type: 'int', value: 2 }
-        ]},
-        { line: 8, description: "Increment i: i++ (2->3)", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 3 },
-          { name: 'i', type: 'int', value: 3 }
-        ]},
-        { line: 7, description: "Check condition: i<=n (3<=5) = true", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 3 },
-          { name: 'i', type: 'int', value: 3 }
-        ]},
-        { line: 8, description: "Execute loop body: sum += i (3+3=6)", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 6 },
-          { name: 'i', type: 'int', value: 3 }
-        ]},
-        { line: 8, description: "Increment i: i++ (3->4)", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 6 },
-          { name: 'i', type: 'int', value: 4 }
-        ]},
-        { line: 7, description: "Check condition: i<=n (4<=5) = true", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 6 },
-          { name: 'i', type: 'int', value: 4 }
-        ]},
-        { line: 8, description: "Execute loop body: sum += i (6+4=10)", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 10 },
-          { name: 'i', type: 'int', value: 4 }
-        ]},
-        { line: 8, description: "Increment i: i++ (4->5)", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 10 },
-          { name: 'i', type: 'int', value: 5 }
-        ]},
-        { line: 7, description: "Check condition: i<=n (5<=5) = true", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 10 },
-          { name: 'i', type: 'int', value: 5 }
-        ]},
-        { line: 8, description: "Execute loop body: sum += i (10+5=15)", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 15 },
-          { name: 'i', type: 'int', value: 5 }
-        ]},
-        { line: 8, description: "Increment i: i++ (5->6)", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 15 },
-          { name: 'i', type: 'int', value: 6 }
-        ]},
-        { line: 7, description: "Check condition: i<=n (6<=5) = false", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 15 },
-          { name: 'i', type: 'int', value: 6 }
-        ]},
-        { line: 11, description: "Print final result: cout << \"Sum = \" << sum << endl", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 15 },
-          { name: 'i', type: 'int', value: 6 }
-        ]},
-        { line: 12, description: "Return from main function", variables: [
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 15 },
-          { name: 'i', type: 'int', value: 6 }
-        ]}
-      ];
-      
-      // Create iterations for each execution step
-      executionSteps.forEach((step, index) => {
-        const iteration = { 
-          step: index + 1,
-          executingLine: step.line,
-          description: step.description,
-          variables: step.variables
-        };
-        
-        const iterationOutput = [
-          `Step ${index + 1}: ${step.description}`,
-          ...step.variables.map(v => `${v.name} = ${v.value}`)
-        ];
-        
-        output.push(iterationOutput);
-        iterations.push(iteration);
-      });
-      
-      // Final output
-      const finalOutput = "Sum = 15";
-      
-      return { 
-        variables: initialVariables, 
-        iterations, 
-        output,
-        finalOutput,
-        initialLine: 1
-      };
-    } else {
-      // Generic execution for other codes
-      const varRegex = /(int|float|double|char|bool|string|let|const|var)\s+(\w+)\s*=?[^,;]*/g;
-      let varMatch;
-      const foundVariables = [];
-      
-      while ((varMatch = varRegex.exec(code)) !== null) {
-        foundVariables.push({
-          name: varMatch[2],
-          type: varMatch[1],
-          value: varMatch[1] === 'int' ? 0 : '?'
-        });
-      }
-      
-      // If no variables found, create some sample ones
-      if (foundVariables.length === 0) {
-        foundVariables.push(
-          { name: 'n', type: 'int', value: 5 },
-          { name: 'sum', type: 'int', value: 0 },
-          { name: 'i', type: 'int', value: '?' }
-        );
-      }
-      
-      // Create sample line-by-line execution
-      const lines = code.split('\n');
-      const sampleIterations = [];
-      
-      for (let i = 0; i < Math.min(lines.length, 10); i++) {
-        if (lines[i].trim() !== '') {
-          // Update variables for this step
-          const stepVariables = foundVariables.map(v => ({
-            ...v,
-            value: v.name === 'i' ? i : v.value
-          }));
-          
-          const iteration = { 
-            step: i + 1,
-            executingLine: i + 1,
-            description: `Executing line ${i + 1}`,
-            variables: stepVariables
-          };
-          
-          const iterationOutput = [
-            `Step ${i + 1}: Executing line ${i + 1}`,
-            ...stepVariables.map(v => `${v.name} = ${v.value}`)
-          ];
-          
-          output.push(iterationOutput);
-          sampleIterations.push(iteration);
-        }
-      }
-      
-      const finalOutput = "Simulation complete";
-      
-      return { 
-        variables: foundVariables, 
-        iterations: sampleIterations, 
-        output,
-        finalOutput,
-        initialLine: 1
-      };
-    }
-  };
+
 
   // Navigation functions
   const goToNextStep = () => {
@@ -591,27 +431,57 @@ const LoopVisualizer = () => {
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Variable</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Type</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Value</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Current Value</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {(iterations.length > 0 && currentStep < iterations.length) ? (
-                        iterations[currentStep].variables.map((variable, index) => (
-                          <tr key={index} className="bg-white">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{variable.name}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">{variable.type}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700 font-mono">{variable.value}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        variables.map((variable, index) => (
-                          <tr key={index} className="bg-white">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{variable.name}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">{variable.type}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700 font-mono">{variable.value}</td>
-                          </tr>
-                        ))
-                      )}
+                      {(() => {
+                        try {
+                          // Get current step variables
+                          const currentStepVariables = iterations[currentStep]?.variables || [];
+                          
+                          // Check if we have any variables to display
+                          if (currentStepVariables.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan="3" className="px-4 py-3 text-center text-gray-500">
+                                  No variable data available for current step
+                                </td>
+                              </tr>
+                            );
+                          }
+                          
+                          return currentStepVariables.map((variable, index) => {
+                            try {
+                              return (
+                                <tr key={index} className="bg-white">
+                                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{variable.name}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-700">{variable.type}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-700 font-mono">{String(variable.value)}</td>
+                                </tr>
+                              );
+                            } catch (rowError) {
+                              console.error('Error rendering variable row:', rowError);
+                              return (
+                                <tr key={index}>
+                                  <td colSpan="3" className="px-4 py-3 text-red-500">
+                                    Error displaying variable {variable.name}
+                                  </td>
+                                </tr>
+                              );
+                            }
+                          });
+                        } catch (tableError) {
+                          console.error('Error in variable tracking table:', tableError);
+                          return (
+                            <tr>
+                              <td colSpan="3" className="px-4 py-3 text-red-500">
+                                Error loading variable tracking data
+                              </td>
+                            </tr>
+                          );
+                        }
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -621,6 +491,7 @@ const LoopVisualizer = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 11-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <p>Upload and compile code to track variables</p>
+                  <p className="text-xs mt-2">Variables: {variables.length}, Iterations: {iterations.length}</p>
                 </div>
               )}
             </div>
