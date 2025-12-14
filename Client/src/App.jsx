@@ -24,6 +24,8 @@ import Submissions from './pages/Submissions';
 import ContestInside from './pages/ContestInside';
 import MySubmissions from './pages/MySubmissions'; // Import MySubmissions page
 import ContestLeaderboard from './pages/ContestLeaderboard';
+import ContestEditorial from './pages/ContestEditorial';
+import ContestDiscussion from './pages/ContestDiscussion';
 
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
@@ -108,12 +110,19 @@ function App() {
                 <MySubmissions /> {/* Make sure this component exists */}
               </Layout>
             } />
+
+            <Route path="/contests/:contestId/discussion" element={
+              <Layout>
+                <ContestDiscussion /> {/* Make sure this component exists */}
+              </Layout>
+            } />
             
             <Route path="/contests/:contestId/leaderboard" element={
               <Layout>
                 <ContestLeaderboard /> {/* Make sure this component exists */}
               </Layout>
             } />
+            <Route path="/contests/:contestId/editorial" element={<ContestEditorial />} />
             
             {/* General contest route LAST (less specific) */}
             <Route path="/contests/:contestId" element={
