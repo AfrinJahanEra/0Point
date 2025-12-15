@@ -1,6 +1,6 @@
-// ContestDiscussion.jsx - UPDATED WITH API INTEGRATION
+// ContestDiscussion.jsx - UPDATED WITH FIXED COMMENTS SYSTEM
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { 
   MessageSquare,
   ChevronUp,
@@ -10,14 +10,18 @@ import {
   Plus,
   Send,
   Flag,
-  Share2
+  Share2,
+  X,
+  ThumbsUp,
+  ThumbsDown,
+  Reply,
+  MoreVertical
 } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:8000/'; // Adjust to your backend URL
+const API_BASE_URL = 'http://localhost:8000';
 
 const ContestDiscussion = () => {
   const { contestId } = useParams();
-  const navigate = useNavigate();
   
   const [contest, setContest] = useState(null);
   const [discussions, setDiscussions] = useState([]);
@@ -28,26 +32,30 @@ const ContestDiscussion = () => {
   const [newPost, setNewPost] = useState({
     title: '',
     content: '',
-    problem: '', // Frontend uses 'problem' field
+    problem: '',
     tags: []
   });
   const [showNewPostForm, setShowNewPostForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [problems, setProblems] = useState(['A', 'B', 'C', 'D']);
+  const [expandedPost, setExpandedPost] = useState(null);
+  
+  // FIX: Separate comment input for each post
+  const [commentInputs, setCommentInputs] = useState({}); // {postId: string}
+  // FIX: Separate reply state for each post
+  const [replyingTo, setReplyingTo] = useState({}); // {postId: commentId}
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
 
-  // Fetch discussions from backend
+  // Fetch discussions from backend WITH COMMENTS
   const fetchDiscussions = async () => {
     try {
       setLoading(true);
-    //   const TOKEN = localStorage.getItem('access_token');
       const headers = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${TOKEN}`  // Always use hardcoded token
-        };
+        'Authorization': `Bearer ${TOKEN}`
+      };
 
-      // Build query parameters
       const params = new URLSearchParams({
         sort: sortBy,
         page: 1,
@@ -75,18 +83,56 @@ const ContestDiscussion = () => {
       }
       
       const data = await response.json();
-      setDiscussions(data.discussions || []);
-      setFilteredDiscussions(data.discussions || []);
       
-      // Update contest info
+      // FIX: Fetch comments for each discussion
+      const discussionsWithComments = await Promise.all(
+        (data.discussions || []).map(async (discussion) => {
+          try {
+            const commentsResponse = await fetch(
+              `${API_BASE_URL}/contests/${contestId}/discussions/${discussion.id}/comments/`,
+              { headers }
+            );
+            
+            if (commentsResponse.ok) {
+              const commentsData = await commentsResponse.json();
+              return {
+                ...discussion,
+                comments: commentsData.comments || [],
+                comment_count: commentsData.total_comments || commentsData.comments?.length || 0
+              };
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch comments for discussion ${discussion.id}:`, error);
+          }
+          
+          return {
+            ...discussion,
+            comments: [],
+            comment_count: discussion.comment_count || 0
+          };
+        })
+      );
+      
+      setDiscussions(discussionsWithComments);
+      setFilteredDiscussions(discussionsWithComments);
+      
       if (data.contest) {
         setContest(data.contest);
-        setProblems(data.contest.problems || ['A', 'B', 'C', 'D']);
+        
+        const contestProblems = data.contest.problems || [];
+        
+        if (Array.isArray(contestProblems) && contestProblems.length > 0) {
+          setProblems(contestProblems);
+        } else if (Array.isArray(contestProblems) && contestProblems[0] && contestProblems[0].index) {
+          const problemIndices = contestProblems.map(p => p.index).filter(Boolean);
+          setProblems(problemIndices.length > 0 ? problemIndices : ['A', 'B', 'C', 'D']);
+        } else {
+          setProblems(['A', 'B', 'C', 'D']);
+        }
       }
       
     } catch (error) {
       console.error('Error fetching discussions:', error);
-      // Fallback to mock data if API fails
       setDiscussions([]);
       setFilteredDiscussions([]);
     } finally {
@@ -126,24 +172,17 @@ const ContestDiscussion = () => {
     }
   };
 
+  // FIXED VOTING LOGIC
   const handleVote = async (postId, voteType) => {
     try {
-
-      // Map frontend vote_status to backend vote_type
-      const voteMapping = {
-        'upvoted': 'upvote',
-        'downvoted': 'downvote'
-      };
-      
-      // Determine what to send based on current vote
-      let voteToSend = voteType;
       const currentDiscussion = discussions.find(d => d.id === postId);
+      if (!currentDiscussion) return;
+
+      let voteToSend;
       
       if (currentDiscussion.voteStatus === voteType) {
-        // Remove vote if already voted the same way
         voteToSend = 'remove';
-      } else if (currentDiscussion.voteStatus) {
-        // Change vote
+      } else {
         voteToSend = voteType;
       }
 
@@ -156,7 +195,7 @@ const ContestDiscussion = () => {
             'Authorization': `Bearer ${TOKEN}`
           },
           body: JSON.stringify({
-            vote_type: voteMapping[voteToSend] || voteToSend
+            vote_type: voteToSend
           })
         }
       );
@@ -167,8 +206,19 @@ const ContestDiscussion = () => {
 
       const data = await response.json();
       
-      // Update local state
       setDiscussions(prev => prev.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            upvotes: data.upvotes,
+            downvotes: data.downvotes,
+            voteStatus: data.vote_status
+          };
+        }
+        return post;
+      }));
+
+      setFilteredDiscussions(prev => prev.map(post => {
         if (post.id === postId) {
           return {
             ...post,
@@ -186,46 +236,94 @@ const ContestDiscussion = () => {
     }
   };
 
-  const handleSavePost = async (postId) => {
-    try {
+// In ContestDiscussion.jsx - Update the handleSavePost function
+const handleSavePost = async (postId) => {
+  try {
+    const currentDiscussion = discussions.find(d => d.id === postId);
+    if (!currentDiscussion) return;
 
-      const currentDiscussion = discussions.find(d => d.id === postId);
-      const action = currentDiscussion.saved ? 'unsave' : 'save';
-
-      const response = await fetch(
-        `${API_BASE_URL}/contests/${contestId}/discussions/${postId}/save/`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${TOKEN}`
-          },
-          body: JSON.stringify({ action })
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Save failed: ${response.status}`);
+    // Use 'toggle' action by default
+    const action = 'toggle';
+    
+    const response = await fetch(
+      `${API_BASE_URL}/contests/${contestId}/discussions/${postId}/save/`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${TOKEN}`
+        },
+        body: JSON.stringify({
+          action: action
+        })
       }
+    );
 
-      const data = await response.json();
-      
-      // Update local state
-      setDiscussions(prev => prev.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            saved: data.saved
-          };
-        }
-        return post;
-      }));
-
-    } catch (error) {
-      console.error('Error saving post:', error);
-      alert('Failed to save post. Please try again.');
+    if (!response.ok) {
+      if (response.status === 400) {
+        const errorData = await response.json();
+        console.warn('Save action warning:', errorData.error);
+        
+        // Still toggle the UI state even if backend says already saved/unsaved
+        setDiscussions(prev => prev.map(post => {
+          if (post.id === postId) {
+            return {
+              ...post,
+              saved: !post.saved // Toggle the saved state
+            };
+          }
+          return post;
+        }));
+        
+        setFilteredDiscussions(prev => prev.map(post => {
+          if (post.id === postId) {
+            return {
+              ...post,
+              saved: !post.saved // Toggle the saved state
+            };
+          }
+          return post;
+        }));
+        return;
+      }
+      throw new Error(`Save failed: ${response.status}`);
     }
-  };
+
+    const data = await response.json();
+    
+    // Update local state based on response
+    setDiscussions(prev => prev.map(post => {
+      if (post.id === postId) {
+        return {
+          ...post,
+          saved: data.saved
+        };
+      }
+      return post;
+    }));
+
+    setFilteredDiscussions(prev => prev.map(post => {
+      if (post.id === postId) {
+        return {
+          ...post,
+          saved: data.saved
+        };
+      }
+      return post;
+    }));
+
+    // Optional: Show a brief success message
+    if (data.saved) {
+      console.log('Post saved successfully');
+    } else {
+      console.log('Post unsaved successfully');
+    }
+
+  } catch (error) {
+    console.error('Error saving post:', error);
+    alert('Failed to save post. Please try again.');
+  }
+};
 
   const handleCreatePost = async () => {
     if (!newPost.title.trim() || !newPost.content.trim()) {
@@ -234,7 +332,6 @@ const ContestDiscussion = () => {
     }
 
     try {
-
       const response = await fetch(
         `${API_BASE_URL}/contests/${contestId}/discussions/`,
         {
@@ -259,8 +356,8 @@ const ContestDiscussion = () => {
 
       const data = await response.json();
       
-      // Add new post to discussions
       setDiscussions(prev => [data.discussion, ...prev]);
+      setFilteredDiscussions(prev => [data.discussion, ...prev]);
       setNewPost({ title: '', content: '', problem: '', tags: [] });
       setShowNewPostForm(false);
       
@@ -272,8 +369,308 @@ const ContestDiscussion = () => {
     }
   };
 
-  const handleViewPost = (postId) => {
-    navigate(`/contests/${contestId}/discussion/${postId}`);
+  // FIXED: Nested comments renderer
+  const renderComments = (comments, depth = 0, postId) => {
+    if (!comments || !Array.isArray(comments) || comments.length === 0) {
+      return (
+        <div className="text-center py-4 text-gray-500 text-sm">
+          No comments yet.
+        </div>
+      );
+    }
+    
+    return comments.map((comment) => {
+      const commentId = comment.id;
+      const authorName = comment.author?.name || 'Unknown User';
+      const authorInitial = authorName.charAt(0).toUpperCase();
+      const hasReplies = comment.replies && comment.replies.length > 0;
+      
+      return (
+        <div key={commentId} className="mb-4">
+          <div className={`flex ${depth > 0 ? 'ml-6' : ''}`}>
+            {/* Visual connector for nested comments */}
+            {depth > 0 && (
+              <div className="w-6 flex-shrink-0 flex flex-col items-center">
+                <div className="w-0.5 h-8 bg-gray-300"></div>
+                <div className="w-3 h-3 rounded-full border border-gray-300 bg-white"></div>
+                <div className="flex-1 w-0.5 bg-gray-300"></div>
+              </div>
+            )}
+            
+            <div className={`flex-1 ${depth > 0 ? 'ml-2' : ''}`}>
+              {/* Comment Card */}
+              <div className={`bg-gray-50 rounded-lg p-4 ${depth > 0 ? 'border-l-4 border-blue-300' : ''}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                      <span className="text-sm font-medium text-blue-800">
+                        {authorInitial}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-sm text-gray-900">
+                        {authorName}
+                      </span>
+                      <span className="text-xs text-gray-500 ml-2">
+                        {formatDate(comment.created_at || comment.createdAt)}
+                      </span>
+                      {comment.is_edited && (
+                        <span className="text-xs text-gray-400 ml-2">(edited)</span>
+                      )}
+                    </div>
+                  </div>
+                  <button className="text-gray-400 hover:text-gray-600">
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                <p className="text-gray-700 text-sm mb-3 whitespace-pre-wrap">
+                  {comment.content || 'No content'}
+                </p>
+                
+                <div className="flex items-center gap-4">
+                  <button 
+                    className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReply(postId, commentId);
+                    }}
+                  >
+                    <Reply className="w-3 h-3" />
+                    Reply
+                  </button>
+                  <button className="text-xs text-gray-500 hover:text-green-600 flex items-center gap-1">
+                    <ThumbsUp className="w-3 h-3" />
+                    {comment.upvotes || 0}
+                  </button>
+                  <button className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1">
+                    <ThumbsDown className="w-3 h-3" />
+                    {comment.downvotes || 0}
+                  </button>
+                  {hasReplies && (
+                    <span className="text-xs text-gray-500">
+                      {comment.replies_count || comment.replies?.length || 0} replies
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {/* Reply input for this specific comment */}
+              {replyingTo[postId] === commentId && (
+                <div className="mt-3 ml-2">
+                  <div className="flex items-start gap-2">
+                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center mt-2 flex-shrink-0">
+                      <span className="text-xs font-medium text-blue-800">Y</span>
+                    </div>
+                    <div className="flex-1">
+                      <textarea
+                        value={commentInputs[postId] || ''}
+                        onChange={(e) => setCommentInputs(prev => ({
+                          ...prev,
+                          [postId]: e.target.value
+                        }))}
+                        placeholder="Write your reply..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        rows="2"
+                        autoFocus
+                      />
+                      <div className="flex justify-end gap-2 mt-2">
+                        <button
+                          onClick={() => handleCancelReply(postId)}
+                          className="px-3 py-1 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleSubmitComment(postId, commentId)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                        >
+                          Reply
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Recursively render replies */}
+              {hasReplies && (
+                <div className="mt-4">
+                  {renderComments(comment.replies, depth + 1, postId)}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    });
+  };
+
+  // Update toggleComments function
+  const toggleComments = async (postId) => {
+    if (expandedPost === postId) {
+      setExpandedPost(null);
+      handleCancelReply(postId);
+    } else {
+      setExpandedPost(postId);
+      handleCancelReply(postId);
+      
+      // Only fetch if comments are empty
+      const post = discussions.find(p => p.id === postId);
+      if (!post.comments || post.comments.length === 0) {
+        try {
+          const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${TOKEN}`
+          };
+
+          const commentsResponse = await fetch(
+            `${API_BASE_URL}/contests/${contestId}/discussions/${postId}/comments/`,
+            { headers }
+          );
+
+          if (commentsResponse.ok) {
+            const commentsData = await commentsResponse.json();
+            
+            setDiscussions(prev => prev.map(post => {
+              if (post.id === postId) {
+                return {
+                  ...post,
+                  comments: commentsData.comments || [],
+                  comment_count: commentsData.total_comments || commentsData.comments?.length || 0
+                };
+              }
+              return post;
+            }));
+            
+            setFilteredDiscussions(prev => prev.map(post => {
+              if (post.id === postId) {
+                return {
+                  ...post,
+                  comments: commentsData.comments || [],
+                  comment_count: commentsData.total_comments || commentsData.comments?.length || 0
+                };
+              }
+              return post;
+            }));
+          }
+        } catch (error) {
+          console.error('Error fetching comments:', error);
+        }
+      }
+    }
+  };
+
+  // Handle comment submission
+  const handleSubmitComment = async (postId, parentCommentId = null) => {
+    const commentText = commentInputs[postId] || '';
+    
+    if (!commentText.trim()) {
+      alert('Please enter a comment');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/contests/${contestId}/discussions/${postId}/comments/`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${TOKEN}`
+          },
+          body: JSON.stringify({
+            content: commentText,
+            parent_comment_id: parentCommentId
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to post comment: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Refresh comments after posting
+      try {
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${TOKEN}`
+        };
+
+        const commentsResponse = await fetch(
+          `${API_BASE_URL}/contests/${contestId}/discussions/${postId}/comments/`,
+          { headers }
+        );
+
+        if (commentsResponse.ok) {
+          const commentsData = await commentsResponse.json();
+          
+          setDiscussions(prev => prev.map(post => {
+            if (post.id === postId) {
+              return {
+                ...post,
+                comments: commentsData.comments || [],
+                comment_count: commentsData.total_comments || commentsData.comments?.length || 0
+              };
+            }
+            return post;
+          }));
+
+          setFilteredDiscussions(prev => prev.map(post => {
+            if (post.id === postId) {
+              return {
+                ...post,
+                comments: commentsData.comments || [],
+                comment_count: commentsData.total_comments || commentsData.comments?.length || 0
+              };
+            }
+            return post;
+          }));
+        }
+      } catch (fetchError) {
+        console.error('Error refreshing comments:', fetchError);
+      }
+
+      // Reset input and reply state for this post
+      setCommentInputs(prev => ({
+        ...prev,
+        [postId]: ''
+      }));
+      handleCancelReply(postId);
+      
+      alert('Comment posted successfully!');
+
+    } catch (error) {
+      console.error('Error posting comment:', error);
+      alert(error.message || 'Failed to post comment. Please try again.');
+    }
+  };
+
+  // Reply to a comment
+  const handleReply = (postId, commentId) => {
+    setReplyingTo(prev => ({
+      ...prev,
+      [postId]: commentId
+    }));
+    setCommentInputs(prev => ({
+      ...prev,
+      [postId]: ''
+    }));
+  };
+
+  // Cancel reply
+  const handleCancelReply = (postId) => {
+    setReplyingTo(prev => ({
+      ...prev,
+      [postId]: null
+    }));
+    setCommentInputs(prev => ({
+      ...prev,
+      [postId]: ''
+    }));
   };
 
   const getProblemColor = (problem) => {
@@ -392,7 +789,7 @@ const ContestDiscussion = () => {
                 onClick={() => setShowNewPostForm(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
-                ×
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
@@ -455,17 +852,16 @@ const ContestDiscussion = () => {
             filteredDiscussions.map(post => (
               <div 
                 key={post.id} 
-                className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200 cursor-pointer"
-                onClick={() => handleViewPost(post.id)}
+                className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200"
               >
                 <div className="p-6">
                   {/* Author Info - Top Left */}
                   <div className="flex items-center gap-3 mb-4">
-                    <img
-                      src={post.author?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?.username}`}
-                      alt={post.author?.name}
-                      className="w-10 h-10 rounded-full"
-                    />
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <span className="text-sm font-medium text-blue-800">
+                        {post.author?.name?.charAt(0) || 'U'}
+                      </span>
+                    </div>
                     <div>
                       <div className="font-medium text-gray-900">
                         {post.author?.name || 'Unknown User'}
@@ -501,61 +897,154 @@ const ContestDiscussion = () => {
                     {/* Left Side - Upvote/Downvote and Comments */}
                     <div className="flex items-center gap-6">
                       {/* Voting */}
-                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleVote(post.id, 'upvoted');
                           }}
-                          className={`p-1.5 rounded ${post.voteStatus === 'upvoted' ? 'text-green-600 bg-green-50' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
+                          className={`p-1.5 rounded ${
+                            post.voteStatus === 'upvoted' 
+                              ? 'text-green-600 bg-green-50 border border-green-200' 
+                              : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                          }`}
                         >
                           <ChevronUp className="w-5 h-5" />
                         </button>
                         <span className="font-medium text-gray-900 min-w-[20px] text-center mx-1">
-                          {post.upvotes - post.downvotes}
+                          {(post.upvotes || 0) - (post.downvotes || 0)}
                         </span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleVote(post.id, 'downvoted');
                           }}
-                          className={`p-1.5 rounded ${post.voteStatus === 'downvoted' ? 'text-red-600 bg-red-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}
+                          className={`p-1.5 rounded ${
+                            post.voteStatus === 'downvoted' 
+                              ? 'text-red-600 bg-red-50 border border-red-200' 
+                              : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                          }`}
                         >
                           <ChevronDown className="w-5 h-5" />
                         </button>
                       </div>
 
-                      {/* Comments */}
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <MessageSquare className="w-4 h-4" />
-                        <span className="text-xs">{post.comments || 0}</span>
-                      </div>
-                    </div>
-
-                    {/* Right Side - Save, Report, Share */}
-                    <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                      {/* Comments Button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSavePost(post.id);
+                          toggleComments(post.id);
                         }}
-                        className={`flex items-center gap-1 text-xs ${post.saved ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                          expandedPost === post.id
+                            ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                            : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+                        }`}
                       >
-                        <Bookmark className="w-4 h-4" />
-                        <span>{post.saved ? 'Saved' : 'Save'}</span>
+                        <MessageSquare className="w-4 h-4" />
+                        <span className="text-xs">{post.comment_count || 0}</span>
+                        <span className="text-xs">Comments</span>
                       </button>
+                    </div>
+
+                    {/* Right Side - Save, Report, Share */}
+                    <div className="flex items-center gap-4">
+{/* In the JSX where you render the save button */}
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+    handleSavePost(post.id);
+  }}
+  className={`flex items-center gap-1 text-xs transition-colors duration-200 ${
+    post.saved 
+      ? 'text-blue-600 hover:text-blue-700' 
+      : 'text-gray-500 hover:text-blue-600'
+  }`}
+>
+  {post.saved ? (
+    // When saved - use Bookmark with fill
+    <Bookmark className="w-4 h-4" strokeWidth={1.5} fill="currentColor" />
+  ) : (
+    // When not saved - use outline Bookmark
+    <Bookmark className="w-4 h-4" strokeWidth={1.5} />
+  )}
+  <span>{post.saved ? 'Saved' : 'Save'}</span>
+</button>
                       
-                      <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600">
+                      <button 
+                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Flag className="w-4 h-4" />
                         <span>Report</span>
                       </button>
                       
-                      <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600">
+                      <button 
+                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Share2 className="w-4 h-4" />
                         <span>Share</span>
                       </button>
                     </div>
                   </div>
+
+                  {/* Comments Section - Expandable */}
+                  {expandedPost === post.id && (
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <h4 className="font-medium text-gray-900 mb-4">
+                        Comments ({post.comment_count || 0})
+                      </h4>
+                      
+                      {/* Comment Input */}
+                      <div className="mb-6">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span className="text-sm font-medium text-blue-800">Y</span>
+                          </div>
+                          <div className="flex-1">
+                            <textarea
+                              value={commentInputs[post.id] || ''}
+                              onChange={(e) => setCommentInputs(prev => ({
+                                ...prev,
+                                [post.id]: e.target.value
+                              }))}
+                              placeholder={replyingTo[post.id] ? "Write your reply..." : "Write a comment..."}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                              rows="3"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          {replyingTo[post.id] && (
+                            <button
+                              onClick={() => handleCancelReply(post.id)}
+                              className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                            >
+                              Cancel Reply
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleSubmitComment(post.id, replyingTo[post.id] || null)}
+                            className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                          >
+                            {replyingTo[post.id] ? 'Reply' : 'Comment'}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Comments List */}
+                      <div className="space-y-4">
+                        {post.comments && post.comments.length > 0 ? (
+                          renderComments(post.comments, 0, post.id)
+                        ) : (
+                          <div className="text-center py-8 text-gray-500 text-sm">
+                            No comments yet. Be the first to comment!
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))
