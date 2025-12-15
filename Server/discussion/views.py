@@ -195,7 +195,7 @@ class DiscussionListCreateAPIView(APIView):
             "upvotes": discussion.upvotes,
             "downvotes": discussion.downvotes,
             "comments": discussion.comment_count,
-            "saved": False,
+            "saved": False if not user else user.id in [str(saved_user.id) for saved_user in discussion.saved_by],
             "voteStatus": None
         }
         
@@ -231,7 +231,6 @@ class DiscussionListCreateAPIView(APIView):
             return "Problem Solver"
         else:
             return "Participant"
-
 
 class DiscussionDetailAPIView(APIView):
     """Retrieve, update, or delete a discussion"""
@@ -429,7 +428,7 @@ class DiscussionVoteAPIView(APIView):
         })
 
 class DiscussionSaveAPIView(APIView):
-    """Save/unsave a discussion"""
+    """Save/unsave a discussion with toggle functionality"""
     
     def post(self, request, contest_id, discussion_id):
         user = get_user_from_request(request)
@@ -446,37 +445,83 @@ class DiscussionSaveAPIView(APIView):
         except Discussion.DoesNotExist:
             return Response({"error": "Discussion not found"}, status=404)
         
-        action = request.data.get('action', 'save').strip().lower()
-        if action not in ['save', 'unsave']:
-            return Response({"error": "Invalid action. Use 'save' or 'unsave'"}, status=400)
+        # Get the action from request, default to 'toggle'
+        action = request.data.get('action', 'toggle').strip().lower()
         
-        # Check if already saved
-        is_saved = user.id in [str(saved_user.id) for saved_user in discussion.saved_by]
+        # FIX: Proper ID comparison - convert everything to strings
+        # Check if user has already saved this discussion
+        current_user_id_str = str(user.id)
+        saved_user_ids = []
         
-        if action == 'save':
-            if is_saved:
-                return Response({"error": "Discussion already saved"}, status=400)
+        # Safely get all saved user IDs as strings
+        for saved_user in discussion.saved_by:
+            try:
+                saved_user_id = str(saved_user.id)
+                saved_user_ids.append(saved_user_id)
+            except (AttributeError, TypeError):
+                # Skip if user or id is None/malformed
+                continue
+        
+        # Check current saved status
+        is_currently_saved = current_user_id_str in saved_user_ids
+        
+        # Handle different actions
+        if action == 'toggle':
+            # Toggle save/unsave
+            if is_currently_saved:
+                # Unsave - remove user from saved_by
+                discussion.saved_by = [u for u in discussion.saved_by if str(u.id) != current_user_id_str]
+                saved = False
+                message = "Discussion unsaved"
+            else:
+                # Save - add user to saved_by
+                discussion.saved_by.append(user)
+                saved = True
+                message = "Discussion saved"
+                
+        elif action == 'save':
+            # Explicit save action
+            if is_currently_saved:
+                return Response({
+                    "error": "Discussion already saved"
+                }, status=400)
             discussion.saved_by.append(user)
-        else:  # unsave
-            if not is_saved:
-                return Response({"error": "Discussion not saved"}, status=400)
-            discussion.saved_by = [u for u in discussion.saved_by if u.id != user.id]
+            saved = True
+            message = "Discussion saved"
+            
+        elif action == 'unsave':
+            # Explicit unsave action
+            if not is_currently_saved:
+                return Response({
+                    "error": "Discussion not saved"
+                }, status=400)
+            discussion.saved_by = [u for u in discussion.saved_by if str(u.id) != current_user_id_str]
+            saved = False
+            message = "Discussion unsaved"
+            
+        else:
+            return Response({"error": "Invalid action. Use 'toggle', 'save', or 'unsave'"}, status=400)
         
+        # Save the updated discussion
         try:
             discussion.save()
         except Exception as e:
             return Response({"error": f"Failed to update saved status: {str(e)}"}, status=500)
         
         return Response({
-            "message": f"Discussion {'saved' if action == 'save' else 'unsaved'} successfully",
-            "saved": action == 'save'
+            "message": message,
+            "saved": saved,
+            "action": action
         })
+
+# discussion/views.py - Updated CommentListCreateAPIView
+from .utils import find_comment_by_id, get_comment_depth, increment_parent_reply_count
 
 class CommentListCreateAPIView(APIView):
     """List and create comments on a discussion"""
     
     def get(self, request, contest_id, discussion_id):
-        """Get all comments for a discussion"""
+        """Get all comments for a discussion in nested format"""
         try:
             contest = Contest.objects.get(id=contest_id)
         except Contest.DoesNotExist:
@@ -487,13 +532,17 @@ class CommentListCreateAPIView(APIView):
         except Discussion.DoesNotExist:
             return Response({"error": "Discussion not found"}, status=404)
         
+        # Get nested comments structure
+        nested_comments = discussion.get_nested_comments()
+        
         return Response({
             "discussion_id": str(discussion.id),
-            "comments": [comment.to_dict() for comment in discussion.comments]
+            "comments": nested_comments,
+            "total_comments": discussion.comment_count
         })
     
     def post(self, request, contest_id, discussion_id):
-        """Add a comment to a discussion"""
+        """Add a comment to a discussion (supports nested replies)"""
         user = get_user_from_request(request)
         if not user:
             return Response({"error": "Authentication required"}, status=401)
@@ -517,18 +566,40 @@ class CommentListCreateAPIView(APIView):
             return Response(serializer.errors, status=400)
         
         data = serializer.validated_data
+        parent_comment_id = data.get('parent_comment_id')
+        
+        # Validate parent comment if provided
+        if parent_comment_id:
+            parent_comment = find_comment_by_id(discussion.comments, parent_comment_id)
+            if not parent_comment:
+                return Response({"error": "Parent comment not found"}, status=404)
+            
+            # Check depth limit (optional, prevent too deep nesting)
+            max_depth = 5
+            if parent_comment.depth >= max_depth:
+                return Response({"error": "Maximum reply depth reached"}, status=400)
+        
+        # Calculate depth for new comment
+        depth = get_comment_depth(discussion.comments, parent_comment_id)
         
         # Create comment
         comment = Comment(
             content=data['content'].strip(),
             author=user,
             created_at=datetime.now(),
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
+            parent_comment_id=parent_comment_id,
+            depth=depth
         )
         
         # Add to discussion
         discussion.comments.append(comment)
         discussion.comment_count += 1
+        
+        # Increment parent's reply count
+        if parent_comment_id:
+            increment_parent_reply_count(discussion.comments, parent_comment_id)
+        
         discussion.updated_at = datetime.now()
         
         try:
@@ -536,13 +607,88 @@ class CommentListCreateAPIView(APIView):
         except Exception as e:
             return Response({"error": f"Failed to add comment: {str(e)}"}, status=500)
         
-        # Get the newly added comment (last one)
+        # Get the newly added comment
         new_comment = discussion.comments[-1]
         
         return Response({
             "message": "Comment added successfully",
-            "comment": new_comment.to_dict()
+            "comment": new_comment.to_dict(),
+            "parent_comment_id": parent_comment_id
         }, status=201)
+
+# Update CommentDetailAPIView to handle parent-child relationships
+class CommentDetailAPIView(APIView):
+    """Update or delete a comment"""
+    
+    def delete(self, request, contest_id, discussion_id, comment_id):
+        """Delete a comment and its replies"""
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+        
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=404)
+        
+        try:
+            discussion = Discussion.objects.get(id=discussion_id, contest=contest)
+        except Discussion.DoesNotExist:
+            return Response({"error": "Discussion not found"}, status=404)
+        
+        # Find the comment and its index
+        comment_index = -1
+        comment_to_delete = None
+        for idx, c in enumerate(discussion.comments):
+            if str(c.id) == comment_id:
+                comment_to_delete = c
+                comment_index = idx
+                break
+        
+        if not comment_to_delete:
+            return Response({"error": "Comment not found"}, status=404)
+        
+        # Check permissions
+        is_comment_author = comment_to_delete.author.id == user.id
+        is_discussion_author = discussion.author.id == user.id
+        is_admin = hasattr(user, 'role') and user.role in ['admin', 'superadmin']
+        
+        if not (is_comment_author or is_discussion_author or is_admin):
+            return Response({"error": "You don't have permission to delete this comment"}, status=403)
+        
+        # Find and delete all replies to this comment
+        replies_to_delete = []
+        for c in discussion.comments:
+            if c.parent_comment_id == comment_id:
+                replies_to_delete.append(str(c.id))
+        
+        # Remove the comment and its replies
+        updated_comments = []
+        for c in discussion.comments:
+            if str(c.id) != comment_id and str(c.id) not in replies_to_delete:
+                updated_comments.append(c)
+        
+        discussion.comments = updated_comments
+        discussion.comment_count = len(updated_comments)
+        
+        # Update parent's reply count if this was a reply
+        if comment_to_delete.parent_comment_id:
+            parent_comment = find_comment_by_id(discussion.comments, comment_to_delete.parent_comment_id)
+            if parent_comment and parent_comment.replies_count > 0:
+                parent_comment.replies_count -= 1
+        
+        discussion.updated_at = datetime.now()
+        
+        try:
+            discussion.save()
+        except Exception as e:
+            return Response({"error": f"Failed to delete comment: {str(e)}"}, status=500)
+        
+        return Response({
+            "message": "Comment and its replies deleted successfully",
+            "deleted_comment_id": comment_id,
+            "deleted_reply_ids": replies_to_delete
+        })
 
 class CommentDetailAPIView(APIView):
     """Update or delete a comment"""
@@ -673,8 +819,3 @@ class MySavedDiscussionsAPIView(APIView):
             "count": len(discussions_data)
         })
     
-
-# Keep other views (CommentListCreateAPIView, CommentDetailAPIView, MySavedDiscussionsAPIView) as they are
-# They should work fine with minor frontend adjustments
-
-
