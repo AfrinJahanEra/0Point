@@ -148,7 +148,7 @@ const ContestDiscussion = () => {
   // Filter discussions when search/filter/sort changes
   useEffect(() => {
     fetchDiscussions();
-  }, [activeFilter, searchQuery, sortBy]);
+  }, [activeFilter, sortBy]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown date';
@@ -710,7 +710,11 @@ const handleSavePost = async (postId) => {
                 placeholder="Search discussions..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch(e)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch(e); // Only search on Enter
+                  }
+                }}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
               />
             </div>
