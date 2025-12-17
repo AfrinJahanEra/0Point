@@ -18,94 +18,100 @@ const Contests = () => {
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
 
-  // Fetch contests and registrations
+  // Initial data fetch
   useEffect(() => {
-    const fetchContests = async () => {
+    const fetchData = async () => {
       try {
-        console.log('Fetching contests...');
-        const res = await axios.get('http://localhost:8000/contests/', {
+        setLoading(true);
+        console.log('📡 Fetching initial contests data...');
+        
+        // Fetch contests
+        const contestsRes = await axios.get('http://localhost:8000/contests/', {
           headers: { Authorization: `Bearer ${TOKEN}` }
         });
         
-        console.log('Contests API Response:', res.data);
-        console.log('Number of contests:', res.data.contests?.length || 0);
+        console.log('✅ Contests loaded:', contestsRes.data.contests?.length || 0);
+        setContests(contestsRes.data.contests || []);
         
-        // Log all contests with their status
-        if (res.data.contests) {
-          res.data.contests.forEach((contest, index) => {
-            console.log(`Contest ${index + 1}:`, {
-              id: contest.id,
-              title: contest.title,
-              status: contest.status,
-              is_creator: contest.is_creator,
-              platform: contest.platform,
-              start_time: contest.start_time
-            });
+        // Fetch user's registrations
+        try {
+          const registrationsRes = await axios.get('http://localhost:8000/contests/registrations/', {
+            headers: { Authorization: `Bearer ${TOKEN}` }
           });
           
-          // Count drafts
-          const drafts = res.data.contests.filter(c => c.status === 'draft');
-          console.log(`Found ${drafts.length} draft contests`);
-          drafts.forEach(draft => {
-            console.log('Draft contest:', {
-              title: draft.title,
-              is_creator: draft.is_creator,
-              created_by: draft.created_by
-            });
-          });
+          console.log('✅ Registrations loaded:', registrationsRes.data.registered_contests?.length || 0);
+          setRegisteredContests(registrationsRes.data.registered_contests || []);
+        } catch (regErr) {
+          console.warn('⚠️ Could not fetch registrations:', regErr);
+          // Don't fail the whole page if registrations fail
         }
         
-        setContests(res.data.contests || []);
         setError(null);
       } catch (err) {
-        console.error('Failed to fetch contests:', err);
+        console.error('❌ Error fetching contests:', err);
         setError(err.response?.data?.error || 'Failed to load contests');
-      }
-    };
-
-    const fetchRegistrations = async () => {
-      try {
-        const res = await axios.get('http://localhost:8000/contests/registrations/', {
-          headers: { Authorization: `Bearer ${TOKEN}` }
-        });
-        setRegisteredContests(res.data.registered_contests || []);
-      } catch (err) {
-        console.error('Failed to fetch registrations:', err);
-      }
-    };
-
-    Promise.all([fetchContests(), fetchRegistrations()])
-      .finally(() => {
+      } finally {
         setLoading(false);
-        console.log('Finished loading contests');
-      });
-  }, []);
+      }
+    };
+
+    fetchData();
+  }, []); // Run once on mount
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    console.log('🔌 [WebSocket] Initializing connection...');
+    
+    const ws = new WebSocket("ws://localhost:8000/ws/contest/global/");
+    
+    ws.onopen = () => {
+      console.log('✅ [WebSocket] Connected to real-time contest updates');
+    };
+
+    ws.onerror = (err) => {
+      console.error('❌ [WebSocket] Error:', err);
+    };
+
+    ws.onclose = (event) => {
+      console.log('⚠️ [WebSocket] Disconnected');
+      console.log('📊 Close code:', event.code);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📩 [WebSocket] Message received:', data.event);
+        
+        if (data.event === "contest_list_update") {
+          console.log('🔄 [WebSocket] Updating contest list:', data.contests?.length || 0);
+          setContests(data.contests || []);
+        }
+      } catch (error) {
+        console.error('❌ [WebSocket] Error parsing message:', error);
+      }
+    };
+
+    // Cleanup on unmount
+    return () => {
+      console.log('🔌 [WebSocket] Cleaning up connection...');
+      ws.close();
+    };
+  }, []); // Only run once
 
   // Filter contests based on tab, platform, search query
   useEffect(() => {
-    console.log('Filtering contests:', {
-      totalContests: contests.length,
-      activeTab,
-      activePlatform,
-      searchQuery
-    });
-
     let filtered = [...contests];
 
     if (activeTab !== 'all') {
       if (activeTab === 'draft') {
-        // For drafts tab, show ALL drafts regardless of creator
         filtered = filtered.filter(c => c.status === 'draft');
-        console.log(`Filtered to ${filtered.length} drafts`);
       } else {
         filtered = filtered.filter(c => c.status === activeTab);
-        console.log(`Filtered to ${filtered.length} contests with status: ${activeTab}`);
       }
     }
 
     if (activePlatform !== 'all') {
       filtered = filtered.filter(c => c.platform === activePlatform);
-      console.log(`After platform filter (${activePlatform}): ${filtered.length}`);
     }
 
     if (searchQuery) {
@@ -114,7 +120,6 @@ const Contests = () => {
         c.title.toLowerCase().includes(query) ||
         (c.description && c.description.toLowerCase().includes(query))
       );
-      console.log(`After search filter: ${filtered.length}`);
     }
 
     setFilteredContests(filtered);
@@ -135,12 +140,13 @@ const Contests = () => {
   const handlePublishDraft = async (contestId) => {
     if (window.confirm("Publish this draft contest? Once published, it will be visible to users.")) {
       try {
-        const res = await axios.post(
+        await axios.post(
           `http://localhost:8000/contests/${contestId}/publish/`,
           { type: "final" },
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
         alert("Contest published successfully!");
+        
         // Refresh contests list
         const contestsRes = await axios.get('http://localhost:8000/contests/', {
           headers: { Authorization: `Bearer ${TOKEN}` }
@@ -187,133 +193,73 @@ const Contests = () => {
     }
   };
 
-
-const handleContestEntry = async (contestId, contestStatus) => {
-  console.log('Handling contest entry:', { contestId, contestStatus });
-  
-  // For drafts, go directly to edit page
-  if (contestStatus === 'draft') {
-    navigate(`/contests/${contestId}/edit`);
-    return;
-  }
-  
-  try {
-    // Fetch problems to check access
-    const problemsRes = await axios.get(
-      `http://localhost:8000/contests/${contestId}/problems/`,
-      { headers: { Authorization: `Bearer ${TOKEN}` } }
-    );
-    
-    console.log('Problems API Response:', problemsRes.data);
-    
-    const problems = problemsRes.data.problems || [];
-    
-    if (problems.length === 0) {
-      alert('This contest has no problems yet.');
-      return; // Don't navigate anywhere
+  const handleContestEntry = async (contestId, contestStatus) => {
+    if (contestStatus === 'draft') {
+      navigate(`/contests/${contestId}/edit`);
+      return;
     }
     
-    // Get the FIRST problem's index dynamically
-    const firstProblem = problems[0];
-    const firstProblemIndex = firstProblem.problem_id || firstProblem.index || firstProblem.code || 'A';
-    
-    console.log('Navigating to problem:', { contestId, firstProblemIndex, contestStatus });
-    
-    // Navigate to the problem
-    navigate(`/contests/${contestId}`);
-    
-  } catch (error) {
-    console.error('Error fetching contest problems:', error);
-    
-    // Handle registration required
-    if (error.response?.status === 403) {
-      const errorData = error.response.data;
+    try {
+      const problemsRes = await axios.get(
+        `http://localhost:8000/contests/${contestId}/problems/`,
+        { headers: { Authorization: `Bearer ${TOKEN}` } }
+      );
       
-      if (errorData.can_register) {
-        // Show registration prompt
-        const shouldRegister = window.confirm(
-          `You need to register for this ${contestStatus} contest. Register now?`
-        );
+      const problems = problemsRes.data.problems || [];
+      
+      if (problems.length === 0) {
+        alert('This contest has no problems yet.');
+        return;
+      }
+      
+      navigate(`/contests/${contestId}`);
+      
+    } catch (error) {
+      console.error('Error fetching contest problems:', error);
+      
+      if (error.response?.status === 403) {
+        const errorData = error.response.data;
         
-        if (shouldRegister) {
-          try {
-            // Try to register
-            await axios.post(
-              `http://localhost:8000/contests/${contestId}/register/`,
-              {},
-              { headers: { Authorization: `Bearer ${TOKEN}` } }
-            );
-            
-            alert('Successfully registered! You can now enter the contest.');
-            
-            // Try to enter contest again
-            const problemsRes = await axios.get(
-              `http://localhost:8000/contests/${contestId}/problems/`,
-              { headers: { Authorization: `Bearer ${TOKEN}` } }
-            );
-            
-            const problems = problemsRes.data.problems || [];
-            if (problems.length > 0) {
-              const firstProblem = problems[0];
-              const firstProblemIndex = firstProblem.problem_id || firstProblem.index || firstProblem.code || 'A';
+        if (errorData.can_register) {
+          const shouldRegister = window.confirm(
+            `You need to register for this ${contestStatus} contest. Register now?`
+          );
+          
+          if (shouldRegister) {
+            try {
+              await axios.post(
+                `http://localhost:8000/contests/${contestId}/register/`,
+                {},
+                { headers: { Authorization: `Bearer ${TOKEN}` } }
+              );
+              
+              alert('Successfully registered! You can now enter the contest.');
               navigate(`/contests/${contestId}`);
-            }
-            
-          } catch (registerError) {
-            console.error('Registration error:', registerError);
-            
-            if (registerError.response?.status === 400) {
-              alert(registerError.response.data.error || 'Registration failed');
-            } else {
-              // Navigate to registration page
+              
+            } catch (registerError) {
+              console.error('Registration error:', registerError);
               navigate(`/contests/${contestId}/register`);
             }
           }
+        } else {
+          alert(errorData.message || 'Access denied to this contest.');
         }
       } else {
-        alert(errorData.message || 'Access denied to this contest.');
+        alert('Failed to load contest. Please try again.');
       }
-    } else {
-      // Other errors
-      alert('Failed to load contest. Please try again.');
     }
-  }
-  // REMOVE THIS LINE: navigate(`/contests/${contestId}`);
-};
-
-  // Handle contest title click
-  const handleTitleClick = (contest, e) => {
-    if (contest.status === 'upcoming') {
-    return;
-
-    if (contest.status === 'draft') {
-      // For drafts, go to edit page
-      navigate(`/contests/${contest.id}/edit`);
-    } 
-  }
-    
-    handleContestEntry(contest.id, contest.status);
   };
 
-  // Handle contest card click
-  const handleCardClick = (contest) => {
-    console.log('Card clicked for contest:', contest);
-    handleContestEntry(contest.id, contest.status);
+  const handleDraftEdit = (contestId, e) => {
+    e.stopPropagation();
+    navigate(`/contests/${contestId}/edit`);
   };
 
-const handleDraftEdit = (contestId, e) => {
-  e.stopPropagation();
-  console.log('Edit draft:', contestId);
-  navigate(`/contests/${contestId}/edit`);
-};
-  // Handle draft publish button
   const handleDraftPublish = async (contestId, e) => {
     e.stopPropagation();
-    console.log('Publish draft:', contestId);
     handlePublishDraft(contestId);
   };
 
-  // Define status tabs
   const statusTabs = [
     { value: 'all', label: 'All Contests' },
     { value: 'live', label: 'Live Now' },
@@ -359,7 +305,6 @@ const handleDraftEdit = (contestId, e) => {
                   <h1 className="text-lg font-semibold text-gray-900">Contests</h1>
                   <p className="text-xs text-gray-600 mt-1">
                     {contests.length} contest{contests.length !== 1 ? 's' : ''} found
-                    {activeTab === 'draft' && ` • ${contests.filter(c => c.status === 'draft').length} draft${contests.filter(c => c.status === 'draft').length !== 1 ? 's' : ''}`}
                   </p>
                 </div>
                 <div className="relative w-full lg:w-64">
@@ -394,16 +339,9 @@ const handleDraftEdit = (contestId, e) => {
             <div className="grid gap-4">
               {filteredContests.length > 0 ? (
                 filteredContests.map(contest => (
-                  console.log('Contest data:', {
-      id: contest.id,
-      title: contest.title,
-      duration: contest.duration,
-      duration_type: typeof contest.duration
-    }),
                   <div 
                     key={contest.id} 
                     className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200"
-                    onClick={() => handleCardClick(contest)}
                     style={{ 
                       cursor: contest.status === 'upcoming' ? 'default' : 'pointer'
                     }}
@@ -411,47 +349,13 @@ const handleDraftEdit = (contestId, e) => {
                     <div className="p-4 flex justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-1">
-<h3 
-  className={`text-xs font-semibold truncate ${
-    contest.status === 'upcoming' 
-      ? 'text-gray-900' 
-      : 'text-gray-900 hover:text-blue-800 cursor-pointer'
-  }`}
-  onClick={(e) => {
-    e.stopPropagation();
-    
-    // Handle different statuses
-    if (contest.status === 'upcoming') {
-      return; // No action for upcoming contests
-    }
-    
-    if (contest.status === 'draft') {
-      // For drafts, go to edit page
-      navigate(`/contests/${contest.id}/edit`);
-    } else {
-      // For other statuses, use the contest entry logic
-      handleContestEntry(contest.id, contest.status);
-    }
-  }}
->
-  {contest.title}
-</h3>
+                          <h3 className="text-xs font-semibold truncate text-gray-900">{contest.title}</h3>
                           <span className={getStatusBadge(contest.status)}>
-                            {contest.status === 'live' ? 'Live' : 
-                             contest.status === 'upcoming' ? 'Upcoming' : 
-                             contest.status === 'past' ? 'Past' :
-                             contest.status === 'draft' ? 'Draft' :
-                             contest.status === 'test' ? 'Test' : contest.status}
+                            {contest.status.toUpperCase()}
                           </span>
                         </div>
                         <p className="text-xs text-gray-600 mb-2">
-                          {getPlatformName(contest.platform)} • {contest.type === 'individual' ? 'Individual' : 'Team' || 'Individual'}
-                          {contest.status === 'draft' && contest.is_creator && (
-                            <span className="ml-2 text-yellow-600">(Your Draft)</span>
-                          )}
-                          {contest.status === 'draft' && !contest.is_creator && (
-                            <span className="ml-2 text-gray-500">(Other User's Draft)</span>
-                          )}
+                          {getPlatformName(contest.platform)} • {contest.type === 'individual' ? 'Individual' : 'Team'}
                         </p>
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <span className="flex items-center space-x-1">
@@ -470,10 +374,19 @@ const handleDraftEdit = (contestId, e) => {
                       </div>
 
                       <div className="flex flex-col space-y-2 ml-4" onClick={(e) => e.stopPropagation()}>
-
-                        
-                        {/* UPCOMING BUTTONS */}
-                        {contest.status === 'upcoming' && (
+                        {contest.status === 'draft' ? (
+                          // Draft contest buttons: Edit and Publish
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={(e) => handleDraftEdit(contest.id, e)}
+                              className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-1"
+                            >
+                              <Edit className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                          </div>
+                        ) : contest.status === 'upcoming' ? (
+                          // Upcoming contest buttons
                           registeredContests.includes(contest.id) ? (
                             <span className="px-3 py-1.5 bg-gray-300 text-gray-600 rounded text-xs font-medium">Registered</span>
                           ) : (
@@ -485,38 +398,34 @@ const handleDraftEdit = (contestId, e) => {
                               <span>Register</span>
                             </button>
                           )
-                        )}
-                        
-{/* LIVE BUTTONS */}
-{contest.status === 'live' && (
-  registeredContests.includes(contest.id) ? (
-    <button
-      onClick={() => handleContestEntry(contest.id, 'live')}
-      className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-1"
-    >
-      <Play className="w-3 h-3" />
-      <span>Enter</span>
-    </button>
-  ) : (
-    <button
-      onClick={() => navigate(`/contests/${contest.id}/register`)}
-      className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-orange-700 transition-colors duration-200 flex items-center space-x-1"
-    >
-      <Eye className="w-3 h-3" />
-      <span>Live</span>
-    </button>
-  )
-)}
-                        
-                        {/* PAST BUTTONS */}
-                        {contest.status === 'past' && (
+                        ) : contest.status === 'live' ? (
+                          // Live contest buttons
+                          registeredContests.includes(contest.id) ? (
+                            <button
+                              onClick={() => handleContestEntry(contest.id, 'live')}
+                              className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-1"
+                            >
+                              <Play className="w-3 h-3" />
+                              <span>Enter</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => navigate(`/contests/${contest.id}/register`)}
+                              className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-orange-700 transition-colors duration-200 flex items-center space-x-1"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>Live</span>
+                            </button>
+                          )
+                        ) : contest.status === 'past' ? (
+                          // Past contest buttons
                           <button 
                             onClick={() => handleContestEntry(contest.id, 'past')}
                             className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200"
                           >
                             View
                           </button>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -532,13 +441,11 @@ const handleDraftEdit = (contestId, e) => {
                       ? `No ${activeTab} contests found. Try a different filter.`
                       : "Try adjusting your filters to find more contests."}
                   </p>
-                 
                 </div>
               )}
             </div>
           </div>
 
-          {/* Sidebar */}
           <div className="lg:col-span-3 space-y-4">
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="p-3 border-b border-gray-200">

@@ -28,7 +28,9 @@ const ProblemInside = () => {
   const [problemData, setProblemData] = useState(null);
   const [problemsList, setProblemsList] = useState([]);
   const [userStatus, setUserStatus] = useState({});
-  const [error, setError] = useState(null); // ADDED: Missing error state
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  const [error, setError] = useState(null);
   const [code, setCode] = useState(`#include <bits/stdc++.h>
 using namespace std;
 
@@ -41,7 +43,6 @@ int main() {
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
 
-
   useEffect(() => {
     const footer = document.querySelector("footer");
     if (footer) footer.style.display = "none";
@@ -49,9 +50,39 @@ int main() {
     return () => {
       if (footer) footer.style.display = "block";
     };
-  }, []); // 
-// Hide footer only in ProblemInside page
-useEffect(() => {
+  }, []);
+
+  // Helper function to calculate time remaining
+  const calculateTimeRemaining = (contest) => {
+    if (!contest?.start_time || contest?.status !== 'live') {
+      return 0;
+    }
+    
+    try {
+      const startTime = new Date(contest.start_time);
+      const durationMinutes = contest.duration_minutes || 
+                             (contest.duration ? contest.duration * 60 : 0);
+      
+      if (durationMinutes <= 0) return 0;
+      
+      const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
+      const now = new Date();
+      
+      if (now >= startTime && now <= endTime) {
+        return Math.floor((endTime - now) / 1000);
+      } else if (now > endTime) {
+        return 0;
+      }
+    } catch (error) {
+      console.error('Error calculating time remaining:', error);
+      return 0;
+    }
+    
+    return 0;
+  };
+
+  // Hide footer only in ProblemInside page
+  useEffect(() => {
     const fetchAllData = async () => {
       if (!contestId) {
         setLoading(false);
@@ -60,7 +91,7 @@ useEffect(() => {
 
       console.log('Fetching data for contest:', contestId, 'problem:', problemIndex);
       setLoading(true);
-      setError(null); // Reset error on new fetch
+      setError(null);
 
       try {
         // 1. Fetch contest problems list
@@ -111,15 +142,16 @@ useEffect(() => {
             
             if (problemRes.data) {
               console.log('Problem data response:', problemRes.data);
+              console.log('Contest status from problem response:', problemRes.data.contest_status);
               setProblemData(problemRes.data);
               
               // If we don't have contestData yet, use data from problem response
               if (!contestData && problemRes.data.contest_title) {
                 setContestData({
+                  status: problemRes.data.contest_status,
                   title: problemRes.data.contest_title,
                   platform: 'Custom Platform',
-                  status: 'live', // default
-                  type: 'individual' // default
+                  type: 'individual'
                 });
               }
             } else {
@@ -138,6 +170,17 @@ useEffect(() => {
           }
         }
         
+        // Calculate initial time remaining from API response data
+        const contestInfo = problemsRes.data?.contest_info || problemsRes.data?.contest;
+        if (contestInfo) {
+          const remaining = calculateTimeRemaining(contestInfo);
+          if (remaining > 0) {
+            setTimeRemaining(remaining);
+            setIsTimerActive(true);
+            console.log('⏰ Timer started:', remaining, 'seconds remaining');
+          }
+        }
+        
         setLoading(false);
       } catch (error) {
         console.error('Error fetching contest data:', error);
@@ -149,28 +192,53 @@ useEffect(() => {
     fetchAllData();
   }, [contestId, problemIndex, navigate]);
 
-  // Calculate time remaining for live contests
-  const calculateTimeRemaining = () => {
-    if (!contestData || !contestData.start_time || !contestData.duration_minutes) {
-      return '00:00:00';
+  // Dynamic countdown timer effect
+  useEffect(() => {
+    let intervalId;
+    
+    if (isTimerActive && timeRemaining > 0) {
+      intervalId = setInterval(() => {
+        setTimeRemaining(prevTime => {
+          if (prevTime <= 1) {
+            clearInterval(intervalId);
+            setIsTimerActive(false);
+            return 0;
+          }
+          return prevTime - 1;
+        });
+      }, 1000);
     }
     
-    const startTime = new Date(contestData.start_time);
-    const endTime = new Date(startTime.getTime() + contestData.duration_minutes * 60 * 1000);
-    const now = new Date();
-    
-    if (now < startTime) {
-      return 'Not started';
-    } else if (now > endTime) {
-      return 'Contest ended';
-    } else {
-      const diff = endTime - now;
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    // Cleanup interval on component unmount
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isTimerActive, timeRemaining]);
+
+  // Update timer when contestData changes
+  useEffect(() => {
+    if (contestData?.start_time && contestData?.status === 'live') {
+      try {
+        const remaining = calculateTimeRemaining(contestData);
+        if (remaining > 0 && remaining !== timeRemaining) {
+          setTimeRemaining(remaining);
+          setIsTimerActive(true);
+        }
+      } catch (timeError) {
+        console.error('Error updating timer from contestData:', timeError);
+      }
     }
+  }, [contestData]);
+
+  // Format time for display
+  const formatTime = (seconds) => {
+    if (seconds <= 0) return '00:00:00';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   const getStatusIcon = (problemIdentifier) => {
@@ -362,11 +430,14 @@ useEffect(() => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              {displayContestData.status === 'live' && (
+              {displayContestData.status === 'live' && timeRemaining > 0 && (
                 <div className="text-right">
-                  <div className="text-xs text-gray-600">Time Remaining</div>
-                  <div className="font-mono font-bold text-lg text-red-600">
-                    {calculateTimeRemaining()}
+                  <div className="text-xs text-gray-600 flex items-center justify-end gap-1">
+                    <Clock className="w-3 h-3" />
+                    Time Remaining
+                  </div>
+                  <div className="font-mono font-bold text-lg text-red-600 animate-pulse">
+                    {formatTime(timeRemaining)}
                   </div>
                 </div>
               )}
@@ -417,40 +488,49 @@ useEffect(() => {
               </div>
             </div>
 
-{/* Contest Navigation */}
-<div className="space-y-1">
-  <Link
-    to={`/contests/${contestId}/submissions`}
-    className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
-  >
-    <Code2 className="w-4 h-4" />
-    <span className="text-xs font-semibold text-gray-900">My Submissions</span>
-  </Link>
-  
-  <button
-    onClick={() => alert('Discussions feature not implemented yet')}
-    className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
-  >
-    <MessageSquare className="w-4 h-4" />
-    <span className="text-xs font-semibold text-gray-900">Discussions</span>
-  </button>
-  
-  <button
-    onClick={() => alert('Q&A Forum feature not implemented yet')}
-    className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
-  >
-    <HelpCircle className="w-4 h-4" />
-    <span className="text-xs font-semibold text-gray-900">Q&A Forum</span>
-  </button>
-  
-  <Link
-    to={`/contests/${contestId}/leaderboard`}
-    className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
-  >
-    <Trophy className="w-4 h-4" />
-    <span className="text-xs font-semibold text-gray-900">Leaderboard</span>
-  </Link>
-</div>
+            {/* Contest Navigation */}
+            <div className="space-y-1">
+              <Link
+                to={`/contests/${contestId}/submissions`}
+                className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
+              >
+                <Code2 className="w-4 h-4" />
+                <span className="text-xs font-semibold text-gray-900">My Submissions</span>
+              </Link>
+              
+              <button
+                onClick={() => alert('Discussions feature not implemented yet')}
+                className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span className="text-xs font-semibold text-gray-900">Discussions</span>
+              </button>
+              
+              <button
+                onClick={() => alert('Q&A Forum feature not implemented yet')}
+                className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
+              >
+                <HelpCircle className="w-4 h-4" />
+                <span className="text-xs font-semibold text-gray-900">Q&A Forum</span>
+              </button>
+              
+              <Link
+                to={`/contests/${contestId}/leaderboard`}
+                className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
+              >
+                <Trophy className="w-4 h-4" />
+                <span className="text-xs font-semibold text-gray-900">Leaderboard</span>
+              </Link>
+              {displayContestData.status === 'past' && (
+                <Link
+                  to={`/contests/${contestId}/editorial`}
+                  className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
+                >
+                  <Trophy className="w-4 h-4" />
+                  <span className="text-xs font-semibold text-gray-900">Editorial</span>
+                </Link>
+              )}
+            </div>
 
             {/* Problem Stats */}
             <div className="bg-gray-50 rounded-lg p-4">
@@ -517,53 +597,65 @@ useEffect(() => {
                   
                   {/* Sample Test Cases */}
                   {problemData?.sample_test_cases && problemData.sample_test_cases.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="space-y-8 mb-8">
                       {problemData.sample_test_cases.map((testCase, index) => (
-                        <div key={index}>
-                          <div className="flex items-center justify-between mb-2">
+                        <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                             <h4 className="font-semibold text-gray-900">
-                              Sample {index === 0 ? '' : index + 1} {index === 0 ? 'Input' : ''}
+                              Sample Test Case {index + 1}
                             </h4>
-                            <button 
-                              onClick={() => {
-                                navigator.clipboard.writeText(testCase.input);
-                                alert('Copied to clipboard!');
-                              }}
-                              className="text-gray-500 hover:text-gray-700 transition-colors" 
-                              title="Copy"
-                            >
-                              <Clipboard className="w-4 h-4" />
-                            </button>
                           </div>
-                          <pre className="bg-gray-800 text-gray-100 p-4 rounded font-mono text-xs overflow-x-auto whitespace-pre">
-                            {testCase.input}
-                          </pre>
                           
-                          <div className="mt-4 flex items-center justify-between mb-2">
-                            <h4 className="font-semibold text-gray-900">
-                              Sample {index === 0 ? '' : index + 1} {index === 0 ? 'Output' : ''}
-                            </h4>
-                            <button 
-                              onClick={() => {
-                                navigator.clipboard.writeText(testCase.output);
-                                alert('Copied to clipboard!');
-                              }}
-                              className="text-gray-500 hover:text-gray-700 transition-colors" 
-                              title="Copy"
-                            >
-                              <Clipboard className="w-4 h-4" />
-                            </button>
+                          {/* Input and Output side by side */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                            {/* Input Column */}
+                            <div className="border-r border-gray-200">
+                              <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-200">
+                                <h5 className="font-medium text-gray-900">Input</h5>
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(testCase.input);
+                                  }}
+                                  className="text-gray-500 hover:text-gray-700 transition-colors" 
+                                  title="Copy"
+                                >
+                                  <Clipboard className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <pre className="bg-gray-800 text-gray-100 p-4 font-mono text-xs overflow-x-auto whitespace-pre m-0">
+                                {testCase.input}
+                              </pre>
+                            </div>
+                            
+                            {/* Output Column */}
+                            <div>
+                              <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-200">
+                                <h5 className="font-medium text-gray-900">Output</h5>
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(testCase.output);
+                                  }}
+                                  className="text-gray-500 hover:text-gray-700 transition-colors" 
+                                  title="Copy"
+                                >
+                                  <Clipboard className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <pre className="bg-gray-800 text-gray-100 p-4 font-mono text-xs overflow-x-auto whitespace-pre m-0">
+                                {testCase.output}
+                              </pre>
+                            </div>
                           </div>
-                          <pre className="bg-gray-800 text-gray-100 p-4 rounded font-mono text-xs overflow-x-auto whitespace-pre">
-                            {testCase.output}
-                          </pre>
                           
+                          {/* Explanation - Full width below */}
                           {testCase.explanation && (
-                            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                              <h4 className="font-semibold text-blue-900 mb-2">Explanation</h4>
-                              <p className="text-blue-800 text-xs">
+                            <div className="border-t border-gray-200">
+                              <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
+                                <h5 className="font-medium text-blue-900">Explanation</h5>
+                              </div>
+                              <div className="p-4 bg-blue-50 text-blue-800 text-xs">
                                 {testCase.explanation}
-                              </p>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -572,13 +664,6 @@ useEffect(() => {
                   ) : (
                     <div className="mb-8 p-4 bg-gray-50 border border-gray-200 rounded">
                       <p className="text-gray-600 text-sm">No sample test cases available.</p>
-                    </div>
-                  )}
-
-                  {problemData?.tutorial && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-8">
-                      <h4 className="font-semibold text-green-900 mb-2">Tutorial / Editorial</h4>
-                      <div className="text-green-800 text-sm" dangerouslySetInnerHTML={{ __html: problemData.tutorial }} />
                     </div>
                   )}
                 </div>

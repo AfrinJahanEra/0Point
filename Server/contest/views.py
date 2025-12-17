@@ -1,11 +1,14 @@
 # contest/views.py
-# contest/views.py
+from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta, timezone
 from mongoengine.errors import ValidationError as MEValidationError
 import pytz
+from .broadcast import broadcast_contest_update
+from .broadcast import broadcast_global_update
+
 
 from .models import Contest, ContestProblem, ContestRegistration, TestCase
 from .serializers import ContestCreateSerializer
@@ -29,6 +32,9 @@ from contest.models import Contest
 from submission.models import Submission
 from contest.utils.auth import get_user_from_request
 from account.models import Account
+
+from contest.broadcast import broadcast_global_update
+
 
 class UserProblemStatusAPIView(APIView):
     """Get user's problem status for a contest"""
@@ -123,6 +129,14 @@ class UserProblemStatusAPIView(APIView):
             print(f"DEBUG: Final statuses: {problem_statuses}")
         else:
             print(f"DEBUG: User not authenticated, returning default statuses")
+
+        payload = {
+            "event": "problem_status",
+            "contest_id": str(contest.id),
+            "problem_statuses": problem_statuses,
+        }
+
+        broadcast_contest_update(contest_id, payload)
         
         return Response({
             "contest_id": str(contest.id),
@@ -159,12 +173,12 @@ class ContestProblemTutorialAPIView(APIView):
         user = get_user_from_request(request)
         can_access = False
         
-        if contest.status == "past":
+        if get_contest_status(contest) == "past":
             can_access = True
-        elif contest.status == "draft":
+        elif get_contest_status(contest) == "draft":
             if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                 can_access = True
-        elif contest.status in ["live", "upcoming", "test"]:
+        elif get_contest_status(contest) in ["live", "upcoming", "test"]:
             if user:
                 is_registered = ContestRegistration.objects.filter(
                     user=user, contest=contest
@@ -181,7 +195,7 @@ class ContestProblemTutorialAPIView(APIView):
             }, status=403)
         
         # Check if editorial is published
-        if contest.status in ["live", "upcoming", "test"] and not contest.editorial_published:
+        if get_contest_status(contest) in ["live", "upcoming", "test"] and not contest.editorial_published:
             # Only creator can access tutorial before editorial is published
             if not (user and contest.created_by and str(contest.created_by.id) == str(user.id)):
                 return Response({
@@ -270,7 +284,7 @@ class ContestEditorialAPIView(APIView):
             "editorial_published": getattr(contest, 'editorial_published', False),
             "total_problems": len(contest.problems),
             "problems_with_tutorials": problems_with_tutorials,
-            "can_publish": contest.status in ["past", "live", "test"]  # When editorial can be published
+            "can_publish": get_contest_status(contest) in ["past", "live", "test"]  # When editorial can be published
         })
     
     def post(self, request, contest_id):
@@ -313,7 +327,7 @@ class ContestProblemsAPIView(APIView):
         
         try:
             contest = Contest.objects.get(id=contest_id)
-            print(f"DEBUG: Found contest: {contest.title}, Status: {contest.status}")
+            print(f"DEBUG: Found contest: {contest.title}, Status: {get_contest_status(contest)}")
         except Contest.DoesNotExist:
             print(f"DEBUG: Contest not found")
             return Response({"error": "Contest not found"}, status=404)
@@ -328,18 +342,18 @@ class ContestProblemsAPIView(APIView):
         can_access = False
         
         # Determine access based on contest status
-        if contest.status == "past":
+        if get_contest_status(contest) == "past":
             # Past contests are accessible to everyone
             can_access = True
             print("DEBUG: Past contest - access granted to all")
-        elif contest.status == "draft":
+        elif get_contest_status(contest) == "draft":
             # Drafts - only accessible to creator
             if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                 can_access = True
                 print("DEBUG: Draft contest - creator access")
             else:
                 print("DEBUG: Draft contest - access denied")
-        elif contest.status in ["live", "upcoming", "test"]:
+        elif get_contest_status(contest) in ["live", "upcoming", "test"]:
             # For live/upcoming/test contests, allow access to:
             # 1. Registered users
             # 2. Contest creator
@@ -362,13 +376,13 @@ class ContestProblemsAPIView(APIView):
                     return Response({"error": f"Error checking access: {str(e)}"}, status=500)
         
         # If access denied for non-past contests
-        if not can_access and contest.status != "past":
-            print(f"DEBUG: Access denied for contest status: {contest.status}")
+        if not can_access and get_contest_status(contest) != "past":
+            print(f"DEBUG: Access denied for contest status: {get_contest_status(contest)}")
             return Response({
                 "error": "Access denied",
                 "message": "You don't have access to this contest",
-                "contest_status": contest.status,
-                "can_register": contest.status in ["live", "upcoming"]
+                "contest_status": get_contest_status(contest),
+                "can_register": get_contest_status(contest) in ["live", "upcoming"]
             }, status=403)
         
         # Prepare problems list
@@ -405,7 +419,7 @@ class ContestProblemsAPIView(APIView):
             contest_info = {
                 "id": str(contest.id),
                 "title": contest.title,
-                "status": contest.status,
+                "status": get_contest_status(contest),
                 "start_time": contest.start_time.isoformat() if contest.start_time else None,
                 "duration": contest.duration,
                 "platform": contest.platform,
@@ -455,7 +469,7 @@ class ContestProblemDetailAPIView(APIView):
         can_access = False
         needs_registration = False
         
-        if contest.status == "live":
+        if get_contest_status(contest) == "live":
             if user:
                 is_registered = ContestRegistration.objects.filter(
                     user=user, contest=contest
@@ -466,7 +480,7 @@ class ContestProblemDetailAPIView(APIView):
             else:
                 needs_registration = True
                 
-        elif contest.status == "upcoming":
+        elif get_contest_status(contest) == "upcoming":
             if user:
                 is_registered = ContestRegistration.objects.filter(
                     user=user, contest=contest
@@ -477,9 +491,9 @@ class ContestProblemDetailAPIView(APIView):
             else:
                 needs_registration = True
                 
-        elif contest.status == "past":
+        elif get_contest_status(contest) == "past":
             can_access = True
-        elif contest.status == "draft":
+        elif get_contest_status(contest) == "draft":
             if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                 can_access = True
         
@@ -488,8 +502,8 @@ class ContestProblemDetailAPIView(APIView):
                 return Response({
                     "error": "Registration required",
                     "message": "You need to register for this contest to access this problem",
-                    "contest_status": contest.status,
-                    "can_register": True if contest.status in ["live", "upcoming"] else False
+                    "contest_status": get_contest_status(contest),
+                    "can_register": True if get_contest_status(contest) in ["live", "upcoming"] else False
                 }, status=403)
             else:
                 return Response({
@@ -521,12 +535,12 @@ class ContestProblemDetailAPIView(APIView):
 
         tutorial_available = False
         if problem.tutorial and problem.tutorial.strip():
-            if contest.status == "past":
+            if get_contest_status(contest) == "past":
                 tutorial_available = True
-            elif contest.status == "draft":
+            elif get_contest_status(contest) == "draft":
                 if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                     tutorial_available = True
-            elif contest.status in ["live", "upcoming", "test"]:
+            elif get_contest_status(contest) in ["live", "upcoming", "test"]:
                 # During contest, only creator can see tutorial
                 if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                     tutorial_available = True
@@ -576,7 +590,7 @@ class ContestUpdateAPIView(APIView):
             return Response({"error": "Contest not found or access denied"}, status=404)
 
         # Only allow updates for drafts
-        if contest.status != "draft":
+        if get_contest_status(contest) != "draft":
             return Response({"error": "Only draft contests can be updated"}, status=400)
 
         serializer = ContestCreateSerializer(data=request.data, partial=True)
@@ -591,7 +605,7 @@ class ContestUpdateAPIView(APIView):
             if field in updated_data:
                 setattr(contest, field, updated_data[field])
 
-        # Update problems if provided - FIXED to preserve existing tutorials
+        # Update problems if provided
         if 'problems' in updated_data:
             # Create a map of existing problems by index for easy lookup
             existing_problems = {p.index: p for p in contest.problems}
@@ -645,8 +659,7 @@ class ContestUpdateAPIView(APIView):
             contest.testers = updated_data['testers']
         if 'test_start_time' in updated_data:
             contest.test_start_time = updated_data['test_start_time']
-        if 'test_duration' in updated_data:
-            contest.test_duration = updated_data['test_duration']
+        # REMOVE: test_duration updates
 
         try:
             contest.save()
@@ -656,7 +669,7 @@ class ContestUpdateAPIView(APIView):
         return Response({
             "message": "Contest updated successfully",
             "id": str(contest.id),
-            "status": contest.status,
+            "status": get_contest_status(contest),
             "problems_updated": len(contest.problems)
         })
 
@@ -669,40 +682,100 @@ class ContestPublishAPIView(APIView):
         try:
             contest = Contest.objects.get(id=contest_id, created_by=user)
         except Contest.DoesNotExist:
-            return Response({"error": "Contest not found"}, status=404)
+            return Response({"error": "Contest not found or access denied"}, status=404)
 
-        # Check required fields for publishing
-        if contest.status == "draft":
+        # Get current status
+        current_status = get_contest_status(contest)
+        
+        # FIRST, update the contest with request data
+        # Update start_time if provided
+        if 'start_time' in request.data:
+            try:
+                contest.start_time = datetime.fromisoformat(request.data['start_time'].replace('Z', '+00:00'))
+            except Exception as e:
+                return Response({"error": f"Invalid start_time format: {str(e)}"}, status=400)
+        
+        # Update duration if provided
+        if 'duration' in request.data:
+            contest.duration = request.data['duration']
+        
+        # Update type if provided
+        if 'type' in request.data:
+            contest.type = request.data['type']
+        
+        # Update platform if provided
+        if 'platform' in request.data:
+            contest.platform = request.data['platform']
+        
+        # Update problems if provided (though usually they're already there)
+        if 'problems' in request.data and request.data['problems']:
+            # Handle problems update similar to ContestUpdateAPIView
+            existing_problems = {p.index: p for p in contest.problems}
+            new_problems = []
+            
+            for problem_data in request.data['problems']:
+                problem_index = problem_data.get('index')
+                
+                if problem_index in existing_problems:
+                    # Update existing problem
+                    existing_problem = existing_problems[problem_index]
+                    
+                    # Preserve tutorial if not provided
+                    if 'tutorial' not in problem_data and hasattr(existing_problem, 'tutorial'):
+                        problem_data['tutorial'] = existing_problem.tutorial
+                    
+                    test_cases_data = problem_data.pop('test_cases', [])
+                    tutorial = problem_data.pop('tutorial', existing_problem.tutorial if hasattr(existing_problem, 'tutorial') else '')
+                    
+                    testcases = [TestCase(**tc) for tc in test_cases_data]
+                    
+                    # Update fields
+                    for key, value in problem_data.items():
+                        setattr(existing_problem, key, value)
+                    
+                    existing_problem.test_cases = testcases
+                    existing_problem.tutorial = tutorial
+                    new_problems.append(existing_problem)
+                else:
+                    # Create new problem
+                    test_cases_data = problem_data.pop('test_cases', [])
+                    tutorial = problem_data.pop('tutorial', '')
+                    
+                    testcases = [TestCase(**tc) for tc in test_cases_data]
+                    
+                    problem = ContestProblem(
+                        **problem_data,
+                        test_cases=testcases,
+                        tutorial=tutorial
+                    )
+                    new_problems.append(problem)
+            
+            contest.problems = new_problems
+        
+        # NOW check if contest can be made active
+        if current_status == "draft":
             required_fields = ["start_time", "duration", "type", "platform", "problems"]
             missing_fields = [f for f in required_fields if not getattr(contest, f)]
             if missing_fields:
-                return Response({"error": f"Missing fields to publish: {missing_fields}"}, status=400)
-
-        # Get publish type from request
-        publish_type = request.data.get("type", "final")
-        
-        if publish_type == "test":
-            testers = request.data.get("testers", [])
-            test_start_time = request.data.get("testStartTime")
-            test_duration = request.data.get("testDuration")
+                return Response({"error": f"Missing fields to make contest active: {missing_fields}"}, status=400)
             
-            if not testers or not test_start_time:
-                return Response({"error": "Test contest requires testers and test start time"}, status=400)
+            # Check if user wants to convert to test contest
+            convert_to_test = request.data.get("convert_to_test", False)
             
-            # Convert test_start_time string to datetime if needed
-            try:
-                if isinstance(test_start_time, str):
-                    test_start_time = datetime.fromisoformat(test_start_time.replace('Z', '+00:00'))
-            except Exception as e:
-                return Response({"error": f"Invalid test start time format: {str(e)}"}, status=400)
-            
-            contest.status = "test"
-            contest.testers = testers
-            contest.test_start_time = test_start_time
-            if test_duration:
-                contest.test_duration = float(test_duration)
-        else:
-            contest.status = "upcoming"
+            if convert_to_test:
+                testers = request.data.get("testers", [])
+                test_start_time = request.data.get("testStartTime")
+                
+                if not testers or not test_start_time:
+                    return Response({"error": "Test contest requires testers and test start time"}, status=400)
+                
+                try:
+                    if isinstance(test_start_time, str):
+                        contest.test_start_time = datetime.fromisoformat(test_start_time.replace('Z', '+00:00'))
+                except Exception as e:
+                    return Response({"error": f"Invalid test start time format: {str(e)}"}, status=400)
+                
+                contest.testers = testers
         
         # Update editorial published status if provided
         if 'editorial_published' in request.data:
@@ -710,15 +783,21 @@ class ContestPublishAPIView(APIView):
         
         try:
             contest.save()
+            
+            # Get updated status
+            updated_status = get_contest_status(contest)
+            
             return Response({
-                "message": "Contest published successfully", 
+                "message": f"Contest updated successfully", 
                 "id": str(contest.id),
-                "status": contest.status,
-                "editorial_published": contest.editorial_published
+                "status": updated_status,
+                "editorial_published": contest.editorial_published,
+                "is_draft": updated_status == "draft",
+                "is_test": updated_status == "test"
             })
         except Exception as e:
             return Response({"error": f"Failed to save contest: {str(e)}"}, status=400)
-          
+
 from datetime import datetime, timedelta
 import pytz
 
@@ -726,9 +805,40 @@ def get_contest_status(contest):
     """
     Calculate contest status based on current time.
     Duration is in hours (not minutes).
+    Returns: "draft", "upcoming", "live", "past", or "test"
     """
-    if getattr(contest, "status", "draft") == "draft":
-        return {"status": "draft", "participants": 0}
+    # Check for test contests first
+    if hasattr(contest, 'test_start_time') and contest.test_start_time:
+        dhaka_tz = pytz.timezone('Asia/Dhaka')
+        now = datetime.now(dhaka_tz)
+        test_start_time = contest.test_start_time
+        
+        # Ensure test_start_time is in Dhaka timezone
+        if test_start_time.tzinfo is None:
+            test_start_time = dhaka_tz.localize(test_start_time)
+        elif str(test_start_time.tzinfo) != 'Asia/Dhaka':
+            test_start_time = test_start_time.astimezone(dhaka_tz)
+        
+        # Check if it's a test contest - use contest.duration for test duration
+        # Convert duration from hours to minutes
+        duration_hours = contest.duration if contest.duration else 0
+        duration_minutes = duration_hours * 60
+        test_end_time = test_start_time + timedelta(minutes=duration_minutes)
+        
+        if test_start_time <= now <= test_end_time:
+            return "test"
+    
+    # Check if contest has all required fields
+    has_required_fields = all([
+        contest.start_time is not None,
+        contest.duration is not None,
+        contest.type is not None,
+        contest.platform is not None,
+        contest.problems is not None and len(contest.problems) > 0
+    ])
+    
+    if not has_required_fields:
+        return "draft"
     
     # Use Asia/Dhaka timezone
     dhaka_tz = pytz.timezone('Asia/Dhaka')
@@ -738,7 +848,7 @@ def get_contest_status(contest):
     start_time = contest.start_time
     
     if not start_time:
-        return {"status": "upcoming", "participants": 0}
+        return "draft"
     
     # Ensure start_time is in Dhaka timezone
     if start_time.tzinfo is None:
@@ -754,46 +864,36 @@ def get_contest_status(contest):
         end_time = start_time + timedelta(minutes=duration_minutes)
         
         if start_time <= now <= end_time:
-            status = "live"
+            return "live"
         elif now < start_time:
-            status = "upcoming"
+            return "upcoming"
         else:
-            status = "past"
+            return "past"
     else:
         # No duration specified
-        status = "past" if now > start_time else "upcoming"
-    
-    participants = ContestRegistration.objects(contest=contest).count()
-    
-    return {"status": status, "participants": participants}
+        return "past" if now > start_time else "upcoming"
 
 class ContestListCreateAPIView(APIView):
     def get(self, request):
         user = get_user_from_request(request)
         
-        # If user is authenticated, show their drafts too
-        if user:
-            # Show all contests except other users' drafts
-            contests = Contest.objects.filter(
-                Q(status__ne="draft") | Q(created_by=user, status="draft")
-            ).order_by("-start_time").limit(200)
-        else:
-            # For non-authenticated users, hide all drafts
-            contests = Contest.objects.filter(status__ne="draft").order_by("-start_time").limit(200)
+        # Get all contests (no status filter needed now)
+        contests = Contest.objects.all().order_by("-start_time").limit(200)
         
         data = []
 
         for c in contests:
-            # Handle draft status specially
-            if c.status == "draft":
-                status_value = {"status": "draft", "participants": 0}
-            else:
-                status_value = get_contest_status(c)
+            # Calculate status dynamically
+            status_value = get_contest_status(c)
+            
+            # Filter out drafts for non-creators
+            if status_value == "draft":
+                if not user or not c.created_by or str(c.created_by.id) != str(user.id):
+                    continue
             
             participant_count = ContestRegistration.objects(contest=c).count()
             
-            # Check if current user is the creator
-            is_creator = user and str(c.created_by.id) == str(user.id) if c.created_by else False
+            is_creator = user and c.created_by and str(c.created_by.id) == str(user.id)
 
             data.append({
                 "id": str(c.id),
@@ -804,10 +904,16 @@ class ContestListCreateAPIView(APIView):
                 "type": c.type,
                 "platform": c.platform,
                 "created_by": str(c.created_by.id) if c.created_by else None,
-                "is_creator": is_creator,  # Add this field
-                "status": status_value["status"],
+                "is_creator": is_creator,
+                "status": status_value,  # Use calculated status
                 "participants": participant_count,
             })
+
+        # Broadcast update
+        broadcast_global_update({
+            "event": "contest_list_update",
+            "contests": data,
+        })
 
         return Response({"contests": data})
 
@@ -835,63 +941,43 @@ class ContestFullCreateAPIView(APIView):
         contest = serializer.create(serializer.validated_data)
         contest.created_by = user
         
-        # Check if status is provided in request
-        status_from_request = request.data.get("status")
-        if status_from_request in ["test", "upcoming"]:
-            # Validate required fields for publishing
-            required_fields = ["start_time", "duration", "type", "platform", "problems"]
-            missing_fields = [f for f in required_fields if not getattr(contest, f)]
-            if missing_fields:
-                return Response({"error": f"Missing fields to publish: {missing_fields}"}, status=400)
-            
-            contest.status = status_from_request
-            
+        # Check if this should be a test contest
+        is_test_contest = request.data.get("is_test_contest", False)
+        
+        if is_test_contest:
             # Handle test contest specific fields
-            if status_from_request == "test":
-                testers = request.data.get("testers", [])
-                test_start_time = request.data.get("test_start_time")
-                test_duration = request.data.get("test_duration")
-                
-                if not testers or not test_start_time:
-                    return Response({"error": "Test contest requires testers and test_start_time"}, status=400)
-                
-                contest.testers = testers
-                try:
-                    contest.test_start_time = datetime.fromisoformat(test_start_time.replace('Z', '+00:00'))
-                except Exception as e:
-                    return Response({"error": f"Invalid test_start_time format: {str(e)}"}, status=400)
-                
-                if test_duration:
-                    contest.test_duration = float(test_duration)
-                    
-            # Set editorial published if provided
-            if 'editorial_published' in request.data:
-                contest.editorial_published = request.data['editorial_published']
-        else:
-            # Default to draft
-            contest.status = "draft"
-            # Set editorial published if provided (for drafts)
-            if 'editorial_published' in request.data:
-                contest.editorial_published = request.data['editorial_published']
-
-        # Ensure tutorials are saved for all problems
-        if 'problems' in request.data:
-            for idx, problem_data in enumerate(request.data['problems']):
-                if idx < len(contest.problems) and 'tutorial' in problem_data:
-                    contest.problems[idx].tutorial = problem_data['tutorial']
+            testers = request.data.get("testers", [])
+            test_start_time = request.data.get("test_start_time")
+            
+            if not testers or not test_start_time:
+                return Response({"error": "Test contest requires testers and test_start_time"}, status=400)
+            
+            contest.testers = testers
+            try:
+                contest.test_start_time = datetime.fromisoformat(test_start_time.replace('Z', '+00:00'))
+            except Exception as e:
+                return Response({"error": f"Invalid test_start_time format: {str(e)}"}, status=400)
+        
+        # Set editorial published if provided
+        if 'editorial_published' in request.data:
+            contest.editorial_published = request.data['editorial_published']
 
         try:
             contest.save()
         except MEValidationError as e:
             return Response({"error": str(e)}, status=400)
 
+        # Calculate the current status
+        current_status = get_contest_status(contest)
+        
         return Response({
-            "message": f"Contest {'published' if contest.status != 'draft' else 'created'} successfully",
+            "message": f"Contest created successfully",
             "id": str(contest.id),
-            "status": contest.status,
-            "editorial_published": contest.editorial_published
+            "status": current_status,  # Calculated status
+            "editorial_published": contest.editorial_published,
+            "is_draft": current_status == "draft"
         }, status=201)
-    
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -910,7 +996,7 @@ class ContestRegisterAPIView(APIView):
             return Response({"error": "Contest not found"}, status=404)
         
         # Check if contest is in a state that allows registration
-        if contest.status not in ["live", "upcoming"]:
+        if get_contest_status(contest) not in ["live", "upcoming"]:
             return Response({"error": "Registration is closed for this contest"}, status=400)
         
         # Check if already registered
@@ -936,6 +1022,9 @@ class ContestDetailAPIView(APIView):
 
         user = get_user_from_request(request)
         
+        # Calculate status dynamically
+        status_value = get_contest_status(c)
+        
         # Check if user can access
         can_access = False
         needs_registration = False
@@ -946,25 +1035,23 @@ class ContestDetailAPIView(APIView):
             registration = ContestRegistration.objects(user=user, contest=c).first()
             is_registered = bool(registration)
         
-        # Check access based on contest status
-        if c.status == "live":
+        # Check access based on calculated contest status
+        if status_value == "live":
             can_access = is_registered
             if not can_access:
                 needs_registration = True
                 
-        elif c.status == "upcoming":
+        elif status_value == "upcoming":
             can_access = is_registered
             if not can_access:
                 needs_registration = True
                 
-        elif c.status == "past":
+        elif status_value == "past":
             can_access = True
-        elif c.status == "draft":
+        elif status_value == "draft":
             if user and c.created_by and str(c.created_by.id) == str(user.id):
                 can_access = True
         
-        # Get contest status with participants count
-        status_value = get_contest_status(c)
         participant_count = ContestRegistration.objects(contest=c).count()
         
         # Check if user is creator
@@ -977,10 +1064,10 @@ class ContestDetailAPIView(APIView):
             "description": c.description or "",
             "start_time": c.start_time.isoformat() if c.start_time else None,
             "duration": c.duration,  # This is in hours
-            "duration_minutes": c.duration * 60 if c.duration else None,  # Convert to minutes
+            "duration_minutes": c.duration * 60 if c.duration else None,
             "type": c.type,
             "platform": c.platform,
-            "status": status_value["status"],
+            "status": status_value,  # Use calculated status
             "participants": participant_count,
             "problems_count": len(c.problems) if c.problems else 0,
             "is_creator": is_creator,
@@ -994,7 +1081,7 @@ class ContestDetailAPIView(APIView):
                 "can_access": can_access,
                 "needs_registration": needs_registration,
                 "is_registered": is_registered,
-                "can_register": c.status in ["live", "upcoming"]
+                "can_register": status_value in ["live", "upcoming"]
             }
         }
 
@@ -1089,16 +1176,16 @@ class ContestProblemDetailAPIView(APIView):
         
         can_access = False
         
-        if contest.status == "past":
+        if get_contest_status(contest) == "past":
             can_access = True
             print("DEBUG: Past contest - access granted")
-        elif contest.status == "draft":
+        elif get_contest_status(contest) == "draft":
             if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                 can_access = True
                 print("DEBUG: Draft contest - creator access")
             else:
                 print("DEBUG: Draft contest - access denied")
-        elif contest.status in ["live", "upcoming"]:
+        elif get_contest_status(contest) in ["live", "upcoming"]:
             if user:
                 # Check registration
                 registration = ContestRegistration.objects.filter(
@@ -1110,12 +1197,12 @@ class ContestProblemDetailAPIView(APIView):
                 can_access = is_registered
         
         if not can_access:
-            print(f"DEBUG: Access denied for contest status: {contest.status}")
-            if contest.status in ["live", "upcoming"]:
+            print(f"DEBUG: Access denied for contest status: {get_contest_status(contest)}")
+            if get_contest_status(contest) in ["live", "upcoming"]:
                 return Response({
                     "error": "Registration required",
                     "message": "You need to register for this contest to access this problem",
-                    "contest_status": contest.status,
+                    "contest_status": get_contest_status(contest),
                     "can_register": True
                 }, status=403)
             else:
@@ -1129,6 +1216,7 @@ class ContestProblemDetailAPIView(APIView):
             problem_data = {
                 "contest_id": str(contest.id),
                 "contest_title": contest.title,
+                "contest_status": get_contest_status(contest),  # ADD THIS LINE
                 "problem_index": problem.index,
                 "problem_code": problem.index,
                 "title": problem.title,
@@ -1149,12 +1237,12 @@ class ContestProblemDetailAPIView(APIView):
 
             tutorial_available = False
             if problem.tutorial and problem.tutorial.strip():
-                if contest.status == "past":
+                if get_contest_status(contest) == "past":
                     tutorial_available = True
-                elif contest.status == "draft":
+                elif get_contest_status(contest) == "draft":
                     if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                         tutorial_available = True
-                elif contest.status in ["live", "upcoming", "test"]:
+                elif get_contest_status(contest) in ["live", "upcoming", "test"]:
                     if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                         tutorial_available = True
                     elif getattr(contest, 'editorial_published', False):
@@ -1226,7 +1314,7 @@ class AnnouncementCreateAPIView(APIView):
         elif hasattr(user, 'role') and user.role in ["admin", "superadmin"]:
             can_post = True
         # Check if user is a tester (for test contests)
-        elif contest.status == "test" and user.email in contest.testers:
+        elif get_contest_status(contest) == "test" and user.email in contest.testers:
             can_post = True
         
         if not can_post:
@@ -1251,6 +1339,11 @@ class AnnouncementCreateAPIView(APIView):
             return Response({"error": f"Validation error: {str(e)}"}, status=400)
         except Exception as e:
             return Response({"error": f"Failed to create announcement: {str(e)}"}, status=500)
+        
+        broadcast_contest_update(data["contest_id"], {
+            "event": "announcement",
+            "announcement": announcement.to_dict()
+        })
 
         # Return the created announcement
         return Response({
@@ -1270,7 +1363,7 @@ class ContestEditorialAPIView(APIView):
         
         try:
             contest = Contest.objects.get(id=contest_id)
-            print(f"DEBUG: Found contest: {contest.title}, Status: {contest.status}")
+            print(f"DEBUG: Found contest: {contest.title}, Status: {get_contest_status(contest)}")
         except Contest.DoesNotExist:
             print("DEBUG: Contest not found")
             return Response({"error": "Contest not found"}, status=404)
@@ -1283,11 +1376,11 @@ class ContestEditorialAPIView(APIView):
         can_access_editorial = False
         access_error = None
         
-        if contest.status == "past":
+        if get_contest_status(contest) == "past":
             # Past contests - editorial is accessible to everyone
             can_access_editorial = True
             print("DEBUG: Past contest - editorial access granted to all")
-        elif contest.status == "draft":
+        elif get_contest_status(contest) == "draft":
             # Drafts - only creator can access
             if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                 can_access_editorial = True
@@ -1295,7 +1388,7 @@ class ContestEditorialAPIView(APIView):
             else:
                 access_error = "Editorial not available in draft contests"
                 print("DEBUG: Draft contest - editorial access denied")
-        elif contest.status in ["live", "upcoming", "test"]:
+        elif get_contest_status(contest) in ["live", "upcoming", "test"]:
             # During contest, editorial is restricted
             if getattr(contest, 'editorial_published', False):
                 # If editorial is explicitly published, allow access
@@ -1314,7 +1407,7 @@ class ContestEditorialAPIView(APIView):
             return Response({
                 "error": "Access denied",
                 "message": access_error or "You don't have access to the editorial",
-                "contest_status": contest.status,
+                "contest_status": get_contest_status(contest),
                 "editorial_published": getattr(contest, 'editorial_published', False),
                 "can_access": False
             }, status=403)
@@ -1348,7 +1441,7 @@ class ContestEditorialAPIView(APIView):
             response_data = {
                 "contest_id": str(contest.id),
                 "contest_title": contest.title,
-                "contest_status": contest.status,
+                "contest_status": get_contest_status(contest),
                 "editorial_published": getattr(contest, 'editorial_published', False),
                 "total_problems": total_problems,
                 "tutorials_available": tutorials_count,
@@ -1369,5 +1462,6 @@ class ContestEditorialAPIView(APIView):
                 "error": f"Error preparing editorial: {str(e)}",
                 "can_access": False
             }, status=500)
+
 
 

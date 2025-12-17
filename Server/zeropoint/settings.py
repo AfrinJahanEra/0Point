@@ -32,6 +32,8 @@ INSTALLED_APPS = [
     'announcement',
     'tutorial',
     'corsheaders',
+    'channels',
+    'daphne',
 ]
 
 MIDDLEWARE = [
@@ -63,7 +65,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'zeropoint.wsgi.application'
-ASGI_APPLICATION = 'techsage.asgi.application'
 
 connect(
     db=os.getenv('MONGO_DB_NAME', 'zeropoint'),
@@ -74,20 +75,31 @@ connect(
     # w='majority'
 )
 
-if os.getenv('DJANGO_ENV') == 'production':
-    REDIS_URL = os.getenv('REDIS_URL') 
-else:
-    REDIS_URL = 'redis://127.0.0.1:6379' 
-
+ASGI_APPLICATION = "zeropoint.asgi.application"
 
 CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [REDIS_URL],
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
         },
     },
 }
+
+# if os.getenv('DJANGO_ENV') == 'production':
+#     REDIS_URL = os.getenv('REDIS_URL') 
+# else:
+#     REDIS_URL = 'redis://127.0.0.1:6379' 
+
+
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             'hosts': [REDIS_URL],
+#         },
+#     },
+# }
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
@@ -114,6 +126,7 @@ cloudinary.config(
     api_secret=os.getenv('CLOUDINARY_API_SECRET'),
     secure=True
 )
+
 
 DATABASES = {
     'default': {
