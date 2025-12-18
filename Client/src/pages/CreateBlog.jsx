@@ -123,6 +123,24 @@ const customComponents = {
       />
     );
   },
+  
+  // Unordered list component for -, *, + bullets
+  ul: ({ depth, ...props }) => {
+    const isTopLevel = depth === 0;
+    return (
+      <ul
+        className={`
+          my-5 space-y-3
+          ${isTopLevel
+            ? 'list-disc ml-9 text-lg marker:text-blue-600'
+            : 'list-disc ml-8 text-base marker:text-blue-500'
+          }
+        `}
+        {...props}
+      />
+    );
+  },
+  
   li: ({ ordered, children, ...props }) => (
     <li
       className="leading-relaxed text-gray-800 pl-2 hover:text-gray-900 transition-colors"
