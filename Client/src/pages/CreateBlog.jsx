@@ -158,6 +158,33 @@ const customComponents = {
       </div>
     </blockquote>
   ),
+  
+  // Image component supporting base64 and regular URLs
+  img: ({ src, alt, ...props }) => {
+    // Check if it's a base64 image
+    const isBase64 = src && (src.startsWith('data:image/') || src.startsWith('base64,'));
+    
+    return (
+      <div className="my-6 flex flex-col items-center">
+        <img
+          src={src}
+          alt={alt || 'Image'}
+          className="max-w-full h-auto rounded-lg shadow-md border border-gray-300"
+          {...props}
+        />
+        {alt && (
+          <p className="mt-2 text-sm text-gray-600 text-center italic">
+            {alt}
+          </p>
+        )}
+        {isBase64 && (
+          <p className="mt-1 text-xs text-gray-500 text-center">
+            (Base64 Image)
+          </p>
+        )}
+      </div>
+    );
+  },
 };
 
   return (
