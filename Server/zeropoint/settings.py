@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'daphne',
     'django.contrib.staticfiles',
     'rest_framework',
     'account',
@@ -33,7 +34,6 @@ INSTALLED_APPS = [
     'tutorial',
     'corsheaders',
     'channels',
-    'daphne',
 ]
 
 MIDDLEWARE = [
@@ -155,7 +155,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+# STATICFILES_DIRS = [BASE_DIR / 'static']  # Temporarily commented out
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
