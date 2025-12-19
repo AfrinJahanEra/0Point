@@ -20,7 +20,8 @@ import {
   Upload,
   Eye,
   EyeOff,
-  Users
+  Users,
+  Download
 } from 'lucide-react';
 
 const InterviewSession = () => {
@@ -38,6 +39,7 @@ const InterviewSession = () => {
   const [questionFile, setQuestionFile] = useState(null);
   const [showQuestionUploadPopup, setShowQuestionUploadPopup] = useState(false);
   const [questionContent, setQuestionContent] = useState('');
+  const [fileUrl, setFileUrl] = useState(null);
   
   // Code Editor States
   const [code, setCode] = useState('// Write your code here...\nfunction solution() {\n  \n}\n');
@@ -57,6 +59,7 @@ const InterviewSession = () => {
   const editorRef = useRef(null);
   const socketRef = useRef(null);
   const fileInputRef = useRef(null);
+  const fileUrlRef = useRef(null);
 
   // Initialize - Check if question exists on mount
   useEffect(() => {
@@ -68,6 +71,13 @@ const InterviewSession = () => {
         setShowQuestionUploadPopup(true);
       }, 1000);
     }
+    
+    // Cleanup function to revoke object URLs
+    return () => {
+      if (fileUrlRef.current) {
+        URL.revokeObjectURL(fileUrlRef.current);
+      }
+    };
   }, []);
 
   // Simulate candidate joining after invitation
@@ -152,6 +162,15 @@ const InterviewSession = () => {
                  file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
       setQuestionFile(file);
       
+      // Create a URL for the file to display it
+      // Revoke the previous URL if it exists
+      if (fileUrlRef.current) {
+        URL.revokeObjectURL(fileUrlRef.current);
+      }
+      const url = URL.createObjectURL(file);
+      setFileUrl(url);
+      fileUrlRef.current = url;
+      
       const mockContent = `Extracted content from: ${file.name}
       
       Question 1: Array Manipulation
@@ -213,6 +232,15 @@ const InterviewSession = () => {
     
     setQuestionContent(manualQuestion);
     localStorage.setItem('interviewQuestion', manualQuestion);
+    
+    // Clear file state when manually adding questions
+    setQuestionFile(null);
+    if (fileUrlRef.current) {
+      URL.revokeObjectURL(fileUrlRef.current);
+      fileUrlRef.current = null;
+      setFileUrl(null);
+    }
+    
     setShowQuestionUploadPopup(false);
     
     toast.success('Question set added successfully!', {
@@ -368,14 +396,14 @@ ${evalCode(code)}
       </header>
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-grow" >
         {/* Left Panel (Combined Videos + Questions) */}
         {isVideoOpen && (
-          <div className={`${getLeftPanelWidth()} flex transition-all duration-300 ease-in-out`}>
+          <div className={`${getLeftPanelWidth()} flex transition-all duration-300 ease-in-out flex-grow overflow-visible`}>
             {/* Collapsed Videos Panel (Left side of left panel) */}
-            <div className={`${getVideosWidth()} flex flex-col border-r bg-gray-900 transition-all duration-300 ease-in-out`}>
+            <div className={`${getVideosWidth()} flex flex-col border-r bg-gray-900 transition-all duration-300 ease-in-out flex-shrink-0`}>
               {/* Videos Header */}
-              <div className="p-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
+              <div className="p-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-white" />
                   <span className="text-white text-sm font-medium">Participants (2)</span>
@@ -399,10 +427,10 @@ ${evalCode(code)}
               </div>
 
               {/* Collapsed Videos List */}
-              <div className="flex-1 overflow-y-auto p-2">
+              <div className="flex-1 p-2 flex flex-col space-y-4">
                 {/* Interviewer Video Card */}
-                <div className="bg-gray-800 rounded-lg mb-2 overflow-hidden">
-                  <div className="relative aspect-video bg-gray-700">
+                <div className="bg-gray-800 rounded-lg flex-1">
+                  <div className="relative bg-gray-700 pt-2 pb-2 h-full">
                     {isInterviewerVideoOn ? (
                       <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
                         <div className="text-center">
@@ -440,8 +468,8 @@ ${evalCode(code)}
                 </div>
 
                 {/* Candidate Video Card */}
-                <div className="bg-gray-800 rounded-lg overflow-hidden">
-                  <div className="relative aspect-video bg-gray-700">
+                <div className="bg-gray-800 rounded-lg flex-1">
+                  <div className="relative bg-gray-700 pt-2 pb-2 h-full">
                     {candidateJoined && isCandidateVideoOn ? (
                       <div className="absolute inset-0 bg-gradient-to-br from-green-900 to-blue-900 flex items-center justify-center">
                         <div className="text-center">
@@ -514,7 +542,7 @@ ${evalCode(code)}
                 </div>
 
                 {/* Video Controls at Bottom */}
-                <div className="mt-4 p-2 bg-gray-800 rounded-lg">
+                <div className="mt-2 p-2 bg-gray-800 rounded-lg">
                   <div className="flex justify-center space-x-2">
                     <button 
                       onClick={toggleInterviewerVideo}
@@ -541,9 +569,9 @@ ${evalCode(code)}
 
             {/* Questions Panel (Right side of left panel) */}
             {showQuestions && (
-              <div className={`${getQuestionsWidth()} flex flex-col bg-white border-r transition-all duration-300 ease-in-out overflow-hidden`}>
+              <div className={`${getQuestionsWidth()} flex flex-col bg-white border-r transition-all duration-300 ease-in-out flex-grow`}>
                 {/* Questions Header */}
-                <div className="p-3 border-b flex justify-between items-center">
+                <div className="p-3 border-b flex justify-between items-center flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4" />
                     <span className="font-medium">Interview Questions</span>
@@ -567,63 +595,111 @@ ${evalCode(code)}
                 </div>
 
                 {/* Questions Content */}
-                <div className="flex-1 overflow-auto p-4">
+                <div className="flex-1 p-4 flex flex-col">
                   {questionContent ? (
-                    <div className="space-y-4">
-                      <div className="bg-blue-50 border border-blue-200 p-3 rounded">
-                        <div className="flex items-center">
-                          <FileText className="w-4 h-4 text-blue-600 mr-2" />
-                          <div>
-                            <p className="font-medium text-blue-800 text-sm">
-                              {questionFile ? `Uploaded: ${questionFile.name}` : 'Manual Question Set'}
-                            </p>
-                            {questionFile && (
-                              <p className="text-xs text-blue-600">{(questionFile.size / 1024).toFixed(2)} KB</p>
+                    <div className="space-y-4 flex-grow flex flex-col">
+                      {questionFile && fileUrl ? (
+                        <div className="flex flex-col h-full flex-grow">
+                          <div className="bg-blue-50 border border-blue-200 p-3 rounded flex-shrink-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <FileText className="w-4 h-4 text-blue-600 mr-2" />
+                                <div>
+                                  <p className="font-medium text-blue-800 text-sm">
+                                    {questionFile ? `Uploaded: ${questionFile.name}` : 'Manual Question Set'}
+                                  </p>
+                                  <p className="text-xs text-blue-600">{(questionFile.size / 1024).toFixed(2)} KB</p>
+                                </div>
+                              </div>
+                              <a 
+                                href={fileUrl} 
+                                download={questionFile.name}
+                                className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                              >
+                                <Download className="w-3 h-3" />
+                                Download
+                              </a>
+                            </div>
+                          </div>
+                          
+                          <div className="border rounded-lg overflow-hidden flex-grow mt-4">
+                            {questionFile.type === 'application/pdf' ? (
+                              <iframe 
+                                src={fileUrl} 
+                                className="w-full h-full" 
+                                title="PDF Viewer"
+                              />
+                            ) : (
+                              <div className="flex items-center justify-center h-full bg-gray-100">
+                                <div className="text-center">
+                                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                                  <p className="text-gray-600 mb-2">Document Preview Unavailable</p>
+                                  <p className="text-sm text-gray-500 mb-3">DOCX files cannot be previewed directly in browser</p>
+                                  <a 
+                                    href={fileUrl} 
+                                    download={questionFile.name}
+                                    className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 rounded text-sm"
+                                  >
+                                    Download File
+                                  </a>
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="border-l-4 border-blue-500 pl-3 py-2">
-                          <h3 className="font-semibold text-sm">Question 1: Array Manipulation</h3>
-                          <p className="text-gray-700 text-xs mt-1">
-                            Given an array of integers, find the maximum product of any two numbers in the array.
-                          </p>
-                        </div>
-                        
-                        <div className="border-l-4 border-blue-500 pl-3 py-2">
-                          <h3 className="font-semibold text-sm">Question 2: String Operations</h3>
-                          <p className="text-gray-700 text-xs mt-1">
-                            Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
-                          </p>
-                        </div>
-                        
-                        <div className="border-l-4 border-blue-500 pl-3 py-2">
-                          <h3 className="font-semibold text-sm">Question 3: System Design</h3>
-                          <p className="text-gray-700 text-xs mt-1">
-                            Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.
-                          </p>
-                        </div>
-                      </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+                            <div className="flex items-center">
+                              <FileText className="w-4 h-4 text-blue-600 mr-2" />
+                              <div>
+                                <p className="font-medium text-blue-800 text-sm">Manual Question Set</p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div className="border-l-4 border-blue-500 pl-3 py-2">
+                              <h3 className="font-semibold text-sm">Question 1: Array Manipulation</h3>
+                              <p className="text-gray-700 text-xs mt-1">
+                                Given an array of integers, find the maximum product of any two numbers in the array.
+                              </p>
+                            </div>
+                            
+                            <div className="border-l-4 border-blue-500 pl-3 py-2">
+                              <h3 className="font-semibold text-sm">Question 2: String Operations</h3>
+                              <p className="text-gray-700 text-xs mt-1">
+                                Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
+                              </p>
+                            </div>
+                            
+                            <div className="border-l-4 border-blue-500 pl-3 py-2">
+                              <h3 className="font-semibold text-sm">Question 3: System Design</h3>
+                              <p className="text-gray-700 text-xs mt-1">
+                                Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.
+                              </p>
+                            </div>
+                          </div>
 
-                      <div className="pt-4 border-t">
-                        <h3 className="font-semibold text-sm mb-2">Behavioral Questions</h3>
-                        <ul className="space-y-1 text-sm">
-                          <li className="flex items-center">
-                            <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
-                            <span>Tell me about a challenging project</span>
-                          </li>
-                          <li className="flex items-center">
-                            <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
-                            <span>How do you handle conflicting priorities?</span>
-                          </li>
-                          <li className="flex items-center">
-                            <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
-                            <span>Describe your experience with agile methodologies</span>
-                          </li>
-                        </ul>
-                      </div>
+                          <div className="pt-4 border-t">
+                            <h3 className="font-semibold text-sm mb-2">Behavioral Questions</h3>
+                            <ul className="space-y-1 text-sm">
+                              <li className="flex items-center">
+                                <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
+                                <span>Tell me about a challenging project</span>
+                              </li>
+                              <li className="flex items-center">
+                                <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
+                                <span>How do you handle conflicting priorities?</span>
+                              </li>
+                              <li className="flex items-center">
+                                <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
+                                <span>Describe your experience with agile methodologies</span>
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center p-4">
