@@ -130,9 +130,10 @@ Process exited with code 0`);
             </button>
           </div>
 
-          <div className="flex-1 grid grid-cols-2 gap-4">
+          {/* 1 column, 2 row layout for videos */}
+          <div className="flex-1 flex flex-col gap-4">
             {/* Interviewer (Host) Video */}
-            <div className="bg-gray-200 rounded-lg flex items-center justify-center relative">
+            <div className="bg-gray-200 rounded-lg flex items-center justify-center relative flex-1">
               <span className="text-gray-700">Interviewer</span>
               {!candidateJoined && (
                 <div className="absolute bottom-2 right-2">
@@ -144,7 +145,7 @@ Process exited with code 0`);
             </div>
 
             {/* Candidate Video */}
-            <div className="bg-gray-300 rounded-lg flex items-center justify-center">
+            <div className="bg-gray-300 rounded-lg flex items-center justify-center flex-1">
               {candidateJoined ? (
                 <span className="text-gray-700">Candidate</span>
               ) : (
