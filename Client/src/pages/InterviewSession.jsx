@@ -46,6 +46,8 @@ const InterviewSession = () => {
   const [output, setOutput] = useState('');
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [collaboratorCursor, setCollaboratorCursor] = useState(null);
+  const [language, setLanguage] = useState('javascript');
+  const [isRunning, setIsRunning] = useState(false);
   
   // Invitation States
   const [showInvitePopup, setShowInvitePopup] = useState(false);
@@ -283,6 +285,92 @@ ${evalCode(code)}
     }
   };
 
+  const executeJavaScript = (codeString) => {
+    const timestamp = new Date().toLocaleTimeString();
+    
+    if (codeString.includes('console.log')) {
+      return `[${timestamp}] JavaScript Runtime
+> Compiling code...
+> Code executed successfully!
+> 
+> Output:
+Hello, Interview! Code executed successfully.
+> 
+> Execution time: 0.003s
+> Memory used: 5.1 MB
+> 
+> Process exited with code 0`;
+    } else if (codeString.includes('function solution')) {
+      return `[${timestamp}] JavaScript Runtime
+> Compiling code...
+> Code executed successfully!
+> 
+> Output:
+Solution function defined. Add implementation.
+> 
+> Execution time: 0.002s
+> Memory used: 4.8 MB
+> 
+> Process exited with code 0`;
+    }
+    return `[${timestamp}] JavaScript Runtime
+> Compiling code...
+> Code executed successfully!
+> 
+> Output:
+Code executed. No output generated.
+> 
+> Execution time: 0.001s
+> Memory used: 3.9 MB
+> 
+> Process exited with code 0`;
+  };
+  
+  const executePython = (codeString) => {
+    const timestamp = new Date().toLocaleTimeString();
+    return `[${timestamp}] Python 3.9.7 Runtime
+> Compiling code...
+> Code executed successfully!
+> 
+> Output:
+Python execution simulation complete.
+> 
+> Execution time: 0.012s
+> Memory used: 8.2 MB
+> 
+> Process exited with code 0`;
+  };
+  
+  const executeJava = (codeString) => {
+    const timestamp = new Date().toLocaleTimeString();
+    return `[${timestamp}] Java 11 Runtime
+> Compiling code...
+> Code compiled successfully!
+> 
+> Output:
+Java execution simulation complete.
+> 
+> Execution time: 0.156s
+> Memory used: 24.5 MB
+> 
+> Process exited with code 0`;
+  };
+  
+  const executeCpp = (codeString) => {
+    const timestamp = new Date().toLocaleTimeString();
+    return `[${timestamp}] C++ GCC 11 Runtime
+> Compiling code...
+> Code compiled successfully!
+> 
+> Output:
+C++ execution simulation complete.
+> 
+> Execution time: 0.008s
+> Memory used: 3.1 MB
+> 
+> Process exited with code 0`;
+  };
+  
   const evalCode = (codeString) => {
     if (codeString.includes('console.log')) {
       return 'Hello, Interview! Code executed successfully.';
@@ -427,10 +515,10 @@ ${evalCode(code)}
               </div>
 
               {/* Collapsed Videos List */}
-              <div className="flex-1 p-2 flex flex-col space-y-4">
+              <div className="flex-1 p-2 flex flex-col space-y-3">
                 {/* Interviewer Video Card */}
-                <div className="bg-gray-800 rounded-lg flex-1">
-                  <div className="relative bg-gray-700 pt-2 pb-2 h-full">
+                <div className="bg-gray-800 rounded-lg flex flex-col h-[calc(50%-12px)]">
+                  <div className="relative bg-gray-700 pt-2 pb-2 flex-grow">
                     {isInterviewerVideoOn ? (
                       <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
                         <div className="text-center">
@@ -468,8 +556,8 @@ ${evalCode(code)}
                 </div>
 
                 {/* Candidate Video Card */}
-                <div className="bg-gray-800 rounded-lg flex-1">
-                  <div className="relative bg-gray-700 pt-2 pb-2 h-full">
+                <div className="bg-gray-800 rounded-lg flex flex-col h-[calc(50%-12px)]">
+                  <div className="relative bg-gray-700 pt-2 pb-2 flex-grow">
                     {candidateJoined && isCandidateVideoOn ? (
                       <div className="absolute inset-0 bg-gradient-to-br from-green-900 to-blue-900 flex items-center justify-center">
                         <div className="text-center">
@@ -542,7 +630,7 @@ ${evalCode(code)}
                 </div>
 
                 {/* Video Controls at Bottom */}
-                <div className="mt-2 p-2 bg-gray-800 rounded-lg">
+                <div className="p-2 bg-gray-800 rounded-lg">
                   <div className="flex justify-center space-x-2">
                     <button 
                       onClick={toggleInterviewerVideo}
@@ -759,16 +847,28 @@ ${evalCode(code)}
                 </button>
               )}
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-4">
+              <select 
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="border border-gray-300 rounded px-3 py-1 text-sm"
+                disabled={isRunning}
+              >
+                <option value="javascript">JavaScript</option>
+                <option value="python">Python</option>
+                <option value="java">Java</option>
+                <option value="cpp">C++</option>
+              </select>
               <div className="text-sm text-gray-600">
                 Cursor: Line {cursorPosition.lineNumber}, Column {cursorPosition.column}
               </div>
               <button 
                 onClick={handleRunCode}
-                className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 rounded text-sm flex items-center gap-1 transition-colors"
+                disabled={isRunning}
+                className={`px-4 py-2 rounded text-sm flex items-center gap-1 transition-colors ${isRunning ? 'bg-gray-500 cursor-not-allowed' : 'bg-blue-800 hover:bg-blue-900 text-white'}`}
               >
                 <Send className="w-4 h-4" />
-                Run Code
+                {isRunning ? 'Running...' : 'Run Code'}
               </button>
             </div>
           </div>
@@ -778,7 +878,7 @@ ${evalCode(code)}
             <div className="flex-1 relative">
               <Editor
                 height="100%"
-                defaultLanguage="javascript"
+                language={language}
                 defaultValue={code}
                 onChange={handleEditorChange}
                 onMount={handleEditorDidMount}
@@ -816,12 +916,20 @@ ${evalCode(code)}
             {/* Output Panel */}
             <div className="h-1/3 bg-black text-green-400 p-4 font-mono text-sm overflow-auto">
               <div className="mb-2 flex items-center justify-between">
-                <span>Interview Compiler v1.0</span>
-                <span className="text-gray-400 text-xs">
-                  {candidateJoined ? 'Real-time collaboration active' : 'Single user mode'}
-                </span>
+                <span>Interview Compiler v{language === 'javascript' ? '1.0' : language === 'python' ? '2.1' : language === 'java' ? '3.5' : '4.2'}</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-gray-400 text-xs">
+                    {candidateJoined ? 'Real-time collaboration active' : 'Single user mode'}
+                  </span>
+                  <button 
+                    onClick={() => setOutput('')}
+                    className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded border border-gray-600"
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
-              <div className="whitespace-pre-wrap">{output || '$ Ready to execute code'}</div>
+              <div className="whitespace-pre-wrap">{output || `$ Ready to execute ${language} code`}</div>
             </div>
           </div>
         </div>
