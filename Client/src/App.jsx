@@ -21,6 +21,8 @@ import Community from './pages/Community';
 import Dashboard from './pages/Dashboard';
 import CreateBlog from './pages/CreateBlog';
 import Submissions from './pages/Submissions';
+import Interview from './pages/Interview';
+import InterviewSession from './pages/InterviewSession';
 import ContestInside from './pages/ContestInside';
 import MySubmissions from './pages/MySubmissions'; // Import MySubmissions page
 import ContestLeaderboard from './pages/ContestLeaderboard';
@@ -192,6 +194,14 @@ function App() {
                 <Submissions />
               </NavLayout>
             } />
+            <Route path="/interview" element={
+              <NavLayout>
+                <Interview />
+              </NavLayout>
+            } />
+            
+            {/* Interview Session page (opens in new tab) */}
+            <Route path="/interview-session" element={<InterviewSession />} />
           </Routes>
         </div>
       </Router>
