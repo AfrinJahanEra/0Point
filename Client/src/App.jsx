@@ -18,7 +18,8 @@ import Community from './pages/Community';
 import Dashboard from './pages/Dashboard';
 import CreateBlog from './pages/CreateBlog';
 import Submissions from './pages/Submissions';
-
+import Interview from './pages/Interview';
+import InterviewSession from './pages/InterviewSession';
 
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
@@ -118,6 +119,14 @@ function App() {
                 <Submissions />
               </NavLayout>
             } />
+            <Route path="/interview" element={
+              <NavLayout>
+                <Interview />
+              </NavLayout>
+            } />
+            
+            {/* Interview Session page (opens in new tab) */}
+            <Route path="/interview-session" element={<InterviewSession />} />
           </Routes>
         </div>
       </Router>

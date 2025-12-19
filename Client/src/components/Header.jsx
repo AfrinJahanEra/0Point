@@ -8,6 +8,7 @@ const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
   const profileRef = useRef(null);
 
   const isPublicPage = ['/', '/login', '/register'].includes(location.pathname);
@@ -46,6 +47,16 @@ const Header = () => {
     setIsProfileOpen(!isProfileOpen);
   };
 
+  const handleInterviewClick = () => {
+    setIsInterviewModalOpen(true);
+  };
+
+  const handleCreateInterview = () => {
+    // Open interview session in new tab
+    window.open('/interview-session', '_blank');
+    setIsInterviewModalOpen(false);
+  };
+
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-[1920px] mx-auto px-6">
@@ -68,8 +79,7 @@ const Header = () => {
           {/* Navigation */}
           {(!isPublicPage || location.pathname === '/home') && (
             <nav className="flex-1 flex justify-center">
-              <ul className="flex flex-wrap justify-center gap-4 md:gap-6">
-
+              <ul className="flex flex-wrap justify-center items-center gap-4 md:gap-6">
                 {['Home', 'Contests', 'Practice', 'Community', 'Leaderboard'].map((item) => {
                   const path = `/${item.toLowerCase()}`;
 
@@ -90,6 +100,21 @@ const Header = () => {
                   );
                 })}
 
+                {/* Interview Tab */}
+                <li>
+                  <button
+                    onClick={handleInterviewClick}
+                    className={`px-5 py-2 rounded-full font-medium transition-all duration-300 border
+                      ${isActive("/interview")
+                        ? "bg-white border-blue-700 text-blue-700 shadow-md scale-105"
+                        : "bg-transparent border-transparent text-gray-700 hover:bg-gray-100 hover:text-blue-800"
+                      }
+                    `}
+                  >
+                    Interview
+                  </button>
+                </li>
+
                 {/* Visualizer */}
                 <li>
                   <a
@@ -106,14 +131,12 @@ const Header = () => {
                     Visualizer
                   </a>
                 </li>
-
               </ul>
             </nav>
           )}
 
           {/* Avatar & Dropdown */}
           <div className="flex gap-3 items-center">
-
             <Link to="/dashboard" className="flex items-center gap-2 text-gray-900 
               hover:text-blue-800 transition-all duration-300 transform hover:scale-105">
               <BarChart2 className="w-5 h-5" />
@@ -153,9 +176,29 @@ const Header = () => {
               )}
             </div>
           </div>
-
         </div>
       </div>
+
+      {/* Interview Modal Popup */}
+      {isInterviewModalOpen && (
+        <div className="fixed inset-0 bg-transparent bg-opacity-0 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
+            <h2 className="text-xl font-bold mb-4">Interview Options</h2>
+            <button
+              onClick={handleCreateInterview}
+              className="w-full bg-blue-800 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+            >
+              Create Interview Link
+            </button>
+            <button
+              onClick={() => setIsInterviewModalOpen(false)}
+              className="w-full mt-2 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 };
