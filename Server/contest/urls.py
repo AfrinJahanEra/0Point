@@ -2,11 +2,12 @@
 from django.urls import path, include
 
 from submission.views import (
-    SubmissionCreateAPIView,
+    # SubmissionCreateAPIView,
     SubmissionListByProblemAPIView,
     SubmissionDetailAPIView,
     ContestSubmissionsAPIView,
     ContestProblemsListAPIView,
+    ProblemStatisticsAPIView,
 )
 
 from leaderboard.views import LeaderboardView, FreezeLeaderboardView, RecalculateLeaderboardView
@@ -38,7 +39,23 @@ from discussion.views import (
     DiscussionSaveAPIView,
     CommentListCreateAPIView,
     CommentDetailAPIView,
-    MySavedDiscussionsAPIView
+    MySavedDiscussionsAPIView,
+)
+
+from clarification.views import (
+    ClarificationListCreateAPIView,
+    ClarificationDetailAPIView,
+    ClarificationStatusUpdateAPIView,
+    ClarificationReplyAPIView,
+    ClarificationWatchAPIView,
+    ClarificationVoteAPIView,
+    MyClarificationsAPIView,
+    OrganizerClarificationsAPIView,
+)
+
+from compiler.views import (
+    CodeExecuteAPIView,
+    ContestProblemExecuteAPIView,
 )
 
 urlpatterns = [
@@ -62,9 +79,9 @@ urlpatterns = [
     # Keep this for problem submissions:
     path('problems/<str:problem_id>/submissions/', SubmissionListByProblemAPIView.as_view(), name='problem-submissions'),
     path('contests/<str:contest_id>/problems/list/', ContestProblemsListAPIView.as_view(), name='contest-problems-list'),
-    path('submissions/create/', SubmissionCreateAPIView.as_view(), name='submission-create'),
+    # path('submissions/create/', SubmissionCreateAPIView.as_view(), name='submission-create'),
     path('contests/<str:contest_id>/editorial/', ContestEditorialAPIView.as_view()),
-    path('contests/<str:contest_id>/execute/', CodeExecuteAPIView.as_view(), name='code-execute'),
+    # path('contests/<str:contest_id>/execute/', CodeExecuteAPIView.as_view(), name='code-execute'),
 
     # Discussion endpoints
     path('contests/<contest_id>/discussions/', DiscussionListCreateAPIView.as_view(), name='contest-discussions'),
@@ -76,4 +93,35 @@ urlpatterns = [
     path('contests/<contest_id>/discussions/<discussion_id>/comments/<comment_id>/', CommentDetailAPIView.as_view(), name='comment-detail'),
     # User saved discussions
     path('discussions/saved/', MySavedDiscussionsAPIView.as_view(), name='my-saved-discussions'),
+
+
+    # Contest clarification endpoints
+    path('contests/<contest_id>/clarifications/', ClarificationListCreateAPIView.as_view(), name='contest-clarifications'),
+    path('contests/<contest_id>/clarifications/<clarification_id>/', ClarificationDetailAPIView.as_view(), name='clarification-detail'),
+    
+    path('contests/<contest_id>/clarifications/<clarification_id>/status/', ClarificationStatusUpdateAPIView.as_view(), name='clarification-status'),
+    
+    path('contests/<contest_id>/clarifications/<clarification_id>/reply/', ClarificationReplyAPIView.as_view(), name='clarification-reply'),
+    
+    path('contests/<contest_id>/clarifications/<clarification_id>/reply/<reply_id>/', ClarificationReplyAPIView.as_view(), name='clarification-reply-edit'),
+    
+    path('contests/<contest_id>/clarifications/<clarification_id>/watch/', ClarificationWatchAPIView.as_view(), name='clarification-watch'),
+    
+    path('contests/<contest_id>/clarifications/<clarification_id>/vote/', ClarificationVoteAPIView.as_view(), name='clarification-vote'),
+    
+    # Organizer-specific endpoints
+    path('contests/<contest_id>/clarifications/organizer/', OrganizerClarificationsAPIView.as_view(), name='organizer-clarifications'),
+    
+    # User clarifications
+    path('clarifications/my/', MyClarificationsAPIView.as_view(), name='my-clarifications'),
+
+    # execution endpoint
+    path('contests/<str:contest_id>/problems/<str:problem_index>/execute/', ContestProblemExecuteAPIView.as_view(), name='contest-problem-execute'),
+
+    # Stats
+    path('contests/<str:contest_id>/problems/<str:problem_index>/stats/', ProblemStatisticsAPIView.as_view(), name='problem-statistics'),
+
+    # Keep the compiler endpoints
+    path('contests/<str:contest_id>/execute/', CodeExecuteAPIView.as_view(), name='code-execute'),
+    path('contests/<str:contest_id>/problems/<str:problem_index>/execute/', ContestProblemExecuteAPIView.as_view(), name='contest-problem-execute'),
 ]

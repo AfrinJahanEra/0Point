@@ -33,7 +33,7 @@ INSTALLED_APPS = [
     'tutorial',
     'corsheaders',
     'channels',
-    'daphne',
+    # 'daphne',
 ]
 
 MIDDLEWARE = [

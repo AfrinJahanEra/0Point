@@ -1,4 +1,3 @@
-# compiler/views.py
 import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -10,6 +9,10 @@ from .models import CodeSubmission
 from .serializers import CodeSubmissionSerializer
 from contest.utils.auth import get_user_from_request
 
+# Import submission models
+from submission.models import Submission
+from contest.models import Contest, ContestProblem
+
 # JDoodle credentials
 JD_CLIENT_ID = "fd5008b0be3517adb097999e752bdc36"
 JD_CLIENT_SECRET = "99df47ceee2ae9af0137b30d0d7eebcdc3aac2fc400b16ef5298bff3576ad5e2"
@@ -17,6 +20,7 @@ JD_URL = "https://api.jdoodle.com/v1/execute"
 
 # Map for language -> recommended versionIndex
 LANGUAGE_VERSION_MAP = {
+    "python": "3",
     "python3": "3",
     "java": "4",
     "c": "5",
@@ -30,85 +34,134 @@ def dhaka_now():
     return datetime.now(dhaka_tz)
 
 class CodeExecuteAPIView(APIView):
-    """Execute code via JDoodle API and save submission for a contest problem"""
-
+    """Execute code via JDoodle API for testing (Run button)"""
+    
     def post(self, request, contest_id=None, problem_id=None):
         # Authenticate user
         user = get_user_from_request(request)
         if not user:
             return Response({"error": "Authentication required"}, status=401)
-
+        
         # Validate input
         serializer = CodeSubmissionSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
-
+        
         data = serializer.validated_data
         language = data["language"].lower()
         version_index = data.get("version_index") or LANGUAGE_VERSION_MAP.get(language, "0")
-
-        # Create MongoEngine submission document
-        submission = CodeSubmission(
-            user=user,
-            language=language,
-            version_index=version_index,
-            code=data["code"],
-            input_data=data.get("input_data", ""),
-            created_at=dhaka_now()
-        )
-
+        
         # JDoodle payload
         payload = {
             "clientId": JD_CLIENT_ID,
             "clientSecret": JD_CLIENT_SECRET,
-            "script": submission.code,
-            "stdin": submission.input_data or "",
+            "script": data["code"],
+            "stdin": data.get("input_data", ""),
             "language": language,
             "versionIndex": version_index
         }
-
+        
         try:
             res = requests.post(JD_URL, json=payload, timeout=15)
             res_data = res.json()
 
+            print("=" * 50)
+            print("DEBUG - CodeExecuteAPIView JDoodle Response:")
+            print(f"Full JDoodle response: {res_data}")
+            print(f"cpuTime: {res_data.get('cpuTime')}, type: {type(res_data.get('cpuTime'))}")
+            print(f"memory: {res_data.get('memory')}, type: {type(res_data.get('memory'))}")
+            print(f"isExecutionSuccess: {res_data.get('isExecutionSuccess')}")
+            print(f"statusCode: {res_data.get('statusCode')}")
+            print("=" * 50)
+            
             jdoodle_output = res_data.get("output", "").strip()
-            execution_success = res_data.get("isExecutionSuccess", False)
-
-            submission.output = jdoodle_output
-            submission.status = "success" if execution_success else "error"
-
-            # Check expected output
+            cpu_time_str = res_data.get("cpuTime")
+            cpu_time_seconds = 0.0 if cpu_time_str is None else float(cpu_time_str)
+            cpu_time_ms = int(cpu_time_seconds * 1000)
+            memory_kb = int(res_data.get("memory", 0))
+            status_code = res_data.get("statusCode", 200)
+            is_execution_success = res_data.get("isExecutionSuccess", False)
+            
+            # Check expected output if provided
+            verdict = "OK"
             expected_output = data.get("expected_output", "").strip()
             if expected_output:
-                submission.verdict = "AC" if jdoodle_output == expected_output else "WA"
-            else:
-                submission.verdict = "OK"
-
-            submission.save()
-
+                verdict = "AC" if jdoodle_output == expected_output else "WA"
+            
+            # Check for compilation/runtime errors
+            status = "success" if is_execution_success else "error"
+            if status_code == 400:
+                status = "compilation_error"
+            elif not is_execution_success:
+                status = "runtime_error"
+            
+            # Save to CodeSubmission for debugging
+            code_submission = CodeSubmission(
+                user=user,
+                language=language,
+                version_index=version_index,
+                code=data["code"],
+                input_data=data.get("input_data", ""),
+                output=jdoodle_output,
+                status=status,
+                created_at=dhaka_now()
+            )
+            code_submission.save()
+            
             return Response({
-                "submission_id": str(submission.id),
+                "submission_id": str(code_submission.id),
                 "contest_id": contest_id,
                 "problem_id": problem_id,
                 "output": jdoodle_output,
-                "status": submission.status,
-                "verdict": submission.verdict,
-                "jdoodle_response": res_data  # optional full JDoodle response for debugging
+                "status": status,
+                "verdict": verdict,
+                "execution_time_ms": cpu_time_ms,
+                "execution_time_seconds": cpu_time_seconds,
+                "memory_kb": memory_kb,
+                "memory_mb": round(memory_kb / 1024, 2),
+                "status_code": status_code,
+                "is_execution_success": is_execution_success,
+                "jdoodle_response": res_data
             })
-
+            
+        except requests.exceptions.Timeout:
+            error_msg = "Execution timeout (15 seconds)"
+            code_submission = CodeSubmission(
+                user=user,
+                language=language,
+                version_index=version_index,
+                code=data["code"],
+                input_data=data.get("input_data", ""),
+                output=error_msg,
+                status="timeout_error",
+                created_at=dhaka_now()
+            )
+            code_submission.save()
+            return Response({"error": error_msg}, status=408)
+            
         except Exception as e:
-            submission.status = "error"
-            submission.output = str(e)
-            submission.verdict = "ERROR"
-            submission.save()
-            return Response({"error": str(e)}, status=500)
-
-from submission.models import Submission
-from contest.models import Contest, ContestProblem
-import pytz
+            error_msg = str(e)
+            code_submission = CodeSubmission(
+                user=user,
+                language=language,
+                version_index=version_index,
+                code=data["code"],
+                input_data=data.get("input_data", ""),
+                output=error_msg,
+                status="system_error",
+                execution_time_ms=cpu_time_ms,
+                execution_time_seconds=cpu_time_seconds,
+                memory_kb=memory_kb,
+                memory_mb=round(memory_kb / 1024, 2),
+                status_code=status_code,
+                is_execution_success=is_execution_success,
+                created_at=dhaka_now()
+            )
+            code_submission.save()
+            return Response({"error": error_msg}, status=500)
 
 class ContestProblemExecuteAPIView(APIView):
-    """Execute code for a contest problem and create submission record"""
+    """Execute and judge code for a contest problem (Submit button)"""
     
     def post(self, request, contest_id, problem_index=None):
         # Authenticate user
@@ -148,7 +201,7 @@ class ContestProblemExecuteAPIView(APIView):
         current_time = datetime.now(dhaka_tz)
         
         # Calculate contest time
-        contest_time = None
+        contest_time = 0
         if contest.start_time:
             # Ensure both times are timezone aware
             if contest.start_time.tzinfo is None:
@@ -160,7 +213,22 @@ class ContestProblemExecuteAPIView(APIView):
                 current_time = dhaka_tz.localize(current_time)
             
             contest_time_seconds = (current_time - start_time).total_seconds()
-            contest_time_minutes = contest_time_seconds / 60.0
+            contest_time = contest_time_seconds / 60.0
+        
+        # Initialize submission
+        submission = Submission(
+            user=user,
+            contest=contest,
+            problem_index=problem_index.upper(),
+            problem_code=problem_index.upper(),
+            problem_title=problem_title,
+            language=language,
+            code=data["code"],
+            verdict='RUNNING',
+            submitted_at=current_time,
+            contest_time=contest_time,
+            is_public=True
+        )
         
         # Test against problem test cases
         all_passed = True
@@ -168,6 +236,11 @@ class ContestProblemExecuteAPIView(APIView):
         actual_output = ""
         passed_count = 0
         total_test_cases = len(problem.test_cases)
+        error_message = None
+        compile_output = None
+        max_execution_time = 0  # Track maximum execution time across test cases
+        max_memory_used = 0     # Track maximum memory used across test cases
+        verdict = "RUNNING"
         
         # Test each test case
         for i, test_case in enumerate(problem.test_cases):
@@ -184,12 +257,58 @@ class ContestProblemExecuteAPIView(APIView):
             try:
                 res = requests.post(JD_URL, json=payload, timeout=15)
                 res_data = res.json()
+
+                print("=" * 50)
+                print(f"DEBUG - ContestProblemExecuteAPIView JDoodle Response (Test case {i}):")
+                print(f"Full JDoodle response: {res_data}")
+                print(f"cpuTime: {res_data.get('cpuTime')}, type: {type(res_data.get('cpuTime'))}")
+                print(f"memory: {res_data.get('memory')}, type: {type(res_data.get('memory'))}")
+                print(f"isExecutionSuccess: {res_data.get('isExecutionSuccess')}")
+                print(f"statusCode: {res_data.get('statusCode')}")
+                print("=" * 50)
                 
+                # Replace lines 156-161 with:
                 jdoodle_output = res_data.get("output", "").strip()
+                cpu_time_str = res_data.get("cpuTime")
+                if cpu_time_str is None:
+                   cpu_time_seconds = 0.0
+                else:
+                    cpu_time_seconds = float(cpu_time_str)
+                cpu_time_ms = int(cpu_time_seconds * 1000)
+                memory_kb = int(res_data.get("memory", 0))
+                status_code = res_data.get("statusCode", 200)
+                is_execution_success = res_data.get("isExecutionSuccess", False)
+                
+                # Update max values
+                max_execution_time = max(max_execution_time, cpu_time_ms)
+                max_memory_used = max(max_memory_used, memory_kb)
+                
+                # Check for compilation error (status code 400 usually means compilation error)
+                if status_code == 400 or not is_execution_success:
+                    all_passed = False
+                    compile_output = jdoodle_output
+                    verdict = "CE"
+                    break
                 
                 # For first test case, save output for display
                 if i == 0:
                     actual_output = jdoodle_output
+                
+                # Check time limit (problem.time_limit_seconds is in seconds)
+                time_limit_ms = problem.time_limit_seconds * 1000
+                if cpu_time_ms > time_limit_ms:
+                    all_passed = False
+                    verdict = "TLE"
+                    error_message = f"Time limit exceeded: {cpu_time_ms}ms > {time_limit_ms}ms"
+                    break
+                
+                # Check memory limit (problem.memory_limit_mb is in MB, convert to KB)
+                memory_limit_kb = problem.memory_limit_mb * 1024
+                if memory_kb > memory_limit_kb:
+                    all_passed = False
+                    verdict = "MLE"
+                    error_message = f"Memory limit exceeded: {memory_kb}KB > {memory_limit_kb}KB"
+                    break
                 
                 # Check if output matches expected (strip whitespace)
                 expected_output = test_case.output.strip()
@@ -198,38 +317,41 @@ class ContestProblemExecuteAPIView(APIView):
                 else:
                     all_passed = False
                     failed_test_case = i + 1
+                    verdict = "WA"
+                    error_message = f"Test case {i+1} failed\nExpected: {expected_output}\nGot: {jdoodle_output}"
                     break
                     
+            except requests.exceptions.Timeout:
+                all_passed = False
+                verdict = "TLE"
+                error_message = "Execution timeout (15 seconds)"
+                break
             except Exception as e:
                 all_passed = False
-                actual_output = str(e)
+                verdict = "SE"
+                error_message = f"System error: {str(e)}"
                 break
         
-        # Determine verdict
+        # Determine final verdict
         if all_passed:
             verdict = "AC"
             status_msg = "Accepted"
-        else:
+        elif verdict == "RUNNING":  # If no specific verdict was set
             verdict = "WA"
             status_msg = f"Wrong Answer on test case {failed_test_case}"
+        else:
+            status_msg = verdict  # Use the verdict as status message
         
-        # Create Submission record
-        submission = Submission(
-            user=user,
-            contest=contest,
-            problem_index=problem_index.upper(),
-            problem_code=problem_index.upper(),
-            problem_title=problem_title,
-            language=language,
-            code=data["code"],
-            verdict=verdict,
-            contest_time=contest_time_minutes,
-            submitted_at=current_time,
-            passed_test_cases=passed_count,
-            total_test_cases=total_test_cases,
-            failed_test_case=failed_test_case if not all_passed else -1,
-            is_public=True
-        )
+        # Update submission with results
+        submission.verdict = verdict
+        submission.passed_test_cases = passed_count
+        submission.total_test_cases = total_test_cases
+        submission.failed_test_case = failed_test_case if not all_passed else -1
+        submission.error_message = error_message
+        submission.compile_output = compile_output
+        submission.judged_at = current_time
+        submission.execution_time = max_execution_time
+        submission.memory = max_memory_used
         
         try:
             submission.save()
@@ -243,11 +365,35 @@ class ContestProblemExecuteAPIView(APIView):
             version_index=version_index,
             code=data["code"],
             input_data=data.get("input_data", ""),
-            output=actual_output,
+            output=actual_output or error_message or compile_output or "",
             status="success" if all_passed else "error",
-            created_at=current_time
+            execution_time_ms=max_execution_time,
+            execution_time_seconds=max_execution_time / 1000 if max_execution_time > 0 else 0,
+            memory_kb=max_memory_used,
+            memory_mb=round(max_memory_used / 1024, 2) if max_memory_used > 0 else 0,
+            status_code=200 if all_passed else 400,
+            is_execution_success=all_passed,  # True if all test cases passed
+            created_at=dhaka_now()
         )
         code_submission.save()
+        
+        # Update user problem status
+        from contest.views import broadcast_contest_update
+        
+        payload = {
+            "event": "submission_update",
+            "submission_id": str(submission.id),
+            "problem_index": problem_index,
+            "verdict": verdict,
+            "user_id": str(user.id),
+            "execution_time": max_execution_time,
+            "memory_used": max_memory_used
+        }
+        
+        try:
+            broadcast_contest_update(contest_id, payload)
+        except:
+            pass  # Silently fail if broadcast fails
         
         return Response({
             "submission_id": str(submission.id),
@@ -256,13 +402,21 @@ class ContestProblemExecuteAPIView(APIView):
             "problem_index": problem_index,
             "verdict": verdict,
             "status": status_msg,
-            "output": actual_output,
+            "output": actual_output or error_message or compile_output or "No output",
             "all_passed": all_passed,
             "passed_test_cases": passed_count,
             "total_test_cases": total_test_cases,
             "failed_test_case": failed_test_case,
-            "contest_time": contest_time_minutes,
-            "submitted_at": current_time.isoformat()
+            "contest_time": contest_time,
+            "submitted_at": current_time.isoformat(),
+            "execution_time": max_execution_time,
+            "memory_used": max_memory_used,
+            "time_limit": problem.time_limit_seconds * 1000,
+            "memory_limit": problem.memory_limit_mb * 1024,
+            "cpu_time_seconds": max_execution_time / 1000 if max_execution_time > 0 else 0
         })
     
+    
+    
+      
     
