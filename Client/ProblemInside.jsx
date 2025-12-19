@@ -31,17 +31,38 @@ const ProblemInside = () => {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [error, setError] = useState(null);
-  const [code, setCode] = useState(`#include <bits/stdc++.h>
-using namespace std;
-
-int main() {
-    // Your code here
-    return 0;
-}`);
+  const [code, setCode] = useState();
   const [language, setLanguage] = useState('cpp');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [problemStats, setProblemStats] = useState(null);
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
+
+  useEffect(() => {
+  const fetchProblemStats = async () => {
+    if (!contestId || !(problemData?.problem_index || problemIndex)) {
+      return;
+    }
+    
+    try {
+      const problemIdentifier = problemData?.problem_index || problemIndex;
+      const statsRes = await axios.get(
+        `http://localhost:8000/contests/${contestId}/problems/${problemIdentifier}/stats/`,
+        { headers: { Authorization: `Bearer ${TOKEN}` } }
+      );
+      
+      console.log('Problem stats response:', statsRes.data);
+      setProblemStats(statsRes.data);
+    } catch (error) {
+      console.error('Error fetching problem stats:', error);
+      // Don't set error state here - stats are not critical
+    }
+  };
+  
+  if (problemData || problemIndex) {
+    fetchProblemStats();
+  }
+}, [contestId, problemData, problemIndex]);
 
   useEffect(() => {
     const footer = document.querySelector("footer");
@@ -259,8 +280,24 @@ int main() {
     }
   };
 
+  const refreshProblemStatus = async () => {
+    try {
+      const response = await axios.get(
+        `http://localhost:8000/contests/${contestId}/problems/`,
+        { headers: { Authorization: `Bearer ${TOKEN}` } }
+      );
+      if (response.data.problems) {
+        setProblemsList(response.data.problems);
+      }
+    } catch (error) {
+      console.error('Error refreshing problems:', error);
+    }
+  };
 
-  // Handle Run test
+
+  
+
+// Update handleRun function:
 const handleRun = async () => {
   if (!code.trim()) {
     alert('Please write some code before running.');
@@ -295,10 +332,20 @@ const handleRun = async () => {
 
     console.log('Run response:', response.data);
     
-    if (response.data.status === 'success') {
-      alert(`✅ Execution successful!\nOutput: ${response.data.output}\nVerdict: ${response.data.verdict}`);
+    if (response.data.is_execution_success || response.data.status === 'success') {
+      const timeMsg = response.data.execution_time_ms ? 
+        `\n⏱️ Time: ${response.data.execution_time_ms}ms (${response.data.execution_time_seconds}s)` : '';
+      const memoryMsg = response.data.memory_kb ? 
+        `\n💾 Memory: ${response.data.memory_kb}KB (${response.data.memory_mb}MB)` : '';
+      
+      alert(`✅ Execution successful!${timeMsg}${memoryMsg}\n📤 Output: ${response.data.output}\n🎯 Verdict: ${response.data.verdict}`);
     } else {
-      alert(`❌ Execution error!\nOutput: ${response.data.output}\nStatus: ${response.data.status}`);
+      const timeMsg = response.data.execution_time_ms ? 
+        `\n⏱️ Time: ${response.data.execution_time_ms}ms` : '';
+      const memoryMsg = response.data.memory_kb ? 
+        `\n💾 Memory: ${response.data.memory_kb}KB` : '';
+      
+      alert(`❌ Execution error!${timeMsg}${memoryMsg}\n📤 Output: ${response.data.output}\n🔴 Status: ${response.data.status}`);
     }
   } catch (error) {
     console.error('Run error:', error);
@@ -306,7 +353,7 @@ const handleRun = async () => {
   }
 };
 
-// Handle code submission
+// Update handleSubmit function:
 const handleSubmit = async () => {
   if (!code.trim()) {
     alert('Please write some code before submitting.');
@@ -342,13 +389,27 @@ const handleSubmit = async () => {
     console.log('Submit response:', response.data);
     
     if (response.data.verdict === 'AC') {
-      alert(`✅ Accepted! All ${response.data.total_test_cases} test cases passed.\nSubmission ID: ${response.data.submission_id}`);
+      const timeMsg = response.data.execution_time ? 
+        `\n⏱️ Time: ${response.data.execution_time}ms (${response.data.cpu_time_seconds}s)` : '';
+      const memoryMsg = response.data.memory_used ? 
+        `\n💾 Memory: ${response.data.memory_used}KB (${Math.round(response.data.memory_used / 1024 * 100) / 100}MB)` : '';
+      const limitsMsg = response.data.time_limit && response.data.memory_limit ? 
+        `\n📊 Limits: ${response.data.time_limit}ms, ${response.data.memory_limit}KB` : '';
       
-      // Refresh problem status
-      // You might want to fetch user status again
+      alert(`✅ Accepted! All ${response.data.total_test_cases} test cases passed.${timeMsg}${memoryMsg}${limitsMsg}\n🎫 Submission ID: ${response.data.submission_id}`);
+      
+      // Refresh status
       fetchUserProblemStatus();
+      refreshProblemStatus();
     } else {
-      alert(`❌ ${response.data.status}\nPassed: ${response.data.passed_test_cases}/${response.data.total_test_cases}\nFailed on test case: ${response.data.failed_test_case}`);
+      const timeMsg = response.data.execution_time ? 
+        `\n⏱️ Time: ${response.data.execution_time}ms` : '';
+      const memoryMsg = response.data.memory_used ? 
+        `\n💾 Memory: ${response.data.memory_used}KB` : '';
+      const limitsMsg = response.data.time_limit && response.data.memory_limit ? 
+        `\n📊 Limits: ${response.data.time_limit}ms, ${response.data.memory_limit}KB` : '';
+      
+      alert(`❌ ${response.data.status}${timeMsg}${memoryMsg}${limitsMsg}\n✅ Passed: ${response.data.passed_test_cases}/${response.data.total_test_cases}\n❌ Failed on test case: ${response.data.failed_test_case}`);
     }
     
   } catch (error) {
@@ -629,27 +690,82 @@ useEffect(() => {
             </div>
 
             {/* Problem Stats */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-xs font-semibold text-gray-900 mb-3">Problem Stats</h3>
-              <div className="space-y-3 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Points:</span>
-                  <span className="font-medium text-gray-900">{problemData?.points || 100}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Solved By:</span>
-                  <span className="font-medium text-green-600">{problemData?.solved_count || 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Accuracy:</span>
-                  <span className="font-medium text-gray-900">{problemData?.accuracy || '0%'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Attempts:</span>
-                  <span className="font-medium text-yellow-600">{problemData?.attempted_count || 0}</span>
-                </div>
-              </div>
-            </div>
+<div className="bg-gray-50 rounded-lg p-4">
+  <h3 className="text-xs font-semibold text-gray-900 mb-3">Problem Stats</h3>
+  <div className="space-y-3 text-xs">
+    <div className="flex justify-between">
+      <span className="text-gray-600">Points:</span>
+      <span className="font-medium text-gray-900">
+        {problemStats?.problem?.points || problemData?.points || 100}
+      </span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-600">Solved By:</span>
+      <span className="font-medium text-green-600">
+        {problemStats?.statistics?.users_solved || problemData?.solved_count || 0}
+        {problemStats?.statistics?.users_attempted ? 
+          `/${problemStats.statistics.users_attempted}` : ''}
+      </span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-600">Accuracy:</span>
+      <span className="font-medium text-gray-900">
+        {problemStats?.statistics?.accuracy || problemData?.accuracy || '0%'}
+      </span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-600">Attempts:</span>
+      <span className="font-medium text-yellow-600">
+        {problemStats?.statistics?.total_submissions || problemData?.attempted_count || 0}
+      </span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-600">Your Status:</span>
+      <span className={`font-medium ${
+        problemStats?.statistics?.user_status === 'solved' ? 'text-green-600' :
+        problemStats?.statistics?.user_status === 'attempted' ? 'text-yellow-600' :
+        'text-gray-600'
+      }`}>
+        {problemStats?.statistics?.user_status === 'solved' ? 'Solved' :
+         problemStats?.statistics?.user_status === 'attempted' ? 'Attempted' :
+         'Not Attempted'}
+        {problemStats?.statistics?.user_attempts > 0 ? 
+          ` (${problemStats.statistics.user_attempts})` : ''}
+      </span>
+    </div>
+    {problemStats?.statistics?.average_time > 0 && (
+      <div className="flex justify-between">
+        <span className="text-gray-600">Avg Time:</span>
+        <span className="font-medium text-gray-900">
+          {problemStats.statistics.average_time}ms
+        </span>
+      </div>
+    )}
+  </div>
+  {problemStats?.statistics?.verdict_distribution && 
+   problemStats.statistics.verdict_distribution.length > 0 && (
+    <div className="mt-4 pt-4 border-t border-gray-200">
+      <h4 className="text-xs font-semibold text-gray-900 mb-2">Verdict Breakdown</h4>
+      <div className="space-y-1">
+        {problemStats.statistics.verdict_distribution.slice(0, 4).map((item, idx) => (
+          <div key={idx} className="flex items-center justify-between">
+            <span className="text-gray-600 text-xs">{item.verdict}:</span>
+            <span className="font-medium text-gray-900 text-xs">
+              {item.count}
+            </span>
+          </div>
+        ))}
+        {problemStats.statistics.verdict_distribution.length > 4 && (
+          <div className="text-center">
+            <span className="text-gray-500 text-xs">
+              +{problemStats.statistics.verdict_distribution.length - 4} more
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )}
+</div>
           </div>
         </div>
 
