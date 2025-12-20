@@ -268,7 +268,6 @@ const MySubmissions = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    alert('Code copied to clipboard!');
   };
 
   const handleSort = (field) => {

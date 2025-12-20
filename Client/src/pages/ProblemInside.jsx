@@ -259,42 +259,177 @@ int main() {
     }
   };
 
-  // Handle code submission
-  const handleSubmit = async () => {
-    if (!code.trim()) {
-      alert('Please write some code before submitting.');
-      return;
-    }
-
+  const refreshProblemStatus = async () => {
     try {
-      const submissionData = {
-        contest_id: contestId,
-        problem_index: problemData?.problem_index || problemIndex,
-        language: language,
-        code: code
-      };
-
-      alert('Submission endpoint not implemented yet.');
+      const response = await axios.get(
+        `http://localhost:8000/contests/${contestId}/problems/`,
+        { headers: { Authorization: `Bearer ${TOKEN}` } }
+      );
+      if (response.data.problems) {
+        setProblemsList(response.data.problems);
+      }
     } catch (error) {
-      console.error('Submission error:', error);
-      alert(error.response?.data?.error || 'Submission failed');
+      console.error('Error refreshing problems:', error);
     }
   };
 
-  // Handle Run test
-  const handleRun = async () => {
-    if (!code.trim()) {
-      alert('Please write some code before running.');
-      return;
-    }
 
-    try {
-      alert('Run endpoint not implemented yet.');
-    } catch (error) {
-      console.error('Run error:', error);
-      alert(error.response?.data?.error || 'Run failed');
+  
+
+// Update handleRun function:
+const handleRun = async () => {
+  if (!code.trim()) {
+    alert('Please write some code before running.');
+    return;
+  }
+
+  try {
+    // Use sample test case input for running
+    const sampleInput = problemData?.sample_test_cases?.[0]?.input || '';
+    const expectedOutput = problemData?.sample_test_cases?.[0]?.output || '';
+
+    const runData = {
+      language: language,
+      version_index: getVersionIndex(language),
+      code: code,
+      input_data: sampleInput,
+      expected_output: expectedOutput
+    };
+
+    console.log('Running code with data:', runData);
+    
+    const response = await axios.post(
+      `http://localhost:8000/contests/${contestId}/execute/`,
+      runData,
+      { 
+        headers: { 
+          Authorization: `Bearer ${TOKEN}`,
+          'Content-Type': 'application/json'
+        } 
+      }
+    );
+
+    console.log('Run response:', response.data);
+    
+    if (response.data.is_execution_success || response.data.status === 'success') {
+      const timeMsg = response.data.execution_time_ms ? 
+        `\n⏱️ Time: ${response.data.execution_time_ms}ms (${response.data.execution_time_seconds}s)` : '';
+      const memoryMsg = response.data.memory_kb ? 
+        `\n💾 Memory: ${response.data.memory_kb}KB (${response.data.memory_mb}MB)` : '';
+      
+      alert(`✅ Execution successful!${timeMsg}${memoryMsg}\n📤 Output: ${response.data.output}\n🎯 Verdict: ${response.data.verdict}`);
+    } else {
+      const timeMsg = response.data.execution_time_ms ? 
+        `\n⏱️ Time: ${response.data.execution_time_ms}ms` : '';
+      const memoryMsg = response.data.memory_kb ? 
+        `\n💾 Memory: ${response.data.memory_kb}KB` : '';
+      
+      alert(`❌ Execution error!${timeMsg}${memoryMsg}\n📤 Output: ${response.data.output}\n🔴 Status: ${response.data.status}`);
     }
-  };
+  } catch (error) {
+    console.error('Run error:', error);
+    alert(error.response?.data?.error || 'Run failed');
+  }
+};
+
+// Update handleSubmit function:
+const handleSubmit = async () => {
+  if (!code.trim()) {
+    alert('Please write some code before submitting.');
+    return;
+  }
+
+  // Show confirmation for submission
+  if (!window.confirm('Submit your solution? This will be judged against all test cases.')) {
+    return;
+  }
+
+  try {
+    const submitData = {
+      language: language,
+      version_index: getVersionIndex(language),
+      code: code,
+      input_data: '', // Empty for full submission
+    };
+
+    console.log('Submitting code:', submitData);
+    
+    const response = await axios.post(
+      `http://localhost:8000/contests/${contestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
+      submitData,
+      { 
+        headers: { 
+          Authorization: `Bearer ${TOKEN}`,
+          'Content-Type': 'application/json'
+        } 
+      }
+    );
+
+    console.log('Submit response:', response.data);
+    
+    if (response.data.verdict === 'AC') {
+      const timeMsg = response.data.execution_time ? 
+        `\n⏱️ Time: ${response.data.execution_time}ms (${response.data.cpu_time_seconds}s)` : '';
+      const memoryMsg = response.data.memory_used ? 
+        `\n💾 Memory: ${response.data.memory_used}KB (${Math.round(response.data.memory_used / 1024 * 100) / 100}MB)` : '';
+      const limitsMsg = response.data.time_limit && response.data.memory_limit ? 
+        `\n📊 Limits: ${response.data.time_limit}ms, ${response.data.memory_limit}KB` : '';
+      
+      alert(`✅ Accepted! All ${response.data.total_test_cases} test cases passed.${timeMsg}${memoryMsg}${limitsMsg}\n🎫 Submission ID: ${response.data.submission_id}`);
+      
+      // Refresh status
+      fetchUserProblemStatus();
+      refreshProblemStatus();
+    } else {
+      const timeMsg = response.data.execution_time ? 
+        `\n⏱️ Time: ${response.data.execution_time}ms` : '';
+      const memoryMsg = response.data.memory_used ? 
+        `\n💾 Memory: ${response.data.memory_used}KB` : '';
+      const limitsMsg = response.data.time_limit && response.data.memory_limit ? 
+        `\n📊 Limits: ${response.data.time_limit}ms, ${response.data.memory_limit}KB` : '';
+      
+      alert(`❌ ${response.data.status}${timeMsg}${memoryMsg}${limitsMsg}\n✅ Passed: ${response.data.passed_test_cases}/${response.data.total_test_cases}\n❌ Failed on test case: ${response.data.failed_test_case}`);
+    }
+    
+  } catch (error) {
+    console.error('Submission error:', error);
+    alert(error.response?.data?.error || 'Submission failed');
+  }
+};
+
+// Helper function to get version index
+const getVersionIndex = (lang) => {
+  switch(lang) {
+    case 'python': return '3';
+    case 'python3': return '3';
+    case 'java': return '4';
+    case 'c': return '5';
+    case 'cpp': return '5';
+    case 'javascript': return '4';
+    default: return '0';
+  }
+};
+
+// Add this function to fetch user problem status
+const fetchUserProblemStatus = async () => {
+  try {
+    const response = await axios.get(
+      `http://localhost:8000/contests/${contestId}/problems/status/`,
+      { headers: { Authorization: `Bearer ${TOKEN}` } }
+    );
+    setUserStatus(response.data.problem_statuses || {});
+  } catch (error) {
+    console.error('Error fetching problem status:', error);
+  }
+};
+
+// Call this in your useEffect after loading problem data
+useEffect(() => {
+  if (problemData && contestId) {
+    fetchUserProblemStatus();
+  }
+}, [problemData, contestId]);
+
 
   // Format problem difficulty
   const formatDifficulty = (difficulty) => {
@@ -410,23 +545,24 @@ int main() {
               </button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">{displayContestData.title}</h1>
-                <div className="flex items-center space-x-3 text-xs text-gray-600">
-                  <span className="flex items-center space-x-1">
-                    <Users className="w-3 h-3" />
-                    <span>{displayContestData.platform}</span>
-                  </span>
-                  <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded-full text-xs">
-                    {displayContestData.type === 'individual' ? 'Individual' : 'Team'}
-                  </span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                    displayContestData.status === 'live' ? 'bg-red-100 text-red-800' :
-                    displayContestData.status === 'upcoming' ? 'bg-blue-100 text-blue-800' :
-                    displayContestData.status === 'past' ? 'bg-green-100 text-green-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {displayContestData.status?.charAt(0).toUpperCase() + displayContestData.status?.slice(1)}
-                  </span>
-                </div>
+
+<div className="flex items-center space-x-3 text-xs text-gray-600">
+  <span className="flex items-center space-x-1">
+    <Users className="w-3 h-3" />
+    <span>{problemData?.contest_platform || displayContestData?.platform || 'Custom Platform'}</span>
+  </span>
+  <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded-full text-xs">
+    {problemData?.contest_type === 'team' ? 'Team' : 'Individual'}
+  </span>
+  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+    displayContestData?.status === 'live' ? 'bg-red-100 text-red-800' :
+    displayContestData?.status === 'upcoming' ? 'bg-blue-100 text-blue-800' :
+    displayContestData?.status === 'past' ? 'bg-green-100 text-green-800' :
+    'bg-gray-100 text-gray-800'
+  }`}>
+    {displayContestData?.status?.charAt(0).toUpperCase() + displayContestData?.status?.slice(1)}
+  </span>
+</div>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -498,21 +634,21 @@ int main() {
                 <span className="text-xs font-semibold text-gray-900">My Submissions</span>
               </Link>
               
-              <button
-                onClick={() => alert('Discussions feature not implemented yet')}
+              <Link
+                to={`/contests/${contestId}/discussion`}
                 className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
               >
                 <MessageSquare className="w-4 h-4" />
                 <span className="text-xs font-semibold text-gray-900">Discussions</span>
-              </button>
+              </Link>
               
-              <button
-                onClick={() => alert('Q&A Forum feature not implemented yet')}
+              <Link
+                to={`/contests/${contestId}/clarifications`}
                 className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
               >
                 <HelpCircle className="w-4 h-4" />
-                <span className="text-xs font-semibold text-gray-900">Q&A Forum</span>
-              </button>
+                <span className="text-xs font-semibold text-gray-900">Clarification</span>
+              </Link>
               
               <Link
                 to={`/contests/${contestId}/leaderboard`}
@@ -676,16 +812,18 @@ int main() {
               <div className="border-b border-gray-200 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <select 
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                      className="border border-gray-300 rounded px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="cpp">C++ 17</option>
-                      <option value="java">Java</option>
-                      <option value="python">Python 3</option>
-                      <option value="c">C</option>
-                    </select>
+                    
+<select 
+  value={language}
+  onChange={(e) => setLanguage(e.target.value)}
+  className="border border-gray-300 rounded px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+>
+  <option value="python">Python 3</option>
+  <option value="cpp">C++ 17</option>
+  <option value="java">Java</option>
+  <option value="c">C</option>
+  <option value="javascript">JavaScript</option>
+</select>
                   </div>
                   <div className="flex items-center space-x-2">
                     <button 
