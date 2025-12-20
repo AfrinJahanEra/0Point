@@ -69,9 +69,16 @@ const simulateCompilation = async () => {
       })
     });
 
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 100)}...`);
+    }
+
     if (!response.ok) {
       const err = await response.json();
-      throw new Error(err.error || "Execution failed");
+      throw new Error(err.error || `Execution failed with status ${response.status}`);
     }
 
     const data = await response.json();

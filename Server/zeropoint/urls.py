@@ -13,4 +13,5 @@ urlpatterns = [
     path("", include("tutorial.urls")),
     path('admin/', admin.site.urls),
     path('interview/', include('interview.urls')),
+    path('api/', include('executor.urls')),
 ]

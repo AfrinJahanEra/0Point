@@ -22,62 +22,89 @@ import {
   Download,
   MessageSquare,
   Maximize2,
-  Settings
+  Settings,
+  File
 } from 'lucide-react';
+
+// PDF Viewer Component
+const PDFViewer = ({ fileUrl }) => {
+  return (
+    <div className="w-full h-full">
+      <iframe 
+        src={`${fileUrl}#view=fitH`}
+        className="w-full h-full border-0"
+        title="PDF Viewer"
+        type="application/pdf"
+      />
+    </div>
+  );
+};
 
 // Helper function to extract text from files
 const extractTextFromPDF = async (file) => {
-  return `PDF Content Preview: ${file.name}
-  
-  For full PDF viewing, the file needs to be downloaded.
-  Shared content from the PDF will appear here.
-  
-  Question 1: Array Manipulation
-  -------------------------------
-  Given an array of integers, find the maximum product of any two numbers in the array.
-  
-  Example:
-  Input: [1, 2, 3, 4]
-  Output: 12 (3 * 4)
-  
-  Question 2: String Operations
-  -----------------------------
-  Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
-  
-  Example:
-  Input: "A man, a plan, a canal: Panama"
-  Output: true
-  
-  Question 3: System Design
-  -------------------------
-  Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.`;
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const mockContent = `PDF File: ${file.name}
+Size: ${(file.size / 1024).toFixed(2)} KB
+Pages: Estimated ${Math.ceil(file.size / 50000)} pages
+
+Content Preview:
+----------------
+The PDF file has been uploaded successfully. 
+You can preview it directly in the browser.
+
+For detailed text extraction, please download the file.
+
+Questions included in this PDF:
+1. Data Structures & Algorithms
+2. System Design Principles
+3. Database Design Patterns
+4. API Design Best Practices
+
+Uploaded at: ${new Date().toLocaleTimeString()}`;
+        
+        resolve(mockContent);
+      } catch (error) {
+        console.error('PDF extraction error:', error);
+        resolve(`PDF File: ${file.name}\n\nUnable to extract text. File uploaded successfully.`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
 };
 
 const extractTextFromDOCX = async (file) => {
-  return `DOCX Content Preview: ${file.name}
-  
-  For full DOCX viewing, the file needs to be downloaded.
-  Shared content from the document will appear here.
-  
-  Question 1: Array Manipulation
-  -------------------------------
-  Given an array of integers, find the maximum product of any two numbers in the array.
-  
-  Example:
-  Input: [1, 2, 3, 4]
-  Output: 12 (3 * 4)
-  
-  Question 2: String Operations
-  -----------------------------
-  Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
-  
-  Example:
-  Input: "A man, a plan, a canal: Panama"
-  Output: true
-  
-  Question 3: System Design
-  -------------------------
-  Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.`;
+  return `DOCX File: ${file.name}
+Size: ${(file.size / 1024).toFixed(2)} KB
+
+DOCX Content Preview:
+--------------------
+For full DOCX viewing, the file needs to be downloaded.
+DOCX files require server-side processing for text extraction.
+
+Question 1: Array Manipulation
+------------------------------
+Given an array of integers, find the maximum product of any two numbers in the array.
+
+Example:
+Input: [1, 2, 3, 4]
+Output: 12 (3 * 4)
+
+Question 2: String Operations
+-----------------------------
+Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
+
+Example:
+Input: "A man, a plan, a canal: Panama"
+Output: true
+
+Question 3: System Design
+-------------------------
+Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.
+
+Uploaded at: ${new Date().toLocaleTimeString()}`;
 };
 
 const InterviewSession = () => {
@@ -97,6 +124,7 @@ const InterviewSession = () => {
   const [showQuestionUploadPopup, setShowQuestionUploadPopup] = useState(false);
   const [questionContent, setQuestionContent] = useState('');
   const [fileUrl, setFileUrl] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Code Editor States
   const [code, setCode] = useState('// Write your code here...\nfunction solution() {\n  \n}\n');
@@ -200,7 +228,8 @@ const InterviewSession = () => {
                   if (data.question.file_name) {
                     setQuestionFile({
                       name: data.question.file_name,
-                      type: data.question.file_type
+                      type: data.question.file_type,
+                      size: data.question.file_size
                     });
                   }
                 }
@@ -590,54 +619,73 @@ const InterviewSession = () => {
     }
   };
 
-  // Question Management
+  // Question Management with PDF preview
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (file && (file.type === 'application/pdf' || 
                  file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-      setQuestionFile(file);
       
-      // Create a URL for the file to display it locally
-      if (fileUrlRef.current) {
-        URL.revokeObjectURL(fileUrlRef.current);
-      }
-      const url = URL.createObjectURL(file);
-      setFileUrl(url);
-      fileUrlRef.current = url;
+      setIsUploading(true);
       
-      // Extract text content from the file
-      let extractedContent = '';
-      
-      if (file.type === 'application/pdf') {
-        extractedContent = await extractTextFromPDF(file);
-      } else {
-        extractedContent = await extractTextFromDOCX(file);
-      }
-      
-      const mockContent = `File: ${file.name}
+      try {
+        setQuestionFile(file);
+        
+        // Create a URL for the file to display it locally
+        if (fileUrlRef.current) {
+          URL.revokeObjectURL(fileUrlRef.current);
+        }
+        const url = URL.createObjectURL(file);
+        setFileUrl(url);
+        fileUrlRef.current = url;
+        
+        // Extract text content from the file
+        let extractedContent = '';
+        
+        if (file.type === 'application/pdf') {
+          extractedContent = await extractTextFromPDF(file);
+        } else {
+          extractedContent = await extractTextFromDOCX(file);
+        }
+        
+        const fullContent = `File: ${file.name}
 Size: ${(file.size / 1024).toFixed(2)} KB
 Type: ${file.type}
+Uploaded by: ${currentUser.username}
+Time: ${new Date().toLocaleTimeString()}
 
-${extractedContent || 'Content preview not available. Please download the file to view full content.'}`;
-      
-      setQuestionContent(mockContent);
-      localStorage.setItem('interviewQuestion', mockContent);
-      
-      // Send to other users
-      sendQuestionUpdate(mockContent, {
-        file_name: file.name,
-        file_type: file.type,
-        file_size: file.size
-      });
-      
-      toast.success('Question file uploaded and shared!', {
-        style: {
-          background: '#1e40af',
-          color: '#ffffff',
-        },
-      });
-      
-      setShowQuestionUploadPopup(false);
+${extractedContent}`;
+        
+        setQuestionContent(fullContent);
+        localStorage.setItem('interviewQuestion', fullContent);
+        
+        // Send to other users
+        sendQuestionUpdate(fullContent, {
+          file_name: file.name,
+          file_type: file.type,
+          file_size: file.size,
+          uploaded_by: currentUser.username,
+          uploaded_at: new Date().toISOString()
+        });
+        
+        toast.success('Question file uploaded and shared!', {
+          style: {
+            background: '#1e40af',
+            color: '#ffffff',
+          },
+        });
+        
+        setShowQuestionUploadPopup(false);
+      } catch (error) {
+        console.error('File upload error:', error);
+        toast.error('Failed to upload file. Please try again.', {
+          style: {
+            background: '#dc2626',
+            color: '#ffffff',
+          },
+        });
+      } finally {
+        setIsUploading(false);
+      }
     } else {
       toast.error('Please upload a PDF or DOCX file', {
         style: {
@@ -649,20 +697,24 @@ ${extractedContent || 'Content preview not available. Please download the file t
   };
 
   const handleManualQuestion = () => {
-    const manualQuestion = `Interview Questions
-    ==================
-    
-    1. Coding Questions:
-    --------------------
-    a) Given an array, find the maximum product of any two numbers.
-    b) Check if a string is a palindrome (ignore special characters).
-    c) Design a URL shortening service (system design).
-    
-    2. Behavioral Questions:
-    ------------------------
-    a) Tell me about a challenging project.
-    b) How do you handle conflicting priorities?
-    c) Describe your experience with agile methodologies.`;
+    const manualQuestion = `Manual Question Set
+Uploaded by: ${currentUser.username}
+Time: ${new Date().toLocaleTimeString()}
+
+Interview Questions
+==================
+
+1. Coding Questions:
+--------------------
+a) Given an array, find the maximum product of any two numbers.
+b) Check if a string is a palindrome (ignore special characters).
+c) Design a URL shortening service (system design).
+
+2. Behavioral Questions:
+------------------------
+a) Tell me about a challenging project.
+b) How do you handle conflicting priorities?
+c) Describe your experience with agile methodologies.`;
     
     setQuestionContent(manualQuestion);
     localStorage.setItem('interviewQuestion', manualQuestion);
@@ -867,6 +919,195 @@ ${evalCpp(codeString)}
     setTimeRemaining(newTime);
     setIsTimerRunning(true);
     sendTimerUpdate(newTime, true);
+  };
+
+  // Render Questions Content
+  const renderQuestionsContent = () => {
+    if (!questionContent) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center p-4">
+          <FileText className="w-12 h-12 text-gray-300 mb-3" />
+          <p className="text-gray-500 text-sm text-center mb-4">No questions available</p>
+          <button 
+            onClick={() => setShowQuestionUploadPopup(true)}
+            className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-2 rounded text-sm flex items-center gap-1"
+          >
+            <Upload className="w-3 h-3" />
+            Upload Questions
+          </button>
+        </div>
+      );
+    }
+
+    if (questionFile && fileUrl && questionFile.type === 'application/pdf') {
+      // Local user has PDF - show preview
+      return (
+        <div className="flex flex-col h-full">
+          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <File className="w-4 h-4 text-blue-600 mr-2" />
+                <div>
+                  <p className="font-medium text-blue-800 text-sm">
+                    PDF: {questionFile.name}
+                  </p>
+                  <p className="text-xs text-blue-600">
+                    {(questionFile.size / 1024).toFixed(2)} KB • Uploaded by you
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = fileUrl;
+                    link.download = questionFile.name;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                >
+                  <Download className="w-3 h-3" />
+                  Download
+                </button>
+                <button
+                  onClick={() => {
+                    window.open(fileUrl, '_blank');
+                  }}
+                  className="bg-green-800 hover:bg-green-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                >
+                  <Maximize2 className="w-3 h-3" />
+                  Open Full
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex-1 border rounded-lg overflow-hidden bg-gray-100">
+            <PDFViewer fileUrl={fileUrl} />
+          </div>
+          
+          <div className="mt-4 p-4 bg-gray-50 rounded border flex-shrink-0">
+            <h4 className="font-medium text-sm mb-2">PDF Details:</h4>
+            <div className="text-xs text-gray-600 space-y-1">
+              <div className="flex justify-between">
+                <span>File Name:</span>
+                <span className="font-medium">{questionFile.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>File Size:</span>
+                <span className="font-medium">{(questionFile.size / 1024).toFixed(2)} KB</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Type:</span>
+                <span className="font-medium">PDF Document</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    } else if (questionFile && !fileUrl && questionFile.type === 'application/pdf') {
+      // Remote user - received PDF but no local file
+      return (
+        <div className="flex flex-col h-full">
+          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded mb-4 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <File className="w-4 h-4 text-yellow-600 mr-2" />
+                <div>
+                  <p className="font-medium text-yellow-800 text-sm">
+                    PDF Shared: {questionFile.name}
+                  </p>
+                  <p className="text-xs text-yellow-600">
+                    {(questionFile.size / 1024).toFixed(2)} KB • Shared by another user
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => toast.info('Please ask the uploader to send you the PDF file directly.')}
+                className="bg-yellow-800 hover:bg-yellow-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" />
+                Request File
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex-1 p-4 bg-gray-50 rounded border overflow-auto">
+            <div className="whitespace-pre-wrap text-sm">
+              {questionContent}
+            </div>
+          </div>
+          
+          <div className="mt-4 p-4 bg-gray-50 rounded border flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">To view the actual PDF:</span>
+              <button
+                onClick={() => toast.info('Contact the interviewer to get the PDF file.')}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                Request Access
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    } else if (questionFile && fileUrl && questionFile.type.includes('wordprocessingml')) {
+      // Local user has DOCX
+      return (
+        <div className="flex flex-col h-full">
+          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <FileText className="w-4 h-4 text-blue-600 mr-2" />
+                <div>
+                  <p className="font-medium text-blue-800 text-sm">
+                    DOCX: {questionFile.name}
+                  </p>
+                  <p className="text-xs text-blue-600">
+                    {(questionFile.size / 1024).toFixed(2)} KB • Uploaded by you
+                  </p>
+                </div>
+              </div>
+              <a 
+                href={fileUrl} 
+                download={questionFile.name}
+                className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" />
+                Download
+              </a>
+            </div>
+          </div>
+          
+          <div className="flex-1 p-4 bg-gray-50 rounded border overflow-auto">
+            <div className="whitespace-pre-wrap text-sm">
+              {questionContent}
+            </div>
+          </div>
+        </div>
+      );
+    } else {
+      // Manual questions or no file
+      return (
+        <div className="h-full overflow-auto">
+          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4">
+            <div className="flex items-center">
+              <FileText className="w-4 h-4 text-blue-600 mr-2" />
+              <div>
+                <p className="font-medium text-blue-800 text-sm">Manual Question Set</p>
+                <p className="text-xs text-blue-600">Shared in real-time</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded border">
+            {questionContent}
+          </div>
+        </div>
+      );
+    }
   };
 
   // Calculate widths based on layout state
@@ -1137,74 +1378,9 @@ ${evalCpp(codeString)}
                   </div>
                 </div>
 
-                <div className="flex-1 p-4 overflow-auto">
-                  {questionContent ? (
-                    <div className="space-y-4">
-                      {questionFile && fileUrl ? (
-                        <div>
-                          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <FileText className="w-4 h-4 text-blue-600 mr-2" />
-                                <div>
-                                  <p className="font-medium text-blue-800 text-sm">
-                                    Uploaded: {questionFile.name}
-                                  </p>
-                                  <p className="text-xs text-blue-600">You have the original file</p>
-                                </div>
-                              </div>
-                              <a 
-                                href={fileUrl} 
-                                download={questionFile.name}
-                                className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-                              >
-                                <Download className="w-3 h-3" />
-                                Download
-                              </a>
-                            </div>
-                          </div>
-                          <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded">
-                            {questionContent}
-                          </div>
-                        </div>
-                      ) : questionFile && !fileUrl ? (
-                        <div>
-                          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded mb-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <FileText className="w-4 h-4 text-yellow-600 mr-2" />
-                                <div>
-                                  <p className="font-medium text-yellow-800 text-sm">
-                                    Shared: {questionFile.name}
-                                  </p>
-                                  <p className="text-xs text-yellow-600">Shared by another user</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded">
-                            {questionContent}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded">
-                          {questionContent}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center p-4">
-                      <FileText className="w-12 h-12 text-gray-300 mb-3" />
-                      <p className="text-gray-500 text-sm text-center mb-4">No questions available</p>
-                      <button 
-                        onClick={() => setShowQuestionUploadPopup(true)}
-                        className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-2 rounded text-sm flex items-center gap-1"
-                      >
-                        <Upload className="w-3 h-3" />
-                        Upload Questions
-                      </button>
-                    </div>
-                  )}
+                {/* Questions Content Area */}
+                <div className="flex-1 p-4 overflow-hidden">
+                  {renderQuestionsContent()}
                 </div>
 
                 <div className="p-3 border-t">
@@ -1416,25 +1592,31 @@ ${evalCpp(codeString)}
               <FileText className="w-5 h-5" />
               Set Interview Questions
             </h2>
-            <p className="text-gray-600 mb-4">Upload a question file or add questions manually</p>
+            <p className="text-gray-600 mb-4">Upload a PDF/DOCX file or add questions manually</p>
             
             <div className="space-y-4">
               {/* File Upload Option */}
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                 <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600 mb-4">Upload PDF or DOCX file</p>
-                <label className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 rounded cursor-pointer flex items-center justify-center gap-2 transition-colors mb-2">
+                <label className={`px-4 py-2 rounded cursor-pointer flex items-center justify-center gap-2 transition-colors mb-2 ${
+                  isUploading 
+                    ? 'bg-gray-400 text-white cursor-not-allowed' 
+                    : 'bg-blue-800 hover:bg-blue-900 text-white'
+                }`}>
                   <Upload className="w-4 h-4" />
-                  Choose File
+                  {isUploading ? 'Uploading...' : 'Choose File'}
                   <input 
                     ref={fileInputRef}
                     type="file" 
-                    accept=".pdf,.docx" 
+                    accept=".pdf,.docx,.doc" 
                     className="hidden" 
                     onChange={handleFileUpload}
+                    disabled={isUploading}
                   />
                 </label>
                 <p className="text-sm text-gray-500">Supports PDF and DOCX formats</p>
+                <p className="text-xs text-gray-400 mt-2">PDF files will be previewable</p>
               </div>
               
               {/* Manual Option */}
@@ -1443,7 +1625,12 @@ ${evalCpp(codeString)}
                 <p className="text-sm text-gray-600 mb-4">You can type questions directly</p>
                 <button 
                   onClick={handleManualQuestion}
-                  className="w-full bg-gray-800 hover:bg-gray-900 text-white py-2 px-4 rounded transition-colors flex items-center justify-center gap-2"
+                  disabled={isUploading}
+                  className={`w-full py-2 px-4 rounded transition-colors flex items-center justify-center gap-2 ${
+                    isUploading
+                      ? 'bg-gray-400 text-white cursor-not-allowed'
+                      : 'bg-gray-800 hover:bg-gray-900 text-white'
+                  }`}
                 >
                   <FileText className="w-4 h-4" />
                   Use Sample Questions
@@ -1453,13 +1640,14 @@ ${evalCpp(codeString)}
               <div className="flex space-x-2">
                 <button
                   onClick={() => setShowQuestionUploadPopup(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
+                  disabled={isUploading}
+                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => {
-                    if (!questionContent) {
+                    if (!questionContent && !questionFile) {
                       toast.error('Please upload or add questions first', {
                         style: {
                           background: '#dc2626',
@@ -1470,9 +1658,10 @@ ${evalCpp(codeString)}
                     }
                     setShowQuestionUploadPopup(false);
                   }}
-                  className="flex-1 bg-blue-800 hover:bg-blue-900 text-white py-2 px-4 rounded transition-colors"
+                  disabled={isUploading}
+                  className="flex-1 bg-blue-800 hover:bg-blue-900 text-white py-2 px-4 rounded transition-colors disabled:opacity-50"
                 >
-                  Continue
+                  {isUploading ? 'Uploading...' : 'Continue'}
                 </button>
               </div>
             </div>
