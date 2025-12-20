@@ -8,10 +8,7 @@ from contest.models import Contest
 from .models import ContestLeaderboard, LeaderboardEntry
 from .serializers import FreezeSerializer, RecalculateSerializer
 from .services import calculate_leaderboard
-
-# Import submission model
 from submission.models import Submission
-
 
 class LeaderboardView(APIView):
     """
@@ -22,116 +19,79 @@ class LeaderboardView(APIView):
         if not contest:
             return Response({"error": "Contest not found"}, status=404)
 
-        # Get contest status from the contest object
         contest_status = get_contest_status(contest)
-        
-        # Get current user
         current_user = get_user_from_request(request)
         current_user_id = str(current_user.id) if current_user else None
-        
-        # ========== CRITICAL FIX: Calculate contest end time ==========
-        contest_end_time = None
+
+        # ====== Contest timing as naive Asia/Dhaka datetime ======
         if contest.start_time and contest.duration:
-            # Convert start_time to aware datetime if needed
-            if contest.start_time.tzinfo is None:
-                import pytz
-                # If naive, assume it's Asia/Dhaka
-                dhaka_tz = pytz.timezone('Asia/Dhaka')
-                start_time_dhaka = dhaka_tz.localize(contest.start_time)
-            else:
-                start_time_dhaka = contest.start_time
-            
-            # Calculate end time
+            start_time_dhaka = contest.start_time  # assume naive is Asia/Dhaka
             contest_end_time = start_time_dhaka + timedelta(minutes=contest.duration * 60)
-        
-        # ========== Get only submissions within contest duration ==========
-        if contest_end_time:
-            # Filter submissions that are within contest time window
+        else:
+            start_time_dhaka = None
+            contest_end_time = None
+
+        # ====== Filter submissions within contest duration ======
+        if start_time_dhaka and contest_end_time:
             valid_submissions = Submission.objects(
                 contest=contest,
-                submitted_at__gte=contest.start_time,  # After contest start
-                submitted_at__lte=contest_end_time     # Before contest end
+                submitted_at__gte=start_time_dhaka,
+                submitted_at__lte=contest_end_time
             ).order_by("submitted_at")
-            print(f"DEBUG: Contest duration filtering active. Contest runs from {contest.start_time} to {contest_end_time}")
-            print(f"DEBUG: Found {valid_submissions.count()} submissions within contest duration")
         else:
-            # If no contest timing info, get all submissions
             valid_submissions = Submission.objects(contest=contest).order_by("submitted_at")
-            print(f"DEBUG: No contest timing info, using all {valid_submissions.count()} submissions")
-        
-        # Group submissions by user
+
+        # ====== Group submissions by user ======
         user_submissions = {}
-        
         for submission in valid_submissions:
             user_id = str(submission.user.id)
             if user_id not in user_submissions:
                 user_submissions[user_id] = {
-                    'user': submission.user,
-                    'submissions': [],
-                    'problem_results': {},
-                    'total_score': 0,
-                    'total_penalty': 0
+                    "user": submission.user,
+                    "submissions": []
                 }
-            user_submissions[user_id]['submissions'].append(submission)
-        
-        # Get actual problem indices from contest
-        actual_problems = [problem.index for problem in contest.problems]
-        actual_problems.sort()
-        
+            user_submissions[user_id]["submissions"].append(submission)
+
+        actual_problems = sorted([p.index for p in contest.problems])
         results = []
-        
+
         for user_id, data in user_submissions.items():
-            user = data['user']
+            user = data["user"]
             problem_results = {}
-            
-            # Group submissions by problem
-            problem_submissions = {}
-            for sub in data['submissions']:
-                problem_index = sub.problem_index
-                if problem_index not in problem_submissions:
-                    problem_submissions[problem_index] = []
-                problem_submissions[problem_index].append(sub)
-            
-            # Calculate results for each problem
             total_score = 0
             total_penalty = 0
             problems_solved = 0
-            
-            # Get problem points from contest
-            problem_points = {}
-            for problem in contest.problems:
-                problem_points[problem.index] = problem.points if hasattr(problem, 'points') else 100
-            
-            for problem_index, submissions_list in problem_submissions.items():
-                # Sort submissions by time
-                submissions_list.sort(key=lambda x: x.submitted_at)
-                
+
+            problem_points = {p.index: getattr(p, "points", 100) for p in contest.problems}
+
+            # Group submissions by problem
+            problem_submissions = {}
+            for sub in data["submissions"]:
+                idx = sub.problem_index
+                if idx not in problem_submissions:
+                    problem_submissions[idx] = []
+                problem_submissions[idx].append(sub)
+
+            for problem_index, subs_list in problem_submissions.items():
+                subs_list.sort(key=lambda x: x.submitted_at)
                 accepted = False
                 tries = 0
                 penalty = 0
                 solved_time = 0
                 points_earned = 0
-                
-                for sub in submissions_list:
+
+                for sub in subs_list:
                     tries += 1
-                    
                     if sub.verdict == "AC":
                         accepted = True
-                        # Calculate contest time in minutes
-                        if contest.start_time:
-                            time_diff = sub.submitted_at - contest.start_time
-                            solved_time = time_diff.total_seconds() / 60
-                        
-                        base_points = problem_points.get(problem_index, 100)
-                        points_earned = base_points
-                        
+                        if start_time_dhaka:
+                            solved_time = (sub.submitted_at - start_time_dhaka).total_seconds() / 60
+                        points_earned = problem_points.get(problem_index, 100)
                         if tries > 1:
-                            penalty += (tries - 1) * 20  # 20 minute penalty per wrong attempt
-                        
+                            penalty += (tries - 1) * 20
                         break
-                
+
                 time_penalty = solved_time + penalty
-                
                 problem_results[problem_index] = {
                     "tries": tries,
                     "time": solved_time,
@@ -142,121 +102,96 @@ class LeaderboardView(APIView):
                     "accepted": accepted,
                     "has_submissions": tries > 0
                 }
-                
+
                 if accepted:
                     total_score += points_earned
                     total_penalty += time_penalty
                     problems_solved += 1
-            
-            # Check if this is the current user
+
             is_current_user = current_user_id == user_id if current_user_id else False
-            
-            # Get user rating
-            user_rating = user.rating if hasattr(user, 'rating') else 1500
-            
-            # Format problem status for frontend
+            user_rating = getattr(user, "rating", 1500)
+
             submissions_display = []
-            
             for problem in actual_problems:
-                problem_data = problem_results.get(problem)
+                pdata = problem_results.get(problem, {})
                 status = "NA"
                 points = 0
                 tries = 0
-                
-                if problem_data:
-                    tries = problem_data.get("tries", 0)
-                    if problem_data.get("accepted"):
+                if pdata:
+                    tries = pdata.get("tries", 0)
+                    if pdata.get("accepted"):
                         status = "AC"
-                        points = problem_data.get("points", 0)
+                        points = pdata.get("points", 0)
                     elif tries > 0:
                         status = "WA"
-                        points = 0
-                
                 submissions_display.append({
                     "problem": problem,
                     "status": status,
                     "points": points,
                     "tries": tries
                 })
-            
+
             results.append({
                 "rank": 0,
-                "username": user.username if hasattr(user, 'username') and user.username else user.name,
-                "name": user.name if hasattr(user, 'name') else "Anonymous",
-                "country": user.country if hasattr(user, 'country') else "Unknown",
-                "institution": user.institution if hasattr(user, 'institution') else "Unknown",
+                "username": getattr(user, "username", getattr(user, "name", "Anonymous")),
+                "name": getattr(user, "name", "Anonymous"),
+                "country": getattr(user, "country", "Unknown"),
+                "institution": getattr(user, "institution", "Unknown"),
                 "score": total_score,
                 "points": total_score,
                 "problemsSolved": problems_solved,
                 "penalty": total_penalty,
                 "rating": user_rating,
-                "ratingChange": 0,  # Will be calculated below if contest is past
+                "ratingChange": 0,
                 "isCurrentUser": is_current_user,
                 "submissions": submissions_display,
                 "problemResults": problem_results
             })
-        
-        # Sort and rank participants
-        results.sort(key=lambda x: (-x['score'], x['penalty']))
-        
-        # Assign ranks
+
+        # ====== Sort and assign ranks ======
+        results.sort(key=lambda x: (-x["score"], x["penalty"]))
+        last_score = last_penalty = None
+        current_rank = 0
         for i, participant in enumerate(results):
-            participant['rank'] = i + 1
-        
-        # ========== ADD RATING CALCULATION HERE ==========
-        # Only calculate rating changes if contest is over
+            if participant["score"] != last_score or participant["penalty"] != last_penalty:
+                current_rank = i + 1
+                last_score = participant["score"]
+                last_penalty = participant["penalty"]
+            participant["rank"] = current_rank
+
+        # ====== Calculate rating changes if contest is past ======
         if contest_status == "past":
-            # Collect all ratings for calculation
-            all_ratings = [p['rating'] for p in results]
-            
-            # Simple rating calculation (simplified Codeforces style)
+            all_ratings = [p["rating"] for p in results]
             for participant in results:
-                expected_rank = self.calculate_expected_rank(participant['rating'], all_ratings)
-                actual_rank = participant['rank']
-                participant['ratingChange'] = self.calculate_rating_change(
-                    participant['rating'], 
-                    expected_rank, 
-                    actual_rank, 
-                    len(results)
+                expected_rank = self.calculate_expected_rank(participant["rating"], all_ratings)
+                actual_rank = participant["rank"]
+                participant["ratingChange"] = self.calculate_rating_change(
+                    participant["rating"], expected_rank, actual_rank, len(results)
                 )
-        
+
         return Response({
             "leaderboard": results,
             "contest_status": contest_status,
             "total_participants": len(results),
             "problems": actual_problems,
             "contest_info": {
-                "start_time": contest.start_time.isoformat() if contest.start_time else None,
+                "start_time": start_time_dhaka.isoformat() if start_time_dhaka else None,
                 "end_time": contest_end_time.isoformat() if contest_end_time else None,
                 "duration": contest.duration
             }
         })
-    
-    # Helper methods for rating calculation (keep these as is)
+
     def calculate_expected_rank(self, user_rating, all_ratings):
-        """Calculate expected rank based on Elo/Codeforces formula"""
         expected_score = 0
         for other_rating in all_ratings:
             if user_rating != other_rating:
                 expected_score += 1 / (1 + 10 ** ((other_rating - user_rating) / 400))
         return expected_score + 1
-    
+
     def calculate_rating_change(self, user_rating, expected_rank, actual_rank, total_participants):
-        """Calculate rating change using simplified Codeforces formula"""
-        # Codeforces-like formula
-        expected_performance = expected_rank
-        actual_performance = actual_rank
-        
-        # K-factor (how much ratings can change)
-        k_factor = 32  # For new users this could be higher
-        
-        # Simplified calculation
-        performance_diff = expected_performance - actual_performance
-        rating_change = performance_diff * (k_factor / total_participants)
-        
-        # Round to nearest integer
-        return int(round(rating_change))
-    
+        k_factor = 32
+        performance_diff = expected_rank - actual_rank
+        return int(round(performance_diff * (k_factor / total_participants)))
 
 class FreezeLeaderboardView(APIView):
     """

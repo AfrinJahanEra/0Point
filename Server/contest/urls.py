@@ -7,6 +7,7 @@ from submission.views import (
     SubmissionDetailAPIView,
     ContestSubmissionsAPIView,
     ContestProblemsListAPIView,
+    ProblemStatisticsAPIView,
 )
 
 from leaderboard.views import LeaderboardView, FreezeLeaderboardView, RecalculateLeaderboardView
@@ -57,6 +58,16 @@ from compiler.views import (
     ContestProblemExecuteAPIView,
 )
 
+from virtual.views import (
+    VirtualContestStartAPIView,
+    VirtualContestSubmitAPIView,
+    VirtualContestDetailAPIView,
+    VirtualContestProblemsAPIView,
+    UserVirtualContestsAPIView,
+    VirtualContestLeaderboardAPIView,
+    VirtualContestProblemDetailAPIView,
+)
+
 urlpatterns = [
     path('contests/', ContestListCreateAPIView.as_view()),
     path('contests/registrations/', MyContestRegistrationsAPIView.as_view()),
@@ -73,7 +84,7 @@ urlpatterns = [
     path('contests/<contest_id>/editorial/', ContestEditorialAPIView.as_view(), name='contest-editorial'),
     path('contests/<contest_id>/announcements/', ContestAnnouncementsAPIView.as_view(), name='contest-announcements'),
     path('announcements/create/', AnnouncementCreateAPIView.as_view(), name='announcement-create'),   
-    path('contests/<str:contest_id>/leaderboard/', LeaderboardView.as_view()), 
+    path('contests/<str:contest_id>/standings/', LeaderboardView.as_view()), 
     path('contests/<str:contest_id>/submissions/', ContestSubmissionsAPIView.as_view(), name='contest-submissions'),
     # Keep this for problem submissions:
     path('problems/<str:problem_id>/submissions/', SubmissionListByProblemAPIView.as_view(), name='problem-submissions'),
@@ -114,13 +125,18 @@ urlpatterns = [
     # User clarifications
     path('clarifications/my/', MyClarificationsAPIView.as_view(), name='my-clarifications'),
 
-    # execution endpoint
-    path('contests/<str:contest_id>/problems/<str:problem_index>/execute/', ContestProblemExecuteAPIView.as_view(), name='contest-problem-execute'),
-
-    # Remove or update the old submission create endpoint
-    # path('submissions/create/', SubmissionCreateAPIView.as_view(), name='submission-create'),
+    # Stats
+    path('contests/<str:contest_id>/problems/<str:problem_index>/stats/', ProblemStatisticsAPIView.as_view(), name='problem-statistics'),
 
     # Keep the compiler endpoints
     path('contests/<str:contest_id>/execute/', CodeExecuteAPIView.as_view(), name='code-execute'),
     path('contests/<str:contest_id>/problems/<str:problem_index>/execute/', ContestProblemExecuteAPIView.as_view(), name='contest-problem-execute'),
+
+    # virtual URLs - FIXED VERSION
+    path('contests/<str:contest_id>/virtual-start/', VirtualContestStartAPIView.as_view(), name='virtual-contest-start'),
+    path('my-virtual/', UserVirtualContestsAPIView.as_view(), name='user-virtual-contests'),
+    path('contests/<str:contest_id>/virtual/<str:virtual_contest_id>/', VirtualContestDetailAPIView.as_view(), name='virtual-contest-detail'),
+    path('contests/<str:contest_id>/virtual/<str:virtual_contest_id>/submit/', VirtualContestSubmitAPIView.as_view(), name='virtual-contest-submit'),
+    path('contests/<str:contest_id>/virtual/<str:virtual_contest_id>/problems/', VirtualContestProblemsAPIView.as_view(), name='virtual-contest-problems'),
+    path('contests/<str:contest_id>/virtual/<str:virtual_contest_id>/problems/<str:problem_index>/', VirtualContestProblemDetailAPIView.as_view(), name='virtual-contest-problem-detail'),
 ]

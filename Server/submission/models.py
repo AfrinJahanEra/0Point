@@ -1,58 +1,45 @@
-# submission/models.py
+#submission/models.py
 from mongoengine import Document, fields
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
+
+def dhaka_now():
+    return datetime.now()  # naive datetime, assumed Dhaka local time
 
 class Submission(Document):
     """Model for storing contest submissions"""
     
-    # Submission ID
     id = fields.StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    contest = fields.ReferenceField('Contest', required=True, reverse_delete_rule=2)
     
-    # Contest reference
-    contest = fields.ReferenceField('Contest', required=True, reverse_delete_rule=2)  # 2 = CASCADE
-    
-    # Problem reference within contest
     problem_index = fields.StringField(required=True)  # A, B, C, etc.
     problem_code = fields.StringField(required=True)
     problem_title = fields.StringField()
     
-    # User who submitted
-    user = fields.ReferenceField('Account', required=True, reverse_delete_rule=2)  # 2 = CASCADE
-    user_id = fields.StringField()  # For faster queries
+    user = fields.ReferenceField('Account', required=True, reverse_delete_rule=2)
+    user_id = fields.StringField()
     
-    # Submission details
     code = fields.StringField(required=True)
-    language = fields.StringField(required=True, choices=[
-        'python', 'cpp', 'java', 'javascript', 'c'
-    ])
+    language = fields.StringField(required=True, choices=['python', 'cpp', 'java', 'javascript', 'c'])
     
-    # Execution results
-    verdict = fields.StringField(required=True, default='PENDING', choices=[
-        'PENDING', 'RUNNING', 'AC', 'WA', 'TLE', 'MLE', 'CE', 'RE', 'SE'
-    ])
-    execution_time = fields.IntField(default=0)  # in milliseconds
-    memory = fields.IntField(default=0)  # in KB
+    verdict = fields.StringField(required=True, default='PENDING', choices=['PENDING', 'RUNNING', 'AC', 'WA', 'TLE', 'MLE', 'CE', 'RE', 'SE'])
+    execution_time = fields.IntField(default=0)  # milliseconds
+    memory = fields.IntField(default=0)  # KB
     
-    # Test case details (for partial results)
     passed_test_cases = fields.IntField(default=0)
     total_test_cases = fields.IntField(default=0)
-    failed_test_case = fields.IntField(default=-1)  # -1 means all passed
+    failed_test_case = fields.IntField(default=-1)
     
-    # Error details for compilation/runtime errors
     error_message = fields.StringField()
     compile_output = fields.StringField()
     
-    # Timestamps
-    submitted_at = fields.DateTimeField(default=datetime.utcnow)
+    submitted_at = fields.DateTimeField(default=dhaka_now)
     judged_at = fields.DateTimeField()
     
-    # Contest timing
-    contest_time = fields.FloatField(default=0)  # Time in minutes from contest start
+    contest_time = fields.FloatField(default=0)
     
-    # Metadata
     is_public = fields.BooleanField(default=True)
-    is_current_user = fields.BooleanField(default=False)  # Computed field
+    is_current_user = fields.BooleanField(default=False)
     
     meta = {
         'collection': 'submissions',
@@ -66,27 +53,21 @@ class Submission(Document):
         ],
         'ordering': ['-submitted_at']
     }
-    
+
     def calculate_contest_time(self, contest_start_time):
-        """Calculate time in minutes from contest start"""
         if contest_start_time and self.submitted_at:
             time_diff = self.submitted_at - contest_start_time
             self.contest_time = time_diff.total_seconds() / 60
-            return self.contest_time
-        return 0
-    
-        # submission/models.py - Update to_dict() method
+        return self.contest_time or 0
+
     def to_dict(self):
-        """Convert to dictionary for API response"""
-        # Get user details
-        user_name = getattr(self.user, 'name', '')
-        if not user_name:
-            user_name = getattr(self.user, 'username', '')
-        if not user_name:
-            user_name = getattr(self.user, 'email', '').split('@')[0] if getattr(self.user, 'email', '') else f"User_{str(self.user.id)[:8]}"
-        
+        user_name = getattr(self.user, 'name', '') or getattr(self.user, 'username', '') \
+                    or (getattr(self.user, 'email', '').split('@')[0] if getattr(self.user, 'email', '') else f"User_{str(self.user.id)[:8]}")
         user_email = getattr(self.user, 'email', '')
-        
+
+        submitted_at_dhaka = self.submitted_at or dhaka_now()
+        judged_at_dhaka = self.judged_at
+
         return {
             'id': self.id,
             'contest_id': str(self.contest.id),
@@ -108,12 +89,12 @@ class Submission(Document):
             'failed_test_case': self.failed_test_case,
             'error_message': self.error_message,
             'compile_output': self.compile_output,
-            'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
-            'judged_at': self.judged_at.isoformat() if self.judged_at else None,
+            'submitted_at': submitted_at_dhaka.isoformat() if submitted_at_dhaka else None,
+            'judged_at': judged_at_dhaka.isoformat() if judged_at_dhaka else None,
             'contest_time': self.contest_time,
             'is_public': self.is_public,
-            'time': self.submitted_at.isoformat() if self.submitted_at else None,
+            'time': submitted_at_dhaka.isoformat() if submitted_at_dhaka else None,
         }
-    
+
 
     

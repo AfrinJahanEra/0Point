@@ -3,7 +3,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime
-import pytz
 
 from .models import CodeSubmission
 from .serializers import CodeSubmissionSerializer
@@ -14,8 +13,10 @@ from submission.models import Submission
 from contest.models import Contest, ContestProblem
 
 # JDoodle credentials
-JD_CLIENT_ID = "fd5008b0be3517adb097999e752bdc36"
-JD_CLIENT_SECRET = "99df47ceee2ae9af0137b30d0d7eebcdc3aac2fc400b16ef5298bff3576ad5e2"
+# JD_CLIENT_ID = "fd5008b0be3517adb097999e752bdc36"
+JD_CLIENT_ID = "6c83bb2cd0b9e9a790f59a2484011318"
+# JD_CLIENT_SECRET = "99df47ceee2ae9af0137b30d0d7eebcdc3aac2fc400b16ef5298bff3576ad5e2"
+JD_CLIENT_SECRET = "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4"
 JD_URL = "https://api.jdoodle.com/v1/execute"
 
 # Map for language -> recommended versionIndex
@@ -28,10 +29,6 @@ LANGUAGE_VERSION_MAP = {
     "javascript": "4"
 }
 
-# Dhaka timezone helper
-def dhaka_now():
-    dhaka_tz = pytz.timezone("Asia/Dhaka")
-    return datetime.now(dhaka_tz)
 
 class CodeExecuteAPIView(APIView):
     """Execute code via JDoodle API for testing (Run button)"""
@@ -64,9 +61,19 @@ class CodeExecuteAPIView(APIView):
         try:
             res = requests.post(JD_URL, json=payload, timeout=15)
             res_data = res.json()
+
+            print("=" * 50)
+            print("DEBUG - CodeExecuteAPIView JDoodle Response:")
+            print(f"Full JDoodle response: {res_data}")
+            print(f"cpuTime: {res_data.get('cpuTime')}, type: {type(res_data.get('cpuTime'))}")
+            print(f"memory: {res_data.get('memory')}, type: {type(res_data.get('memory'))}")
+            print(f"isExecutionSuccess: {res_data.get('isExecutionSuccess')}")
+            print(f"statusCode: {res_data.get('statusCode')}")
+            print("=" * 50)
             
             jdoodle_output = res_data.get("output", "").strip()
-            cpu_time_seconds = float(res_data.get("cpuTime", 0))
+            cpu_time_str = res_data.get("cpuTime")
+            cpu_time_seconds = 0.0 if cpu_time_str is None else float(cpu_time_str)
             cpu_time_ms = int(cpu_time_seconds * 1000)
             memory_kb = int(res_data.get("memory", 0))
             status_code = res_data.get("statusCode", 200)
@@ -93,8 +100,7 @@ class CodeExecuteAPIView(APIView):
                 code=data["code"],
                 input_data=data.get("input_data", ""),
                 output=jdoodle_output,
-                status=status,
-                created_at=dhaka_now()
+                status=status
             )
             code_submission.save()
             
@@ -123,8 +129,7 @@ class CodeExecuteAPIView(APIView):
                 code=data["code"],
                 input_data=data.get("input_data", ""),
                 output=error_msg,
-                status="timeout_error",
-                created_at=dhaka_now()
+                status="timeout_error"
             )
             code_submission.save()
             return Response({"error": error_msg}, status=408)
@@ -139,7 +144,12 @@ class CodeExecuteAPIView(APIView):
                 input_data=data.get("input_data", ""),
                 output=error_msg,
                 status="system_error",
-                created_at=dhaka_now()
+                execution_time_ms=cpu_time_ms,
+                execution_time_seconds=cpu_time_seconds,
+                memory_kb=memory_kb,
+                memory_mb=round(memory_kb / 1024, 2),
+                status_code=status_code,
+                is_execution_success=is_execution_success
             )
             code_submission.save()
             return Response({"error": error_msg}, status=500)
@@ -181,21 +191,14 @@ class ContestProblemExecuteAPIView(APIView):
         version_index = data.get("version_index") or LANGUAGE_VERSION_MAP.get(language, "0")
         
         # Get current time in Dhaka
-        dhaka_tz = pytz.timezone('Asia/Dhaka')
-        current_time = datetime.now(dhaka_tz)
+        current_time = datetime.now()
         
         # Calculate contest time
         contest_time = 0
         if contest.start_time:
             # Ensure both times are timezone aware
-            if contest.start_time.tzinfo is None:
-                start_time = dhaka_tz.localize(contest.start_time)
-            else:
-                start_time = contest.start_time.astimezone(dhaka_tz)
-            
-            if current_time.tzinfo is None:
-                current_time = dhaka_tz.localize(current_time)
-            
+            start_time = contest.start_time
+                        
             contest_time_seconds = (current_time - start_time).total_seconds()
             contest_time = contest_time_seconds / 60.0
         
@@ -241,9 +244,23 @@ class ContestProblemExecuteAPIView(APIView):
             try:
                 res = requests.post(JD_URL, json=payload, timeout=15)
                 res_data = res.json()
+
+                print("=" * 50)
+                print(f"DEBUG - ContestProblemExecuteAPIView JDoodle Response (Test case {i}):")
+                print(f"Full JDoodle response: {res_data}")
+                print(f"cpuTime: {res_data.get('cpuTime')}, type: {type(res_data.get('cpuTime'))}")
+                print(f"memory: {res_data.get('memory')}, type: {type(res_data.get('memory'))}")
+                print(f"isExecutionSuccess: {res_data.get('isExecutionSuccess')}")
+                print(f"statusCode: {res_data.get('statusCode')}")
+                print("=" * 50)
                 
+                # Replace lines 156-161 with:
                 jdoodle_output = res_data.get("output", "").strip()
-                cpu_time_seconds = float(res_data.get("cpuTime", 0))
+                cpu_time_str = res_data.get("cpuTime")
+                if cpu_time_str is None:
+                   cpu_time_seconds = 0.0
+                else:
+                    cpu_time_seconds = float(cpu_time_str)
                 cpu_time_ms = int(cpu_time_seconds * 1000)
                 memory_kb = int(res_data.get("memory", 0))
                 status_code = res_data.get("statusCode", 200)
@@ -337,7 +354,12 @@ class ContestProblemExecuteAPIView(APIView):
             input_data=data.get("input_data", ""),
             output=actual_output or error_message or compile_output or "",
             status="success" if all_passed else "error",
-            created_at=current_time
+            execution_time_ms=max_execution_time,
+            execution_time_seconds=max_execution_time / 1000 if max_execution_time > 0 else 0,
+            memory_kb=max_memory_used,
+            memory_mb=round(max_memory_used / 1024, 2) if max_memory_used > 0 else 0,
+            status_code=200 if all_passed else 400,
+            is_execution_success=all_passed  # True if all test cases passed
         )
         code_submission.save()
         

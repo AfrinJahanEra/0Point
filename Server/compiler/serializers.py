@@ -1,3 +1,4 @@
+# compiler/serializers.py
 from rest_framework import serializers
 
 class CodeSubmissionSerializer(serializers.Serializer):
@@ -20,3 +21,4 @@ class CodeSubmissionSerializer(serializers.Serializer):
             raise serializers.ValidationError(f"Unsupported language. Supported: {', '.join(valid_languages)}")
         
         return lang
+    

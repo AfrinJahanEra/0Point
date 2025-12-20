@@ -1,3 +1,4 @@
+# compiler/models.py
 from mongoengine import Document, StringField, ReferenceField, DateTimeField, IntField, FloatField, BooleanField
 from datetime import datetime
 import pytz
@@ -5,8 +6,7 @@ from account.models import Account
 
 # Function to return current datetime in Asia/Dhaka
 def dhaka_now():
-    dhaka_tz = pytz.timezone('Asia/Dhaka')
-    return datetime.now(dhaka_tz)
+    return datetime.now()
 
 class CodeSubmission(Document):
     user = ReferenceField(Account, required=True)
@@ -40,3 +40,5 @@ class CodeSubmission(Document):
 
     def __str__(self):
         return f"{self.user.email} - {self.language} - {self.status}"
+    
+    
