@@ -75,9 +75,11 @@ connect(
     # ssl=True,
     # retryWrites=True,
     # w='majority'
+
 )
 
-ASGI_APPLICATION = "zeropoint.asgi.application"
+
+ASGI_APPLICATION ="zeropoint.asgi.application"
 
 CHANNEL_LAYERS = {
     "default": {

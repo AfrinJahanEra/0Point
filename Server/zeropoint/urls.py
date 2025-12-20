@@ -2,7 +2,6 @@
 from django.urls import path, include
 from django.contrib import admin
 
-
 urlpatterns = [
     path("auth/", include("account.urls")),
     path("", include("contest.urls")),
@@ -14,4 +13,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('interview/', include('interview.urls')),
     path('api/', include('executor.urls')),
+    
 ]
