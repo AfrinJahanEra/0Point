@@ -1,4 +1,5 @@
-from mongoengine import Document, StringField, DictField, ListField, DateTimeField, BooleanField, IntField
+# interview/models.py
+from mongoengine import Document, StringField, DictField, ListField, DateTimeField, BooleanField, IntField, BinaryField
 from datetime import datetime
 import json
 

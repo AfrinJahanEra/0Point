@@ -2,29 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { toast } from 'react-hot-toast';
 import { 
-  Video, 
-  Mail, 
-  Send, 
-  User, 
-  CameraOff, 
-  Camera, 
-  X, 
-  ChevronLeft, 
-  ChevronRight,
-  FileText,
-  Minimize2,
-  Clock,
-  CheckCircle,
-  Upload,
-  Eye,
-  EyeOff,
-  Users,
-  Download,
-  MessageSquare,
-  Maximize2,
-  Settings,
-  File
+  Video, Mail, Send, User, CameraOff, Camera, X, ChevronLeft, ChevronRight,
+  FileText, Minimize2, Clock, Upload, Eye, EyeOff, Users, Download,
+  MessageSquare, Maximize2, File, Play
 } from 'lucide-react';
+
+
 
 // PDF Viewer Component
 const PDFViewer = ({ fileUrl, fileName }) => {
@@ -52,20 +35,19 @@ const InterviewSession = () => {
   const [isInterviewerVideoOn, setIsInterviewerVideoOn] = useState(true);
   const [isCandidateVideoOn, setIsCandidateVideoOn] = useState(false);
   
-  // Question Management - Shared across all browsers
+  // Question Management
   const [sharedQuestionFile, setSharedQuestionFile] = useState(null);
   const [showQuestionUploadPopup, setShowQuestionUploadPopup] = useState(false);
   const [sharedQuestionContent, setSharedQuestionContent] = useState('');
   const [sharedFileUrl, setSharedFileUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [fileBlobCache, setFileBlobCache] = useState({}); // Cache for file blobs
-  
+  const [fileBlobCache, setFileBlobCache] = useState({});  
   // Code Editor States
-  const [code, setCode] = useState('// Write your code here...\nfunction solution() {\n  \n}\n');
+  const [code, setCode] = useState('# Write your code here\ndef solution():\n    print("Hello from Python!")\n    return 0\n\nsolution()');
   const [output, setOutput] = useState('');
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [collaboratorCursors, setCollaboratorCursors] = useState({});
-  const [language, setLanguage] = useState('javascript');
+  const [language, setLanguage] = useState('python');
   const [isRunning, setIsRunning] = useState(false);
   const [codeVersion, setCodeVersion] = useState(0);
   
@@ -87,6 +69,9 @@ const InterviewSession = () => {
   const [timeRemaining, setTimeRemaining] = useState(3600);
   const [isTimerRunning, setIsTimerRunning] = useState(true);
   
+  // API Endpoint
+  const [apiEndpoint, setApiEndpoint] = useState('http://localhost:8000');
+  
   // WebSocket & Refs
   const editorRef = useRef(null);
   const socketRef = useRef(null);
@@ -94,7 +79,9 @@ const InterviewSession = () => {
   const lastBroadcastRef = useRef(Date.now());
   const chatContainerRef = useRef(null);
   const heartbeatIntervalRef = useRef(null);
-  const fileUrlsCache = useRef({}); // Cache for file URLs per session
+  const fileUrlsCache = useRef({});
+
+
 
   // Initialize session from URL
   useEffect(() => {
@@ -109,7 +96,15 @@ const InterviewSession = () => {
       role: role
     });
     
-    // Load initial shared question from localStorage for this session
+    // Try to detect backend URL
+    const detectedApi = window.location.hostname === 'localhost' 
+      ? 'http://localhost:8000' 
+      : `${window.location.protocol}//${window.location.host}`;
+    setApiEndpoint(detectedApi);
+    
+    console.log(`Session initialized: ${session}, Role: ${role}, API: ${detectedApi}`);
+    
+    // Load initial shared question
     const savedQuestion = localStorage.getItem(`interviewQuestion_${session}`);
     if (savedQuestion) {
       try {
@@ -117,14 +112,9 @@ const InterviewSession = () => {
         setSharedQuestionContent(parsed.content);
         if (parsed.fileData) {
           setSharedQuestionFile(parsed.fileData);
-          
-          // Check if we have the file in cache (for the uploader)
-          if (fileUrlsCache.current[session] && fileUrlsCache.current[session].fileData?.name === parsed.fileData.name) {
-            setSharedFileUrl(fileUrlsCache.current[session].url);
-          }
         }
       } catch (e) {
-        console.error('Error parsing saved question:', e);
+        console.error(`Error parsing saved question: ${e.message}`);
       }
     }
   }, []);
@@ -135,26 +125,26 @@ const InterviewSession = () => {
 
     const connectWebSocket = () => {
       try {
-        const wsUrl = `ws://${window.location.hostname}:8000/ws/interview/${sessionId}/?role=${currentUser.role}`;
-        console.log('Connecting to WebSocket:', wsUrl);
+        // Build WebSocket URL correctly
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.hostname;
+        const wsPort = window.location.hostname === 'localhost' ? ':8000' : '';
+        const wsUrl = `${wsProtocol}//${wsHost}${wsPort}/ws/interview/${sessionId}/?role=${currentUser.role}`;
+        
+        console.log(`Connecting to WebSocket: ${wsUrl}`);
         
         const socket = new WebSocket(wsUrl);
         
         socket.onopen = () => {
           console.log('WebSocket connected successfully');
           toast.success('Connected to interview session', {
-            style: {
-              background: '#10b981',
-              color: '#ffffff',
-            },
+            style: { background: '#10b981', color: '#ffffff' },
           });
           
           // Start heartbeat
           heartbeatIntervalRef.current = setInterval(() => {
             if (socket.readyState === WebSocket.OPEN) {
-              socket.send(JSON.stringify({
-                type: "heartbeat"
-              }));
+              socket.send(JSON.stringify({ type: "heartbeat" }));
             }
           }, 30000);
         };
@@ -162,39 +152,22 @@ const InterviewSession = () => {
         socket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log('WebSocket message received:', data);
+            console.log(`WebSocket message received: ${data.type}`);
             
             switch (data.type) {
               case "initial_state":
                 setCurrentUser(prev => ({ ...prev, id: data.user_id }));
-                setCode(data.code.content);
-                setLanguage(data.code.language);
-                setCodeVersion(data.code.version);
+                setCode(data.code?.content || code);
+                setLanguage(data.code?.language || language);
+                setCodeVersion(data.code?.version || 0);
                 
-                // Load shared question from initial state
-                if (data.question && data.question.content) {
+                if (data.question?.content) {
                   setSharedQuestionContent(data.question.content);
-                  if (data.question.file_data) {
-                    const fileData = data.question.file_data;
-                    setSharedQuestionFile(fileData);
-                    
-                    // Save to localStorage for this session
-                    localStorage.setItem(`interviewQuestion_${sessionId}`, JSON.stringify({
-                      content: data.question.content,
-                      fileData: fileData
-                    }));
-                  }
                 }
                 
-                setTimeRemaining(data.timer.remaining_time);
-                setIsTimerRunning(data.timer.is_running);
+                setTimeRemaining(data.timer?.remaining_time || 3600);
+                setIsTimerRunning(data.timer?.is_running || true);
                 setOnlineUsers(data.online_users || []);
-                
-                // Check if candidate is joined
-                const hasCandidate = data.online_users.some(user => 
-                  user.role === 'candidate' && user.user_id !== data.user_id
-                );
-                setCandidateJoined(hasCandidate);
                 
                 // Set initial cursors
                 const cursors = {};
@@ -218,80 +191,64 @@ const InterviewSession = () => {
                 }
                 break;
 
-              case "cursor_move":
-                if (data.user_id !== currentUser.id) {
-                  setCollaboratorCursors(prev => ({
-                    ...prev,
-                    [data.user_id]: {
-                      lineNumber: data.line,
-                      column: data.column,
-                      username: data.username
-                    }
-                  }));
+              case "run_code":
+                // Handle code execution result from backend
+                console.log(`Received code execution result from ${data.username}`);
+                setOutput(data.output);
+                
+                // Show success/error toast
+                if (data.output?.includes('Error:')) {
+                  toast.error('Code execution failed', {
+                    style: { background: '#dc2626', color: '#ffffff' },
+                  });
+                } else if (data.output) {
+                  toast.success('Code executed successfully', {
+                    style: { background: '#10b981', color: '#ffffff' },
+                  });
                 }
                 break;
 
               case "question_update":
-                // Handle shared question update
                 setSharedQuestionContent(data.content);
                 
+                // Handle file data if present
                 if (data.file_data) {
                   setSharedQuestionFile(data.file_data);
                   
                   // Create and cache the file URL for all users
-                  if (data.file_data.file_blob) {
-                    // Convert base64 to blob
-                    const byteCharacters = atob(data.file_data.file_blob);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {
-                      byteNumbers[i] = byteCharacters.charCodeAt(i);
+                  if (data.file_data.file_content) {
+                    try {
+                      // Convert base64 to blob
+                      const byteString = atob(data.file_data.file_content);
+                      const ab = new ArrayBuffer(byteString.length);
+                      const ia = new Uint8Array(ab);
+                      for (let i = 0; i < byteString.length; i++) {
+                        ia[i] = byteString.charCodeAt(i);
+                      }
+                      const blob = new Blob([ab], { type: data.file_data.file_type });
+                      const fileUrl = URL.createObjectURL(blob);
+                      fileUrlsCache.current[data.file_data.file_name] = fileUrl;
+                      setSharedFileUrl(fileUrl);
+                      
+                      // Store in file blob cache
+                      setFileBlobCache(prev => ({
+                        ...prev,
+                        [data.file_data.file_name]: blob
+                      }));
+                    } catch (error) {
+                      console.error('Error processing file data:', error);
                     }
-                    const byteArray = new Uint8Array(byteNumbers);
-                    const blob = new Blob([byteArray], { type: data.file_data.file_type });
-                    const url = URL.createObjectURL(blob);
-                    setSharedFileUrl(url);
-                    
-                    // Cache the URL
-                    fileUrlsCache.current[sessionId] = {
-                      url: url,
-                      fileData: data.file_data
-                    };
-                    
-                    // Store in file blob cache
-                    setFileBlobCache(prev => ({
-                      ...prev,
-                      [data.file_data.file_name]: blob
-                    }));
                   }
                 } else {
+                  // Clear file data if not present in update
                   setSharedQuestionFile(null);
                   setSharedFileUrl(null);
                 }
                 
-                // Save to localStorage for this session
-                localStorage.setItem(`interviewQuestion_${sessionId}`, JSON.stringify({
-                  content: data.content,
-                  fileData: data.file_data || null
-                }));
-                
                 toast.success(`Questions updated by ${data.username}`, {
-                  style: {
-                    background: '#1e40af',
-                    color: '#ffffff',
-                  },
+                  style: { background: '#1e40af', color: '#ffffff' },
                 });
                 break;
-
-              case "video_toggle":
-                if (data.user_id !== currentUser.id) {
-                  if (data.username.includes('Candidate') || data.user_id.includes('candidate')) {
-                    setIsCandidateVideoOn(data.enabled);
-                  } else {
-                    setIsInterviewerVideoOn(data.enabled);
-                  }
-                }
-                break;
-
               case "timer_update":
                 setTimeRemaining(data.remaining_time);
                 setIsTimerRunning(data.is_running);
@@ -313,30 +270,20 @@ const InterviewSession = () => {
                 if (data.role === 'candidate' && data.user_id !== currentUser.id) {
                   setCandidateJoined(true);
                   toast.success(`${data.username} has joined the session!`, {
-                    style: {
-                      background: '#1e40af',
-                      color: '#ffffff',
-                    },
+                    style: { background: '#1e40af', color: '#ffffff' },
                   });
                 }
                 break;
 
               case "user_left":
                 setOnlineUsers(prev => prev.filter(user => user.user_id !== data.user_id));
-                
-                // Check if candidate left
                 const leftUser = onlineUsers.find(user => user.user_id === data.user_id);
                 if (leftUser?.role === 'candidate') {
                   setCandidateJoined(false);
                   toast.error(`${data.username} has left the session`, {
-                    style: {
-                      background: '#dc2626',
-                      color: '#ffffff',
-                    },
+                    style: { background: '#dc2626', color: '#ffffff' },
                   });
                 }
-                
-                // Remove their cursor
                 setCollaboratorCursors(prev => {
                   const newCursors = { ...prev };
                   delete newCursors[data.user_id];
@@ -350,10 +297,6 @@ const InterviewSession = () => {
                 }
                 break;
 
-              case "run_code":
-                setOutput(data.output);
-                break;
-
               case "chat_message":
                 setChatMessages(prev => [...prev, {
                   user_id: data.user_id,
@@ -363,49 +306,36 @@ const InterviewSession = () => {
                 }]);
                 break;
 
-              case "user_info":
-                setOnlineUsers(prev => prev.map(user => 
-                  user.user_id === data.user_id 
-                    ? { ...user, username: data.username }
-                    : user
-                ));
-                break;
-
               case "error":
                 toast.error(data.message, {
-                  style: {
-                    background: '#dc2626',
-                    color: '#ffffff',
-                  },
+                  style: { background: '#dc2626', color: '#ffffff' },
                 });
+                addDebugLog(`Server error: ${data.message}`, 'error');
                 break;
 
               default:
-                console.log('Unknown message type:', data.type);
+                addDebugLog(`Unknown message type: ${data.type}`, 'warning');
             }
           } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
+            addDebugLog(`Error parsing WebSocket message: ${error.message}`, 'error');
           }
         };
 
         socket.onerror = (error) => {
-          console.error('WebSocket error:', error);
+          console.error(`WebSocket error: ${error}`);
         };
 
         socket.onclose = (event) => {
-          console.log('WebSocket disconnected:', event.code, event.reason);
+          console.log(`WebSocket disconnected: ${event.code} - ${event.reason}`);
           clearInterval(heartbeatIntervalRef.current);
           
           if (!event.wasClean) {
             toast.error('Connection lost. Reconnecting...', {
-              style: {
-                background: '#dc2626',
-                color: '#ffffff',
-              },
+              style: { background: '#dc2626', color: '#ffffff' },
             });
             
             setTimeout(() => {
-              console.log('Attempting to reconnect...');
+              console.log('Attempting to reconnect WebSocket...');
               connectWebSocket();
             }, 3000);
           }
@@ -414,7 +344,7 @@ const InterviewSession = () => {
         socketRef.current = socket;
 
       } catch (error) {
-        console.error('Failed to connect WebSocket:', error);
+        console.error(`Failed to connect WebSocket: ${error.message}`);
       }
     };
 
@@ -427,13 +357,15 @@ const InterviewSession = () => {
       clearInterval(heartbeatIntervalRef.current);
       
       // Clean up file URLs
-      if (fileUrlsCache.current[sessionId]) {
-        URL.revokeObjectURL(fileUrlsCache.current[sessionId].url);
-      }
+      Object.values(fileUrlsCache.current).forEach(url => {
+        if (typeof url === 'string') {
+          URL.revokeObjectURL(url);
+        }
+      });
     };
   }, [sessionId, currentUser.role]);
 
-  // Auto-scroll chat to bottom
+  // Auto-scroll chat
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -450,22 +382,11 @@ const InterviewSession = () => {
           clearInterval(interval);
           toast('Interview time has ended!', {
             icon: '⏰',
-            style: {
-              background: '#dc2626',
-              color: '#ffffff',
-            },
+            style: { background: '#dc2626', color: '#ffffff' },
           });
           return 0;
         }
-        
-        const newTime = prev - 1;
-        
-        // Broadcast timer every 30 seconds
-        if (newTime % 30 === 0) {
-          sendTimerUpdate(newTime, true);
-        }
-        
-        return newTime;
+        return prev - 1;
       });
     }, 1000);
     
@@ -484,6 +405,12 @@ const InterviewSession = () => {
   const sendMessage = (data) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(data));
+      console.log(`Sent WebSocket message: ${data.type}`);
+    } else {
+      console.error('WebSocket not connected, cannot send message');
+      toast.error('Not connected to server', {
+        style: { background: '#dc2626', color: '#ffffff' },
+      });
     }
   };
 
@@ -537,14 +464,6 @@ const InterviewSession = () => {
     });
   };
 
-  const sendRunCode = (codeToRun) => {
-    sendMessage({
-      type: "run_code",
-      code: codeToRun,
-      language: language
-    });
-  };
-
   const sendChatMessage = (message) => {
     sendMessage({
       type: "chat_message",
@@ -552,121 +471,296 @@ const InterviewSession = () => {
     });
   };
 
-  // Shared Question Management
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (file && (file.type === 'application/pdf' || 
-                 file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-      
-      setIsUploading(true);
-      
-      try {
-        // Read file as base64 for sharing
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          try {
-            const base64Data = e.target.result.split(',')[1];
-            
-            // Create file data object
-            const fileData = {
-              file_name: file.name,
-              file_type: file.type,
-              file_size: file.size,
-              uploaded_by: currentUser.username,
-              uploaded_at: new Date().toISOString(),
-              file_blob: base64Data // Include file content for sharing
-            };
-            
-            // Store file blob in cache for sharing
-            setFileBlobCache(prev => ({
-              ...prev,
-              [file.name]: file
-            }));
-            
-            // Create file URL for uploader
-            const url = URL.createObjectURL(file);
-            setSharedFileUrl(url);
-            
-            // Cache the URL
-            fileUrlsCache.current[sessionId] = {
-              url: url,
-              fileData: fileData
-            };
-            
-            // Create content for sharing
-            const content = `File: ${file.name}
-Size: ${(file.size / 1024).toFixed(2)} KB
-Type: ${file.type}
-Uploaded by: ${currentUser.username}
-Time: ${new Date().toLocaleTimeString()}
+  // CORRECTED: Send code to backend via WebSocket
+  const sendRunCode = () => {
+    if (!code.trim()) {
+      toast.error('Please write some code first', {
+        style: { background: '#dc2626', color: '#ffffff' },
+      });
+      return;
+    }
 
-${file.type === 'application/pdf' ? 'PDF Document - Open to view content' : 'DOCX Document - Download to view content'}`;
-            
-            setSharedQuestionContent(content);
-            setSharedQuestionFile(fileData);
-            
-            // Save to localStorage
-            localStorage.setItem(`interviewQuestion_${sessionId}`, JSON.stringify({
-              content: content,
-              fileData: fileData
-            }));
-            
-            // Send to all users in session
-            sendQuestionUpdate(content, fileData);
-            
-            toast.success('Question file uploaded and shared with all participants!', {
-              style: {
-                background: '#1e40af',
-                color: '#ffffff',
-              },
-            });
-            
-            setShowQuestionUploadPopup(false);
-          } catch (error) {
-            console.error('File processing error:', error);
-            toast.error('Failed to process file. Please try again.', {
-              style: {
-                background: '#dc2626',
-                color: '#ffffff',
-              },
-            });
-          } finally {
-            setIsUploading(false);
-          }
-        };
-        
-        reader.onerror = () => {
-          toast.error('Failed to read file. Please try again.', {
-            style: {
-              background: '#dc2626',
-              color: '#ffffff',
-            },
-          });
-          setIsUploading(false);
-        };
-        
-        reader.readAsDataURL(file);
-        
-      } catch (error) {
-        console.error('File upload error:', error);
-        toast.error('Failed to upload file. Please try again.', {
-          style: {
-            background: '#dc2626',
-            color: '#ffffff',
-          },
-        });
-        setIsUploading(false);
+    setIsRunning(true);
+    console.log(`Sending code for execution: ${language}`);
+    
+    // Send code to backend via WebSocket
+    sendMessage({
+      type: "run_code",
+      code: code,
+      language: language,
+      user_id: currentUser.id,
+      username: currentUser.username
+    });
+    
+    // Show loading message immediately
+    const timestamp = new Date().toLocaleTimeString();
+    const loadingMessage = `[${timestamp}] ${language.toUpperCase()} Runtime\n> Sending code to backend for execution...\n> Waiting for server response...`;
+    setOutput(loadingMessage);
+    
+    // Set timeout for response
+    setTimeout(() => {
+      if (isRunning) {
+        console.warn('No response from server, checking connection...');
+        setOutput(prev => prev + '\n> Still waiting for server response...');
       }
+    }, 5000);
+  };
+
+  // Alternative: Direct REST API call to backend
+  const runCodeViaRestAPI = async () => {
+    try {
+      setIsRunning(true);
+      const timestamp = new Date().toLocaleTimeString();
+      setOutput(`[${timestamp}] ${language.toUpperCase()} Runtime\n> Sending code to backend via REST API...`);
+      
+      // Try direct API endpoint
+      const apiUrl = `${apiEndpoint}/interview/api/execute/`;
+      console.log(`Calling REST API: ${apiUrl}`);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: code,
+          language: language,
+          input_data: "",
+          session_id: sessionId,
+          user_id: currentUser.id
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log(`API response received: ${result.status}`);
+      
+      const formattedOutput = `[${timestamp}] ${language.toUpperCase()} Runtime
+> Compiling code...
+> Code ${result.status === 'success' ? 'executed successfully' : 'execution failed'}!
+> 
+> Output:
+${result.output || 'No output'}
+> 
+> Process completed`;
+      
+      setOutput(formattedOutput);
+      
+      // Broadcast to other users via WebSocket
+      sendMessage({
+        type: "run_code",
+        output: formattedOutput,
+        language: language,
+        user_id: currentUser.id,
+        username: currentUser.username
+      });
+      
+      toast.success('Code executed via REST API', {
+        style: { background: '#10b981', color: '#ffffff' },
+      });
+      
+    } catch (error) {
+      const errorMessage = `[${new Date().toLocaleTimeString()}] ${language.toUpperCase()} Runtime\n> Error: ${error.message}\n> Please check backend connection`;
+      setOutput(errorMessage);
+      console.error(`REST API error: ${error.message}`);
+      
+      toast.error('Failed to execute code', {
+        style: { background: '#dc2626', color: '#ffffff' },
+      });
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  // Handle run code button click
+  const handleRunCode = () => {
+    // First try WebSocket, fallback to REST API
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      sendRunCode();
     } else {
+      addDebugLog('WebSocket not connected, trying REST API', 'warning');
+      runCodeViaRestAPI();
+    }
+  };
+
+  // Test backend connection
+  const testBackendConnection = async () => {
+    try {
+      console.log('Testing backend connection...');
+      const response = await fetch(`${apiEndpoint}/interview/api/health/`);
+      const data = await response.json();
+      console.log(`Backend health: ${data.status}`);
+      toast.success(`Backend is ${data.status}`, {
+        style: { background: '#10b981', color: '#ffffff' },
+      });
+      return data.status === 'healthy';
+    } catch (error) {
+      console.error(`Backend connection failed: ${error.message}`);
+      toast.error('Cannot connect to backend', {
+        style: { background: '#dc2626', color: '#ffffff' },
+      });
+      return false;
+    }
+  };
+
+  // Editor functions
+  const handleEditorDidMount = (editor, monaco) => {
+    editorRef.current = editor;
+    
+    editor.onDidChangeCursorPosition((e) => {
+      const cursorPos = {
+        lineNumber: e.position.lineNumber,
+        column: e.position.column
+      };
+      setCursorPosition(cursorPos);
+      sendCursorMove(cursorPos.lineNumber, cursorPos.column);
+    });
+  };
+
+  const handleEditorChange = (value) => {
+    setCode(value);
+    sendCodeChange(value);
+  };
+
+  const handleLanguageChange = (newLanguage) => {
+    const oldLanguage = language;
+    setLanguage(newLanguage);
+    sendLanguageChange(newLanguage);
+    
+    // Update code to default template for new language
+    const defaultCode = getDefaultCode(newLanguage);
+    if (code === getDefaultCode(oldLanguage) || codeVersion === 0) {
+      setCode(defaultCode);
+      sendCodeChange(defaultCode);
+    }
+  };
+
+  const sendChat = () => {
+    if (newMessage.trim()) {
+      sendChatMessage(newMessage.trim());
+      setNewMessage('');
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChat();
+    }
+  };
+
+  // File upload handler
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!validTypes.includes(file.type)) {
       toast.error('Please upload a PDF or DOCX file', {
         style: {
           background: '#dc2626',
           color: '#ffffff',
         },
       });
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      
+      // Read file as base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const base64File = e.target.result.split(',')[1]; // Remove data URL prefix
+          
+          // Create file data object
+          const fileData = {
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            file_content: base64File,
+            uploaded_by: currentUser.username,
+            uploaded_at: new Date().toISOString()
+          };
+
+          // Store file blob in cache for sharing
+          setFileBlobCache(prev => ({
+            ...prev,
+            [file.name]: file
+          }));
+          
+          // Create file URL for uploader
+          const blob = await fetch(`data:${file.type};base64,${base64File}`).then(res => res.blob());
+          const fileUrl = URL.createObjectURL(blob);
+          fileUrlsCache.current[file.name] = fileUrl;
+          setSharedFileUrl(fileUrl);
+
+          // Update state
+          setSharedQuestionFile(fileData);
+          setSharedQuestionContent(`File: ${file.name}`);
+          
+          // Send to other users via WebSocket
+          sendQuestionUpdate(`File: ${file.name}`, fileData);
+          
+          // Save to localStorage
+          localStorage.setItem(`interviewQuestion_${sessionId}`, JSON.stringify({
+            content: `File: ${file.name}`,
+            fileData: fileData
+          }));
+
+          // Close popup
+          setShowQuestionUploadPopup(false);
+          
+          // Show success message
+          toast.success('File uploaded successfully!', {
+            style: {
+              background: '#10b981',
+              color: '#ffffff',
+            },
+          });
+        } catch (error) {
+          console.error('File processing error:', error);
+          toast.error('Failed to process file. Please try again.', {
+            style: {
+              background: '#dc2626',
+              color: '#ffffff',
+            },
+          });
+        } finally {
+          setIsUploading(false);
+        }
+      };
+      
+      reader.onerror = () => {
+        toast.error('Failed to read file. Please try again.', {
+          style: {
+            background: '#dc2626',
+            color: '#ffffff',
+          },
+        });
+        setIsUploading(false);
+      };
+      
+      reader.readAsDataURL(file);
+      
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast.error('Failed to upload file. Please try again.', {
+        style: {
+          background: '#dc2626',
+          color: '#ffffff',
+        },
+      });
+      setIsUploading(false);
     }
   };
 
+  // Manual question handler
   const handleManualQuestion = () => {
     const content = `Manual Question Set
 Uploaded by: ${currentUser.username}
@@ -710,332 +804,7 @@ c) Describe your experience with agile methodologies.`;
     });
   };
 
-  // Render Shared Questions Content
-  const renderQuestionsContent = () => {
-    if (!sharedQuestionContent) {
-      return (
-        <div className="h-full flex flex-col items-center justify-center p-4">
-          <FileText className="w-12 h-12 text-gray-300 mb-3" />
-          <p className="text-gray-500 text-sm text-center mb-4">No questions available</p>
-          <button 
-            onClick={() => setShowQuestionUploadPopup(true)}
-            className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-2 rounded text-sm flex items-center gap-1"
-          >
-            <Upload className="w-3 h-3" />
-            Upload Questions
-          </button>
-        </div>
-      );
-    }
-
-    if (sharedQuestionFile && sharedQuestionFile.file_type === 'application/pdf') {
-      // PDF File - now all users can view the PDF
-      if (sharedFileUrl) {
-        // All users can view the PDF
-        return (
-          <div className="flex flex-col h-full">
-            <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <File className="w-4 h-4 text-blue-600 mr-2" />
-                  <div>
-                    <p className="font-medium text-blue-800 text-sm">
-                      PDF: {sharedQuestionFile.file_name}
-                    </p>
-                    <p className="text-xs text-blue-600">
-                      {(sharedQuestionFile.file_size / 1024).toFixed(2)} KB • Uploaded by {sharedQuestionFile.uploaded_by}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = sharedFileUrl;
-                      link.download = sharedQuestionFile.file_name;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }}
-                    className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-                  >
-                    <Download className="w-3 h-3" />
-                    Download
-                  </button>
-                  <button
-                    onClick={() => {
-                      window.open(sharedFileUrl, '_blank');
-                    }}
-                    className="bg-green-800 hover:bg-green-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-                  >
-                    <Maximize2 className="w-3 h-3" />
-                    Open Full
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex-1 border rounded-lg overflow-hidden bg-gray-100">
-              <PDFViewer fileUrl={sharedFileUrl} fileName={sharedQuestionFile.file_name} />
-            </div>
-            
-            <div className="mt-4 p-4 bg-gray-50 rounded border flex-shrink-0">
-              <div className="text-xs text-gray-600 space-y-1">
-                <div className="flex justify-between">
-                  <span>Uploaded by:</span>
-                  <span className="font-medium">{sharedQuestionFile.uploaded_by}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Uploaded at:</span>
-                  <span className="font-medium">{new Date(sharedQuestionFile.uploaded_at).toLocaleTimeString()}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      } else {
-        // Fallback if file URL is not available
-        return (
-          <div className="flex flex-col h-full">
-            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded mb-4 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <File className="w-4 h-4 text-yellow-600 mr-2" />
-                  <div>
-                    <p className="font-medium text-yellow-800 text-sm">
-                      PDF Shared: {sharedQuestionFile.file_name}
-                    </p>
-                    <p className="text-xs text-yellow-600">
-                      {(sharedQuestionFile.file_size / 1024).toFixed(2)} KB • Uploaded by {sharedQuestionFile.uploaded_by}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => toast.info(`Contact ${sharedQuestionFile.uploaded_by} to get the PDF file.`)}
-                  className="bg-yellow-800 hover:bg-yellow-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-                >
-                  <Download className="w-3 h-3" />
-                  Request File
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex-1 p-4 bg-gray-50 rounded border overflow-auto">
-              <div className="whitespace-pre-wrap text-sm">
-                {sharedQuestionContent}
-              </div>
-            </div>
-          </div>
-        );
-      }
-    } else if (sharedQuestionFile && sharedQuestionFile.file_type.includes('wordprocessingml')) {
-      // DOCX File
-      return (
-        <div className="flex flex-col h-full">
-          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <FileText className="w-4 h-4 text-blue-600 mr-2" />
-                <div>
-                  <p className="font-medium text-blue-800 text-sm">
-                    DOCX: {sharedQuestionFile.file_name}
-                  </p>
-                  <p className="text-xs text-blue-600">
-                    {(sharedQuestionFile.file_size / 1024).toFixed(2)} KB • Uploaded by {sharedQuestionFile.uploaded_by}
-                  </p>
-                </div>
-              </div>
-              {sharedFileUrl ? (
-                <a 
-                  href={sharedFileUrl} 
-                  download={sharedQuestionFile.file_name}
-                  className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-                >
-                  <Download className="w-3 h-3" />
-                  Download
-                </a>
-              ) : (
-                <button
-                  onClick={() => toast.info(`Contact ${sharedQuestionFile.uploaded_by} to get the DOCX file.`)}
-                  className="bg-yellow-800 hover:bg-yellow-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-                >
-                  <Download className="w-3 h-3" />
-                  Request File
-                </button>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex-1 p-4 bg-gray-50 rounded border overflow-auto">
-            <div className="whitespace-pre-wrap text-sm">
-              {sharedQuestionContent}
-            </div>
-          </div>
-        </div>
-      );
-    } else {
-      // Manual questions or no file
-      return (
-        <div className="h-full overflow-auto">
-          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4">
-            <div className="flex items-center">
-              <FileText className="w-4 h-4 text-blue-600 mr-2" />
-              <div>
-                <p className="font-medium text-blue-800 text-sm">Shared Question Set</p>
-                <p className="text-xs text-blue-600">Visible to all participants</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded border">
-            {sharedQuestionContent}
-          </div>
-        </div>
-      );
-    }
-  };
-
-  // Rest of the component functions remain the same...
-  const handleEditorDidMount = (editor, monaco) => {
-    editorRef.current = editor;
-    
-    editor.onDidChangeCursorPosition((e) => {
-      const cursorPos = {
-        lineNumber: e.position.lineNumber,
-        column: e.position.column
-      };
-      setCursorPosition(cursorPos);
-      sendCursorMove(cursorPos.lineNumber, cursorPos.column);
-    });
-  };
-
-  const handleRunCode = () => {
-    try {
-      setIsRunning(true);
-      const result = executeCode(code, language);
-      setOutput(result);
-      
-      sendRunCode(code);
-      
-      toast.success('Code executed successfully!', {
-        style: {
-          background: '#10b981',
-          color: '#ffffff',
-        },
-      });
-    } catch (error) {
-      setOutput(`> Compiling code...\n> Error: ${error.message}\n> \n> Please fix the syntax errors and try again.`);
-      
-      toast.error('Code execution failed!', {
-        style: {
-          background: '#dc2626',
-          color: '#ffffff',
-        },
-      });
-    } finally {
-      setTimeout(() => setIsRunning(false), 500);
-    }
-  };
-
-  const executeCode = (codeString, lang) => {
-    const timestamp = new Date().toLocaleTimeString();
-    
-    switch (lang) {
-      case 'javascript':
-        return `[${timestamp}] JavaScript Runtime
-> Compiling code...
-> Code executed successfully!
-> 
-> Output:
-${evalJavaScript(codeString)}
-> 
-> Execution time: 0.003s
-> Memory used: 5.1 MB
-> 
-> Process exited with code 0`;
-        
-      case 'python':
-        return `[${timestamp}] Python 3.9.7 Runtime
-> Compiling code...
-> Code executed successfully!
-> 
-> Output:
-${evalPython(codeString)}
-> 
-> Execution time: 0.012s
-> Memory used: 8.2 MB
-> 
-> Process exited with code 0`;
-        
-      case 'java':
-        return `[${timestamp}] Java 11 Runtime
-> Compiling code...
-> Code compiled successfully!
-> 
-> Output:
-${evalJava(codeString)}
-> 
-> Execution time: 0.156s
-> Memory used: 24.5 MB
-> 
-> Process exited with code 0`;
-        
-      case 'cpp':
-        return `[${timestamp}] C++ GCC 11 Runtime
-> Compiling code...
-> Code compiled successfully!
-> 
-> Output:
-${evalCpp(codeString)}
-> 
-> Execution time: 0.008s
-> Memory used: 3.1 MB
-> 
-> Process exited with code 0`;
-        
-      default:
-        return `[${timestamp}] Unknown Runtime
-> Error: Unsupported language`;
-    }
-  };
-  
-  const evalJavaScript = (codeString) => {
-    if (codeString.includes('console.log')) {
-      return 'Hello, Interview! Code executed successfully.';
-    } else if (codeString.includes('function solution')) {
-      return 'Solution function defined. Add implementation.';
-    }
-    return 'Code executed. No output generated.';
-  };
-  
-  const evalPython = (codeString) => 'Python execution simulation complete.';
-  const evalJava = (codeString) => 'Java execution simulation complete.';
-  const evalCpp = (codeString) => 'C++ execution simulation complete.';
-
-  const handleEditorChange = (value) => {
-    setCode(value);
-    sendCodeChange(value);
-  };
-
-  const handleLanguageChange = (newLanguage) => {
-    setLanguage(newLanguage);
-    sendLanguageChange(newLanguage);
-  };
-
-  const sendChat = () => {
-    if (newMessage.trim()) {
-      sendChatMessage(newMessage.trim());
-      setNewMessage('');
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendChat();
-    }
-  };
-
+  // Layout toggle functions
   const toggleQuestions = () => {
     if (!sharedQuestionContent && !sharedQuestionFile) {
       setShowQuestionUploadPopup(true);
@@ -1043,25 +812,15 @@ ${evalCpp(codeString)}
     }
     setShowQuestions(!showQuestions);
   };
-
-  const toggleVideoPanel = () => {
-    setIsVideoOpen(!isVideoOpen);
-  };
-
-  const toggleQuestionsPanel = () => {
-    setQuestionsPanelCollapsed(!questionsPanelCollapsed);
-  };
-
-  const toggleChat = () => {
-    setShowChat(!showChat);
-  };
-
+  const toggleVideoPanel = () => setIsVideoOpen(!isVideoOpen);
+  const toggleQuestionsPanel = () => setQuestionsPanelCollapsed(!questionsPanelCollapsed);
+  const toggleChat = () => setShowChat(!showChat);
   const toggleInterviewerVideo = () => {
     const newStatus = !isInterviewerVideoOn;
     setIsInterviewerVideoOn(newStatus);
     sendVideoToggle(newStatus);
   };
-
+  
   const toggleCandidateVideo = () => {
     if (candidateJoined) {
       const newStatus = !isCandidateVideoOn;
@@ -1070,27 +829,7 @@ ${evalCpp(codeString)}
     }
   };
 
-  const handleInviteClick = () => {
-    setShowInvitePopup(true);
-  };
-
-  const handleSendInvite = () => {
-    if (inviteEmail) {
-      setShowInvitePopup(false);
-      setInvitationSent(true);
-      
-      toast.success(`Invitation sent to ${inviteEmail}`, {
-        style: {
-          background: '#1e40af',
-          color: '#ffffff',
-        },
-        duration: 4000,
-      });
-      
-      setInviteEmail('');
-    }
-  };
-
+  // Timer functions
   const toggleTimer = () => {
     const newStatus = !isTimerRunning;
     setIsTimerRunning(newStatus);
@@ -1104,25 +843,29 @@ ${evalCpp(codeString)}
     sendTimerUpdate(newTime, true);
   };
 
-  const getLeftPanelWidth = () => {
-    if (!isVideoOpen) return 'w-0';
-    return 'w-1/2';
+  // Default code templates
+  const getDefaultCode = (lang) => {
+    switch (lang) {
+      case 'python':
+        return '# Write your code here\ndef solution():\n    print("Hello from Python!")\n    return 0\n\nsolution()';
+      case 'javascript':
+        return '// Write your code here\nfunction solution() {\n    console.log("Hello from JavaScript!");\n    return 0;\n}\n\nsolution();';
+      case 'java':
+        return '// Write your code here\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello from Java!");\n    }\n}';
+      case 'cpp':
+        return '// Write your code here\n#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello from C++!" << endl;\n    return 0;\n}';
+      case 'c':
+        return '// Write your code here\n#include <stdio.h>\n\nint main() {\n    printf("Hello from C!\\n");\n    return 0;\n}';
+      default:
+        return '// Write your code here...';
+    }
   };
 
-  const getEditorWidth = () => {
-    if (!isVideoOpen) return 'w-full';
-    return 'w-1/2';
-  };
-
-  const getVideosWidth = () => {
-    if (showQuestions && !questionsPanelCollapsed) return 'w-1/4';
-    return 'w-full';
-  };
-
-  const getQuestionsWidth = () => {
-    if (showQuestions && !questionsPanelCollapsed) return 'w-3/4';
-    return 'w-0';
-  };
+  // Layout width calculations
+  const getLeftPanelWidth = () => !isVideoOpen ? 'w-0' : 'w-1/2';
+  const getEditorWidth = () => !isVideoOpen ? 'w-full' : 'w-1/2';
+  const getVideosWidth = () => showQuestions && !questionsPanelCollapsed ? 'w-1/4' : 'w-full';
+  const getQuestionsWidth = () => showQuestions && !questionsPanelCollapsed ? 'w-3/4' : 'w-0';
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -1133,7 +876,7 @@ ${evalCpp(codeString)}
             <Video className="w-5 h-5" />
             Interview Session
             <span className="text-sm font-normal bg-blue-100 text-blue-800 px-2 py-1 rounded">
-              {currentUser.role === 'interviewer' ? 'Interviewer' : 'Candidate'} • {sessionId.substring(0, 8)}
+              {currentUser.role === 'interviewer' ? 'Interviewer' : 'Candidate'} • {sessionId?.substring(0, 8) || 'loading...'}
             </span>
           </h1>
           <div className="flex items-center bg-blue-50 px-3 py-1 rounded">
@@ -1146,10 +889,17 @@ ${evalCpp(codeString)}
               {isTimerRunning ? 'Pause' : 'Resume'}
             </button>
           </div>
+          <button 
+            onClick={testBackendConnection}
+            className="text-xs px-3 py-1 bg-green-100 text-green-800 rounded hover:bg-green-200 flex items-center gap-1"
+          >
+            <Play className="w-3 h-3" />
+            Test Connection
+          </button>
         </div>
         <div className="flex items-center space-x-4">
           <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+            <div className={`w-3 h-3 rounded-full mr-2 ${socketRef.current?.readyState === WebSocket.OPEN ? 'bg-green-500' : 'bg-red-500'}`}></div>
             <span className="text-sm">
               {socketRef.current?.readyState === WebSocket.OPEN ? '🟢 Connected' : '🔴 Disconnected'}
             </span>
@@ -1197,7 +947,7 @@ ${evalCpp(codeString)}
                 </div>
               </div>
 
-              {/* Videos List */}
+              {/* Videos List - Simplified for now */}
               <div className="flex-1 p-2 flex flex-col space-y-3">
                 {/* Interviewer Video Card */}
                 <div className="bg-gray-800 rounded-lg flex flex-col h-[calc(50%-12px)]">
@@ -1216,13 +966,6 @@ ${evalCpp(codeString)}
                         <CameraOff className="w-8 h-8 text-gray-500" />
                       </div>
                     )}
-                    <div className="absolute bottom-1 right-1">
-                      {isInterviewerVideoOn ? (
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      ) : (
-                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      )}
-                    </div>
                   </div>
                   <div className="p-2">
                     <div className="flex justify-between items-center">
@@ -1265,7 +1008,7 @@ ${evalCpp(codeString)}
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70">
                         {!invitationSent ? (
                           <button 
-                            onClick={handleInviteClick}
+                            onClick={() => setShowInvitePopup(true)}
                             className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1 transition-colors"
                           >
                             <Mail className="w-3 h-3" />
@@ -1279,15 +1022,6 @@ ${evalCpp(codeString)}
                             <Mail className="w-3 h-3" />
                             Invited
                           </button>
-                        )}
-                      </div>
-                    )}
-                    {candidateJoined && (
-                      <div className="absolute bottom-1 right-1">
-                        {isCandidateVideoOn ? (
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        ) : (
-                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                         )}
                       </div>
                     )}
@@ -1308,43 +1042,16 @@ ${evalCpp(codeString)}
                     </div>
                   </div>
                 </div>
-
-                {/* Video Controls */}
-                <div className="p-2 bg-gray-800 rounded-lg">
-                  <div className="flex justify-center space-x-2">
-                    <button 
-                      onClick={toggleInterviewerVideo}
-                      className={`p-2 rounded flex items-center gap-1 text-xs ${
-                        isInterviewerVideoOn 
-                          ? 'bg-red-600 hover:bg-red-700 text-white' 
-                          : 'bg-green-600 hover:bg-green-700 text-white'
-                      }`}
-                    >
-                      {isInterviewerVideoOn ? <CameraOff className="w-3 h-3" /> : <Camera className="w-3 h-3" />}
-                    </button>
-                    {candidateJoined && currentUser.role === 'interviewer' && (
-                      <button 
-                        onClick={toggleCandidateVideo}
-                        className="p-2 rounded flex items-center gap-1 text-xs bg-gray-700 hover:bg-gray-600 text-white"
-                      >
-                        {isCandidateVideoOn ? <CameraOff className="w-3 h-3" /> : <Camera className="w-3 h-3" />}
-                      </button>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* Questions Panel */}
+            {/* Questions Panel - Simplified for now */}
             {showQuestions && (
               <div className={`${getQuestionsWidth()} flex flex-col bg-white border-r transition-all duration-300 ease-in-out flex-grow`}>
                 <div className="p-3 border-b flex justify-between items-center flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4" />
                     <span className="font-medium">Shared Questions</span>
-                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                      Synced
-                    </span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <button 
@@ -1364,11 +1071,124 @@ ${evalCpp(codeString)}
                   </div>
                 </div>
 
-                {/* Questions Content Area */}
-                <div className="flex-1 p-4 overflow-hidden">
-                  {renderQuestionsContent()}
+                <div className="flex-1 p-4 overflow-auto">
+                  {sharedQuestionContent ? (
+                    sharedQuestionFile && sharedQuestionFile.file_type === 'application/pdf' ? (
+                      // PDF File - now all users can view the PDF
+                      sharedFileUrl ? (
+                        <div className="flex flex-col h-full">
+                          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 flex-shrink-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <File className="w-4 h-4 text-blue-600 mr-2" />
+                                <div>
+                                  <p className="font-medium text-blue-800 text-sm">
+                                    PDF: {sharedQuestionFile.file_name}
+                                  </p>
+                                  <p className="text-xs text-blue-600">
+                                    {(sharedQuestionFile.file_size / 1024).toFixed(2)} KB • Uploaded by {sharedQuestionFile.uploaded_by}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = sharedFileUrl;
+                                    link.download = sharedQuestionFile.file_name;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                  }}
+                                  className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                                >
+                                  <Download className="w-3 h-3" />
+                                  Download
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    window.open(sharedFileUrl, '_blank');
+                                  }}
+                                  className="bg-green-800 hover:bg-green-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                                >
+                                  <Maximize2 className="w-3 h-3" />
+                                  Open Full
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex-grow border rounded-lg overflow-hidden bg-gray-100">
+                            <PDFViewer fileUrl={sharedFileUrl} fileName={sharedQuestionFile.file_name} />
+                          </div>
+                          
+                          <div className="mt-4 p-4 bg-gray-50 rounded border flex-shrink-0">
+                            <div className="text-xs text-gray-600 space-y-1">
+                              <div className="flex justify-between">
+                                <span>Uploaded by:</span>
+                                <span className="font-medium">{sharedQuestionFile.uploaded_by}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Uploaded at:</span>
+                                <span className="font-medium">{new Date(sharedQuestionFile.uploaded_at).toLocaleTimeString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col h-full">
+                          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded mb-4 flex-shrink-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <File className="w-4 h-4 text-yellow-600 mr-2" />
+                                <div>
+                                  <p className="font-medium text-yellow-800 text-sm">
+                                    PDF Shared: {sharedQuestionFile.file_name}
+                                  </p>
+                                  <p className="text-xs text-yellow-600">
+                                    {(sharedQuestionFile.file_size / 1024).toFixed(2)} KB • Uploaded by {sharedQuestionFile.uploaded_by}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => toast.info(`Contact ${sharedQuestionFile.uploaded_by} to get the PDF file.`)}
+                                className="bg-yellow-800 hover:bg-yellow-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                              >
+                                <Download className="w-3 h-3" />
+                                Request File
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div className="flex-grow flex items-center justify-center">
+                            <div className="text-center">
+                              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                              <p className="text-gray-600 mb-4">Preparing PDF for viewing...</p>
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      // Regular text content
+                      <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded border">
+                        {sharedQuestionContent}
+                      </div>
+                    )
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                      <FileText className="w-12 h-12 mb-3" />
+                      <p className="text-sm">No questions available</p>
+                      <button 
+                        onClick={() => setShowQuestionUploadPopup(true)}
+                        className="mt-4 bg-blue-800 hover:bg-blue-900 text-white px-3 py-2 rounded text-sm"
+                      >
+                        Upload Questions
+                      </button>
+                    </div>
+                  )}
                 </div>
-
+                
                 <div className="p-3 border-t">
                   <button 
                     onClick={() => setShowQuestionUploadPopup(true)}
@@ -1386,24 +1206,14 @@ ${evalCpp(codeString)}
           </div>
         )}
 
-        {/* Video Toggle Button */}
-        {!isVideoOpen && (
-          <div className="absolute left-4 top-20 z-10">
-            <button 
-              onClick={toggleVideoPanel}
-              className="bg-blue-800 hover:bg-blue-900 text-white p-3 rounded-full shadow-lg flex items-center gap-2"
-              title="Show video panel"
-            >
-              <Video className="w-5 h-5" />
-            </button>
-          </div>
-        )}
-
         {/* Code Editor */}
         <div className={`${getEditorWidth()} flex flex-col transition-all duration-300 ease-in-out`}>
           <div className="p-4 border-b flex justify-between items-center bg-white">
             <div className="flex items-center space-x-4">
               <h2 className="text-lg font-semibold">Collaborative Code Editor</h2>
+              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                Connected to Backend
+              </span>
               {!isVideoOpen && (
                 <button 
                   onClick={toggleVideoPanel}
@@ -1421,10 +1231,11 @@ ${evalCpp(codeString)}
                 className="border border-gray-300 rounded px-3 py-1 text-sm"
                 disabled={isRunning}
               >
-                <option value="javascript">JavaScript</option>
                 <option value="python">Python</option>
+                <option value="javascript">JavaScript</option>
                 <option value="java">Java</option>
                 <option value="cpp">C++</option>
+                <option value="c">C</option>
               </select>
               <div className="text-sm text-gray-600">
                 Line {cursorPosition.lineNumber}, Col {cursorPosition.column}
@@ -1434,7 +1245,7 @@ ${evalCpp(codeString)}
                 disabled={isRunning}
                 className={`px-4 py-2 rounded text-sm flex items-center gap-1 transition-colors ${isRunning ? 'bg-gray-500 cursor-not-allowed' : 'bg-blue-800 hover:bg-blue-900 text-white'}`}
               >
-                <Send className="w-4 h-4" />
+                <Play className="w-4 h-4" />
                 {isRunning ? 'Running...' : 'Run Code'}
               </button>
             </div>
@@ -1454,7 +1265,6 @@ ${evalCpp(codeString)}
                   fontSize: 14,
                   scrollBeyondLastLine: false,
                   automaticLayout: true,
-                  readOnly: currentUser.role === 'candidate' && !candidateJoined,
                 }}
               />
               
@@ -1480,7 +1290,7 @@ ${evalCpp(codeString)}
             
             <div className="h-1/3 bg-black text-green-400 p-4 font-mono text-sm overflow-auto">
               <div className="mb-2 flex items-center justify-between">
-                <span>Interview Compiler</span>
+                <span>Backend Compiler Output</span>
                 <div className="flex items-center space-x-2">
                   <button 
                     onClick={() => setOutput('')}
@@ -1490,83 +1300,10 @@ ${evalCpp(codeString)}
                   </button>
                 </div>
               </div>
-              <div className="whitespace-pre-wrap">{output || `$ Ready to execute ${language} code`}</div>
+              <div className="whitespace-pre-wrap">{output || `$ Ready to execute ${language} code\n$ Using backend WebSocket connection`}</div>
             </div>
           </div>
         </div>
-
-        {/* Chat Panel */}
-        {showChat && (
-          <div className="w-80 flex flex-col border-l bg-white">
-            <div className="p-3 border-b flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4" />
-                <span className="font-medium">Chat</span>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                  {onlineUsers.length} online
-                </span>
-              </div>
-              <button 
-                onClick={toggleChat}
-                className="p-1 hover:bg-gray-100 rounded"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            
-            <div 
-              ref={chatContainerRef}
-              className="flex-1 p-4 overflow-auto"
-            >
-              {chatMessages.length > 0 ? (
-                <div className="space-y-3">
-                  {chatMessages.map((msg, index) => (
-                    <div 
-                      key={index}
-                      className={`p-3 rounded-lg ${msg.user_id === currentUser.id ? 'bg-blue-50 ml-8' : 'bg-gray-50 mr-8'}`}
-                    >
-                      <div className="flex justify-between items-center mb-1">
-                        <span className={`text-xs font-medium ${msg.user_id === currentUser.id ? 'text-blue-700' : 'text-gray-700'}`}>
-                          {msg.username}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <p className="text-sm">{msg.message}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                  <MessageSquare className="w-12 h-12 mb-3" />
-                  <p className="text-sm">No messages yet</p>
-                  <p className="text-xs">Start the conversation!</p>
-                </div>
-              )}
-            </div>
-            
-            <div className="p-3 border-t">
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type a message..."
-                  className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button 
-                  onClick={sendChat}
-                  disabled={!newMessage.trim()}
-                  className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Question Upload Popup */}
@@ -1591,16 +1328,15 @@ ${evalCpp(codeString)}
                   <Upload className="w-4 h-4" />
                   {isUploading ? 'Uploading...' : 'Choose File'}
                   <input 
-                    ref={fileInputRef}
                     type="file" 
-                    accept=".pdf,.docx,.doc" 
-                    className="hidden" 
+                    ref={fileInputRef}
                     onChange={handleFileUpload}
+                    accept=".pdf,.docx"
                     disabled={isUploading}
+                    className="hidden" 
                   />
                 </label>
-                <p className="text-sm text-gray-500">Supports PDF and DOCX formats</p>
-                <p className="text-xs text-gray-400 mt-2">Will be shared with all participants</p>
+                <p className="text-xs text-gray-500 mt-2">Supported formats: PDF, DOCX</p>
               </div>
               
               <div className="border border-gray-200 rounded-lg p-4">
@@ -1620,31 +1356,13 @@ ${evalCpp(codeString)}
                 </button>
               </div>
               
-              <div className="flex space-x-2">
+              <div className="flex justify-end space-x-3 pt-4">
                 <button
                   onClick={() => setShowQuestionUploadPopup(false)}
+                  className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
                   disabled={isUploading}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors disabled:opacity-50"
                 >
                   Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (!sharedQuestionContent && !sharedQuestionFile) {
-                      toast.error('Please upload or add questions first', {
-                        style: {
-                          background: '#dc2626',
-                          color: '#ffffff',
-                        },
-                      });
-                      return;
-                    }
-                    setShowQuestionUploadPopup(false);
-                  }}
-                  disabled={isUploading}
-                  className="flex-1 bg-blue-800 hover:bg-blue-900 text-white py-2 px-4 rounded transition-colors disabled:opacity-50"
-                >
-                  {isUploading ? 'Uploading...' : 'Continue'}
                 </button>
               </div>
             </div>
@@ -1652,53 +1370,16 @@ ${evalCpp(codeString)}
         </div>
       )}
 
-      {/* Invite Candidate Popup */}
-      {showInvitePopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Mail className="w-5 h-5" />
-              Invite Candidate
-            </h2>
-            <p className="text-gray-600 mb-4">Enter candidate's email to send invitation link</p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Candidate Email
-              </label>
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="candidate@example.com"
-                className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div className="text-sm text-gray-500 mb-4">
-              <p>Candidate will receive an email with a link to join this interview session.</p>
-              <p className="mt-1 text-xs">Share this link: <code className="bg-gray-100 px-1 py-0.5 rounded">{window.location.origin}/interview-session?session={sessionId}&role=candidate</code></p>
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={handleSendInvite}
-                className="flex-1 bg-blue-800 hover:bg-blue-900 text-white py-2 px-4 rounded transition-colors flex items-center justify-center gap-2"
-              >
-                <Send className="w-4 h-4" />
-                Send Invitation
-              </button>
-              <button
-                onClick={() => {
-                  setShowInvitePopup(false);
-                  setInviteEmail('');
-                }}
-                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Connection Test Modal */}
+      <div className="fixed bottom-4 right-4">
+        <button 
+          onClick={testBackendConnection}
+          className="bg-blue-800 hover:bg-blue-900 text-white p-3 rounded-full shadow-lg flex items-center gap-2"
+          title="Test Backend Connection"
+        >
+          <Play className="w-5 h-5" />
+        </button>
+      </div>    </div>
   );
 };
 

@@ -10,9 +10,10 @@ from .models import CodeSubmission
 from .serializers import CodeSubmissionSerializer
 from contest.utils.auth import get_user_from_request
 
-# JDoodle credentials
-JD_CLIENT_ID = "fd5008b0be3517adb097999e752bdc36"
-JD_CLIENT_SECRET = "99df47ceee2ae9af0137b30d0d7eebcdc3aac2fc400b16ef5298bff3576ad5e2"
+# JDoodle credentials from environment variables
+import os
+JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', 'fd5008b0be3517adb097999e752bdc36')
+JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', '99df47ceee2ae9af0137b30d0d7eebcdc3aac2fc400b16ef5298bff3576ad5e2')
 JD_URL = "https://api.jdoodle.com/v1/execute"
 
 # Map for language -> recommended versionIndex

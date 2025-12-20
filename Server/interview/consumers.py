@@ -1,5 +1,10 @@
+# interview/consumers.py
 import json
 import asyncio
+import requests
+import subprocess
+import tempfile
+import os
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from datetime import datetime
@@ -108,7 +113,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def create_or_get_session(self):
         # Try to get existing session
-        session = InterviewSession.objects(session_id=self.session_id).first()
+        session = InterviewSession.objects.filter(session_id=self.session_id).first()
         
         if session is None:
             # Create new session
@@ -128,7 +133,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def update_user_presence(self, is_online=True):
         # Try to get existing user presence
-        user = UserPresence.objects(session_id=self.session_id, user_id=self.user_id).first()
+        user = UserPresence.objects.filter(session_id=self.session_id, user_id=self.user_id).first()
         
         if user is None:
             # Create new user presence
@@ -156,7 +161,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_code_document(self):
         # Try to get existing code document
-        doc = CodeDocument.objects(session_id=self.session_id).first()
+        doc = CodeDocument.objects.filter(session_id=self.session_id).first()
         
         if doc is None:
             # Create new code document
@@ -171,7 +176,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def update_code_document(self, content, language=None):
-        doc = CodeDocument.objects(session_id=self.session_id).first()
+        doc = CodeDocument.objects.filter(session_id=self.session_id).first()
         if doc:
             doc.content = content
             if language:
@@ -184,13 +189,14 @@ class InterviewConsumer(AsyncWebsocketConsumer):
                 session_id=self.session_id,
                 content=content,
                 language=language or 'javascript'
-            ).save()
+            )
+            doc.save()
         return doc
     
     @database_sync_to_async
     def update_cursor_position(self, line, column):
         # Try to get existing cursor
-        cursor = UserCursor.objects(session_id=self.session_id, user_id=self.user_id).first()
+        cursor = UserCursor.objects.filter(session_id=self.session_id, user_id=self.user_id).first()
         
         if cursor is None:
             # Create new cursor
@@ -215,18 +221,18 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def get_question_document(self):
-        return QuestionDocument.objects(session_id=self.session_id).first()
+        return QuestionDocument.objects.filter(session_id=self.session_id).first()
     
     @database_sync_to_async
     def update_question_document(self, content, file_data=None):
-        doc = QuestionDocument.objects(session_id=self.session_id).first()
+        doc = QuestionDocument.objects.filter(session_id=self.session_id).first()
         if doc:
             doc.content = content
             if file_data:
                 doc.file_name = file_data.get('file_name')
                 doc.file_type = file_data.get('file_type')
                 doc.file_size = file_data.get('file_size')
-                doc.file_data = file_data.get('file_blob')  # Store base64 data
+                doc.file_data = file_data.get('file_blob')
             doc.updated_at = datetime.utcnow()
             doc.save()
         else:
@@ -237,13 +243,14 @@ class InterviewConsumer(AsyncWebsocketConsumer):
                 file_type=file_data.get('file_type') if file_data else None,
                 file_size=file_data.get('file_size') if file_data else None,
                 file_data=file_data.get('file_blob') if file_data else None
-            ).save()
+            )
+            doc.save()
         return doc
     
     @database_sync_to_async
     def get_timer(self):
         # Try to get existing timer
-        timer = InterviewTimer.objects(session_id=self.session_id).first()
+        timer = InterviewTimer.objects.filter(session_id=self.session_id).first()
         
         if timer is None:
             # Create new timer
@@ -259,7 +266,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def update_timer(self, remaining_time, is_running=None):
-        timer = InterviewTimer.objects(session_id=self.session_id).first()
+        timer = InterviewTimer.objects.filter(session_id=self.session_id).first()
         if timer:
             timer.remaining_time = remaining_time
             if is_running is not None:
@@ -270,7 +277,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def get_online_users(self):
-        users = UserPresence.objects(
+        users = UserPresence.objects.filter(
             session_id=self.session_id,
             is_online=True
         ).order_by('-last_seen')
@@ -278,7 +285,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def get_user_cursors(self):
-        cursors = UserCursor.objects(
+        cursors = UserCursor.objects.filter(
             session_id=self.session_id
         ).order_by('-updated_at')
         return list(cursors)
@@ -385,7 +392,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
         # Update code document language
         doc = await self.get_code_document()
         doc.language = language
-        await database_sync_to_async(doc.save)()
+        doc.save()
         
         await self.channel_layer.group_send(
             self.group_name,
@@ -401,19 +408,125 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     async def handle_run_code(self, data):
         code = data.get("code", "")
         language = data.get("language", "javascript")
-        output = f"Code executed in {language}:\n{code[:100]}..."
+        input_data = data.get("input_data", "")
+        
+        # Use JDoodle API for code execution
+        try:
+            output = await self.execute_code_with_jdoodle(code, language, input_data)
+        except Exception as e:
+            output = f"Error executing code: {str(e)}"
+        
+        # Format the final output
+        formatted_output = f"[{datetime.utcnow().strftime('%H:%M:%S')}] {language.upper()} Runtime\n"
+        formatted_output += f"> Compiling code...\n"
+        formatted_output += f"> Code executed successfully!\n"
+        formatted_output += f"> \n"
+        formatted_output += f"> Output:\n"
+        formatted_output += f"{output}\n"
+        formatted_output += f"> \n"
+        formatted_output += f"> Process completed"
         
         await self.channel_layer.group_send(
             self.group_name,
             {
                 "type": "broadcast_run_code",
-                "output": output,
+                "output": formatted_output,
                 "language": language,
                 "user_id": self.user_id,
                 "username": self.username,
                 "timestamp": datetime.utcnow().isoformat()
             }
         )
+    
+    async def execute_code_with_jdoodle(self, code, language, input_data):
+        """Execute code using JDoodle API with retry logic"""
+        # JDoodle credentials from environment variables
+        import os
+        JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', 'fd5008b0be3517adb097999e752bdc36')
+        JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', '99df47ceee2ae9af0137b30d0d7eebcdc3aac2fc400b16ef5298bff3576ad5e2')
+        JD_URL = "https://api.jdoodle.com/v1/execute"
+        
+        # Map for language -> JDoodle language identifier
+        LANGUAGE_MAP = {
+            "javascript": "nodejs",
+            "python": "python3",
+            "java": "java",
+            "cpp": "cpp14",
+            "c": "c"
+        }
+        
+        # Map for language -> recommended versionIndex
+        LANGUAGE_VERSION_MAP = {
+            "javascript": "4",
+            "python": "3",
+            "java": "4",
+            "cpp": "5",
+            "c": "5"
+        }
+        
+        # Retry logic with exponential backoff
+        max_retries = 3
+        base_delay = 1  # 1 second
+        
+        for attempt in range(max_retries + 1):
+            try:
+                # Prepare payload for JDoodle
+                payload = {
+                    "clientId": JD_CLIENT_ID,
+                    "clientSecret": JD_CLIENT_SECRET,
+                    "script": code,
+                    "stdin": input_data,
+                    "language": LANGUAGE_MAP.get(language, "python3"),
+                    "versionIndex": LANGUAGE_VERSION_MAP.get(language, "3")
+                }
+                
+                # Execute code via JDoodle API
+                response = requests.post(JD_URL, json=payload, timeout=15)
+                
+                # Handle rate limiting (429) with retry
+                if response.status_code == 429:
+                    if attempt < max_retries:
+                        import asyncio
+                        delay = base_delay * (2 ** attempt)  # Exponential backoff
+                        print(f"Rate limited. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        return "Rate limit exceeded. Please wait a few minutes and try again."
+                
+                response.raise_for_status()
+                response_data = response.json()
+                
+                # Format output
+                output = response_data.get("output", "No output")
+                memory_used = response_data.get("memory", "N/A")
+                cpu_time = response_data.get("cpuTime", "N/A")
+                
+                return f"{output}\n\nExecution time: {cpu_time}s\nMemory used: {memory_used} KB"
+                
+            except requests.exceptions.RequestException as e:
+                if attempt == max_retries:
+                    # If this is the last attempt, return a more user-friendly error
+                    if '429' in str(e):
+                        return "Rate limit exceeded. You've hit the JDoodle API rate limit. This typically happens when too many requests are made in a short period. Please wait a few minutes and try again."
+                    
+                    return f"API Error: {str(e)}"
+                
+                # Wait before retrying (exponential backoff)
+                import asyncio
+                delay = base_delay * (2 ** attempt)
+                print(f"Request failed. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(delay)
+                
+            except Exception as e:
+                if attempt == max_retries:
+                    return f"Error: {str(e)}"
+                
+                # Wait before retrying (exponential backoff)
+                import asyncio
+                delay = base_delay * (2 ** attempt)
+                print(f"Request failed. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(delay)
     
     async def handle_chat_message(self, data):
         message = data.get("message", "")
@@ -464,9 +577,9 @@ class InterviewConsumer(AsyncWebsocketConsumer):
             "session_id": self.session_id,
             "user_id": self.user_id,
             "code": {
-                "content": code_doc.content,
-                "language": code_doc.language,
-                "version": code_doc.version
+                "content": code_doc.content if code_doc else '// Write your code here...',
+                "language": code_doc.language if code_doc else 'javascript',
+                "version": code_doc.version if code_doc else 0
             },
             "question": {
                 "content": question_doc.content if question_doc else "",
@@ -475,8 +588,8 @@ class InterviewConsumer(AsyncWebsocketConsumer):
                 "file_data": question_doc.file_data if question_doc else None
             },
             "timer": {
-                "remaining_time": timer.remaining_time,
-                "is_running": timer.is_running
+                "remaining_time": timer.remaining_time if timer else 3600,
+                "is_running": timer.is_running if timer else True
             },
             "online_users": [
                 {
