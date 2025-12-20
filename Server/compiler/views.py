@@ -64,19 +64,9 @@ class CodeExecuteAPIView(APIView):
         try:
             res = requests.post(JD_URL, json=payload, timeout=15)
             res_data = res.json()
-
-            print("=" * 50)
-            print("DEBUG - CodeExecuteAPIView JDoodle Response:")
-            print(f"Full JDoodle response: {res_data}")
-            print(f"cpuTime: {res_data.get('cpuTime')}, type: {type(res_data.get('cpuTime'))}")
-            print(f"memory: {res_data.get('memory')}, type: {type(res_data.get('memory'))}")
-            print(f"isExecutionSuccess: {res_data.get('isExecutionSuccess')}")
-            print(f"statusCode: {res_data.get('statusCode')}")
-            print("=" * 50)
             
             jdoodle_output = res_data.get("output", "").strip()
-            cpu_time_str = res_data.get("cpuTime")
-            cpu_time_seconds = 0.0 if cpu_time_str is None else float(cpu_time_str)
+            cpu_time_seconds = float(res_data.get("cpuTime", 0))
             cpu_time_ms = int(cpu_time_seconds * 1000)
             memory_kb = int(res_data.get("memory", 0))
             status_code = res_data.get("statusCode", 200)
@@ -149,12 +139,6 @@ class CodeExecuteAPIView(APIView):
                 input_data=data.get("input_data", ""),
                 output=error_msg,
                 status="system_error",
-                execution_time_ms=cpu_time_ms,
-                execution_time_seconds=cpu_time_seconds,
-                memory_kb=memory_kb,
-                memory_mb=round(memory_kb / 1024, 2),
-                status_code=status_code,
-                is_execution_success=is_execution_success,
                 created_at=dhaka_now()
             )
             code_submission.save()
@@ -257,23 +241,9 @@ class ContestProblemExecuteAPIView(APIView):
             try:
                 res = requests.post(JD_URL, json=payload, timeout=15)
                 res_data = res.json()
-
-                print("=" * 50)
-                print(f"DEBUG - ContestProblemExecuteAPIView JDoodle Response (Test case {i}):")
-                print(f"Full JDoodle response: {res_data}")
-                print(f"cpuTime: {res_data.get('cpuTime')}, type: {type(res_data.get('cpuTime'))}")
-                print(f"memory: {res_data.get('memory')}, type: {type(res_data.get('memory'))}")
-                print(f"isExecutionSuccess: {res_data.get('isExecutionSuccess')}")
-                print(f"statusCode: {res_data.get('statusCode')}")
-                print("=" * 50)
                 
-                # Replace lines 156-161 with:
                 jdoodle_output = res_data.get("output", "").strip()
-                cpu_time_str = res_data.get("cpuTime")
-                if cpu_time_str is None:
-                   cpu_time_seconds = 0.0
-                else:
-                    cpu_time_seconds = float(cpu_time_str)
+                cpu_time_seconds = float(res_data.get("cpuTime", 0))
                 cpu_time_ms = int(cpu_time_seconds * 1000)
                 memory_kb = int(res_data.get("memory", 0))
                 status_code = res_data.get("statusCode", 200)
@@ -367,13 +337,7 @@ class ContestProblemExecuteAPIView(APIView):
             input_data=data.get("input_data", ""),
             output=actual_output or error_message or compile_output or "",
             status="success" if all_passed else "error",
-            execution_time_ms=max_execution_time,
-            execution_time_seconds=max_execution_time / 1000 if max_execution_time > 0 else 0,
-            memory_kb=max_memory_used,
-            memory_mb=round(max_memory_used / 1024, 2) if max_memory_used > 0 else 0,
-            status_code=200 if all_passed else 400,
-            is_execution_success=all_passed,  # True if all test cases passed
-            created_at=dhaka_now()
+            created_at=current_time
         )
         code_submission.save()
         
