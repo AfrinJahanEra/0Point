@@ -299,8 +299,8 @@ class ExecuteCodeAPI(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Get JDoodle credentials from environment variables
-            JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', 'c636758540d5b822ecbd56498a9bd321')
-            JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', 'd8dcc20424dd9f479f84a382dd4d6915e279b92b58bb3272335168dea6ca4b3d')
+            JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', '4771ccb8a9360d9c2616d2ae9a092c78')
+            JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', 'f5c03bad716ca4e6a16cbc7ee99e294c6351e78d03275d52964235193c544645')
             JD_URL = "https://api.jdoodle.com/v1/execute"
             
             # Language mapping for JDoodle

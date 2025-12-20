@@ -442,8 +442,8 @@ class InterviewConsumer(AsyncWebsocketConsumer):
         """Execute code using JDoodle API with retry logic"""
         # JDoodle credentials from environment variables
         import os
-        JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', 'fd5008b0be3517adb097999e752bdc36')
-        JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', '99df47ceee2ae9af0137b30d0d7eebcdc3aac2fc400b16ef5298bff3576ad5e2')
+        JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', '4771ccb8a9360d9c2616d2ae9a092c78')
+        JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', 'f5c03bad716ca4e6a16cbc7ee99e294c6351e78d03275d52964235193c544645')
         JD_URL = "https://api.jdoodle.com/v1/execute"
         
         # Map for language -> JDoodle language identifier
