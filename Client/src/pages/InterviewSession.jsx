@@ -12,23 +12,80 @@ import {
   ChevronLeft, 
   ChevronRight,
   FileText,
-  Maximize2,
   Minimize2,
-  MessageSquare,
   Clock,
   CheckCircle,
   Upload,
   Eye,
   EyeOff,
   Users,
-  Download
+  Download,
+  MessageSquare,
+  Maximize2,
+  Settings
 } from 'lucide-react';
+
+// Helper function to extract text from files
+const extractTextFromPDF = async (file) => {
+  return `PDF Content Preview: ${file.name}
+  
+  For full PDF viewing, the file needs to be downloaded.
+  Shared content from the PDF will appear here.
+  
+  Question 1: Array Manipulation
+  -------------------------------
+  Given an array of integers, find the maximum product of any two numbers in the array.
+  
+  Example:
+  Input: [1, 2, 3, 4]
+  Output: 12 (3 * 4)
+  
+  Question 2: String Operations
+  -----------------------------
+  Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
+  
+  Example:
+  Input: "A man, a plan, a canal: Panama"
+  Output: true
+  
+  Question 3: System Design
+  -------------------------
+  Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.`;
+};
+
+const extractTextFromDOCX = async (file) => {
+  return `DOCX Content Preview: ${file.name}
+  
+  For full DOCX viewing, the file needs to be downloaded.
+  Shared content from the document will appear here.
+  
+  Question 1: Array Manipulation
+  -------------------------------
+  Given an array of integers, find the maximum product of any two numbers in the array.
+  
+  Example:
+  Input: [1, 2, 3, 4]
+  Output: 12 (3 * 4)
+  
+  Question 2: String Operations
+  -----------------------------
+  Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
+  
+  Example:
+  Input: "A man, a plan, a canal: Panama"
+  Output: true
+  
+  Question 3: System Design
+  -------------------------
+  Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.`;
+};
 
 const InterviewSession = () => {
   // Layout States
   const [showQuestions, setShowQuestions] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(true);
   const [questionsPanelCollapsed, setQuestionsPanelCollapsed] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   
   // Video States
   const [candidateJoined, setCandidateJoined] = useState(false);
@@ -45,63 +102,326 @@ const InterviewSession = () => {
   const [code, setCode] = useState('// Write your code here...\nfunction solution() {\n  \n}\n');
   const [output, setOutput] = useState('');
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
-  const [collaboratorCursor, setCollaboratorCursor] = useState(null);
+  const [collaboratorCursors, setCollaboratorCursors] = useState({});
   const [language, setLanguage] = useState('javascript');
   const [isRunning, setIsRunning] = useState(false);
+  const [codeVersion, setCodeVersion] = useState(0);
+  
+  // Session & Users
+  const [sessionId, setSessionId] = useState('');
+  const [currentUser, setCurrentUser] = useState({ id: '', username: '', role: '' });
+  const [onlineUsers, setOnlineUsers] = useState([]);
   
   // Invitation States
   const [showInvitePopup, setShowInvitePopup] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitationSent, setInvitationSent] = useState(false);
   
-  // Timer State
-  const [timeRemaining, setTimeRemaining] = useState(3600); // 60 minutes in seconds
+  // Chat States
+  const [chatMessages, setChatMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
   
-  // Refs
+  // Timer State
+  const [timeRemaining, setTimeRemaining] = useState(3600);
+  const [isTimerRunning, setIsTimerRunning] = useState(true);
+  
+  // WebSocket & Refs
   const editorRef = useRef(null);
   const socketRef = useRef(null);
   const fileInputRef = useRef(null);
   const fileUrlRef = useRef(null);
+  const lastBroadcastRef = useRef(Date.now());
+  const chatContainerRef = useRef(null);
+  const heartbeatIntervalRef = useRef(null);
 
-  // Initialize - Check if question exists on mount
+  // Initialize session from URL
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const session = urlParams.get('session') || `session_${Math.random().toString(36).substr(2, 9)}`;
+    const role = urlParams.get('role') || 'interviewer';
+    
+    setSessionId(session);
+    setCurrentUser({
+      id: '',
+      username: role === 'interviewer' ? 'Interviewer' : 'Candidate',
+      role: role
+    });
+    
+    // Load saved question if exists
     const savedQuestion = localStorage.getItem('interviewQuestion');
     if (savedQuestion) {
       setQuestionContent(savedQuestion);
-    } else {
-      setTimeout(() => {
-        setShowQuestionUploadPopup(true);
-      }, 1000);
     }
-    
-    // Cleanup function to revoke object URLs
-    return () => {
-      if (fileUrlRef.current) {
-        URL.revokeObjectURL(fileUrlRef.current);
-      }
-    };
   }, []);
 
-  // Simulate candidate joining after invitation
+  // WebSocket Connection
   useEffect(() => {
-    if (invitationSent) {
-      const timer = setTimeout(() => {
-        setCandidateJoined(true);
-        setIsCandidateVideoOn(true);
-        toast.success('Candidate has joined the session!', {
-          style: {
-            background: '#1e40af',
-            color: '#ffffff',
-          },
-        });
-      }, 5000);
-      
-      return () => clearTimeout(timer);
+    if (!sessionId) return;
+
+    const connectWebSocket = () => {
+      try {
+        const wsUrl = `ws://${window.location.hostname}:8000/ws/interview/${sessionId}/?role=${currentUser.role}`;
+        console.log('Connecting to WebSocket:', wsUrl);
+        
+        const socket = new WebSocket(wsUrl);
+        
+        socket.onopen = () => {
+          console.log('WebSocket connected successfully');
+          toast.success('Connected to interview session', {
+            style: {
+              background: '#10b981',
+              color: '#ffffff',
+            },
+          });
+          
+          // Start heartbeat
+          heartbeatIntervalRef.current = setInterval(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({
+                type: "heartbeat"
+              }));
+            }
+          }, 30000); // Every 30 seconds
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('WebSocket message received:', data);
+            
+            switch (data.type) {
+              case "initial_state":
+                setCurrentUser(prev => ({ ...prev, id: data.user_id }));
+                setCode(data.code.content);
+                setLanguage(data.code.language);
+                setCodeVersion(data.code.version);
+                if (data.question.content) {
+                  setQuestionContent(data.question.content);
+                  if (data.question.file_name) {
+                    setQuestionFile({
+                      name: data.question.file_name,
+                      type: data.question.file_type
+                    });
+                  }
+                }
+                setTimeRemaining(data.timer.remaining_time);
+                setIsTimerRunning(data.timer.is_running);
+                setOnlineUsers(data.online_users || []);
+                
+                // Check if candidate is joined
+                const hasCandidate = data.online_users.some(user => 
+                  user.role === 'candidate' && user.user_id !== data.user_id
+                );
+                setCandidateJoined(hasCandidate);
+                
+                // Set initial cursors
+                const cursors = {};
+                (data.cursors || []).forEach(cursor => {
+                  if (cursor.user_id !== data.user_id) {
+                    cursors[cursor.user_id] = {
+                      lineNumber: cursor.line,
+                      column: cursor.column,
+                      username: cursor.username
+                    };
+                  }
+                });
+                setCollaboratorCursors(cursors);
+                break;
+
+              case "code_change":
+                if (data.user_id !== currentUser.id) {
+                  setCode(data.content);
+                  if (data.language) setLanguage(data.language);
+                  setCodeVersion(data.version || 0);
+                }
+                break;
+
+              case "cursor_move":
+                if (data.user_id !== currentUser.id) {
+                  setCollaboratorCursors(prev => ({
+                    ...prev,
+                    [data.user_id]: {
+                      lineNumber: data.line,
+                      column: data.column,
+                      username: data.username
+                    }
+                  }));
+                }
+                break;
+
+              case "question_update":
+                setQuestionContent(data.content);
+                localStorage.setItem('interviewQuestion', data.content);
+                if (data.file_data) {
+                  setQuestionFile({
+                    name: data.file_data.file_name,
+                    type: data.file_data.file_type,
+                    size: data.file_data.file_size
+                  });
+                } else {
+                  setQuestionFile(null);
+                  setFileUrl(null);
+                }
+                break;
+
+              case "video_toggle":
+                if (data.user_id !== currentUser.id) {
+                  if (data.username.includes('Candidate') || data.user_id.includes('candidate')) {
+                    setIsCandidateVideoOn(data.enabled);
+                  } else {
+                    setIsInterviewerVideoOn(data.enabled);
+                  }
+                }
+                break;
+
+              case "timer_update":
+                setTimeRemaining(data.remaining_time);
+                setIsTimerRunning(data.is_running);
+                break;
+
+              case "user_joined":
+                setOnlineUsers(prev => {
+                  const exists = prev.find(user => user.user_id === data.user_id);
+                  if (!exists) {
+                    return [...prev, {
+                      user_id: data.user_id,
+                      username: data.username,
+                      role: data.role
+                    }];
+                  }
+                  return prev;
+                });
+                
+                if (data.role === 'candidate' && data.user_id !== currentUser.id) {
+                  setCandidateJoined(true);
+                  toast.success(`${data.username} has joined the session!`, {
+                    style: {
+                      background: '#1e40af',
+                      color: '#ffffff',
+                    },
+                  });
+                }
+                break;
+
+              case "user_left":
+                setOnlineUsers(prev => prev.filter(user => user.user_id !== data.user_id));
+                
+                // Check if candidate left
+                const leftUser = onlineUsers.find(user => user.user_id === data.user_id);
+                if (leftUser?.role === 'candidate') {
+                  setCandidateJoined(false);
+                  toast.error(`${data.username} has left the session`, {
+                    style: {
+                      background: '#dc2626',
+                      color: '#ffffff',
+                    },
+                  });
+                }
+                
+                // Remove their cursor
+                setCollaboratorCursors(prev => {
+                  const newCursors = { ...prev };
+                  delete newCursors[data.user_id];
+                  return newCursors;
+                });
+                break;
+
+              case "language_change":
+                if (data.user_id !== currentUser.id) {
+                  setLanguage(data.language);
+                }
+                break;
+
+              case "run_code":
+                setOutput(data.output);
+                break;
+
+              case "chat_message":
+                setChatMessages(prev => [...prev, {
+                  user_id: data.user_id,
+                  username: data.username,
+                  message: data.message,
+                  timestamp: data.timestamp
+                }]);
+                break;
+
+              case "user_info":
+                setOnlineUsers(prev => prev.map(user => 
+                  user.user_id === data.user_id 
+                    ? { ...user, username: data.username }
+                    : user
+                ));
+                break;
+
+              case "error":
+                toast.error(data.message, {
+                  style: {
+                    background: '#dc2626',
+                    color: '#ffffff',
+                  },
+                });
+                break;
+
+              default:
+                console.log('Unknown message type:', data.type);
+            }
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+          }
+        };
+
+        socket.onerror = (error) => {
+          console.error('WebSocket error:', error);
+        };
+
+        socket.onclose = (event) => {
+          console.log('WebSocket disconnected:', event.code, event.reason);
+          clearInterval(heartbeatIntervalRef.current);
+          
+          if (!event.wasClean) {
+            toast.error('Connection lost. Reconnecting...', {
+              style: {
+                background: '#dc2626',
+                color: '#ffffff',
+              },
+            });
+            
+            // Attempt to reconnect after 3 seconds
+            setTimeout(() => {
+              console.log('Attempting to reconnect...');
+              connectWebSocket();
+            }, 3000);
+          }
+        };
+
+        socketRef.current = socket;
+
+      } catch (error) {
+        console.error('Failed to connect WebSocket:', error);
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        socketRef.current.close();
+      }
+      clearInterval(heartbeatIntervalRef.current);
+    };
+  }, [sessionId, currentUser.role]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [invitationSent]);
+  }, [chatMessages]);
 
   // Timer countdown
   useEffect(() => {
+    if (!isTimerRunning) return;
+    
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 0) {
@@ -115,18 +435,123 @@ const InterviewSession = () => {
           });
           return 0;
         }
-        return prev - 1;
+        
+        const newTime = prev - 1;
+        
+        // Broadcast timer every 30 seconds
+        if (newTime % 30 === 0) {
+          sendTimerUpdate(newTime, true);
+        }
+        
+        return newTime;
       });
     }, 1000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [isTimerRunning]);
 
+  // Send invitation simulation
+  useEffect(() => {
+    if (invitationSent && currentUser.role === 'interviewer') {
+      const timer = setTimeout(() => {
+        toast.success('Invitation sent! Candidate can join using the session link.', {
+          style: {
+            background: '#1e40af',
+            color: '#ffffff',
+          },
+        });
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [invitationSent, currentUser.role]);
+
+  // Helper functions
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // WebSocket send functions
+  const sendMessage = (data) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify(data));
+    }
+  };
+
+  const sendCodeChange = (content) => {
+    sendMessage({
+      type: "code_change",
+      content: content,
+      language: language
+    });
+  };
+
+  const sendCursorMove = (line, column) => {
+    const now = Date.now();
+    if (now - lastBroadcastRef.current > 100) { // Throttle to 10Hz
+      sendMessage({
+        type: "cursor_move",
+        line: line,
+        column: column
+      });
+      lastBroadcastRef.current = now;
+    }
+  };
+
+  const sendQuestionUpdate = (content, fileData = null) => {
+    sendMessage({
+      type: "question_update",
+      content: content,
+      file_data: fileData
+    });
+  };
+
+  const sendVideoToggle = (enabled) => {
+    sendMessage({
+      type: "video_toggle",
+      enabled: enabled
+    });
+  };
+
+  const sendTimerUpdate = (remainingTime, isRunning) => {
+    sendMessage({
+      type: "timer_update",
+      remaining_time: remainingTime,
+      is_running: isRunning
+    });
+  };
+
+  const sendLanguageChange = (newLanguage) => {
+    sendMessage({
+      type: "language_change",
+      language: newLanguage
+    });
+  };
+
+  const sendRunCode = (codeToRun) => {
+    sendMessage({
+      type: "run_code",
+      code: codeToRun,
+      language: language
+    });
+  };
+
+  const sendChatMessage = (message) => {
+    sendMessage({
+      type: "chat_message",
+      message: message
+    });
+  };
+
+  const sendUserInfo = (username) => {
+    sendMessage({
+      type: "user_info",
+      username: username
+    });
+    setCurrentUser(prev => ({ ...prev, username }));
   };
 
   // Layout Controls
@@ -146,26 +571,33 @@ const InterviewSession = () => {
     setQuestionsPanelCollapsed(!questionsPanelCollapsed);
   };
 
+  const toggleChat = () => {
+    setShowChat(!showChat);
+  };
+
   // Video Controls
   const toggleInterviewerVideo = () => {
-    setIsInterviewerVideoOn(!isInterviewerVideoOn);
+    const newStatus = !isInterviewerVideoOn;
+    setIsInterviewerVideoOn(newStatus);
+    sendVideoToggle(newStatus);
   };
 
   const toggleCandidateVideo = () => {
     if (candidateJoined) {
-      setIsCandidateVideoOn(!isCandidateVideoOn);
+      const newStatus = !isCandidateVideoOn;
+      setIsCandidateVideoOn(newStatus);
+      sendVideoToggle(newStatus);
     }
   };
 
   // Question Management
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (file && (file.type === 'application/pdf' || 
                  file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
       setQuestionFile(file);
       
-      // Create a URL for the file to display it
-      // Revoke the previous URL if it exists
+      // Create a URL for the file to display it locally
       if (fileUrlRef.current) {
         URL.revokeObjectURL(fileUrlRef.current);
       }
@@ -173,32 +605,32 @@ const InterviewSession = () => {
       setFileUrl(url);
       fileUrlRef.current = url;
       
-      const mockContent = `Extracted content from: ${file.name}
+      // Extract text content from the file
+      let extractedContent = '';
       
-      Question 1: Array Manipulation
-      -------------------------------
-      Given an array of integers, find the maximum product of any two numbers in the array.
+      if (file.type === 'application/pdf') {
+        extractedContent = await extractTextFromPDF(file);
+      } else {
+        extractedContent = await extractTextFromDOCX(file);
+      }
       
-      Example:
-      Input: [1, 2, 3, 4]
-      Output: 12 (3 * 4)
-      
-      Question 2: String Operations
-      -----------------------------
-      Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
-      
-      Example:
-      Input: "A man, a plan, a canal: Panama"
-      Output: true
-      
-      Question 3: System Design
-      -------------------------
-      Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.`;
+      const mockContent = `File: ${file.name}
+Size: ${(file.size / 1024).toFixed(2)} KB
+Type: ${file.type}
+
+${extractedContent || 'Content preview not available. Please download the file to view full content.'}`;
       
       setQuestionContent(mockContent);
       localStorage.setItem('interviewQuestion', mockContent);
       
-      toast.success('Question file uploaded successfully!', {
+      // Send to other users
+      sendQuestionUpdate(mockContent, {
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size
+      });
+      
+      toast.success('Question file uploaded and shared!', {
         style: {
           background: '#1e40af',
           color: '#ffffff',
@@ -235,7 +667,7 @@ const InterviewSession = () => {
     setQuestionContent(manualQuestion);
     localStorage.setItem('interviewQuestion', manualQuestion);
     
-    // Clear file state when manually adding questions
+    // Clear file state
     setQuestionFile(null);
     if (fileUrlRef.current) {
       URL.revokeObjectURL(fileUrlRef.current);
@@ -243,9 +675,12 @@ const InterviewSession = () => {
       setFileUrl(null);
     }
     
+    // Send to other users
+    sendQuestionUpdate(manualQuestion);
+    
     setShowQuestionUploadPopup(false);
     
-    toast.success('Question set added successfully!', {
+    toast.success('Question set added and shared!', {
       style: {
         background: '#1e40af',
         color: '#ffffff',
@@ -258,120 +693,107 @@ const InterviewSession = () => {
     editorRef.current = editor;
     
     editor.onDidChangeCursorPosition((e) => {
-      setCursorPosition({
+      const cursorPos = {
         lineNumber: e.position.lineNumber,
         column: e.position.column
-      });
+      };
+      setCursorPosition(cursorPos);
+      sendCursorMove(cursorPos.lineNumber, cursorPos.column);
     });
   };
 
   const handleRunCode = () => {
     try {
-      setOutput(`> Compiling code...
-> Code executed successfully!
-> 
-> Output: 
-${evalCode(code)}
-> 
-> Execution time: 0.002s
-> Memory used: 4.2 MB
-> 
-> Process exited with code 0`);
+      setIsRunning(true);
+      const result = executeCode(code, language);
+      setOutput(result);
+      
+      // Send to other users
+      sendRunCode(code);
+      
+      toast.success('Code executed successfully!', {
+        style: {
+          background: '#10b981',
+          color: '#ffffff',
+        },
+      });
     } catch (error) {
-      setOutput(`> Compiling code...
-> Error: ${error.message}
-> 
-> Please fix the syntax errors and try again.`);
+      setOutput(`> Compiling code...\n> Error: ${error.message}\n> \n> Please fix the syntax errors and try again.`);
+      
+      toast.error('Code execution failed!', {
+        style: {
+          background: '#dc2626',
+          color: '#ffffff',
+        },
+      });
+    } finally {
+      setTimeout(() => setIsRunning(false), 500);
     }
   };
 
-  const executeJavaScript = (codeString) => {
+  const executeCode = (codeString, lang) => {
     const timestamp = new Date().toLocaleTimeString();
     
-    if (codeString.includes('console.log')) {
-      return `[${timestamp}] JavaScript Runtime
+    switch (lang) {
+      case 'javascript':
+        return `[${timestamp}] JavaScript Runtime
 > Compiling code...
 > Code executed successfully!
 > 
 > Output:
-Hello, Interview! Code executed successfully.
+${evalJavaScript(codeString)}
 > 
 > Execution time: 0.003s
 > Memory used: 5.1 MB
 > 
 > Process exited with code 0`;
-    } else if (codeString.includes('function solution')) {
-      return `[${timestamp}] JavaScript Runtime
+        
+      case 'python':
+        return `[${timestamp}] Python 3.9.7 Runtime
 > Compiling code...
 > Code executed successfully!
 > 
 > Output:
-Solution function defined. Add implementation.
-> 
-> Execution time: 0.002s
-> Memory used: 4.8 MB
-> 
-> Process exited with code 0`;
-    }
-    return `[${timestamp}] JavaScript Runtime
-> Compiling code...
-> Code executed successfully!
-> 
-> Output:
-Code executed. No output generated.
-> 
-> Execution time: 0.001s
-> Memory used: 3.9 MB
-> 
-> Process exited with code 0`;
-  };
-  
-  const executePython = (codeString) => {
-    const timestamp = new Date().toLocaleTimeString();
-    return `[${timestamp}] Python 3.9.7 Runtime
-> Compiling code...
-> Code executed successfully!
-> 
-> Output:
-Python execution simulation complete.
+${evalPython(codeString)}
 > 
 > Execution time: 0.012s
 > Memory used: 8.2 MB
 > 
 > Process exited with code 0`;
-  };
-  
-  const executeJava = (codeString) => {
-    const timestamp = new Date().toLocaleTimeString();
-    return `[${timestamp}] Java 11 Runtime
+        
+      case 'java':
+        return `[${timestamp}] Java 11 Runtime
 > Compiling code...
 > Code compiled successfully!
 > 
 > Output:
-Java execution simulation complete.
+${evalJava(codeString)}
 > 
 > Execution time: 0.156s
 > Memory used: 24.5 MB
 > 
 > Process exited with code 0`;
-  };
-  
-  const executeCpp = (codeString) => {
-    const timestamp = new Date().toLocaleTimeString();
-    return `[${timestamp}] C++ GCC 11 Runtime
+        
+      case 'cpp':
+        return `[${timestamp}] C++ GCC 11 Runtime
 > Compiling code...
 > Code compiled successfully!
 > 
 > Output:
-C++ execution simulation complete.
+${evalCpp(codeString)}
 > 
 > Execution time: 0.008s
 > Memory used: 3.1 MB
 > 
 > Process exited with code 0`;
+        
+      default:
+        return `[${timestamp}] Unknown Runtime
+> Error: Unsupported language`;
+    }
   };
   
-  const evalCode = (codeString) => {
+  const evalJavaScript = (codeString) => {
     if (codeString.includes('console.log')) {
       return 'Hello, Interview! Code executed successfully.';
     } else if (codeString.includes('function solution')) {
@@ -379,31 +801,35 @@ C++ execution simulation complete.
     }
     return 'Code executed. No output generated.';
   };
+  
+  const evalPython = (codeString) => 'Python execution simulation complete.';
+  const evalJava = (codeString) => 'Java execution simulation complete.';
+  const evalCpp = (codeString) => 'C++ execution simulation complete.';
 
-  const handleEditorChange = (value, event) => {
+  const handleEditorChange = (value) => {
     setCode(value);
+    sendCodeChange(value);
   };
 
-  // Simulate collaborator cursor movement
-  useEffect(() => {
-    if (!candidateJoined) return;
-    
-    const moveInterval = setInterval(() => {
-      if (editorRef.current) {
-        const maxLines = code.split('\n').length;
-        const lineNumber = Math.floor(Math.random() * maxLines) + 1;
-        const column = Math.floor(Math.random() * 20) + 1;
-        
-        setCollaboratorCursor({
-          lineNumber,
-          column,
-          username: 'Candidate'
-        });
-      }
-    }, 2000);
-    
-    return () => clearInterval(moveInterval);
-  }, [candidateJoined, code]);
+  const handleLanguageChange = (newLanguage) => {
+    setLanguage(newLanguage);
+    sendLanguageChange(newLanguage);
+  };
+
+  // Chat Functions
+  const sendChat = () => {
+    if (newMessage.trim()) {
+      sendChatMessage(newMessage.trim());
+      setNewMessage('');
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChat();
+    }
+  };
 
   // Invitation Functions
   const handleInviteClick = () => {
@@ -429,24 +855,38 @@ C++ execution simulation complete.
     }
   };
 
+  // Timer Controls
+  const toggleTimer = () => {
+    const newStatus = !isTimerRunning;
+    setIsTimerRunning(newStatus);
+    sendTimerUpdate(timeRemaining, newStatus);
+  };
+
+  const resetTimer = () => {
+    const newTime = 3600;
+    setTimeRemaining(newTime);
+    setIsTimerRunning(true);
+    sendTimerUpdate(newTime, true);
+  };
+
   // Calculate widths based on layout state
   const getLeftPanelWidth = () => {
     if (!isVideoOpen) return 'w-0';
-    return 'w-1/2'; // Keep left panel at 1/2 width regardless of questions visibility
+    return 'w-1/2';
   };
 
   const getEditorWidth = () => {
     if (!isVideoOpen) return 'w-full';
-    return 'w-1/2'; // Editor takes remaining 1/2 of screen
+    return 'w-1/2';
   };
 
   const getVideosWidth = () => {
-    if (showQuestions && !questionsPanelCollapsed) return 'w-1/4'; // Videos take 1/4 of left panel
+    if (showQuestions && !questionsPanelCollapsed) return 'w-1/4';
     return 'w-full';
   };
 
   const getQuestionsWidth = () => {
-    if (showQuestions && !questionsPanelCollapsed) return 'w-3/4'; // Questions take 3/4 of left panel
+    if (showQuestions && !questionsPanelCollapsed) return 'w-3/4';
     return 'w-0';
   };
 
@@ -458,43 +898,59 @@ C++ execution simulation complete.
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Video className="w-5 h-5" />
             Interview Session
+            <span className="text-sm font-normal bg-blue-100 text-blue-800 px-2 py-1 rounded">
+              {currentUser.role === 'interviewer' ? 'Interviewer' : 'Candidate'} • {sessionId.substring(0, 8)}
+            </span>
           </h1>
           <div className="flex items-center bg-blue-50 px-3 py-1 rounded">
             <Clock className="w-4 h-4 text-blue-600 mr-2" />
             <span className="text-blue-700 font-medium">{formatTime(timeRemaining)}</span>
+            <button 
+              onClick={toggleTimer}
+              className="ml-2 text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700"
+            >
+              {isTimerRunning ? 'Pause' : 'Resume'}
+            </button>
+            <button 
+              onClick={resetTimer}
+              className="ml-1 text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700"
+            >
+              Reset
+            </button>
           </div>
         </div>
         <div className="flex items-center space-x-4">
           <div className="flex items-center">
             <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-            <span className="text-sm">Interviewer Connected</span>
+            <span className="text-sm">
+              {socketRef.current?.readyState === WebSocket.OPEN ? '🟢 Connected' : '🔴 Disconnected'}
+            </span>
           </div>
-          {candidateJoined ? (
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-sm">Candidate Connected</span>
-            </div>
-          ) : (
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-              <span className="text-sm">Waiting for Candidate</span>
-            </div>
-          )}
+          <div className="text-sm text-gray-600">
+            Online: {onlineUsers.length} user{onlineUsers.length !== 1 ? 's' : ''}
+          </div>
+          <button 
+            onClick={toggleChat}
+            className={`p-2 rounded ${showChat ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
+            title="Toggle Chat"
+          >
+            <MessageSquare className="w-5 h-5" />
+          </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <div className="flex flex-1 flex-grow" >
+      <div className="flex flex-1 flex-grow">
         {/* Left Panel (Combined Videos + Questions) */}
         {isVideoOpen && (
           <div className={`${getLeftPanelWidth()} flex transition-all duration-300 ease-in-out flex-grow overflow-visible`}>
-            {/* Collapsed Videos Panel (Left side of left panel) */}
+            {/* Collapsed Videos Panel */}
             <div className={`${getVideosWidth()} flex flex-col border-r bg-gray-900 transition-all duration-300 ease-in-out flex-shrink-0`}>
               {/* Videos Header */}
               <div className="p-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-white" />
-                  <span className="text-white text-sm font-medium">Participants (2)</span>
+                  <span className="text-white text-sm font-medium">Participants ({onlineUsers.length})</span>
                 </div>
                 <div className="flex space-x-1">
                   <button 
@@ -514,7 +970,7 @@ C++ execution simulation complete.
                 </div>
               </div>
 
-              {/* Collapsed Videos List */}
+              {/* Videos List */}
               <div className="flex-1 p-2 flex flex-col space-y-3">
                 {/* Interviewer Video Card */}
                 <div className="bg-gray-800 rounded-lg flex flex-col h-[calc(50%-12px)]">
@@ -580,7 +1036,7 @@ C++ execution simulation complete.
                       </div>
                     )}
                     {/* Invite Button for Candidate */}
-                    {!candidateJoined && (
+                    {!candidateJoined && currentUser.role === 'interviewer' && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70">
                         {!invitationSent ? (
                           <button 
@@ -617,7 +1073,7 @@ C++ execution simulation complete.
                       <span className="text-white text-xs">
                         {candidateJoined ? 'Candidate' : 'Waiting...'}
                       </span>
-                      {candidateJoined && (
+                      {candidateJoined && currentUser.role === 'interviewer' && (
                         <button 
                           onClick={toggleCandidateVideo}
                           className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white"
@@ -629,7 +1085,7 @@ C++ execution simulation complete.
                   </div>
                 </div>
 
-                {/* Video Controls at Bottom */}
+                {/* Video Controls */}
                 <div className="p-2 bg-gray-800 rounded-lg">
                   <div className="flex justify-center space-x-2">
                     <button 
@@ -642,7 +1098,7 @@ C++ execution simulation complete.
                     >
                       {isInterviewerVideoOn ? <CameraOff className="w-3 h-3" /> : <Camera className="w-3 h-3" />}
                     </button>
-                    {candidateJoined && (
+                    {candidateJoined && currentUser.role === 'interviewer' && (
                       <button 
                         onClick={toggleCandidateVideo}
                         className="p-2 rounded flex items-center gap-1 text-xs bg-gray-700 hover:bg-gray-600 text-white"
@@ -655,10 +1111,9 @@ C++ execution simulation complete.
               </div>
             </div>
 
-            {/* Questions Panel (Right side of left panel) */}
+            {/* Questions Panel */}
             {showQuestions && (
               <div className={`${getQuestionsWidth()} flex flex-col bg-white border-r transition-all duration-300 ease-in-out flex-grow`}>
-                {/* Questions Header */}
                 <div className="p-3 border-b flex justify-between items-center flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4" />
@@ -682,21 +1137,20 @@ C++ execution simulation complete.
                   </div>
                 </div>
 
-                {/* Questions Content */}
-                <div className="flex-1 p-4 flex flex-col">
+                <div className="flex-1 p-4 overflow-auto">
                   {questionContent ? (
-                    <div className="space-y-4 flex-grow flex flex-col">
+                    <div className="space-y-4">
                       {questionFile && fileUrl ? (
-                        <div className="flex flex-col h-full flex-grow">
-                          <div className="bg-blue-50 border border-blue-200 p-3 rounded flex-shrink-0">
+                        <div>
+                          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
                                 <FileText className="w-4 h-4 text-blue-600 mr-2" />
                                 <div>
                                   <p className="font-medium text-blue-800 text-sm">
-                                    {questionFile ? `Uploaded: ${questionFile.name}` : 'Manual Question Set'}
+                                    Uploaded: {questionFile.name}
                                   </p>
-                                  <p className="text-xs text-blue-600">{(questionFile.size / 1024).toFixed(2)} KB</p>
+                                  <p className="text-xs text-blue-600">You have the original file</p>
                                 </div>
                               </div>
                               <a 
@@ -709,83 +1163,32 @@ C++ execution simulation complete.
                               </a>
                             </div>
                           </div>
-                          
-                          <div className="border rounded-lg overflow-hidden flex-grow mt-4">
-                            {questionFile.type === 'application/pdf' ? (
-                              <iframe 
-                                src={fileUrl} 
-                                className="w-full h-full" 
-                                title="PDF Viewer"
-                              />
-                            ) : (
-                              <div className="flex items-center justify-center h-full bg-gray-100">
-                                <div className="text-center">
-                                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                                  <p className="text-gray-600 mb-2">Document Preview Unavailable</p>
-                                  <p className="text-sm text-gray-500 mb-3">DOCX files cannot be previewed directly in browser</p>
-                                  <a 
-                                    href={fileUrl} 
-                                    download={questionFile.name}
-                                    className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 rounded text-sm"
-                                  >
-                                    Download File
-                                  </a>
+                          <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded">
+                            {questionContent}
+                          </div>
+                        </div>
+                      ) : questionFile && !fileUrl ? (
+                        <div>
+                          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded mb-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <FileText className="w-4 h-4 text-yellow-600 mr-2" />
+                                <div>
+                                  <p className="font-medium text-yellow-800 text-sm">
+                                    Shared: {questionFile.name}
+                                  </p>
+                                  <p className="text-xs text-yellow-600">Shared by another user</p>
                                 </div>
                               </div>
-                            )}
+                            </div>
+                          </div>
+                          <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded">
+                            {questionContent}
                           </div>
                         </div>
                       ) : (
-                        <div className="space-y-4">
-                          <div className="bg-blue-50 border border-blue-200 p-3 rounded">
-                            <div className="flex items-center">
-                              <FileText className="w-4 h-4 text-blue-600 mr-2" />
-                              <div>
-                                <p className="font-medium text-blue-800 text-sm">Manual Question Set</p>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-3">
-                            <div className="border-l-4 border-blue-500 pl-3 py-2">
-                              <h3 className="font-semibold text-sm">Question 1: Array Manipulation</h3>
-                              <p className="text-gray-700 text-xs mt-1">
-                                Given an array of integers, find the maximum product of any two numbers in the array.
-                              </p>
-                            </div>
-                            
-                            <div className="border-l-4 border-blue-500 pl-3 py-2">
-                              <h3 className="font-semibold text-sm">Question 2: String Operations</h3>
-                              <p className="text-gray-700 text-xs mt-1">
-                                Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
-                              </p>
-                            </div>
-                            
-                            <div className="border-l-4 border-blue-500 pl-3 py-2">
-                              <h3 className="font-semibold text-sm">Question 3: System Design</h3>
-                              <p className="text-gray-700 text-xs mt-1">
-                                Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="pt-4 border-t">
-                            <h3 className="font-semibold text-sm mb-2">Behavioral Questions</h3>
-                            <ul className="space-y-1 text-sm">
-                              <li className="flex items-center">
-                                <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
-                                <span>Tell me about a challenging project</span>
-                              </li>
-                              <li className="flex items-center">
-                                <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
-                                <span>How do you handle conflicting priorities?</span>
-                              </li>
-                              <li className="flex items-center">
-                                <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
-                                <span>Describe your experience with agile methodologies</span>
-                              </li>
-                            </ul>
-                          </div>
+                        <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded">
+                          {questionContent}
                         </div>
                       )}
                     </div>
@@ -804,7 +1207,6 @@ C++ execution simulation complete.
                   )}
                 </div>
 
-                {/* Questions Footer */}
                 <div className="p-3 border-t">
                   <button 
                     onClick={() => setShowQuestionUploadPopup(true)}
@@ -819,7 +1221,7 @@ C++ execution simulation complete.
           </div>
         )}
 
-        {/* Video Toggle Button (when minimized) */}
+        {/* Video Toggle Button */}
         {!isVideoOpen && (
           <div className="absolute left-4 top-20 z-10">
             <button 
@@ -850,7 +1252,7 @@ C++ execution simulation complete.
             <div className="flex items-center space-x-4">
               <select 
                 value={language}
-                onChange={(e) => setLanguage(e.target.value)}
+                onChange={(e) => handleLanguageChange(e.target.value)}
                 className="border border-gray-300 rounded px-3 py-1 text-sm"
                 disabled={isRunning}
               >
@@ -860,7 +1262,7 @@ C++ execution simulation complete.
                 <option value="cpp">C++</option>
               </select>
               <div className="text-sm text-gray-600">
-                Cursor: Line {cursorPosition.lineNumber}, Column {cursorPosition.column}
+                Line {cursorPosition.lineNumber}, Col {cursorPosition.column}
               </div>
               <button 
                 onClick={handleRunCode}
@@ -879,7 +1281,7 @@ C++ execution simulation complete.
               <Editor
                 height="100%"
                 language={language}
-                defaultValue={code}
+                value={code}
                 onChange={handleEditorChange}
                 onMount={handleEditorDidMount}
                 theme="vs-dark"
@@ -888,39 +1290,37 @@ C++ execution simulation complete.
                   fontSize: 14,
                   scrollBeyondLastLine: false,
                   automaticLayout: true,
-                  readOnly: !candidateJoined,
+                  readOnly: currentUser.role === 'candidate' && !candidateJoined,
                 }}
               />
               
-              {/* Real-time Collaborator Cursor Indicator */}
-              {collaboratorCursor && (
+              {/* Real-time Collaborator Cursor Indicators */}
+              {Object.values(collaboratorCursors).map((cursor, index) => (
                 <div 
-                  className="absolute w-0.5 h-6 bg-yellow-400 animate-pulse"
+                  key={index}
+                  className="absolute w-0.5 h-6 bg-yellow-400 animate-pulse z-10"
                   style={{
-                    top: `${(collaboratorCursor.lineNumber - 1) * 20}px`,
-                    left: `${(collaboratorCursor.column - 1) * 8}px`,
+                    top: `${(cursor.lineNumber - 1) * 20}px`,
+                    left: `${(cursor.column - 1) * 8}px`,
                   }}
                 >
-                  <div className="absolute -top-6 left-0 bg-yellow-500 text-white text-xs px-2 py-1 rounded">
-                    {collaboratorCursor.username}
+                  <div className="absolute -top-6 left-0 bg-yellow-500 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                    {cursor.username}
                   </div>
                 </div>
-              )}
+              ))}
               
               {/* Collaboration Status */}
               <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                {candidateJoined ? 'Collaborating with Candidate' : 'Waiting for Candidate...'}
+                Version: {codeVersion} • {Object.keys(collaboratorCursors).length} collaborator{Object.keys(collaboratorCursors).length !== 1 ? 's' : ''}
               </div>
             </div>
             
             {/* Output Panel */}
             <div className="h-1/3 bg-black text-green-400 p-4 font-mono text-sm overflow-auto">
               <div className="mb-2 flex items-center justify-between">
-                <span>Interview Compiler v{language === 'javascript' ? '1.0' : language === 'python' ? '2.1' : language === 'java' ? '3.5' : '4.2'}</span>
+                <span>Interview Compiler</span>
                 <div className="flex items-center space-x-2">
-                  <span className="text-gray-400 text-xs">
-                    {candidateJoined ? 'Real-time collaboration active' : 'Single user mode'}
-                  </span>
                   <button 
                     onClick={() => setOutput('')}
                     className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded border border-gray-600"
@@ -933,6 +1333,79 @@ C++ execution simulation complete.
             </div>
           </div>
         </div>
+
+        {/* Chat Panel */}
+        {showChat && (
+          <div className="w-80 flex flex-col border-l bg-white">
+            <div className="p-3 border-b flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                <span className="font-medium">Chat</span>
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                  {onlineUsers.length} online
+                </span>
+              </div>
+              <button 
+                onClick={toggleChat}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div 
+              ref={chatContainerRef}
+              className="flex-1 p-4 overflow-auto"
+            >
+              {chatMessages.length > 0 ? (
+                <div className="space-y-3">
+                  {chatMessages.map((msg, index) => (
+                    <div 
+                      key={index}
+                      className={`p-3 rounded-lg ${msg.user_id === currentUser.id ? 'bg-blue-50 ml-8' : 'bg-gray-50 mr-8'}`}
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className={`text-xs font-medium ${msg.user_id === currentUser.id ? 'text-blue-700' : 'text-gray-700'}`}>
+                          {msg.username}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-sm">{msg.message}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                  <MessageSquare className="w-12 h-12 mb-3" />
+                  <p className="text-sm">No messages yet</p>
+                  <p className="text-xs">Start the conversation!</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-3 border-t">
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Type a message..."
+                  className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button 
+                  onClick={sendChat}
+                  disabled={!newMessage.trim()}
+                  className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Question Upload Popup */}
@@ -1030,6 +1503,7 @@ C++ execution simulation complete.
             </div>
             <div className="text-sm text-gray-500 mb-4">
               <p>Candidate will receive an email with a link to join this interview session.</p>
+              <p className="mt-1 text-xs">Share this link: <code className="bg-gray-100 px-1 py-0.5 rounded">?session={sessionId}&role=candidate</code></p>
             </div>
             <div className="flex space-x-2">
               <button

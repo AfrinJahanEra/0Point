@@ -5,7 +5,7 @@ import { AppProvider } from './context/AppContext';
 import Header from './components/Header';
 import ProblemInside from './pages/ProblemInside';
 import RegisterNow from './pages/RegisterNow';
-import CreateContest from './pages/CreateContest'; // ADD THIS IMPORT
+import CreateContest from './pages/CreateContest';
 import Footer from './components/Footer';
 import NavigationBar from './components/NavigationBar';
 import Home from './pages/Home';
@@ -24,7 +24,7 @@ import Submissions from './pages/Submissions';
 import Interview from './pages/Interview';
 import InterviewSession from './pages/InterviewSession';
 import ContestInside from './pages/ContestInside';
-import MySubmissions from './pages/MySubmissions'; // Import MySubmissions page
+import MySubmissions from './pages/MySubmissions';
 import ContestLeaderboard from './pages/ContestLeaderboard';
 import ContestEditorial from './pages/ContestEditorial';
 import ContestDiscussion from './pages/ContestDiscussion';
@@ -53,6 +53,13 @@ const NavLayout = ({ children }) => (
   </>
 );
 
+// Full-screen layout (no header/footer)
+const FullScreenLayout = ({ children }) => (
+  <main className="flex-grow">
+    {children}
+  </main>
+);
+
 function App() {
   return (
     <AppProvider>
@@ -78,8 +85,9 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             
-            {/* Visualizer takes full screen without Header and Footer */}
+            {/* Visualizer and InterviewSession take full screen without Header and Footer */}
             <Route path="/visualizer" element={<Visualizer />} />
+            <Route path="/interview-session" element={<InterviewSession />} />
             
             {/* Pages with Header and Footer only */}
             <Route path="/home" element={
@@ -88,7 +96,7 @@ function App() {
               </Layout>
             } />
             
-            {/* REORDER: Contest-specific routes FIRST (more specific) */}
+            {/* Contest-specific routes */}
             <Route path="/contests/:contestId/register" element={
               <Layout>
                 <RegisterNow />
@@ -107,33 +115,33 @@ function App() {
               </Layout>
             } />
             
-            {/* IMPORTANT FIX: Add these missing contest routes */}
             <Route path="/contests/:contestId/submissions" element={
               <Layout>
-                <MySubmissions /> {/* Make sure this component exists */}
+                <MySubmissions />
               </Layout>
             } />
 
             <Route path="/contests/:contestId/discussion" element={
               <Layout>
-                <ContestDiscussion /> {/* Make sure this component exists */}
+                <ContestDiscussion />
               </Layout>
             } />
 
             <Route path="/contests/:contestId/clarifications" element={
               <Layout>
-                <ContestClarification /> {/* Make sure this component exists */}
+                <ContestClarification />
               </Layout>
             } />
             
             <Route path="/contests/:contestId/leaderboard" element={
               <Layout>
-                <ContestLeaderboard /> {/* Make sure this component exists */}
+                <ContestLeaderboard />
               </Layout>
             } />
+            
             <Route path="/contests/:contestId/editorial" element={<ContestEditorial />} />
             
-            {/* General contest route LAST (less specific) */}
+            {/* General contest route */}
             <Route path="/contests/:contestId" element={
               <Layout>
                 <ContestInside />
@@ -194,18 +202,17 @@ function App() {
                 <Submissions />
               </NavLayout>
             } />
+            
             <Route path="/interview" element={
               <NavLayout>
                 <Interview />
               </NavLayout>
             } />
-            
-            {/* Interview Session page (opens in new tab) */}
-            <Route path="/interview-session" element={<InterviewSession />} />
           </Routes>
         </div>
       </Router>
     </AppProvider>
   );
 }
+
 export default App;

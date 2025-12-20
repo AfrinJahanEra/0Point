@@ -1,5 +1,7 @@
 # zeropoint/urls.py
 from django.urls import path, include
+from django.contrib import admin
+
 
 urlpatterns = [
     path("auth/", include("account.urls")),
@@ -9,4 +11,6 @@ urlpatterns = [
     path("", include("leaderboard.urls")),
     path("", include("announcement.urls")),
     path("", include("tutorial.urls")),
+    path('admin/', admin.site.urls),
+    path('interview/', include('interview.urls')),
 ]

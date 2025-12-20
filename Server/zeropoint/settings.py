@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'tutorial',
     'corsheaders',
     'channels',
+    'interview',
 ]
 
 MIDDLEWARE = [
@@ -91,15 +92,6 @@ CHANNEL_LAYERS = {
 # else:
 #     REDIS_URL = 'redis://127.0.0.1:6379' 
 
-
-# CHANNEL_LAYERS = {
-#     'default': {
-#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#         'CONFIG': {
-#             'hosts': [REDIS_URL],
-#         },
-#     },
-# }
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
