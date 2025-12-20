@@ -7,7 +7,6 @@ from submission.views import (
     SubmissionDetailAPIView,
     ContestSubmissionsAPIView,
     ContestProblemsListAPIView,
-    ProblemStatisticsAPIView,
 )
 
 from leaderboard.views import LeaderboardView, FreezeLeaderboardView, RecalculateLeaderboardView
@@ -118,8 +117,8 @@ urlpatterns = [
     # execution endpoint
     path('contests/<str:contest_id>/problems/<str:problem_index>/execute/', ContestProblemExecuteAPIView.as_view(), name='contest-problem-execute'),
 
-    # Stats
-    path('contests/<str:contest_id>/problems/<str:problem_index>/stats/', ProblemStatisticsAPIView.as_view(), name='problem-statistics'),
+    # Remove or update the old submission create endpoint
+    # path('submissions/create/', SubmissionCreateAPIView.as_view(), name='submission-create'),
 
     # Keep the compiler endpoints
     path('contests/<str:contest_id>/execute/', CodeExecuteAPIView.as_view(), name='code-execute'),
