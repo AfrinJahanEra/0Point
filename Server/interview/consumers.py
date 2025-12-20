@@ -226,6 +226,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
                 doc.file_name = file_data.get('file_name')
                 doc.file_type = file_data.get('file_type')
                 doc.file_size = file_data.get('file_size')
+                doc.file_data = file_data.get('file_blob')  # Store base64 data
             doc.updated_at = datetime.utcnow()
             doc.save()
         else:
@@ -234,7 +235,8 @@ class InterviewConsumer(AsyncWebsocketConsumer):
                 content=content,
                 file_name=file_data.get('file_name') if file_data else None,
                 file_type=file_data.get('file_type') if file_data else None,
-                file_size=file_data.get('file_size') if file_data else None
+                file_size=file_data.get('file_size') if file_data else None,
+                file_data=file_data.get('file_blob') if file_data else None
             ).save()
         return doc
     
@@ -469,7 +471,8 @@ class InterviewConsumer(AsyncWebsocketConsumer):
             "question": {
                 "content": question_doc.content if question_doc else "",
                 "file_name": question_doc.file_name if question_doc else None,
-                "file_type": question_doc.file_type if question_doc else None
+                "file_type": question_doc.file_type if question_doc else None,
+                "file_data": question_doc.file_data if question_doc else None
             },
             "timer": {
                 "remaining_time": timer.remaining_time,

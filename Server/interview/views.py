@@ -72,7 +72,8 @@ class GetSessionAPI(APIView):
                 'question': {
                     'content': question_doc.content if question_doc else '',
                     'file_name': question_doc.file_name if question_doc else None,
-                    'file_type': question_doc.file_type if question_doc else None
+                    'file_type': question_doc.file_type if question_doc else None,
+                    'file_data': question_doc.file_data if question_doc else None
                 } if question_doc else None,
                 'timer': {
                     'remaining_time': timer.remaining_time if timer else 3600,
@@ -136,16 +137,26 @@ class UpdateQuestionAPI(APIView):
         try:
             data = request.data
             content = data.get('content', '')
+            file_data = data.get('file_data')
             
             question_doc = QuestionDocument.objects(session_id=session_id).first()
             if question_doc:
                 question_doc.content = content
+                if file_data:
+                    question_doc.file_name = file_data.get('file_name')
+                    question_doc.file_type = file_data.get('file_type')
+                    question_doc.file_size = file_data.get('file_size')
+                    question_doc.file_data = file_data.get('file_blob')  # Store base64 data
                 question_doc.updated_at = datetime.utcnow()
                 question_doc.save()
             else:
                 question_doc = QuestionDocument(
                     session_id=session_id,
-                    content=content
+                    content=content,
+                    file_name=file_data.get('file_name') if file_data else None,
+                    file_type=file_data.get('file_type') if file_data else None,
+                    file_size=file_data.get('file_size') if file_data else None,
+                    file_data=file_data.get('file_blob') if file_data else None
                 ).save()
             
             return Response({

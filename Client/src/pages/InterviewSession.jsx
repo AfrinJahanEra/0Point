@@ -27,84 +27,17 @@ import {
 } from 'lucide-react';
 
 // PDF Viewer Component
-const PDFViewer = ({ fileUrl }) => {
+const PDFViewer = ({ fileUrl, fileName }) => {
   return (
     <div className="w-full h-full">
       <iframe 
-        src={`${fileUrl}#view=fitH`}
+        src={`${fileUrl}#view=fitH&toolbar=1`}
         className="w-full h-full border-0"
-        title="PDF Viewer"
+        title={`PDF Viewer - ${fileName}`}
         type="application/pdf"
       />
     </div>
   );
-};
-
-// Helper function to extract text from files
-const extractTextFromPDF = async (file) => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const mockContent = `PDF File: ${file.name}
-Size: ${(file.size / 1024).toFixed(2)} KB
-Pages: Estimated ${Math.ceil(file.size / 50000)} pages
-
-Content Preview:
-----------------
-The PDF file has been uploaded successfully. 
-You can preview it directly in the browser.
-
-For detailed text extraction, please download the file.
-
-Questions included in this PDF:
-1. Data Structures & Algorithms
-2. System Design Principles
-3. Database Design Patterns
-4. API Design Best Practices
-
-Uploaded at: ${new Date().toLocaleTimeString()}`;
-        
-        resolve(mockContent);
-      } catch (error) {
-        console.error('PDF extraction error:', error);
-        resolve(`PDF File: ${file.name}\n\nUnable to extract text. File uploaded successfully.`);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  });
-};
-
-const extractTextFromDOCX = async (file) => {
-  return `DOCX File: ${file.name}
-Size: ${(file.size / 1024).toFixed(2)} KB
-
-DOCX Content Preview:
---------------------
-For full DOCX viewing, the file needs to be downloaded.
-DOCX files require server-side processing for text extraction.
-
-Question 1: Array Manipulation
-------------------------------
-Given an array of integers, find the maximum product of any two numbers in the array.
-
-Example:
-Input: [1, 2, 3, 4]
-Output: 12 (3 * 4)
-
-Question 2: String Operations
------------------------------
-Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
-
-Example:
-Input: "A man, a plan, a canal: Panama"
-Output: true
-
-Question 3: System Design
--------------------------
-Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.
-
-Uploaded at: ${new Date().toLocaleTimeString()}`;
 };
 
 const InterviewSession = () => {
@@ -119,12 +52,13 @@ const InterviewSession = () => {
   const [isInterviewerVideoOn, setIsInterviewerVideoOn] = useState(true);
   const [isCandidateVideoOn, setIsCandidateVideoOn] = useState(false);
   
-  // Question Management
-  const [questionFile, setQuestionFile] = useState(null);
+  // Question Management - Shared across all browsers
+  const [sharedQuestionFile, setSharedQuestionFile] = useState(null);
   const [showQuestionUploadPopup, setShowQuestionUploadPopup] = useState(false);
-  const [questionContent, setQuestionContent] = useState('');
-  const [fileUrl, setFileUrl] = useState(null);
+  const [sharedQuestionContent, setSharedQuestionContent] = useState('');
+  const [sharedFileUrl, setSharedFileUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [fileBlobCache, setFileBlobCache] = useState({}); // Cache for file blobs
   
   // Code Editor States
   const [code, setCode] = useState('// Write your code here...\nfunction solution() {\n  \n}\n');
@@ -157,10 +91,10 @@ const InterviewSession = () => {
   const editorRef = useRef(null);
   const socketRef = useRef(null);
   const fileInputRef = useRef(null);
-  const fileUrlRef = useRef(null);
   const lastBroadcastRef = useRef(Date.now());
   const chatContainerRef = useRef(null);
   const heartbeatIntervalRef = useRef(null);
+  const fileUrlsCache = useRef({}); // Cache for file URLs per session
 
   // Initialize session from URL
   useEffect(() => {
@@ -175,10 +109,23 @@ const InterviewSession = () => {
       role: role
     });
     
-    // Load saved question if exists
-    const savedQuestion = localStorage.getItem('interviewQuestion');
+    // Load initial shared question from localStorage for this session
+    const savedQuestion = localStorage.getItem(`interviewQuestion_${session}`);
     if (savedQuestion) {
-      setQuestionContent(savedQuestion);
+      try {
+        const parsed = JSON.parse(savedQuestion);
+        setSharedQuestionContent(parsed.content);
+        if (parsed.fileData) {
+          setSharedQuestionFile(parsed.fileData);
+          
+          // Check if we have the file in cache (for the uploader)
+          if (fileUrlsCache.current[session] && fileUrlsCache.current[session].fileData?.name === parsed.fileData.name) {
+            setSharedFileUrl(fileUrlsCache.current[session].url);
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing saved question:', e);
+      }
     }
   }, []);
 
@@ -209,7 +156,7 @@ const InterviewSession = () => {
                 type: "heartbeat"
               }));
             }
-          }, 30000); // Every 30 seconds
+          }, 30000);
         };
 
         socket.onmessage = (event) => {
@@ -223,16 +170,22 @@ const InterviewSession = () => {
                 setCode(data.code.content);
                 setLanguage(data.code.language);
                 setCodeVersion(data.code.version);
-                if (data.question.content) {
-                  setQuestionContent(data.question.content);
-                  if (data.question.file_name) {
-                    setQuestionFile({
-                      name: data.question.file_name,
-                      type: data.question.file_type,
-                      size: data.question.file_size
-                    });
+                
+                // Load shared question from initial state
+                if (data.question && data.question.content) {
+                  setSharedQuestionContent(data.question.content);
+                  if (data.question.file_data) {
+                    const fileData = data.question.file_data;
+                    setSharedQuestionFile(fileData);
+                    
+                    // Save to localStorage for this session
+                    localStorage.setItem(`interviewQuestion_${sessionId}`, JSON.stringify({
+                      content: data.question.content,
+                      fileData: fileData
+                    }));
                   }
                 }
+                
                 setTimeRemaining(data.timer.remaining_time);
                 setIsTimerRunning(data.timer.is_running);
                 setOnlineUsers(data.online_users || []);
@@ -279,18 +232,54 @@ const InterviewSession = () => {
                 break;
 
               case "question_update":
-                setQuestionContent(data.content);
-                localStorage.setItem('interviewQuestion', data.content);
+                // Handle shared question update
+                setSharedQuestionContent(data.content);
+                
                 if (data.file_data) {
-                  setQuestionFile({
-                    name: data.file_data.file_name,
-                    type: data.file_data.file_type,
-                    size: data.file_data.file_size
-                  });
+                  setSharedQuestionFile(data.file_data);
+                  
+                  // Create and cache the file URL for all users
+                  if (data.file_data.file_blob) {
+                    // Convert base64 to blob
+                    const byteCharacters = atob(data.file_data.file_blob);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                      byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: data.file_data.file_type });
+                    const url = URL.createObjectURL(blob);
+                    setSharedFileUrl(url);
+                    
+                    // Cache the URL
+                    fileUrlsCache.current[sessionId] = {
+                      url: url,
+                      fileData: data.file_data
+                    };
+                    
+                    // Store in file blob cache
+                    setFileBlobCache(prev => ({
+                      ...prev,
+                      [data.file_data.file_name]: blob
+                    }));
+                  }
                 } else {
-                  setQuestionFile(null);
-                  setFileUrl(null);
+                  setSharedQuestionFile(null);
+                  setSharedFileUrl(null);
                 }
+                
+                // Save to localStorage for this session
+                localStorage.setItem(`interviewQuestion_${sessionId}`, JSON.stringify({
+                  content: data.content,
+                  fileData: data.file_data || null
+                }));
+                
+                toast.success(`Questions updated by ${data.username}`, {
+                  style: {
+                    background: '#1e40af',
+                    color: '#ffffff',
+                  },
+                });
                 break;
 
               case "video_toggle":
@@ -415,7 +404,6 @@ const InterviewSession = () => {
               },
             });
             
-            // Attempt to reconnect after 3 seconds
             setTimeout(() => {
               console.log('Attempting to reconnect...');
               connectWebSocket();
@@ -437,6 +425,11 @@ const InterviewSession = () => {
         socketRef.current.close();
       }
       clearInterval(heartbeatIntervalRef.current);
+      
+      // Clean up file URLs
+      if (fileUrlsCache.current[sessionId]) {
+        URL.revokeObjectURL(fileUrlsCache.current[sessionId].url);
+      }
     };
   }, [sessionId, currentUser.role]);
 
@@ -479,22 +472,6 @@ const InterviewSession = () => {
     return () => clearInterval(interval);
   }, [isTimerRunning]);
 
-  // Send invitation simulation
-  useEffect(() => {
-    if (invitationSent && currentUser.role === 'interviewer') {
-      const timer = setTimeout(() => {
-        toast.success('Invitation sent! Candidate can join using the session link.', {
-          style: {
-            background: '#1e40af',
-            color: '#ffffff',
-          },
-        });
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [invitationSent, currentUser.role]);
-
   // Helper functions
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
@@ -520,7 +497,7 @@ const InterviewSession = () => {
 
   const sendCursorMove = (line, column) => {
     const now = Date.now();
-    if (now - lastBroadcastRef.current > 100) { // Throttle to 10Hz
+    if (now - lastBroadcastRef.current > 100) {
       sendMessage({
         type: "cursor_move",
         line: line,
@@ -575,51 +552,7 @@ const InterviewSession = () => {
     });
   };
 
-  const sendUserInfo = (username) => {
-    sendMessage({
-      type: "user_info",
-      username: username
-    });
-    setCurrentUser(prev => ({ ...prev, username }));
-  };
-
-  // Layout Controls
-  const toggleQuestions = () => {
-    if (!questionContent && !questionFile) {
-      setShowQuestionUploadPopup(true);
-      return;
-    }
-    setShowQuestions(!showQuestions);
-  };
-
-  const toggleVideoPanel = () => {
-    setIsVideoOpen(!isVideoOpen);
-  };
-
-  const toggleQuestionsPanel = () => {
-    setQuestionsPanelCollapsed(!questionsPanelCollapsed);
-  };
-
-  const toggleChat = () => {
-    setShowChat(!showChat);
-  };
-
-  // Video Controls
-  const toggleInterviewerVideo = () => {
-    const newStatus = !isInterviewerVideoOn;
-    setIsInterviewerVideoOn(newStatus);
-    sendVideoToggle(newStatus);
-  };
-
-  const toggleCandidateVideo = () => {
-    if (candidateJoined) {
-      const newStatus = !isCandidateVideoOn;
-      setIsCandidateVideoOn(newStatus);
-      sendVideoToggle(newStatus);
-    }
-  };
-
-  // Question Management with PDF preview
+  // Shared Question Management
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (file && (file.type === 'application/pdf' || 
@@ -628,53 +561,92 @@ const InterviewSession = () => {
       setIsUploading(true);
       
       try {
-        setQuestionFile(file);
-        
-        // Create a URL for the file to display it locally
-        if (fileUrlRef.current) {
-          URL.revokeObjectURL(fileUrlRef.current);
-        }
-        const url = URL.createObjectURL(file);
-        setFileUrl(url);
-        fileUrlRef.current = url;
-        
-        // Extract text content from the file
-        let extractedContent = '';
-        
-        if (file.type === 'application/pdf') {
-          extractedContent = await extractTextFromPDF(file);
-        } else {
-          extractedContent = await extractTextFromDOCX(file);
-        }
-        
-        const fullContent = `File: ${file.name}
+        // Read file as base64 for sharing
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            const base64Data = e.target.result.split(',')[1];
+            
+            // Create file data object
+            const fileData = {
+              file_name: file.name,
+              file_type: file.type,
+              file_size: file.size,
+              uploaded_by: currentUser.username,
+              uploaded_at: new Date().toISOString(),
+              file_blob: base64Data // Include file content for sharing
+            };
+            
+            // Store file blob in cache for sharing
+            setFileBlobCache(prev => ({
+              ...prev,
+              [file.name]: file
+            }));
+            
+            // Create file URL for uploader
+            const url = URL.createObjectURL(file);
+            setSharedFileUrl(url);
+            
+            // Cache the URL
+            fileUrlsCache.current[sessionId] = {
+              url: url,
+              fileData: fileData
+            };
+            
+            // Create content for sharing
+            const content = `File: ${file.name}
 Size: ${(file.size / 1024).toFixed(2)} KB
 Type: ${file.type}
 Uploaded by: ${currentUser.username}
 Time: ${new Date().toLocaleTimeString()}
 
-${extractedContent}`;
+${file.type === 'application/pdf' ? 'PDF Document - Open to view content' : 'DOCX Document - Download to view content'}`;
+            
+            setSharedQuestionContent(content);
+            setSharedQuestionFile(fileData);
+            
+            // Save to localStorage
+            localStorage.setItem(`interviewQuestion_${sessionId}`, JSON.stringify({
+              content: content,
+              fileData: fileData
+            }));
+            
+            // Send to all users in session
+            sendQuestionUpdate(content, fileData);
+            
+            toast.success('Question file uploaded and shared with all participants!', {
+              style: {
+                background: '#1e40af',
+                color: '#ffffff',
+              },
+            });
+            
+            setShowQuestionUploadPopup(false);
+          } catch (error) {
+            console.error('File processing error:', error);
+            toast.error('Failed to process file. Please try again.', {
+              style: {
+                background: '#dc2626',
+                color: '#ffffff',
+              },
+            });
+          } finally {
+            setIsUploading(false);
+          }
+        };
         
-        setQuestionContent(fullContent);
-        localStorage.setItem('interviewQuestion', fullContent);
+        reader.onerror = () => {
+          toast.error('Failed to read file. Please try again.', {
+            style: {
+              background: '#dc2626',
+              color: '#ffffff',
+            },
+          });
+          setIsUploading(false);
+        };
         
-        // Send to other users
-        sendQuestionUpdate(fullContent, {
-          file_name: file.name,
-          file_type: file.type,
-          file_size: file.size,
-          uploaded_by: currentUser.username,
-          uploaded_at: new Date().toISOString()
-        });
+        reader.readAsDataURL(file);
         
-        toast.success('Question file uploaded and shared!', {
-          style: {
-            background: '#1e40af',
-            color: '#ffffff',
-          },
-        });
-        
-        setShowQuestionUploadPopup(false);
       } catch (error) {
         console.error('File upload error:', error);
         toast.error('Failed to upload file. Please try again.', {
@@ -683,7 +655,6 @@ ${extractedContent}`;
             color: '#ffffff',
           },
         });
-      } finally {
         setIsUploading(false);
       }
     } else {
@@ -697,7 +668,7 @@ ${extractedContent}`;
   };
 
   const handleManualQuestion = () => {
-    const manualQuestion = `Manual Question Set
+    const content = `Manual Question Set
 Uploaded by: ${currentUser.username}
 Time: ${new Date().toLocaleTimeString()}
 
@@ -716,23 +687,22 @@ a) Tell me about a challenging project.
 b) How do you handle conflicting priorities?
 c) Describe your experience with agile methodologies.`;
     
-    setQuestionContent(manualQuestion);
-    localStorage.setItem('interviewQuestion', manualQuestion);
+    setSharedQuestionContent(content);
+    setSharedQuestionFile(null);
+    setSharedFileUrl(null);
     
-    // Clear file state
-    setQuestionFile(null);
-    if (fileUrlRef.current) {
-      URL.revokeObjectURL(fileUrlRef.current);
-      fileUrlRef.current = null;
-      setFileUrl(null);
-    }
+    // Save to localStorage
+    localStorage.setItem(`interviewQuestion_${sessionId}`, JSON.stringify({
+      content: content,
+      fileData: null
+    }));
     
-    // Send to other users
-    sendQuestionUpdate(manualQuestion);
+    // Send to all users
+    sendQuestionUpdate(content);
     
     setShowQuestionUploadPopup(false);
     
-    toast.success('Question set added and shared!', {
+    toast.success('Question set added and shared with all participants!', {
       style: {
         background: '#1e40af',
         color: '#ffffff',
@@ -740,7 +710,192 @@ c) Describe your experience with agile methodologies.`;
     });
   };
 
-  // Code Editor Functions
+  // Render Shared Questions Content
+  const renderQuestionsContent = () => {
+    if (!sharedQuestionContent) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center p-4">
+          <FileText className="w-12 h-12 text-gray-300 mb-3" />
+          <p className="text-gray-500 text-sm text-center mb-4">No questions available</p>
+          <button 
+            onClick={() => setShowQuestionUploadPopup(true)}
+            className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-2 rounded text-sm flex items-center gap-1"
+          >
+            <Upload className="w-3 h-3" />
+            Upload Questions
+          </button>
+        </div>
+      );
+    }
+
+    if (sharedQuestionFile && sharedQuestionFile.file_type === 'application/pdf') {
+      // PDF File - now all users can view the PDF
+      if (sharedFileUrl) {
+        // All users can view the PDF
+        return (
+          <div className="flex flex-col h-full">
+            <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <File className="w-4 h-4 text-blue-600 mr-2" />
+                  <div>
+                    <p className="font-medium text-blue-800 text-sm">
+                      PDF: {sharedQuestionFile.file_name}
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      {(sharedQuestionFile.file_size / 1024).toFixed(2)} KB • Uploaded by {sharedQuestionFile.uploaded_by}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = sharedFileUrl;
+                      link.download = sharedQuestionFile.file_name;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                  >
+                    <Download className="w-3 h-3" />
+                    Download
+                  </button>
+                  <button
+                    onClick={() => {
+                      window.open(sharedFileUrl, '_blank');
+                    }}
+                    className="bg-green-800 hover:bg-green-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                  >
+                    <Maximize2 className="w-3 h-3" />
+                    Open Full
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex-1 border rounded-lg overflow-hidden bg-gray-100">
+              <PDFViewer fileUrl={sharedFileUrl} fileName={sharedQuestionFile.file_name} />
+            </div>
+            
+            <div className="mt-4 p-4 bg-gray-50 rounded border flex-shrink-0">
+              <div className="text-xs text-gray-600 space-y-1">
+                <div className="flex justify-between">
+                  <span>Uploaded by:</span>
+                  <span className="font-medium">{sharedQuestionFile.uploaded_by}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Uploaded at:</span>
+                  <span className="font-medium">{new Date(sharedQuestionFile.uploaded_at).toLocaleTimeString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      } else {
+        // Fallback if file URL is not available
+        return (
+          <div className="flex flex-col h-full">
+            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded mb-4 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <File className="w-4 h-4 text-yellow-600 mr-2" />
+                  <div>
+                    <p className="font-medium text-yellow-800 text-sm">
+                      PDF Shared: {sharedQuestionFile.file_name}
+                    </p>
+                    <p className="text-xs text-yellow-600">
+                      {(sharedQuestionFile.file_size / 1024).toFixed(2)} KB • Uploaded by {sharedQuestionFile.uploaded_by}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => toast.info(`Contact ${sharedQuestionFile.uploaded_by} to get the PDF file.`)}
+                  className="bg-yellow-800 hover:bg-yellow-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                >
+                  <Download className="w-3 h-3" />
+                  Request File
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 p-4 bg-gray-50 rounded border overflow-auto">
+              <div className="whitespace-pre-wrap text-sm">
+                {sharedQuestionContent}
+              </div>
+            </div>
+          </div>
+        );
+      }
+    } else if (sharedQuestionFile && sharedQuestionFile.file_type.includes('wordprocessingml')) {
+      // DOCX File
+      return (
+        <div className="flex flex-col h-full">
+          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <FileText className="w-4 h-4 text-blue-600 mr-2" />
+                <div>
+                  <p className="font-medium text-blue-800 text-sm">
+                    DOCX: {sharedQuestionFile.file_name}
+                  </p>
+                  <p className="text-xs text-blue-600">
+                    {(sharedQuestionFile.file_size / 1024).toFixed(2)} KB • Uploaded by {sharedQuestionFile.uploaded_by}
+                  </p>
+                </div>
+              </div>
+              {sharedFileUrl ? (
+                <a 
+                  href={sharedFileUrl} 
+                  download={sharedQuestionFile.file_name}
+                  className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                >
+                  <Download className="w-3 h-3" />
+                  Download
+                </a>
+              ) : (
+                <button
+                  onClick={() => toast.info(`Contact ${sharedQuestionFile.uploaded_by} to get the DOCX file.`)}
+                  className="bg-yellow-800 hover:bg-yellow-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                >
+                  <Download className="w-3 h-3" />
+                  Request File
+                </button>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex-1 p-4 bg-gray-50 rounded border overflow-auto">
+            <div className="whitespace-pre-wrap text-sm">
+              {sharedQuestionContent}
+            </div>
+          </div>
+        </div>
+      );
+    } else {
+      // Manual questions or no file
+      return (
+        <div className="h-full overflow-auto">
+          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4">
+            <div className="flex items-center">
+              <FileText className="w-4 h-4 text-blue-600 mr-2" />
+              <div>
+                <p className="font-medium text-blue-800 text-sm">Shared Question Set</p>
+                <p className="text-xs text-blue-600">Visible to all participants</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded border">
+            {sharedQuestionContent}
+          </div>
+        </div>
+      );
+    }
+  };
+
+  // Rest of the component functions remain the same...
   const handleEditorDidMount = (editor, monaco) => {
     editorRef.current = editor;
     
@@ -760,7 +915,6 @@ c) Describe your experience with agile methodologies.`;
       const result = executeCode(code, language);
       setOutput(result);
       
-      // Send to other users
       sendRunCode(code);
       
       toast.success('Code executed successfully!', {
@@ -868,7 +1022,6 @@ ${evalCpp(codeString)}
     sendLanguageChange(newLanguage);
   };
 
-  // Chat Functions
   const sendChat = () => {
     if (newMessage.trim()) {
       sendChatMessage(newMessage.trim());
@@ -883,15 +1036,46 @@ ${evalCpp(codeString)}
     }
   };
 
-  // Invitation Functions
+  const toggleQuestions = () => {
+    if (!sharedQuestionContent && !sharedQuestionFile) {
+      setShowQuestionUploadPopup(true);
+      return;
+    }
+    setShowQuestions(!showQuestions);
+  };
+
+  const toggleVideoPanel = () => {
+    setIsVideoOpen(!isVideoOpen);
+  };
+
+  const toggleQuestionsPanel = () => {
+    setQuestionsPanelCollapsed(!questionsPanelCollapsed);
+  };
+
+  const toggleChat = () => {
+    setShowChat(!showChat);
+  };
+
+  const toggleInterviewerVideo = () => {
+    const newStatus = !isInterviewerVideoOn;
+    setIsInterviewerVideoOn(newStatus);
+    sendVideoToggle(newStatus);
+  };
+
+  const toggleCandidateVideo = () => {
+    if (candidateJoined) {
+      const newStatus = !isCandidateVideoOn;
+      setIsCandidateVideoOn(newStatus);
+      sendVideoToggle(newStatus);
+    }
+  };
+
   const handleInviteClick = () => {
     setShowInvitePopup(true);
   };
 
   const handleSendInvite = () => {
     if (inviteEmail) {
-      console.log('Sending invitation to:', inviteEmail);
-      
       setShowInvitePopup(false);
       setInvitationSent(true);
       
@@ -907,7 +1091,6 @@ ${evalCpp(codeString)}
     }
   };
 
-  // Timer Controls
   const toggleTimer = () => {
     const newStatus = !isTimerRunning;
     setIsTimerRunning(newStatus);
@@ -921,196 +1104,6 @@ ${evalCpp(codeString)}
     sendTimerUpdate(newTime, true);
   };
 
-  // Render Questions Content
-  const renderQuestionsContent = () => {
-    if (!questionContent) {
-      return (
-        <div className="h-full flex flex-col items-center justify-center p-4">
-          <FileText className="w-12 h-12 text-gray-300 mb-3" />
-          <p className="text-gray-500 text-sm text-center mb-4">No questions available</p>
-          <button 
-            onClick={() => setShowQuestionUploadPopup(true)}
-            className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-2 rounded text-sm flex items-center gap-1"
-          >
-            <Upload className="w-3 h-3" />
-            Upload Questions
-          </button>
-        </div>
-      );
-    }
-
-    if (questionFile && fileUrl && questionFile.type === 'application/pdf') {
-      // Local user has PDF - show preview
-      return (
-        <div className="flex flex-col h-full">
-          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <File className="w-4 h-4 text-blue-600 mr-2" />
-                <div>
-                  <p className="font-medium text-blue-800 text-sm">
-                    PDF: {questionFile.name}
-                  </p>
-                  <p className="text-xs text-blue-600">
-                    {(questionFile.size / 1024).toFixed(2)} KB • Uploaded by you
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = fileUrl;
-                    link.download = questionFile.name;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                  }}
-                  className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-                >
-                  <Download className="w-3 h-3" />
-                  Download
-                </button>
-                <button
-                  onClick={() => {
-                    window.open(fileUrl, '_blank');
-                  }}
-                  className="bg-green-800 hover:bg-green-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-                >
-                  <Maximize2 className="w-3 h-3" />
-                  Open Full
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex-1 border rounded-lg overflow-hidden bg-gray-100">
-            <PDFViewer fileUrl={fileUrl} />
-          </div>
-          
-          <div className="mt-4 p-4 bg-gray-50 rounded border flex-shrink-0">
-            <h4 className="font-medium text-sm mb-2">PDF Details:</h4>
-            <div className="text-xs text-gray-600 space-y-1">
-              <div className="flex justify-between">
-                <span>File Name:</span>
-                <span className="font-medium">{questionFile.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>File Size:</span>
-                <span className="font-medium">{(questionFile.size / 1024).toFixed(2)} KB</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Type:</span>
-                <span className="font-medium">PDF Document</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    } else if (questionFile && !fileUrl && questionFile.type === 'application/pdf') {
-      // Remote user - received PDF but no local file
-      return (
-        <div className="flex flex-col h-full">
-          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded mb-4 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <File className="w-4 h-4 text-yellow-600 mr-2" />
-                <div>
-                  <p className="font-medium text-yellow-800 text-sm">
-                    PDF Shared: {questionFile.name}
-                  </p>
-                  <p className="text-xs text-yellow-600">
-                    {(questionFile.size / 1024).toFixed(2)} KB • Shared by another user
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => toast.info('Please ask the uploader to send you the PDF file directly.')}
-                className="bg-yellow-800 hover:bg-yellow-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-              >
-                <Download className="w-3 h-3" />
-                Request File
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex-1 p-4 bg-gray-50 rounded border overflow-auto">
-            <div className="whitespace-pre-wrap text-sm">
-              {questionContent}
-            </div>
-          </div>
-          
-          <div className="mt-4 p-4 bg-gray-50 rounded border flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">To view the actual PDF:</span>
-              <button
-                onClick={() => toast.info('Contact the interviewer to get the PDF file.')}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-              >
-                Request Access
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    } else if (questionFile && fileUrl && questionFile.type.includes('wordprocessingml')) {
-      // Local user has DOCX
-      return (
-        <div className="flex flex-col h-full">
-          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <FileText className="w-4 h-4 text-blue-600 mr-2" />
-                <div>
-                  <p className="font-medium text-blue-800 text-sm">
-                    DOCX: {questionFile.name}
-                  </p>
-                  <p className="text-xs text-blue-600">
-                    {(questionFile.size / 1024).toFixed(2)} KB • Uploaded by you
-                  </p>
-                </div>
-              </div>
-              <a 
-                href={fileUrl} 
-                download={questionFile.name}
-                className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-              >
-                <Download className="w-3 h-3" />
-                Download
-              </a>
-            </div>
-          </div>
-          
-          <div className="flex-1 p-4 bg-gray-50 rounded border overflow-auto">
-            <div className="whitespace-pre-wrap text-sm">
-              {questionContent}
-            </div>
-          </div>
-        </div>
-      );
-    } else {
-      // Manual questions or no file
-      return (
-        <div className="h-full overflow-auto">
-          <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4">
-            <div className="flex items-center">
-              <FileText className="w-4 h-4 text-blue-600 mr-2" />
-              <div>
-                <p className="font-medium text-blue-800 text-sm">Manual Question Set</p>
-                <p className="text-xs text-blue-600">Shared in real-time</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded border">
-            {questionContent}
-          </div>
-        </div>
-      );
-    }
-  };
-
-  // Calculate widths based on layout state
   const getLeftPanelWidth = () => {
     if (!isVideoOpen) return 'w-0';
     return 'w-1/2';
@@ -1152,12 +1145,6 @@ ${evalCpp(codeString)}
             >
               {isTimerRunning ? 'Pause' : 'Resume'}
             </button>
-            <button 
-              onClick={resetTimer}
-              className="ml-1 text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700"
-            >
-              Reset
-            </button>
           </div>
         </div>
         <div className="flex items-center space-x-4">
@@ -1182,12 +1169,11 @@ ${evalCpp(codeString)}
 
       {/* Main Content */}
       <div className="flex flex-1 flex-grow">
-        {/* Left Panel (Combined Videos + Questions) */}
+        {/* Left Panel */}
         {isVideoOpen && (
           <div className={`${getLeftPanelWidth()} flex transition-all duration-300 ease-in-out flex-grow overflow-visible`}>
-            {/* Collapsed Videos Panel */}
+            {/* Videos Panel */}
             <div className={`${getVideosWidth()} flex flex-col border-r bg-gray-900 transition-all duration-300 ease-in-out flex-shrink-0`}>
-              {/* Videos Header */}
               <div className="p-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-white" />
@@ -1230,7 +1216,6 @@ ${evalCpp(codeString)}
                         <CameraOff className="w-8 h-8 text-gray-500" />
                       </div>
                     )}
-                    {/* Camera Status */}
                     <div className="absolute bottom-1 right-1">
                       {isInterviewerVideoOn ? (
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -1276,7 +1261,6 @@ ${evalCpp(codeString)}
                         )}
                       </div>
                     )}
-                    {/* Invite Button for Candidate */}
                     {!candidateJoined && currentUser.role === 'interviewer' && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70">
                         {!invitationSent ? (
@@ -1298,7 +1282,6 @@ ${evalCpp(codeString)}
                         )}
                       </div>
                     )}
-                    {/* Camera Status */}
                     {candidateJoined && (
                       <div className="absolute bottom-1 right-1">
                         {isCandidateVideoOn ? (
@@ -1358,7 +1341,10 @@ ${evalCpp(codeString)}
                 <div className="p-3 border-b flex justify-between items-center flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4" />
-                    <span className="font-medium">Interview Questions</span>
+                    <span className="font-medium">Shared Questions</span>
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                      Synced
+                    </span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <button 
@@ -1389,8 +1375,11 @@ ${evalCpp(codeString)}
                     className="w-full bg-blue-800 hover:bg-blue-900 text-white py-2 px-4 rounded text-sm flex items-center justify-center gap-2"
                   >
                     <Upload className="w-3 h-3" />
-                    Update Questions
+                    Update Shared Questions
                   </button>
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    Updates will be visible to all participants
+                  </p>
                 </div>
               </div>
             )}
@@ -1410,7 +1399,7 @@ ${evalCpp(codeString)}
           </div>
         )}
 
-        {/* Code Editor / IDE */}
+        {/* Code Editor */}
         <div className={`${getEditorWidth()} flex flex-col transition-all duration-300 ease-in-out`}>
           <div className="p-4 border-b flex justify-between items-center bg-white">
             <div className="flex items-center space-x-4">
@@ -1452,7 +1441,6 @@ ${evalCpp(codeString)}
           </div>
           
           <div className="flex-1 flex flex-col">
-            {/* Code Editor Area */}
             <div className="flex-1 relative">
               <Editor
                 height="100%"
@@ -1470,7 +1458,6 @@ ${evalCpp(codeString)}
                 }}
               />
               
-              {/* Real-time Collaborator Cursor Indicators */}
               {Object.values(collaboratorCursors).map((cursor, index) => (
                 <div 
                   key={index}
@@ -1486,13 +1473,11 @@ ${evalCpp(codeString)}
                 </div>
               ))}
               
-              {/* Collaboration Status */}
               <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
                 Version: {codeVersion} • {Object.keys(collaboratorCursors).length} collaborator{Object.keys(collaboratorCursors).length !== 1 ? 's' : ''}
               </div>
             </div>
             
-            {/* Output Panel */}
             <div className="h-1/3 bg-black text-green-400 p-4 font-mono text-sm overflow-auto">
               <div className="mb-2 flex items-center justify-between">
                 <span>Interview Compiler</span>
@@ -1590,12 +1575,11 @@ ${evalCpp(codeString)}
           <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <FileText className="w-5 h-5" />
-              Set Interview Questions
+              Update Shared Questions
             </h2>
-            <p className="text-gray-600 mb-4">Upload a PDF/DOCX file or add questions manually</p>
+            <p className="text-gray-600 mb-4">Upload a file or add questions manually. Will be visible to all participants.</p>
             
             <div className="space-y-4">
-              {/* File Upload Option */}
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                 <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600 mb-4">Upload PDF or DOCX file</p>
@@ -1616,13 +1600,12 @@ ${evalCpp(codeString)}
                   />
                 </label>
                 <p className="text-sm text-gray-500">Supports PDF and DOCX formats</p>
-                <p className="text-xs text-gray-400 mt-2">PDF files will be previewable</p>
+                <p className="text-xs text-gray-400 mt-2">Will be shared with all participants</p>
               </div>
               
-              {/* Manual Option */}
               <div className="border border-gray-200 rounded-lg p-4">
                 <h3 className="font-semibold mb-2">Or add questions manually</h3>
-                <p className="text-sm text-gray-600 mb-4">You can type questions directly</p>
+                <p className="text-sm text-gray-600 mb-4">Type questions that will be visible to all</p>
                 <button 
                   onClick={handleManualQuestion}
                   disabled={isUploading}
@@ -1647,7 +1630,7 @@ ${evalCpp(codeString)}
                 </button>
                 <button
                   onClick={() => {
-                    if (!questionContent && !questionFile) {
+                    if (!sharedQuestionContent && !sharedQuestionFile) {
                       toast.error('Please upload or add questions first', {
                         style: {
                           background: '#dc2626',
@@ -1692,7 +1675,7 @@ ${evalCpp(codeString)}
             </div>
             <div className="text-sm text-gray-500 mb-4">
               <p>Candidate will receive an email with a link to join this interview session.</p>
-              <p className="mt-1 text-xs">Share this link: <code className="bg-gray-100 px-1 py-0.5 rounded">?session={sessionId}&role=candidate</code></p>
+              <p className="mt-1 text-xs">Share this link: <code className="bg-gray-100 px-1 py-0.5 rounded">{window.location.origin}/interview-session?session={sessionId}&role=candidate</code></p>
             </div>
             <div className="flex space-x-2">
               <button

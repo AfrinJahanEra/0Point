@@ -33,6 +33,7 @@ class QuestionDocument(Document):
     file_name = StringField()
     file_type = StringField()
     file_size = IntField()
+    file_data = StringField()  # Base64 encoded file data
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
     
