@@ -60,37 +60,35 @@ class SubmissionCreateSerializer(serializers.Serializer):
         if not problem_exists:
             raise serializers.ValidationError("Problem not found in contest")
         
-        # FIXED: Check contest timing with Asia/Dhaka timezone
+        # FIXED: Check contest timing with proper timezone handling
+        # Alternative: Convert all times to UTC for comparison
         if contest.start_time and contest.duration:
-            dhaka_tz = pytz.timezone('Asia/Dhaka')
+            # Get current time in UTC
+            current_time_utc = datetime.now(pytz.UTC)
             
-            # Get current time in Asia/Dhaka
-            current_time_dhaka = datetime.now(dhaka_tz)
-            
-            # Ensure contest.start_time is in Asia/Dhaka timezone
+            # Ensure start_time is in UTC
             if contest.start_time.tzinfo is None:
-                # If naive, assume it's Asia/Dhaka
+                # If naive, assume it's Asia/Dhaka and convert to UTC
+                dhaka_tz = pytz.timezone('Asia/Dhaka')
                 start_time_dhaka = dhaka_tz.localize(contest.start_time)
+                start_time_utc = start_time_dhaka.astimezone(pytz.UTC)
             else:
-                # Already has timezone, convert to Dhaka
-                start_time_dhaka = contest.start_time.astimezone(dhaka_tz)
+                # Already has timezone, convert to UTC
+                start_time_utc = contest.start_time.astimezone(pytz.UTC)
             
-            # Calculate end time in Asia/Dhaka
+            # Calculate end time in UTC
             duration_minutes = contest.duration * 60
-            end_time_dhaka = start_time_dhaka + timedelta(minutes=duration_minutes)
+            end_time_utc = start_time_utc + timedelta(minutes=duration_minutes)
             
             # Debug logging
-            print(f"DEBUG TIMING CHECK (Asia/Dhaka):")
-            print(f"  Current time (Dhaka): {current_time_dhaka}")
-            print(f"  Contest start time (Dhaka): {start_time_dhaka}")
-            print(f"  Contest end time (Dhaka): {end_time_dhaka}")
+            print(f"DEBUG TIMING CHECK (UTC):")
+            print(f"  Current time (UTC): {current_time_utc}")
+            print(f"  Contest start time (UTC): {start_time_utc}")
+            print(f"  Contest end time (UTC): {end_time_utc}")
             
-            # Check if contest has started
-            if current_time_dhaka < start_time_dhaka:
+            if current_time_utc < start_time_utc:
                 raise serializers.ValidationError("Contest has not started yet")
-            
-            # Check if contest has ended
-            if current_time_dhaka > end_time_dhaka:
+            if current_time_utc > end_time_utc:
                 raise serializers.ValidationError("Contest has ended")
         
         data['user'] = user
@@ -145,18 +143,8 @@ class SubmissionSerializer(serializers.Serializer):
             
             # For live contests, only show verdict unless contest ended
             if contest.start_time and contest.duration:
-                # FIXED: Use Asia/Dhaka timezone
-                dhaka_tz = pytz.timezone('Asia/Dhaka')
-                current_time_dhaka = datetime.now(dhaka_tz)
-                
-                if contest.start_time.tzinfo is None:
-                    start_time_dhaka = dhaka_tz.localize(contest.start_time)
-                else:
-                    start_time_dhaka = contest.start_time.astimezone(dhaka_tz)
-                
-                end_time_dhaka = start_time_dhaka + timedelta(minutes=contest.duration * 60)
-                
-                if current_time_dhaka > end_time_dhaka:
+                end_time = contest.start_time + timedelta(minutes=contest.duration * 60)
+                if datetime.utcnow() > end_time:
                     return True
                     
         except Contest.DoesNotExist:

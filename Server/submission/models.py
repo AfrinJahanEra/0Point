@@ -2,13 +2,6 @@
 from mongoengine import Document, fields
 from datetime import datetime
 import uuid
-import pytz
-
-from datetime import datetime
-
-def dhaka_now():
-    dhaka_tz = pytz.timezone('Asia/Dhaka')
-    return datetime.now(dhaka_tz)
 
 class Submission(Document):
     """Model for storing contest submissions"""
@@ -51,7 +44,7 @@ class Submission(Document):
     compile_output = fields.StringField()
     
     # Timestamps
-    submitted_at = fields.DateTimeField(default=dhaka_now)
+    submitted_at = fields.DateTimeField(default=datetime.utcnow)
     judged_at = fields.DateTimeField()
     
     # Contest timing
@@ -82,7 +75,7 @@ class Submission(Document):
             return self.contest_time
         return 0
     
-    
+        # submission/models.py - Update to_dict() method
     def to_dict(self):
         """Convert to dictionary for API response"""
         # Get user details
@@ -93,30 +86,7 @@ class Submission(Document):
             user_name = getattr(self.user, 'email', '').split('@')[0] if getattr(self.user, 'email', '') else f"User_{str(self.user.id)[:8]}"
         
         user_email = getattr(self.user, 'email', '')
-        dhaka_tz = pytz.timezone('Asia/Dhaka')
-
-        # Convert times to Asia/Dhaka
-        submitted_at_dhaka = None
-        judged_at_dhaka = None
         
-        if self.submitted_at:
-            if self.submitted_at.tzinfo is None:
-                # If naive, assume it's UTC and convert to Dhaka
-                submitted_at_utc = pytz.utc.localize(self.submitted_at)
-                submitted_at_dhaka = submitted_at_utc.astimezone(dhaka_tz)
-            else:
-                # Already has timezone, convert to Dhaka
-                submitted_at_dhaka = self.submitted_at.astimezone(dhaka_tz)
-        
-        # Convert judged_at similarly
-        if self.judged_at:
-            if self.judged_at.tzinfo is None:
-                judged_at_utc = pytz.utc.localize(self.judged_at)
-                judged_at_dhaka = judged_at_utc.astimezone(dhaka_tz)
-            else:
-                judged_at_dhaka = self.judged_at.astimezone(dhaka_tz)
-        
-        # FIX: Return the converted Dhaka times, not the original times
         return {
             'id': self.id,
             'contest_id': str(self.contest.id),
@@ -138,13 +108,12 @@ class Submission(Document):
             'failed_test_case': self.failed_test_case,
             'error_message': self.error_message,
             'compile_output': self.compile_output,
-            # FIXED: Use the converted Dhaka times
-            'submitted_at': submitted_at_dhaka.isoformat() if submitted_at_dhaka else None,
-            'judged_at': judged_at_dhaka.isoformat() if judged_at_dhaka else None,
+            'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
+            'judged_at': self.judged_at.isoformat() if self.judged_at else None,
             'contest_time': self.contest_time,
             'is_public': self.is_public,
-            # FIXED: This should also use the converted Dhaka time
-            'time': submitted_at_dhaka.isoformat() if submitted_at_dhaka else None,
-        } 
+            'time': self.submitted_at.isoformat() if self.submitted_at else None,
+        }
+    
 
     
