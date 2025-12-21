@@ -3,18 +3,18 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import JsonResponse
+from django.core.mail import send_mail
+from django.conf import settings
 from .models import (
     InterviewSession, CodeDocument, QuestionDocument,
-    UserPresence, InterviewTimer
+    UserPresence, InterviewTimer, SessionInvitation
 )
 from datetime import datetime, timedelta
 import json
 import uuid
 import requests
 import os
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
+import secrets
 
 class CreateSessionAPI(APIView):
     def post(self, request):
@@ -102,10 +102,11 @@ class GetSessionAPI(APIView):
                     }
                     for user in online_users
                 ]
+        
             }
-            
+                    
             return Response(response_data)
-            
+                
         except InterviewSession.DoesNotExist:
             return Response({
                 'status': 'error',
@@ -385,4 +386,362 @@ class ExecuteCodeAPI(APIView):
                 'status': 'error',
                 'message': f'Server error: {str(e)}',
                 'output': f'Server Error: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CreateSessionWithEmailAPI(APIView):
+    def post(self, request):
+        try:
+            data = request.data
+            session_id = data.get('session_id')
+            
+            if not session_id:
+                session_id = str(uuid.uuid4())[:8]
+            
+            # Create session
+            session = InterviewSession(
+                session_id=session_id,
+                title=data.get('title', f'Interview Session {session_id}'),
+                interviewer_email=data.get('interviewer_email'),
+                candidate_email=data.get('candidate_email'),
+                is_active=True
+            )
+            session.save()
+            
+            # Initialize timer
+            timer = InterviewTimer(
+                session_id=session_id,
+                total_duration=data.get('duration', 3600),
+                remaining_time=data.get('duration', 3600),
+                is_running=True
+            )
+            timer.save()
+            
+            # Initialize code document
+            code_doc = CodeDocument(
+                session_id=session_id,
+                content='// Write your code here...\nfunction solution() {\n  \n}\n',
+                language='javascript'
+            )
+            code_doc.save()
+            
+            # Create invitations
+            # Check if interviewer invitation already exists
+            interviewer_existing = SessionInvitation.objects.filter(
+                session_id=session_id,
+                email=data.get('interviewer_email'),
+                role='interviewer'
+            ).first()
+            
+            if interviewer_existing:
+                interviewer_token = interviewer_existing.token
+            else:
+                interviewer_token = secrets.token_urlsafe(32)
+                interviewer_invitation = SessionInvitation(
+                    session_id=session_id,
+                    email=data.get('interviewer_email'),
+                    role='interviewer',
+                    token=interviewer_token
+                )
+                interviewer_invitation.save()
+            
+            # Check if candidate invitation already exists
+            candidate_existing = SessionInvitation.objects.filter(
+                session_id=session_id,
+                email=data.get('candidate_email'),
+                role='candidate'
+            ).first()
+            
+            if candidate_existing:
+                candidate_token = candidate_existing.token
+            else:
+                candidate_token = secrets.token_urlsafe(32)
+                candidate_invitation = SessionInvitation(
+                    session_id=session_id,
+                    email=data.get('candidate_email'),
+                    role='candidate',
+                    token=candidate_token
+                )
+                candidate_invitation.save()
+            
+            # Send emails
+            if data.get('interviewer_email'):
+                interviewer_link = f"{request.build_absolute_uri('/')}interview-session?session={session_id}&role=interviewer"
+                send_mail(
+                    subject=f'Interview Session Invitation - {session.title}',
+                    message=f'''You have been invited to an interview session.
+\nSession Title: {session.title}
+Session ID: {session_id}
+Role: Interviewer
+\nClick the link below to join:
+{interviewer_link}
+\nBest regards,
+The Interview Team''',
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[data.get('interviewer_email')],
+                    fail_silently=False,
+                )
+            
+            if data.get('candidate_email'):
+                candidate_link = f"{request.build_absolute_uri('/')}interview-session?session={session_id}&role=candidate"
+                send_mail(
+                    subject=f'Interview Session Invitation - {session.title}',
+                    message=f'''You have been invited to an interview session.
+\nSession Title: {session.title}
+Session ID: {session_id}
+Role: Candidate
+\nClick the link below to join:
+{candidate_link}
+\nBest regards,
+The Interview Team''',
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[data.get('candidate_email')],
+                    fail_silently=False,
+                )
+            
+            return Response({
+                'status': 'success',
+                'session_id': session_id,
+                'title': session.title,
+                'created_at': session.created_at.isoformat(),
+                'interviewer_link': f'{request.build_absolute_uri("/")}interview-session?session={session_id}&role=interviewer',
+                'candidate_link': f'{request.build_absolute_uri("/")}interview-session?session={session_id}&role=candidate',
+                'message': 'Session created successfully and invitations sent.'
+            })
+            
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ValidateInvitationAPI(APIView):
+    def get(self, request):
+        try:
+            token = request.GET.get('token')
+            
+            if not token:
+                return Response({
+                    'status': 'error',
+                    'message': 'Token is required.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Find invitation by token
+            try:
+                invitation = SessionInvitation.objects.get(token=token)
+            except SessionInvitation.DoesNotExist:
+                return Response({
+                    'status': 'error',
+                    'message': 'Invalid or expired invitation.'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if invitation is already used
+            if invitation.is_used:
+                return Response({
+                    'status': 'error',
+                    'message': 'This invitation has already been used.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if invitation is expired
+            if invitation.expires_at and invitation.expires_at < datetime.utcnow():
+                return Response({
+                    'status': 'error',
+                    'message': 'This invitation has expired.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get session details
+            try:
+                session = InterviewSession.objects.get(session_id=invitation.session_id)
+            except InterviewSession.DoesNotExist:
+                return Response({
+                    'status': 'error',
+                    'message': 'Session not found.'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            return Response({
+                'status': 'success',
+                'session_id': invitation.session_id,
+                'session_title': session.title,
+                'role': invitation.role,
+                'email': invitation.email
+            })
+            
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UseInvitationAPI(APIView):
+    def post(self, request):
+        try:
+            data = request.data
+            token = data.get('token')
+            
+            if not token:
+                return Response({
+                    'status': 'error',
+                    'message': 'Token is required.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Find invitation by token
+            try:
+                invitation = SessionInvitation.objects.get(token=token)
+            except SessionInvitation.DoesNotExist:
+                return Response({
+                    'status': 'error',
+                    'message': 'Invalid or expired invitation.'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if invitation is already used
+            if invitation.is_used:
+                return Response({
+                    'status': 'error',
+                    'message': 'This invitation has already been used.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if invitation is expired
+            if invitation.expires_at and invitation.expires_at < datetime.utcnow():
+                return Response({
+                    'status': 'error',
+                    'message': 'This invitation has expired.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Mark invitation as used
+            invitation.is_used = True
+            invitation.used_at = datetime.utcnow()
+            invitation.save()
+            
+            # Get session details
+            try:
+                session = InterviewSession.objects.get(session_id=invitation.session_id)
+            except InterviewSession.DoesNotExist:
+                return Response({
+                    'status': 'error',
+                    'message': 'Session not found.'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            return Response({
+                'status': 'success',
+                'session_id': invitation.session_id,
+                'session_title': session.title,
+                'role': invitation.role,
+                'join_link': f'/interview-session?session={invitation.session_id}&role={invitation.role}'
+            })
+            
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SendSessionInvitationAPI(APIView):
+    def post(self, request):
+        try:
+            data = request.data
+            session_id = data.get('session_id')
+            email = data.get('email')
+            role = data.get('role', 'candidate')
+            
+            if not session_id or not email:
+                return Response({
+                    'status': 'error',
+                    'message': 'Session ID and email are required.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if session exists, create if it doesn't
+            try:
+                session = InterviewSession.objects.get(session_id=session_id)
+            except InterviewSession.DoesNotExist:
+                # Create session if it doesn't exist
+                session = InterviewSession(
+                    session_id=session_id,
+                    title=f'Interview Session {session_id}',
+                    is_active=True
+                )
+                session.save()
+                
+                # Initialize timer
+                timer = InterviewTimer(
+                    session_id=session_id,
+                    total_duration=3600,
+                    remaining_time=3600,
+                    is_running=True
+                )
+                timer.save()
+                
+                # Initialize code document
+                code_doc = CodeDocument(
+                    session_id=session_id,
+                    content='// Write your code here...\nfunction solution() {\n  \n}\n',
+                    language='javascript'
+                )
+                code_doc.save()
+            
+            # Check if invitation already exists for this email and role
+            existing_invitation = SessionInvitation.objects.filter(
+                session_id=session_id,
+                email=email,
+                role=role
+            ).first()
+            
+            if existing_invitation:
+                # Check if invitation is still valid
+                if existing_invitation.is_used:
+                    return Response({
+                        'status': 'error',
+                        'message': 'Invitation has already been used.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                if existing_invitation.expires_at and existing_invitation.expires_at < datetime.utcnow():
+                    return Response({
+                        'status': 'error',
+                        'message': 'Invitation has expired.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Reuse existing token
+                token = existing_invitation.token
+            else:
+                # Create new invitation
+                token = secrets.token_urlsafe(32)
+                invitation = SessionInvitation(
+                    session_id=session_id,
+                    email=email,
+                    role=role,
+                    token=token
+                )
+                invitation.save()
+            
+            # Send email
+            frontend_base_url = os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173')
+            join_link = f"{frontend_base_url}/interview-session?session={session_id}&role={role}"
+            role_display = 'Interviewer' if role == 'interviewer' else 'Candidate'
+            
+            send_mail(
+                subject=f'Interview Session Invitation - {session.title}',
+                message=f'''You have been invited to an interview session.
+\nSession Title: {session.title}
+Session ID: {session_id}
+Role: {role_display}
+\nClick the link below to join:
+{join_link}
+\nBest regards,
+The Interview Team''',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=False,
+            )
+            
+            return Response({
+                'status': 'success',
+                'message': f'Invitation sent successfully to {email}'
+            })
+            
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

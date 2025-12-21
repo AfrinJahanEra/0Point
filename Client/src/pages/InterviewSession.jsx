@@ -38,6 +38,11 @@ const InterviewSession = () => {
   const [currentUser, setCurrentUser] = useState({ id: '', username: '', role: '' });
   const [onlineUsers, setOnlineUsers] = useState([]);
   
+  // Invitation Handling
+  const [invitationToken, setInvitationToken] = useState('');
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState('');
+  
   // Invitation States
   const [showInvitePopup, setShowInvitePopup] = useState(false);
   const [invitationSent, setInvitationSent] = useState(false);
@@ -59,24 +64,105 @@ const InterviewSession = () => {
   // Initialize session from URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const session = urlParams.get('session') || `session_${Math.random().toString(36).substr(2, 9)}`;
-    const role = urlParams.get('role') || 'interviewer';
+    const session = urlParams.get('session');
+    const role = urlParams.get('role');
+    const token = urlParams.get('token');
     
-    setSessionId(session);
-    setCurrentUser({
-      id: '',
-      username: role === 'interviewer' ? 'Interviewer' : 'Candidate',
-      role
-    });
+    // If we have an invitation token, validate it first
+    if (token) {
+      setInvitationToken(token);
+      validateInvitation(token);
+    } else if (session && role) {
+      // Direct session access
+      setSessionId(session);
+      setCurrentUser({
+        id: '',
+        username: role === 'interviewer' ? 'Interviewer' : 'Candidate',
+        role
+      });
 
-    toast.success(`Joined session: ${session.substring(0, 8)} as ${role}`, {
-      duration: 4000,
-    });
+      toast.success(`Joined session: ${session.substring(0, 8)} as ${role}`, {
+        duration: 4000,
+      });
+    } else {
+      // Generate a new session if neither token nor session/role provided
+      const newSessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
+      setSessionId(newSessionId);
+      setCurrentUser({
+        id: '',
+        username: 'Interviewer',
+        role: 'interviewer'
+      });
+      
+      toast.success(`Created new session: ${newSessionId.substring(0, 8)}`, {
+        duration: 4000,
+      });
+    }
   }, []);
+
+  // Validate invitation token
+  const validateInvitation = async (token) => {
+    setIsValidating(true);
+    setValidationError('');
+    
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/interview/api/sessions/validate-invitation/?token=${token}`);
+      
+      const result = await response.json();
+      
+      if (response.ok && result.status === 'success') {
+        // Set session and role from invitation
+        setSessionId(result.session_id);
+        setCurrentUser({
+          id: '',
+          username: result.role === 'interviewer' ? 'Interviewer' : 'Candidate',
+          role: result.role
+        });
+        
+        toast.success(`Validated invitation for session: ${result.session_id.substring(0, 8)}`, {
+          duration: 4000,
+        });
+      } else {
+        setValidationError(result.message || 'Invalid invitation token');
+      }
+    } catch (error) {
+      setValidationError('Network error: ' + error.message);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  // Use invitation token (mark as used)
+  const useInvitation = async (token) => {
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/interview/api/sessions/use-invitation/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.status === 'success') {
+        // Redirect to the session
+        window.location.href = result.join_link;
+      } else {
+        setValidationError(result.message || 'Failed to use invitation');
+      }
+    } catch (error) {
+      setValidationError('Network error: ' + error.message);
+    }
+  };
+
 
   // WebSocket Connection
   useEffect(() => {
-    if (!sessionId) return;
+    // Don't connect until we have a valid session and role
+    if (!sessionId || !currentUser.role || isValidating || validationError) return;
 
     const connectWebSocket = () => {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -213,7 +299,7 @@ const InterviewSession = () => {
       if (socketRef.current) socketRef.current.close();
       clearInterval(heartbeatIntervalRef.current);
     };
-  }, [sessionId, currentUser.role]);
+  }, [sessionId, currentUser.role, isValidating, validationError]);
 
   // Timer countdown
   useEffect(() => {
@@ -356,6 +442,39 @@ This may take up to 30 seconds. If you don't see output:
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
+      {/* Invitation Validation Overlay */}
+      {(isValidating || validationError) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            {isValidating ? (
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <h3 className="text-lg font-semibold mb-2">Validating Invitation</h3>
+                <p className="text-gray-600">Please wait while we validate your invitation...</p>
+              </div>
+            ) : validationError ? (
+              <div className="text-center">
+                <div className="mx-auto mb-4 text-red-500">
+                  <X className="w-12 h-12 mx-auto" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Invitation Error</h3>
+                <p className="text-gray-600 mb-4">{validationError}</p>
+                <button
+                  onClick={() => {
+                    setValidationError('');
+                    // Redirect to interview sessions page
+                    window.location.href = '/interview';
+                  }}
+                  className="px-4 py-2 bg-blue-800 text-white rounded-md hover:bg-blue-900 transition-colors"
+                >
+                  Back to Interview Sessions
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-6">

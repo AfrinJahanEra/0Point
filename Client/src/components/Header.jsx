@@ -9,6 +9,15 @@ const Header = () => {
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
+  const [isCreateLinkModalOpen, setIsCreateLinkModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareRole, setShareRole] = useState('');
+  const [sessionId, setSessionId] = useState('');
+  const [interviewerLink, setInterviewerLink] = useState('');
+  const [candidateLink, setCandidateLink] = useState('');
+  const [email, setEmail] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const profileRef = useRef(null);
 
   const isPublicPage = ['/', '/login', '/register'].includes(location.pathname);
@@ -51,11 +60,112 @@ const Header = () => {
     setIsInterviewModalOpen(true);
   };
 
-  const handleCreateInterview = () => {
-    // Open interview session in new tab
-    window.open('/interview-session', '_blank');
-    setIsInterviewModalOpen(false);
+  const handleCreateInterview = async () => {
+    setIsCreating(true);
+    try {
+      // Generate a new session ID
+      const newSessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Create a new session in the backend
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/interview/api/sessions/create/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: newSessionId,
+          title: 'Interview Session',
+          duration: 3600
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.status === 'success') {
+        setSessionId(newSessionId);
+        
+        // Generate links
+        const baseURL = window.location.origin;
+        const interviewerURL = `${baseURL}/interview-session?session=${newSessionId}&role=interviewer`;
+        const candidateURL = `${baseURL}/interview-session?session=${newSessionId}&role=candidate`;
+        
+        setInterviewerLink(interviewerURL);
+        setCandidateLink(candidateURL);
+        
+        // Close current modal and open create link modal
+        setIsInterviewModalOpen(false);
+        setIsCreateLinkModalOpen(true);
+      } else {
+        throw new Error(result.message || 'Failed to create session');
+      }
+    } catch (error) {
+      console.error('Error creating session:', error);
+      alert('Failed to create session: ' + error.message);
+    } finally {
+      setIsCreating(false);
+    }
   };
+
+  const handleShareClick = (role) => {
+    setShareRole(role);
+    setEmail('');
+    setIsShareModalOpen(true);
+  };
+
+  const handleSendInvitation = async () => {
+    if (!email) {
+      alert('Please enter an email address');
+      return;
+    }
+    
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert('Please enter a valid email address');
+      return;
+    }
+    
+    setIsSending(true);
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/interview/api/sessions/send-invitation/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          email: email,
+          role: shareRole
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.status === 'success') {
+        alert(`Invitation sent successfully to ${email}`);
+        setIsShareModalOpen(false);
+      } else {
+        alert(`Failed to send invitation: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error sending invitation:', error);
+      alert('Failed to send invitation');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    alert('Link copied to clipboard!');
+  };
+
+  const openLink = (url) => {
+    window.open(url, '_blank');
+  };
+
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -182,7 +292,7 @@ const Header = () => {
 
       {/* Interview Modal Popup */}
       {isInterviewModalOpen && (
-        <div className="fixed inset-0 bg-transparent bg-opacity-0 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <Video className="w-5 h-5" />
@@ -190,10 +300,11 @@ const Header = () => {
             </h2>
             <button
               onClick={handleCreateInterview}
-              className="w-full bg-blue-800 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              disabled={isCreating}
+              className="w-full bg-blue-800 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Video className="w-4 h-4" />
-              Create Interview Link
+              {isCreating ? 'Creating...' : 'Create Interview Link'}
             </button>
             <button
               onClick={() => setIsInterviewModalOpen(false)}
@@ -201,6 +312,122 @@ const Header = () => {
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Create Link Modal Popup */}
+      {isCreateLinkModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Video className="w-5 h-5" />
+              Interview Links
+            </h2>
+            <p className="text-gray-600 mb-4">Session ID: {sessionId.substring(0, 8)}</p>
+            
+            <div className="space-y-4">
+              {/* Interviewer Link */}
+              <div className="border border-gray-200 rounded-lg p-3">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-medium text-blue-800">Interviewer Link</h3>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => copyToClipboard(interviewerLink)}
+                      className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
+                    >
+                      Copy
+                    </button>
+                    <button 
+                      onClick={() => openLink(interviewerLink)}
+                      className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200 transition-colors"
+                    >
+                      Open
+                    </button>
+                    <button 
+                      onClick={() => handleShareClick('interviewer')}
+                      className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded hover:bg-purple-200 transition-colors"
+                    >
+                      Share
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 truncate">{interviewerLink}</p>
+              </div>
+              
+              {/* Candidate Link */}
+              <div className="border border-gray-200 rounded-lg p-3">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-medium text-green-800">Candidate Link</h3>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => copyToClipboard(candidateLink)}
+                      className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
+                    >
+                      Copy
+                    </button>
+                    <button 
+                      onClick={() => openLink(candidateLink)}
+                      className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200 transition-colors"
+                    >
+                      Open
+                    </button>
+                    <button 
+                      onClick={() => handleShareClick('candidate')}
+                      className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded hover:bg-purple-200 transition-colors"
+                    >
+                      Share
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 truncate">{candidateLink}</p>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setIsCreateLinkModalOpen(false)}
+              className="w-full mt-4 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Share Email Modal Popup */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Video className="w-5 h-5" />
+              Share {shareRole === 'interviewer' ? 'Interviewer' : 'Candidate'} Link
+            </h2>
+            <p className="text-gray-600 mb-4">Enter email to send invitation:</p>
+            
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter email address"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+            />
+            
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsShareModalOpen(false)}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
+                disabled={isSending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendInvitation}
+                disabled={isSending}
+                className="flex-1 bg-purple-800 text-white py-2 px-4 rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
+              >
+                {isSending ? 'Sending...' : 'Send Invitation'}
+              </button>
+            </div>
           </div>
         </div>
       )}

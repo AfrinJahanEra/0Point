@@ -1,6 +1,6 @@
 # interview/models.py
 from mongoengine import Document, StringField, DictField, ListField, DateTimeField, BooleanField, IntField, BinaryField
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import base64
 
@@ -101,7 +101,7 @@ class SessionInvitation(Document):
     role = StringField(choices=('interviewer', 'candidate'), required=True)
     token = StringField(required=True, unique=True)
     sent_at = DateTimeField(default=datetime.utcnow)
-    expires_at = DateTimeField()
+    expires_at = DateTimeField(default=lambda: datetime.utcnow() + timedelta(days=7))
     is_used = BooleanField(default=False)
     used_at = DateTimeField()
     
