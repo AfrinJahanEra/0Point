@@ -299,8 +299,8 @@ class ExecuteCodeAPI(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Get JDoodle credentials from environment variables
-            JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', '4771ccb8a9360d9c2616d2ae9a092c78')
-            JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', 'f5c03bad716ca4e6a16cbc7ee99e294c6351e78d03275d52964235193c544645')
+            JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', 'c4e6cb0ce2a45e1c4629d9d5bf2bd89b')
+            JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', '7634e9d0966fbbbde8c40a33c383ff24bbb0132c434fb36d73a1014f875ece0d')
             JD_URL = "https://api.jdoodle.com/v1/execute"
             
             # Language mapping for JDoodle
@@ -313,7 +313,7 @@ class ExecuteCodeAPI(APIView):
             }
             
             VERSION_MAP = {
-                'python': '3',
+                'python3': '3',
                 'javascript': '4',
                 'java': '4',
                 'cpp': '5',
@@ -321,13 +321,15 @@ class ExecuteCodeAPI(APIView):
             }
             
             # Prepare payload for JDoodle
+            # Map language to JDoodle identifier
+            jdoodle_language = LANGUAGE_MAP.get(language, 'python3')
             payload = {
                 'clientId': JD_CLIENT_ID,
                 'clientSecret': JD_CLIENT_SECRET,
                 'script': code,
                 'stdin': input_data,
-                'language': LANGUAGE_MAP.get(language, 'python3'),
-                'versionIndex': VERSION_MAP.get(language, '3')
+                'language': jdoodle_language,
+                'versionIndex': VERSION_MAP.get(jdoodle_language, '3')
             }
             
             # Call JDoodle API

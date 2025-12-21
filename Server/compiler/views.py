@@ -12,8 +12,8 @@ from contest.utils.auth import get_user_from_request
 
 # JDoodle credentials from environment variables
 import os
-JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', '4771ccb8a9360d9c2616d2ae9a092c78')
-JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', 'f5c03bad716ca4e6a16cbc7ee99e294c6351e78d03275d52964235193c544645')
+JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', 'c4e6cb0ce2a45e1c4629d9d5bf2bd89b')
+JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', '7634e9d0966fbbbde8c40a33c383ff24bbb0132c434fb36d73a1014f875ece0d')
 JD_URL = "https://api.jdoodle.com/v1/execute"
 
 # Map for language -> recommended versionIndex

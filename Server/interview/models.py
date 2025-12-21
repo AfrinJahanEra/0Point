@@ -2,23 +2,29 @@
 from mongoengine import Document, StringField, DictField, ListField, DateTimeField, BooleanField, IntField, BinaryField
 from datetime import datetime
 import json
+import base64
 
 class InterviewSession(Document):
     session_id = StringField(required=True, unique=True)
     title = StringField(default="Interview Session")
+    created_by = StringField()  # User who created the session
+    interviewer_email = StringField()
+    candidate_email = StringField()
+    interviewers = ListField(StringField(), default=list)  # List of interviewer emails
+    candidates = ListField(StringField(), default=list)  # List of candidate emails
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
     is_active = BooleanField(default=True)
     
     meta = {
         'collection': 'interview_sessions',
-        'indexes': ['session_id', 'created_at']
+        'indexes': ['session_id', 'created_at', 'created_by']
     }
 
 class CodeDocument(Document):
     session_id = StringField(required=True)
-    language = StringField(default="javascript")
-    content = StringField(default="// Write your code here...\n")
+    language = StringField(default="python")
+    content = StringField(default="# Write your code here")
     version = IntField(default=0)
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
@@ -30,11 +36,12 @@ class CodeDocument(Document):
 
 class QuestionDocument(Document):
     session_id = StringField(required=True)
-    content = StringField()
+    content = StringField(default="")
     file_name = StringField()
     file_type = StringField()
     file_size = IntField()
     file_data = StringField()  # Base64 encoded file data
+    uploaded_by = StringField()
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
     
@@ -47,13 +54,15 @@ class UserCursor(Document):
     session_id = StringField(required=True)
     user_id = StringField(required=True)
     username = StringField(required=True)
+    email = StringField()
+    role = StringField(choices=('interviewer', 'candidate'), default='candidate')
     line = IntField(default=1)
     column = IntField(default=1)
     updated_at = DateTimeField(default=datetime.utcnow)
     
     meta = {
         'collection': 'user_cursors',
-        'indexes': ['session_id', 'user_id'],
+        'indexes': ['session_id', 'user_id', 'email'],
         'index_background': True
     }
 
@@ -61,14 +70,16 @@ class UserPresence(Document):
     session_id = StringField(required=True)
     user_id = StringField(required=True)
     username = StringField(required=True)
+    email = StringField()
     role = StringField(choices=('interviewer', 'candidate'), default='candidate')
     is_online = BooleanField(default=True)
     video_enabled = BooleanField(default=True)
+    joined_at = DateTimeField(default=datetime.utcnow)
     last_seen = DateTimeField(default=datetime.utcnow)
     
     meta = {
         'collection': 'user_presence',
-        'indexes': ['session_id', 'user_id'],
+        'indexes': ['session_id', 'user_id', 'email', 'role'],
         'index_background': True
     }
 
@@ -82,4 +93,19 @@ class InterviewTimer(Document):
     meta = {
         'collection': 'interview_timers',
         'indexes': ['session_id']
+    }
+
+class SessionInvitation(Document):
+    session_id = StringField(required=True)
+    email = StringField(required=True)
+    role = StringField(choices=('interviewer', 'candidate'), required=True)
+    token = StringField(required=True, unique=True)
+    sent_at = DateTimeField(default=datetime.utcnow)
+    expires_at = DateTimeField()
+    is_used = BooleanField(default=False)
+    used_at = DateTimeField()
+    
+    meta = {
+        'collection': 'session_invitations',
+        'indexes': ['session_id', 'email', 'token', 'expires_at']
     }

@@ -89,8 +89,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
                 await self.handle_timer_update(data)
             elif message_type == "language_change":
                 await self.handle_language_change(data)
-            elif message_type == "run_code":
-                await self.handle_run_code(data)
+
             elif message_type == "chat_message":
                 await self.handle_chat_message(data)
             elif message_type == "user_info":
@@ -174,24 +173,26 @@ class InterviewConsumer(AsyncWebsocketConsumer):
         
         return doc
     
-    @database_sync_to_async
-    def update_code_document(self, content, language=None):
-        doc = CodeDocument.objects.filter(session_id=self.session_id).first()
-        if doc:
-            doc.content = content
-            if language:
-                doc.language = language
-            doc.version += 1
-            doc.updated_at = datetime.utcnow()
-            doc.save()
-        else:
-            doc = CodeDocument(
-                session_id=self.session_id,
-                content=content,
-                language=language or 'javascript'
-            )
-            doc.save()
-        return doc
+        @database_sync_to_async
+        def update_code_document(self, content="", language=None):
+            doc = CodeDocument.objects.filter(session_id=self.session_id).first()
+            if doc:
+                if content:
+                    doc.content = content
+                if language is not None:
+                    doc.language = language
+                doc.version += 1
+                doc.updated_at = datetime.utcnow()
+                doc.save()
+            else:
+                doc = CodeDocument(
+                    session_id=self.session_id,
+                    content=content or get_default_code(language or "python"),
+                    language=language or "python",
+                    version=1
+                )
+                doc.save()
+            return doc
     
     @database_sync_to_async
     def update_cursor_position(self, line, column):
@@ -390,9 +391,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
         language = data.get("language", "javascript")
         
         # Update code document language
-        doc = await self.get_code_document()
-        doc.language = language
-        doc.save()
+        doc = await self.update_code_document("", language)  # Ensure language is saved
         
         await self.channel_layer.group_send(
             self.group_name,
@@ -401,132 +400,10 @@ class InterviewConsumer(AsyncWebsocketConsumer):
                 "language": language,
                 "user_id": self.user_id,
                 "username": self.username,
-                "timestamp": datetime.utcnow().isoformat()
             }
         )
     
-    async def handle_run_code(self, data):
-        code = data.get("code", "")
-        language = data.get("language", "javascript")
-        input_data = data.get("input_data", "")
-        
-        # Use JDoodle API for code execution
-        try:
-            output = await self.execute_code_with_jdoodle(code, language, input_data)
-        except Exception as e:
-            output = f"Error executing code: {str(e)}"
-        
-        # Format the final output
-        formatted_output = f"[{datetime.utcnow().strftime('%H:%M:%S')}] {language.upper()} Runtime\n"
-        formatted_output += f"> Compiling code...\n"
-        formatted_output += f"> Code executed successfully!\n"
-        formatted_output += f"> \n"
-        formatted_output += f"> Output:\n"
-        formatted_output += f"{output}\n"
-        formatted_output += f"> \n"
-        formatted_output += f"> Process completed"
-        
-        await self.channel_layer.group_send(
-            self.group_name,
-            {
-                "type": "broadcast_run_code",
-                "output": formatted_output,
-                "language": language,
-                "user_id": self.user_id,
-                "username": self.username,
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        )
-    
-    async def execute_code_with_jdoodle(self, code, language, input_data):
-        """Execute code using JDoodle API with retry logic"""
-        # JDoodle credentials from environment variables
-        import os
-        JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', '4771ccb8a9360d9c2616d2ae9a092c78')
-        JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', 'f5c03bad716ca4e6a16cbc7ee99e294c6351e78d03275d52964235193c544645')
-        JD_URL = "https://api.jdoodle.com/v1/execute"
-        
-        # Map for language -> JDoodle language identifier
-        LANGUAGE_MAP = {
-            "javascript": "nodejs",
-            "python": "python3",
-            "java": "java",
-            "cpp": "cpp14",
-            "c": "c"
-        }
-        
-        # Map for language -> recommended versionIndex
-        LANGUAGE_VERSION_MAP = {
-            "javascript": "4",
-            "python": "3",
-            "java": "4",
-            "cpp": "5",
-            "c": "5"
-        }
-        
-        # Retry logic with exponential backoff
-        max_retries = 3
-        base_delay = 1  # 1 second
-        
-        for attempt in range(max_retries + 1):
-            try:
-                # Prepare payload for JDoodle
-                payload = {
-                    "clientId": JD_CLIENT_ID,
-                    "clientSecret": JD_CLIENT_SECRET,
-                    "script": code,
-                    "stdin": input_data,
-                    "language": LANGUAGE_MAP.get(language, "python3"),
-                    "versionIndex": LANGUAGE_VERSION_MAP.get(language, "3")
-                }
-                
-                # Execute code via JDoodle API
-                response = requests.post(JD_URL, json=payload, timeout=15)
-                
-                # Handle rate limiting (429) with retry
-                if response.status_code == 429:
-                    if attempt < max_retries:
-                        import asyncio
-                        delay = base_delay * (2 ** attempt)  # Exponential backoff
-                        print(f"Rate limited. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
-                        await asyncio.sleep(delay)
-                        continue
-                    else:
-                        return "Rate limit exceeded. Please wait a few minutes and try again."
-                
-                response.raise_for_status()
-                response_data = response.json()
-                
-                # Format output
-                output = response_data.get("output", "No output")
-                memory_used = response_data.get("memory", "N/A")
-                cpu_time = response_data.get("cpuTime", "N/A")
-                
-                return f"{output}\n\nExecution time: {cpu_time}s\nMemory used: {memory_used} KB"
-                
-            except requests.exceptions.RequestException as e:
-                if attempt == max_retries:
-                    # If this is the last attempt, return a more user-friendly error
-                    if '429' in str(e):
-                        return "Rate limit exceeded. You've hit the JDoodle API rate limit. This typically happens when too many requests are made in a short period. Please wait a few minutes and try again."
-                    
-                    return f"API Error: {str(e)}"
-                
-                # Wait before retrying (exponential backoff)
-                import asyncio
-                delay = base_delay * (2 ** attempt)
-                print(f"Request failed. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
-                await asyncio.sleep(delay)
-                
-            except Exception as e:
-                if attempt == max_retries:
-                    return f"Error: {str(e)}"
-                
-                # Wait before retrying (exponential backoff)
-                import asyncio
-                delay = base_delay * (2 ** attempt)
-                print(f"Request failed. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
-                await asyncio.sleep(delay)
+
     
     async def handle_chat_message(self, data):
         message = data.get("message", "")
@@ -671,15 +548,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
             "timestamp": event["timestamp"]
         }))
     
-    async def broadcast_run_code(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "run_code",
-            "output": event["output"],
-            "language": event["language"],
-            "user_id": event["user_id"],
-            "username": event["username"],
-            "timestamp": event["timestamp"]
-        }))
+
     
     async def broadcast_chat_message(self, event):
         await self.send(text_data=json.dumps({

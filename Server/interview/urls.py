@@ -10,4 +10,5 @@ urlpatterns = [
     path('api/sessions/<str:session_id>/timer/', views.UpdateTimerAPI.as_view(), name='update_timer'),
     path('api/sessions/active/', views.GetActiveSessionsAPI.as_view(), name='active_sessions'),
     path('api/health/', views.HealthCheckAPI.as_view(), name='health_check'),
+    path('api/execute/', views.ExecuteCodeAPI.as_view(), name='execute_code'),
 ]
