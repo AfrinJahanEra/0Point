@@ -1,3 +1,4 @@
+// Header.jsx - UPDATED
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -65,18 +66,19 @@ const Header = () => {
     try {
       // Generate a new session ID
       const newSessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
+      const username = user?.name || 'Interviewer';
       
-      // Create a new session in the backend
+      // Create session via API
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/interview/api/sessions/create/`, {
+      const response = await fetch(`${backendUrl}/interview/api/sessions/join/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           session_id: newSessionId,
-          title: 'Interview Session',
-          duration: 3600
+          username: username,
+          role: 'interviewer'
         }),
       });
       
@@ -85,15 +87,27 @@ const Header = () => {
       if (response.ok && result.status === 'success') {
         setSessionId(newSessionId);
         
-        // Generate links
+        // Generate proper URLs with user info
         const baseURL = window.location.origin;
-        const interviewerURL = `${baseURL}/interview-session?session=${newSessionId}&role=interviewer`;
+        const interviewerURL = `${baseURL}/interview-session?session=${newSessionId}&role=interviewer&username=${encodeURIComponent(username)}`;
         const candidateURL = `${baseURL}/interview-session?session=${newSessionId}&role=candidate`;
         
         setInterviewerLink(interviewerURL);
         setCandidateLink(candidateURL);
         
-        // Close current modal and open create link modal
+        // Also create session via create endpoint for compatibility
+        await fetch(`${backendUrl}/interview/api/sessions/create/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            session_id: newSessionId,
+            title: `${username}'s Interview Session`,
+            duration: 3600
+          }),
+        });
+        
         setIsInterviewModalOpen(false);
         setIsCreateLinkModalOpen(true);
       } else {
@@ -166,6 +180,20 @@ const Header = () => {
     window.open(url, '_blank');
   };
 
+  const joinAsInterviewer = () => {
+    if (sessionId) {
+      const username = user?.name || 'Interviewer';
+      const url = `/interview-session?session=${sessionId}&role=interviewer&username=${encodeURIComponent(username)}`;
+      window.open(url, '_blank');
+    }
+  };
+
+  const joinAsCandidate = () => {
+    if (sessionId) {
+      const url = `/interview-session?session=${sessionId}&role=candidate`;
+      window.open(url, '_blank');
+    }
+  };
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -304,7 +332,7 @@ const Header = () => {
               className="w-full bg-blue-800 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Video className="w-4 h-4" />
-              {isCreating ? 'Creating...' : 'Create Interview Link'}
+              {isCreating ? 'Creating...' : 'Create Interview Session'}
             </button>
             <button
               onClick={() => setIsInterviewModalOpen(false)}
@@ -322,9 +350,29 @@ const Header = () => {
           <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <Video className="w-5 h-5" />
-              Interview Links
+              Interview Session Created
             </h2>
-            <p className="text-gray-600 mb-4">Session ID: {sessionId.substring(0, 8)}</p>
+            <p className="text-gray-600 mb-4">Session ID: <code className="bg-gray-100 px-2 py-1 rounded">{sessionId}</code></p>
+            
+            <div className="space-y-4 mb-6">
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="font-medium text-blue-800 mb-2">Quick Join</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={joinAsInterviewer}
+                    className="flex-1 bg-blue-800 hover:bg-blue-900 text-white py-2 px-4 rounded transition-colors text-sm"
+                  >
+                    Join as Interviewer
+                  </button>
+                  <button
+                    onClick={joinAsCandidate}
+                    className="flex-1 bg-green-800 hover:bg-green-900 text-white py-2 px-4 rounded transition-colors text-sm"
+                  >
+                    Join as Candidate
+                  </button>
+                </div>
+              </div>
+            </div>
             
             <div className="space-y-4">
               {/* Interviewer Link */}

@@ -1,42 +1,58 @@
+// InterviewLayout.jsx - UPDATED
 import React from 'react';
 import VideoPanel from './VideoPanel';
 import QuestionPanel from './QuestionPanel';
 import CodeEditorPanel from './CodeEditorPanel';
 
 const InterviewLayout = ({ 
+  // Layout
   isVideoOpen,
   setIsVideoOpen,
   showQuestions,
   setShowQuestions,
   questionsPanelCollapsed,
   setQuestionsPanelCollapsed,
+  
+  // Video
   candidateJoined,
   isInterviewerVideoOn,
   setIsInterviewerVideoOn,
   isCandidateVideoOn,
   setIsCandidateVideoOn,
+  
+  // Questions
   sharedQuestionFile,
   setSharedQuestionFile,
   sharedQuestionContent,
   setSharedQuestionContent,
   sharedFileUrl,
   setSharedFileUrl,
+  
+  // Code
   code,
   setCode,
   output,
   setOutput,
   cursorPosition,
   collaboratorCursors,
+  collaboratorSelections,
   language,
   setLanguage,
   isRunning,
   setIsRunning,
   codeVersion,
+  setCodeVersion,
+  
+  // Session
   currentUser,
   onlineUsers,
+  participants,
   sessionId,
+  sessionTitle,
   invitationSent,
   setShowInvitePopup,
+  
+  // Refs & Handlers
   socketRef,
   editorRef,
   handleRunCode,
@@ -50,7 +66,7 @@ const InterviewLayout = ({
     <div className="flex flex-1 h-full overflow-hidden">
       {/* Left Panel: Video + Questions */}
       {isVideoOpen && (
-        <div className="w-1/2 flex border-r border-gray-300 bg-gray-100 transition-all duration-300">
+        <div className="flex border-r border-gray-300 bg-gray-100 transition-all duration-300">
           <VideoPanel
             isVideoOpen={isVideoOpen}
             setIsVideoOpen={setIsVideoOpen}
@@ -65,6 +81,7 @@ const InterviewLayout = ({
             setIsCandidateVideoOn={setIsCandidateVideoOn}
             currentUser={currentUser}
             onlineUsers={onlineUsers}
+            participants={participants}
             invitationSent={invitationSent}
             setShowInvitePopup={setShowInvitePopup}
             onVideoToggle={sendVideoToggle}
@@ -81,11 +98,10 @@ const InterviewLayout = ({
             currentUser={currentUser}
             sessionId={sessionId}
             socketRef={socketRef}
-            onQuestionUpdate={(content, fileData, fileUrl) => {
+            onQuestionUpdate={(content, fileData) => {
               setSharedQuestionContent(content);
               if (fileData) {
                 setSharedQuestionFile(fileData);
-                setSharedFileUrl(fileUrl);
               }
               sendQuestionUpdate(content, fileData);
             }}
@@ -94,7 +110,7 @@ const InterviewLayout = ({
       )}
 
       {/* Right Panel: Code Editor */}
-      <div className={`${isVideoOpen ? 'w-1/2' : 'w-full'} transition-all duration-300`}>
+      <div className={`${isVideoOpen ? 'flex-1' : 'w-full'} transition-all duration-300`}>
         <CodeEditorPanel
           code={code}
           setCode={setCode}
@@ -106,9 +122,11 @@ const InterviewLayout = ({
           setOutput={setOutput}
           cursorPosition={cursorPosition}
           collaboratorCursors={collaboratorCursors}
+          collaboratorSelections={collaboratorSelections}
           codeVersion={codeVersion}
           isVideoOpen={isVideoOpen}
           setIsVideoOpen={setIsVideoOpen}
+          onlineUsers={onlineUsers}
           onRunCode={handleRunCode}
           onEditorDidMount={handleEditorDidMount}
           onEditorChange={handleEditorChange}

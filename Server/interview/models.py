@@ -1,13 +1,23 @@
-# interview/models.py
-from mongoengine import Document, StringField, DictField, ListField, DateTimeField, BooleanField, IntField, BinaryField
 from datetime import datetime, timedelta
-import json
-import base64
+import uuid
+from mongoengine import Document, StringField, DictField, ListField, DateTimeField, BooleanField, IntField, EmbeddedDocument, EmbeddedDocumentField
+
+class ActiveSessionParticipant(EmbeddedDocument):
+    user_id = StringField(required=True)
+    username = StringField()
+    role = StringField(choices=('interviewer', 'candidate'))
+    joined_at = DateTimeField(default=datetime.utcnow)
+    last_activity = DateTimeField(default=datetime.utcnow)
+    socket_id = StringField()
 
 class InterviewSession(Document):
     session_id = StringField(required=True, unique=True)
     title = StringField(default="Interview Session")
     created_by = StringField()  # User who created the session
+    interviewer_count = IntField(default=1)  # ADD THIS
+    candidate_count = IntField(default=0)    # ADD THIS
+    active_participants = ListField(EmbeddedDocumentField(ActiveSessionParticipant))  # ADD THIS
+    document_version = IntField(default=0)  # ADD THIS for document sync
     interviewer_email = StringField()
     candidate_email = StringField()
     interviewers = ListField(StringField(), default=list)  # List of interviewer emails
@@ -18,7 +28,23 @@ class InterviewSession(Document):
     
     meta = {
         'collection': 'interview_sessions',
-        'indexes': ['session_id', 'created_at', 'created_by']
+        'indexes': [
+            'session_id',
+            'created_at',
+            {'fields': ['updated_at'], 'expireAfterSeconds': 86400}  # Auto-delete after 24h inactivity
+        ]
+    }
+
+class CollaborationState(Document):
+    session_id = StringField(required=True)
+    document_type = StringField(choices=('code', 'question', 'whiteboard'))
+    content = StringField()
+    version = IntField(default=0)
+    last_modified_by = StringField()
+    last_modified_at = DateTimeField(default=datetime.utcnow)
+    meta = {
+        'collection': 'collaboration_states',
+        'indexes': ['session_id', 'document_type']
     }
 
 class CodeDocument(Document):
