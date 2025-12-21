@@ -246,7 +246,7 @@ const InterviewSession = () => {
             break;
             
           case "language_change":
-            handleLanguageChange(data);
+            handleLanguageChangeWS(data);
             break;
             
           case "chat_message":
@@ -508,7 +508,7 @@ const InterviewSession = () => {
     toast.success(`Questions updated by ${data.username}`);
   };
 
-  const handleLanguageChange = (data) => {
+  const handleLanguageChangeWS = (data) => {
     if (data.user_id !== currentUser.id) {
       setLanguage(data.language);
       toast.info(`Language changed to ${data.language} by ${data.username}`);
