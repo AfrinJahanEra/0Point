@@ -60,6 +60,7 @@ const InterviewSession = () => {
   const socketRef = useRef(null);
   const chatContainerRef = useRef(null);
   const heartbeatIntervalRef = useRef(null);
+  const fileUrlRef = useRef(null);
 
   // Initialize session from URL
   useEffect(() => {
@@ -197,7 +198,31 @@ const InterviewSession = () => {
               
               if (data.question?.content) setSharedQuestionContent(data.question.content);
               if (data.question?.file_data) {
-                // Handle file reconstruction if needed
+                setSharedQuestionFile(data.question.file_data);
+                // Reconstruct blob URL for existing file data
+                if (data.question.file_data && data.question.file_type) {
+                  // The file_data is already stored in the database as base64
+                  // We need to convert it back to a blob for display
+                  const byteCharacters = atob(data.question.file_data);
+                  const byteNumbers = new Array(byteCharacters.length);
+                  for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                  }
+                  const byteArray = new Uint8Array(byteNumbers);
+                  const blob = new Blob([byteArray], { type: data.question.file_type });
+                  const fileUrl = URL.createObjectURL(blob);
+                  // Clean up previous URL if exists
+                  if (fileUrlRef.current) {
+                    URL.revokeObjectURL(fileUrlRef.current);
+                  }
+                  fileUrlRef.current = fileUrl;
+                  setSharedFileUrl(fileUrl);
+                } else {
+                  setSharedFileUrl(null);
+                }
+              } else {
+                setSharedQuestionFile(null);
+                setSharedFileUrl(null);
               }
               
               setTimeRemaining(data.timer?.remaining_time || 3600);
@@ -250,7 +275,26 @@ const InterviewSession = () => {
               setSharedQuestionContent(data.content);
               if (data.file_data) {
                 setSharedQuestionFile(data.file_data);
-                // Reconstruct blob URL if needed
+                // Reconstruct blob URL if we have file data
+                if (data.file_data.file_content && data.file_data.file_type) {
+                  // Convert base64 to blob for display
+                  const byteCharacters = atob(data.file_data.file_content);
+                  const byteNumbers = new Array(byteCharacters.length);
+                  for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                  }
+                  const byteArray = new Uint8Array(byteNumbers);
+                  const blob = new Blob([byteArray], { type: data.file_data.file_type });
+                  const fileUrl = URL.createObjectURL(blob);
+                  // Clean up previous URL if exists
+                  if (fileUrlRef.current) {
+                    URL.revokeObjectURL(fileUrlRef.current);
+                  }
+                  fileUrlRef.current = fileUrl;
+                  setSharedFileUrl(fileUrl);
+                } else {
+                  setSharedFileUrl(null);
+                }
               } else {
                 setSharedQuestionFile(null);
                 setSharedFileUrl(null);

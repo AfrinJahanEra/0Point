@@ -50,15 +50,24 @@ const QuestionPanel = ({
           file_name: file.name,
           file_type: file.type,
           file_size: file.size,
-          file_content: base64File,
+          file_blob: base64File,
           uploaded_by: currentUser.username,
           uploaded_at: new Date().toISOString()
         };
 
+        // Create content for sharing
+        const content = `File: ${file.name}
+Size: ${(file.size / 1024).toFixed(2)} KB
+Type: ${file.type}
+Uploaded by: ${currentUser.username}
+Time: ${new Date().toLocaleTimeString()}
+
+${file.type === 'application/pdf' ? 'PDF Document - Open to view content' : 'DOCX Document - Download to view content'}`;
+
         const blob = await fetch(`data:${file.type};base64,${base64File}`).then(res => res.blob());
         const fileUrl = URL.createObjectURL(blob);
 
-        onQuestionUpdate(`File: ${file.name}`, fileData, fileUrl);
+        onQuestionUpdate(content, fileData, fileUrl);
         setShowQuestionUploadPopup(false);
         toast.success('File uploaded and shared!');
       } catch (error) {
@@ -71,7 +80,24 @@ const QuestionPanel = ({
   };
 
   const handleManualQuestion = () => {
-    const content = `Manual Question Set\nUploaded by: ${currentUser.username}\nTime: ${new Date().toLocaleTimeString()}\n\nInterview Questions\n==================\n\n1. Coding Questions:\n--------------------\na) Given an array, find the maximum product of any two numbers.\nb) Check if a string is a palindrome (ignore special characters).\nc) Design a URL shortening service.\n\n2. Behavioral Questions:\n------------------------\na) Tell me about a challenging project.\nb) How do you handle conflicting priorities?\nc) Describe your experience with agile methodologies.`;
+    const content = `Manual Question Set
+Uploaded by: ${currentUser.username}
+Time: ${new Date().toLocaleTimeString()}
+
+Interview Questions
+==================
+
+1. Coding Questions:
+--------------------
+a) Given an array, find the maximum product of any two numbers.
+b) Check if a string is a palindrome (ignore special characters).
+c) Design a URL shortening service.
+
+2. Behavioral Questions:
+------------------------
+a) Tell me about a challenging project.
+b) How do you handle conflicting priorities?
+c) Describe your experience with agile methodologies.`;
     onQuestionUpdate(content, null, null);
     setShowQuestionUploadPopup(false);
     toast.success('Sample questions added!');
