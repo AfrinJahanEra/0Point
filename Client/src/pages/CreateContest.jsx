@@ -1,5 +1,6 @@
 // CreateContest.jsx - Fix the tutorial section
 import React, { useState, useEffect } from 'react';
+import { Code2, Play, Download } from 'lucide-react';
 import { Link, useNavigate, useParams} from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -41,6 +42,8 @@ const CreateContest = () => {
   const navigate = useNavigate();
   const { contestId } = useParams();
   const [activeProblem, setActiveProblem] = useState(null);
+  // Add this with other state declarations
+const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('problems'); // 'problems', 'tutorial', or 'publish'
   const [contestData, setContestData] = useState({
     title: '',
@@ -50,6 +53,16 @@ const CreateContest = () => {
     type: 'individual',
     platform: 'IUT'
   });
+  // Add this with other state declarations
+const [code, setCode] = useState(`#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    // Your code here
+    return 0;
+}`);
+const [language, setLanguage] = useState('cpp');
+const [showStatementPreview, setShowStatementPreview] = useState(false);
 
   const [problems, setProblems] = useState([]);
   const [newTag, setNewTag] = useState('');
@@ -422,23 +435,25 @@ const renderTutorialTab = () => {
     return;
   }
 
-  const formattedProblems = problems.map((problem) => ({
-    index: problem.problemIndex || '',
-    title: problem.title,
-    statement: problem.statement,
-    time_limit_seconds: parseFloat(problem.timeLimit) || 2,
-    memory_limit_mb: parseInt(problem.memoryLimit) || 256,
-    tags: problem.tags,
-    difficulty: problem.difficulty || "Medium",
-    tutorial: problem.tutorial || "",
-    test_cases: problem.testCases.map((tc) => ({
-      input: tc.input,
-      output: tc.output,
-      difficulty: problem.difficulty || null,
-      explanation: tc.explanation || "",
-      sample: true,
-    })),
-  }));
+const formattedProblems = problems.map((problem) => ({
+  index: problem.problemIndex || '',
+  title: problem.title,
+  statement: problem.statement,
+  time_limit_seconds: parseFloat(problem.timeLimit) || 2,
+  memory_limit_mb: parseInt(problem.memoryLimit) || 256,
+  tags: problem.tags,
+  difficulty: problem.difficulty || "Medium",
+  tutorial: problem.tutorial || "",
+  points: parseInt(problem.points) || 0, // Add this line
+  test_cases: problem.testCases.map((tc) => ({
+    input: tc.input,
+    output: tc.output,
+    difficulty: problem.difficulty || null,
+    explanation: tc.explanation || "",
+    sample: true,
+    hidden: tc.hidden || false // Add this line
+  })),
+}));
 
   const payload = {
     title: contestData.title,
@@ -598,7 +613,7 @@ const handlePublishContest = async (type) => {
 
     // Format problems (common for both edit and create modes)
     const formattedProblems = problems.map((problem) => ({
-      index: problem.problemIndex,
+      index: problem.problemIndex || '',
       title: problem.title,
       statement: problem.statement,
       time_limit_seconds: parseFloat(problem.timeLimit) || 2,
@@ -606,12 +621,14 @@ const handlePublishContest = async (type) => {
       tags: problem.tags,
       difficulty: problem.difficulty || "Medium",
       tutorial: problem.tutorial || "",
+      points: parseInt(problem.points) || 0,
       test_cases: problem.testCases.map((tc) => ({
         input: tc.input,
         output: tc.output,
         difficulty: problem.difficulty || null,
         explanation: tc.explanation || "",
         sample: true,
+        hidden: tc.hidden || false
       })),
     }));
 
@@ -624,7 +641,7 @@ const handlePublishContest = async (type) => {
         duration: parseFloat(contestData.duration) || 3.0,
         type: contestData.type,
         platform: contestData.platform,
-        problems: formattedProblems,  // ← THIS IS CRITICAL!
+        problems: formattedProblems,
         editorial_published: publishSettings.editorialPublished
       };
       
@@ -647,7 +664,7 @@ const handlePublishContest = async (type) => {
         type: contestData.type,
         platform: contestData.platform,
         problems: formattedProblems,
-        status: type === "test" ? "test" : "upcoming",
+        status: type === "test" ? "test" : "upcoming",  // IMPORTANT: Set status here
         visibility: publishSettings.visibility,
         registration_required: publishSettings.registrationRequired,
         email_notifications: publishSettings.emailNotifications,
@@ -707,19 +724,90 @@ const handlePublishContest = async (type) => {
       memoryLimit: 256,
       tags: [],
       tutorial: '', // Initialize with empty tutorial
-      difficulty: ''
+      difficulty: '',
+      points: '', // Add this line
+      testResults: [] // Add this
     };
     
     setProblems(prev => [...prev, newProblem]);
     setActiveProblem(newProblem.id);
   };
 
+  const handleRunCode = async () => {
+  if (!code.trim()) {
+    alert('Please write some code before running.');
+    return;
+  }
+
+  const currentProblem = problems.find(p => p.id === activeProblem);
+  if (!currentProblem) return;
+
+  try {
+    // Use sample test case or first test case
+    const testCase = currentProblem.testCases[0];
+    if (!testCase) {
+      alert('Please add at least one test case to run code.');
+      return;
+    }
+
+    const runData = {
+      language: language,
+      version_index: getVersionIndex(language),
+      code: code,
+      input_data: testCase.input,
+      expected_output: testCase.output
+    };
+
+    const response = await fetch('http://localhost:8000/contests/test-execute/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY'
+      },
+      body: JSON.stringify(runData)
+    });
+
+    const data = await response.json();
+    
+    // Update problem with test results
+    handleProblemChange(currentProblem.id, 'testResults', [data]);
+    
+    // Show alert with results
+    if (data.is_execution_success || data.status === 'success') {
+      const timeMsg = data.execution_time_ms ? 
+        `\n⏱️ Time: ${data.execution_time_ms}ms` : '';
+      const memoryMsg = data.memory_kb ? 
+        `\n💾 Memory: ${data.memory_kb}KB` : '';
+      
+      alert(`✅ Execution successful!${timeMsg}${memoryMsg}\n📤 Output: ${data.output}\n🎯 Verdict: ${data.verdict}`);
+    } else {
+      alert(`❌ Execution error!\n📤 Output: ${data.output}\n🔴 Status: ${data.status}`);
+    }
+  } catch (error) {
+    console.error('Run error:', error);
+    alert('Run failed');
+  }
+};
+
+const getVersionIndex = (lang) => {
+  switch(lang) {
+    case 'python': return '3';
+    case 'python3': return '3';
+    case 'java': return '4';
+    case 'c': return '5';
+    case 'cpp': return '5';
+    case 'javascript': return '4';
+    default: return '0';
+  }
+};
+
 const addTestCase = (problemId) => {
   const newTestCase = {
     id: Date.now(),
     input: '',
     output: '',
-    explanation: ''
+    explanation: '',
+    hidden: false // Add this line
   };
   setProblems(prev => prev.map(problem => 
     problem.id === problemId 
@@ -901,49 +989,77 @@ const addTestCase = (problemId) => {
             </div>
             <div className="space-y-6">
               {/* Problem Statement */}
-              <div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-2">
-                      Problem Index
-                    </label>
-                    <input
-                      type="text"
-                      value={currentProblem.problemIndex}
-                      onChange={(e) => handleProblemChange(currentProblem.id, 'problemIndex', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
-                      placeholder="A, B, C, etc."
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Use single letters (A-Z) or multiple letters (AA, AB, etc.)
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-2">
-                      Title
-                    </label>
-                    <input
-                      type="text"
-                      value={currentProblem.title}
-                      onChange={(e) => handleProblemChange(currentProblem.id, 'title', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Enter problem title"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-2">
-                      Statement
-                    </label>
-                    <textarea
-                      value={currentProblem.statement}
-                      onChange={(e) => handleProblemChange(currentProblem.id, 'statement', e.target.value)}
-                      rows={12}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
-                      placeholder="Enter problem statement..."
-                    />
-                  </div>
-                </div>
-              </div>
+<div>
+  <div className="space-y-4">
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-2">
+        Problem Index
+      </label>
+      <input
+        type="text"
+        value={currentProblem.problemIndex}
+        onChange={(e) => handleProblemChange(currentProblem.id, 'problemIndex', e.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
+        placeholder="A, B, C, etc."
+      />
+      <p className="text-xs text-gray-500 mt-1">
+        Use single letters (A-Z) or multiple letters (AA, AB, etc.)
+      </p>
+    </div>
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-2">
+        Title
+      </label>
+      <input
+        type="text"
+        value={currentProblem.title}
+        onChange={(e) => handleProblemChange(currentProblem.id, 'title', e.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="Enter problem title"
+      />
+    </div>
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="block text-xs font-medium text-gray-700">
+          Statement
+        </label>
+        <button
+          type="button"
+          onClick={() => setShowStatementPreview(!showStatementPreview)}
+          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+        >
+          <Eye className="w-3 h-3" />
+          {showStatementPreview ? 'Edit' : 'Preview'}
+        </button>
+      </div>
+      {!showStatementPreview ? (
+        <textarea
+          value={currentProblem.statement}
+          onChange={(e) => handleProblemChange(currentProblem.id, 'statement', e.target.value)}
+          rows={12}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
+          placeholder="Enter problem statement... (Supports Markdown & LaTeX)"
+        />
+      ) : (
+        <div className="border border-gray-300 rounded-lg p-4 bg-gray-50 min-h-[200px] overflow-auto">
+          <div className="prose prose-sm max-w-none">
+            {currentProblem.statement ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkMath]}
+                rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                components={customComponents}
+              >
+                {currentProblem.statement}
+              </ReactMarkdown>
+            ) : (
+              <p className="text-gray-500 italic">No statement content yet.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
 
 {/* Test Cases */}
 <div>
@@ -951,7 +1067,23 @@ const addTestCase = (problemId) => {
     {currentProblem.testCases.map(testCase => (
       <div key={testCase.id} className="border border-gray-200 rounded-lg p-4">
         <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-3">
           <h4 className="font-medium text-gray-900">Test Case</h4>
+          <label className="flex items-center gap-2">
+            <input
+            type="checkbox"
+            checked={testCase.hidden || false}
+            onChange={(e) => {
+              const updatedTestCases = currentProblem.testCases.map(tc =>
+                tc.id === testCase.id ? { ...tc, hidden: e.target.checked } : tc
+              );
+              handleProblemChange(currentProblem.id, 'testCases', updatedTestCases);
+            }}
+            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+          />
+          <span className="text-xs text-gray-600">Hidden</span>
+        </label>
+      </div>
           <button
             type="button"
             onClick={() => removeTestCase(currentProblem.id, testCase.id)}
@@ -1028,53 +1160,67 @@ const addTestCase = (problemId) => {
 </div>
 
 
-              {/* Constraints */}
-              <div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-2">
-                      Time Limit (seconds)
-                    </label>
-                    <input
-                      type="number"
-                      value={currentProblem.timeLimit}
-                      onChange={(e) => handleProblemChange(currentProblem.id, 'timeLimit', e.target.value)}
-                      min="0.1"
-                      step="0.1"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-2">
-                      Memory Limit (MB)
-                    </label>
-                    <input
-                      type="number"
-                      value={currentProblem.memoryLimit}
-                      onChange={(e) => handleProblemChange(currentProblem.id, 'memoryLimit', e.target.value)}
-                      min="16"
-                      step="16"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
+<div>
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-2">
+        Time Limit (s)
+      </label>
+      <input
+        type="number"
+        value={currentProblem.timeLimit}
+        onChange={(e) => handleProblemChange(currentProblem.id, 'timeLimit', e.target.value)}
+        min="0.1"
+        step="0.1"
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      />
+    </div>
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-2">
+        Memory Limit (MB)
+      </label>
+      <input
+        type="number"
+        value={currentProblem.memoryLimit}
+        onChange={(e) => handleProblemChange(currentProblem.id, 'memoryLimit', e.target.value)}
+        min="16"
+        step="16"
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      />
+    </div>
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-2">
+        Difficulty
+      </label>
+      <select
+        value={currentProblem.difficulty || 'Medium'}
+        onChange={(e) => handleProblemChange(currentProblem.id, 'difficulty', e.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      >
+        <option value="">None</option>
+        <option value="Easy">Easy</option>
+        <option value="Medium">Medium</option>
+        <option value="Hard">Hard</option>
+      </select>
+    </div>
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-2">
+        Points
+      </label>
+      <input
+        type="number"
+        value={currentProblem.points || ''}
+        onChange={(e) => handleProblemChange(currentProblem.id, 'points', e.target.value)}
+        min="0"
+        step="1"
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="Points"
+      />
+    </div>
+  </div>
+</div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Difficulty
-                </label>
-                <select
-                  value={currentProblem.difficulty || 'Medium'}
-                  onChange={(e) => handleProblemChange(currentProblem.id, 'difficulty', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">None</option>
-                  <option value="Easy">Easy</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Hard">Hard</option>
-                </select>
-              </div>
+
 
               {/* Tags */}
               <div>
@@ -1115,6 +1261,127 @@ const addTestCase = (problemId) => {
                   </button>
                 </div>
               </div>
+
+              {/* Code Editor Section */}
+<div>
+  <div className="flex items-center justify-between mb-4">
+    <h3 className="font-semibold text-gray-900">Code Testing</h3>
+    <div className="flex items-center gap-2">
+      <select 
+        value={language}
+        onChange={(e) => setLanguage(e.target.value)}
+        className="border border-gray-300 rounded px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="cpp">C++ 17</option>
+        <option value="python">Python 3</option>
+        <option value="java">Java</option>
+        <option value="c">C</option>
+        <option value="javascript">JavaScript</option>
+      </select>
+    </div>
+  </div>
+  
+  {/* Code Editor */}
+  <div className="border border-gray-300 rounded-lg overflow-hidden mb-4">
+    <div className="bg-gray-900 text-gray-100 p-4">
+      <textarea
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        rows={12}
+        className="w-full font-mono text-sm bg-gray-900 text-gray-100 resize-none focus:outline-none"
+        spellCheck="false"
+        placeholder={`// Write your ${language.toUpperCase()} code here...`}
+      />
+    </div>
+    
+    <div className="bg-gray-800 px-4 py-2 border-t border-gray-700 flex justify-between items-center">
+      <div className="text-xs text-gray-400">
+        Language: {language === 'cpp' ? 'C++ 17' : 
+                  language === 'java' ? 'Java' : 
+                  language === 'python' ? 'Python 3' : 'C'}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            const blob = new Blob([code], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `test_code.${language}`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="px-3 py-1 border border-gray-600 rounded text-xs text-gray-300 hover:bg-gray-700 flex items-center gap-1"
+        >
+          <Download className="w-3 h-3" />
+          Download
+        </button>
+        <button
+          type="button"
+          onClick={handleRunCode}
+          className="px-4 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 flex items-center gap-1"
+        >
+          <Play className="w-3 h-3" />
+          Run Code
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  {/* Test Results */}
+  {currentProblem.testResults && currentProblem.testResults.length > 0 && (
+    <div className="border border-gray-300 rounded-lg p-4">
+      <h4 className="font-medium text-gray-900 mb-3">Test Results</h4>
+      {currentProblem.testResults.map((result, index) => (
+        <div key={index} className={`p-3 rounded ${result.is_execution_success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            <div>
+              <span className="text-gray-600">Status:</span>
+              <span className={`ml-2 font-medium ${result.is_execution_success ? 'text-green-600' : 'text-red-600'}`}>
+                {result.is_execution_success ? '✓ Success' : '✗ Failed'}
+              </span>
+            </div>
+            {result.execution_time_ms && (
+              <div>
+                <span className="text-gray-600">Time:</span>
+                <span className="ml-2 font-medium">{result.execution_time_ms}ms</span>
+              </div>
+            )}
+            {result.memory_kb && (
+              <div>
+                <span className="text-gray-600">Memory:</span>
+                <span className="ml-2 font-medium">{result.memory_kb}KB</span>
+              </div>
+            )}
+            <div>
+              <span className="text-gray-600">Verdict:</span>
+              <span className="ml-2 font-medium">{result.verdict || result.status}</span>
+            </div>
+          </div>
+          
+          {result.output && (
+            <div className="mt-3">
+              <div className="text-gray-600 text-xs mb-1">Output:</div>
+              <pre className="bg-gray-800 text-gray-100 p-2 rounded text-xs font-mono overflow-x-auto">
+                {result.output}
+              </pre>
+            </div>
+          )}
+          
+          {result.expected_output && (
+            <div className="mt-3">
+              <div className="text-gray-600 text-xs mb-1">Expected Output:</div>
+              <pre className="bg-gray-800 text-gray-100 p-2 rounded text-xs font-mono overflow-x-auto">
+                {result.expected_output}
+              </pre>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
             </div>
           </div>
         )}
@@ -1306,11 +1573,31 @@ const addTestCase = (problemId) => {
     </div>
   );
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+return (
+  <div className="min-h-screen bg-gray-50 py-8">
+    <div className="max-w-7xl mx-auto px-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          {/* Hamburger Menu Button */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <svg 
+              className="w-5 h-5 text-gray-600" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              {sidebarOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+          
           <div className="flex items-center gap-2">
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${activeTab === 'problems' ? 'bg-blue-100 text-blue-800' : activeTab === 'tutorial' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
               {activeTab === 'problems' ? (editMode ? 'Editing Draft' : 'Creating') : activeTab === 'tutorial' ? 'Tutorial' : 'Publishing'}
@@ -1322,121 +1609,125 @@ const addTestCase = (problemId) => {
             )}
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Problems List */}
-            <div className="bg-white rounded-lg border border-gray-200">
-              <div className="p-4 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-900">Problems</h3>
-              </div>
-              <div className="p-2">
-                {problems.map(problem => (
-                  <div key={problem.id} className="relative group">
-                    <button
-                      onClick={() => {
-                        setActiveProblem(problem.id);
-                        setActiveTab('problems');
-                      }}
-                      className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors duration-200 ${
-                        activeProblem === problem.id
-                          ? 'bg-blue-50 text-blue-800 border border-blue-200'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
-                        activeProblem === problem.id
-                          ? 'bg-blue-800 text-white'
-                          : 'bg-gray-100'
-                      }`}>
-                        {problem.problemIndex || ''}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium truncate">
-                          {problem.title || 'Untitled Problem'}
+
+      <div className="flex gap-4 h-[calc(100vh-6rem)]">
+        {/* Sidebar - Collapsible with independent scroll */}
+        <div className={`${sidebarOpen ? 'w-64' : 'w-0'} flex-shrink-0 transition-all duration-300 ease-in-out`}>
+          {sidebarOpen && (
+            <div className="bg-white rounded-lg border border-gray-200 h-full flex flex-col">
+              {/* Problems List */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-4 border-b border-gray-200">
+                  <h3 className="font-semibold text-gray-900">Problems</h3>
+                </div>
+                <div className="p-2">
+                  {problems.map(problem => (
+                    <div key={problem.id} className="relative group">
+                      <button
+                        onClick={() => {
+                          setActiveProblem(problem.id);
+                          setActiveTab('problems');
+                        }}
+                        className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition-colors duration-200 ${
+                          activeProblem === problem.id
+                            ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
+                          activeProblem === problem.id
+                            ? 'bg-blue-800 text-white'
+                            : 'bg-gray-100'
+                        }`}>
+                          {problem.problemIndex || ''}
                         </div>
-                        {/* Tutorial indicator */}
-                        {problem.tutorial && problem.tutorial.trim() && (
-                          <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                            <GraduationCap className="w-3 h-3" />
-                            Has tutorial
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium truncate">
+                            {problem.title || 'Untitled Problem'}
                           </div>
-                        )}
-                      </div>
-                    </button>
-                    {/* Delete button - visible on hover */}
+                          {/* Tutorial indicator */}
+                          {problem.tutorial && problem.tutorial.trim() && (
+                            <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                              <GraduationCap className="w-3 h-3" />
+                              Has tutorial
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                      {/* Delete button - visible on hover */}
+                      <button
+                        onClick={() => handleDeleteProblem(problem.id)}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-red-600 hover:text-red-800 p-1"
+                        title="Delete Problem"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => {
+                      addProblem();
+                      setActiveTab('problems');
+                    }}
+                    className="w-full flex items-center gap-2 p-2 text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-200 mt-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="text-xs font-medium">Add Problem</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="p-3 border-t border-gray-200">
+                <div className="space-y-2">
+                  <button 
+                    type="button"
+                    onClick={handleSaveDraft}
+                    className="w-full bg-blue-800 text-white py-2 rounded text-xs font-semibold hover:bg-blue-900 transition-colors duration-200 flex items-center justify-center gap-2">
+                    <Save className="w-4 h-4" />
+                    Save Draft
+                  </button>
+
+                  {currentProblem && (
                     <button
-                      onClick={() => handleDeleteProblem(problem.id)}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-red-600 hover:text-red-800 p-1"
-                      title="Delete Problem"
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('tutorial');
+                      }}
+                      className="w-full border border-gray-300 text-gray-700 py-2 rounded text-xs font-semibold hover:bg-gray-50 transition-colors duration-200 flex items-center justify-center gap-2"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <GraduationCap className="w-4 h-4" />
+                      Edit Tutorial
                     </button>
-                  </div>
-                ))}
-                <button
-                  onClick={() => {
-                    addProblem();
-                    setActiveTab('problems');
-                  }}
-                  className="w-full flex items-center gap-2 p-3 text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-200 mt-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span className="text-xs font-medium">Add Problem</span>
-                </button>
-              </div>
-            </div>
+                  )}
 
-            {/* Quick Actions */}
-            <div className="bg-white rounded-lg border border-gray-200">
-              <div className="p-4 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-900">Quick Actions</h3>
-              </div>
-              <div className="p-4 space-y-2">
-                <button 
-                  type="button"
-                  onClick={handleSaveDraft}
-                  className="w-full bg-blue-800 text-white py-2 rounded text-xs font-semibold hover:bg-blue-900 transition-colors duration-200 flex items-center justify-center gap-2">
-                  <Save className="w-4 h-4" />
-                  Save Draft
-                </button>
-
-                {currentProblem && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setActiveTab('tutorial');
-                    }}
+                    onClick={() => setActiveTab('publish')}
                     className="w-full border border-gray-300 text-gray-700 py-2 rounded text-xs font-semibold hover:bg-gray-50 transition-colors duration-200 flex items-center justify-center gap-2"
                   >
-                    <GraduationCap className="w-4 h-4" />
-                    Edit Tutorial
+                    <Check className="w-4 h-4" />
+                    Publish Contest
                   </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('publish')}
-                  className="w-full border border-gray-300 text-gray-700 py-2 rounded text-xs font-semibold hover:bg-gray-50 transition-colors duration-200 flex items-center justify-center gap-2"
-                >
-                  <Check className="w-4 h-4" />
-                  Publish Contest
-                </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            {activeTab === 'problems' ? renderProblemsTab() : 
-             activeTab === 'tutorial' ? renderTutorialTab() : 
-             renderPublishTab()}
-          </div>
+        {/* Main Content - Independent scroll */}
+        <div className={`flex-1 overflow-y-auto transition-all duration-300 ${sidebarOpen ? '' : 'ml-0'}`}>
+          {activeTab === 'problems' ? renderProblemsTab() : 
+           activeTab === 'tutorial' ? renderTutorialTab() : 
+           renderPublishTab()}
         </div>
       </div>
     </div>
-  );
+  </div>
+);
+
 };
 
 export default CreateContest;
