@@ -3,6 +3,10 @@ import os
 from mongoengine import connect
 import cloudinary
 from dotenv import load_dotenv
+# zeropoint/settings.py
+import mimetypes
+
+
 
 load_dotenv()
 
@@ -35,6 +39,7 @@ INSTALLED_APPS = [
     'executor',
     'mock_interview',
     'videoconference',
+    'pdf',
 ]
 
 MIDDLEWARE = [
@@ -45,7 +50,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'pdf.middleware.MediaCORSHeadersMiddleware',
 ]
 
 ROOT_URLCONF = 'zeropoint.urls'
@@ -98,6 +103,9 @@ if USE_MONGO and MONGO_URI:
     except Exception as e:
         print(f"MongoDB connection failed: {e}")
 
+# Fix MIME type for PDFs (critical for iframe)
+mimetypes.add_type("application/pdf", ".pdf", strict=True)
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -108,9 +116,16 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
     os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173'),
 ]
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "x-csrftoken",
+]
 
 cloudinary.config(
     cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
