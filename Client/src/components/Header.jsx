@@ -4,6 +4,19 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Code2, LogOut, User, BarChart2, Video, Monitor, Users, Copy, Send } from 'lucide-react';
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+
+// Helper to extract email from link
+const extractEmailFromLink = (link, param) => {
+  try {
+    const url = new URL(link);
+    return url.searchParams.get(param) || '';
+  } catch (e) {
+    console.error('Error parsing URL:', e);
+    return '';
+  }
+};
+
 const Header = () => {
   const { user, logout } = useApp();
   const location = useLocation();
@@ -67,32 +80,27 @@ const Header = () => {
   const handleCreateInterview = async () => {
     setIsCreating(true);
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/api/interview/create-session/`, {
+      // ✅ Use your EXISTING mock_interview endpoint
+      const response = await fetch(`${BACKEND_URL}/mock-interview/create-session/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: 'Interview Session',
-          description: 'Real-time collaborative interview'
+          interviewer_email: 'interviewer@example.com', // placeholder
+          candidate_email: 'candidate@example.com'      // will be overwritten in share
         }),
       });
       
       const result = await response.json();
       
-      if (response.ok && result.success) {
-        setSessionId(result.session.session_id);
+      if (response.ok) {
+        // ✅ Your backend returns:
+        // { session_id, interviewer_link, candidate_link }
+        setSessionId(result.session_id);
+        setInterviewerLink(result.interviewer_link);
+        setCandidateLink(result.candidate_link);
         
-        // Generate links
-        const baseURL = window.location.origin;
-        const interviewerURL = `${baseURL}/interview/${result.session.session_id}?role=interviewer`;
-        const candidateURL = `${baseURL}/interview/${result.session.session_id}?role=candidate`;
-        
-        setInterviewerLink(interviewerURL);
-        setCandidateLink(candidateURL);
-        
-        // Close current modal and open create link modal
         setIsInterviewModalOpen(false);
         setIsCreateLinkModalOpen(true);
       } else {
@@ -113,18 +121,11 @@ const Header = () => {
     }
 
     try {
-      // Validate session exists
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/api/interview/session/${joinSessionId}/`);
-      
-      if (response.ok) {
-        // Redirect to interview session
-        navigate(`/interview/${joinSessionId}?role=${joinRole}`);
-        setIsJoinModalOpen(false);
-      } else {
-        const error = await response.json();
-        alert(error.error || 'Session not found');
-      }
+      // For mock interview, we don't need to validate session exists
+      // Just redirect to the interview room with the session ID
+      // Redirect to interview session - use the interview room path
+      navigate(`/interview-room/${joinSessionId}?role=${joinRole}`);
+      setIsJoinModalOpen(false);
     } catch (error) {
       console.error('Error joining session:', error);
       alert('Failed to join session');
@@ -152,31 +153,38 @@ const Header = () => {
     
     setIsSending(true);
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/api/interview/send-invitation/`, {
+      // ✅ Use the SAME endpoint, but with real emails
+      const currentInterviewerEmail = extractEmailFromLink(interviewerLink, 'interviewer_email');
+      const currentCandidateEmail = extractEmailFromLink(candidateLink, 'candidate_email');
+      
+      const response = await fetch(`${BACKEND_URL}/mock-interview/create-session/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        // 🎯 Send real emails based on role
         body: JSON.stringify({
-          session_id: sessionId,
-          email: email,
-          role: shareRole,
-          message: 'You are invited to join an interview session'
+          interviewer_email: shareRole === 'interviewer' ? email : currentInterviewerEmail || 'interviewer@example.com',
+          candidate_email: shareRole === 'candidate' ? email : currentCandidateEmail || 'candidate@example.com'
         }),
       });
       
       const result = await response.json();
       
-      if (response.ok && result.success) {
-        alert(`Invitation sent successfully to ${email}`);
+      if (response.ok) {
+        // Update links (in case emails changed)
+        setInterviewerLink(result.interviewer_link);
+        setCandidateLink(result.candidate_link);
+        
+        alert(`✅ Invitation sent to ${email} as ${shareRole}`);
         setIsShareModalOpen(false);
       } else {
-        alert(`Failed to send invitation: ${result.error || 'Unknown error'}`);
+        const errorData = await response.json().catch(() => ({}));
+        alert(`❌ Failed: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error sending invitation:', error);
-      alert('Failed to send invitation');
+      alert('Network error. Check console.');
     } finally {
       setIsSending(false);
     }

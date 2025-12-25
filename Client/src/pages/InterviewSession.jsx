@@ -121,7 +121,7 @@ const InterviewSession = () => {
     };
 
     codeSocket.onmessage = (event) => {
-      console.log('📥 IDE WS Message:', event.data); // 🔴 ADD THIS
+      console.log('📥 IDE WS Message:', event.data);
       const data = JSON.parse(event.data);
       if (data.type === 'code_update') {
         setCode(data.code);
@@ -144,7 +144,7 @@ const InterviewSession = () => {
     if (debouncedSync.current) clearTimeout(debouncedSync.current);
     debouncedSync.current = setTimeout(() => {
       if (codeWs.current?.readyState === WebSocket.OPEN) {
-        console.log('📤 WebSocket sending:', { type: 'code_update', code: newCode.substring(0, 30) + '...', language: newLang }); // 🔴 ADD THIS
+        console.log('📤 WebSocket sending:', { type: 'code_update', code: newCode.substring(0, 30) + '...', language: newLang });
         codeWs.current.send(JSON.stringify({
           type: 'code_update',
           code: newCode,
@@ -247,22 +247,18 @@ const InterviewSession = () => {
             return;
           }
 
-          // 👉 PDF uploaded
           if (data.type === 'pdf_update') {
             console.log('📥 PDF received:', data.pdf_url);
             setPdfUrl(data.pdf_url);
             setPdfUploader(data.uploader_email);
           }
-          // 👉 Media state from remote peer
           else if (data.type === 'media_update' && data.role !== role) {
             if (data.media_type === 'audio') setRemoteAudioEnabled(data.enabled);
             if (data.media_type === 'video') setRemoteVideoEnabled(data.enabled);
           }
-          // 👉 Participant list
           else if (data.type === 'participant_list') {
             setParticipants(data.participants);
           }
-          // 👉 WebRTC signaling
           else if (data.type === 'offer') {
             try {
               await peerConnection.setRemoteDescription(data.offer);
@@ -321,17 +317,14 @@ const InterviewSession = () => {
     return () => {
       cleanupScheduled = true;
 
-      // Close WebSockets
       ws.current?.close();
       codeWs.current?.close();
 
-      // Close PeerConnection
       if (pc.current) {
         pc.current.close();
         pc.current = null;
       }
 
-      // Stop media tracks
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => {
           if (track.readyState === 'live') track.stop();
@@ -339,13 +332,12 @@ const InterviewSession = () => {
         streamRef.current = null;
       }
 
-      // Clear video elements
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     };
   }, [sessionId, role, email, checkPermissions, fetchLatestPDF, initCodeSync]);
 
-  // 🎯 Toggle CAMERA (real hardware control)
+  // 🎯 Toggle CAMERA
   const toggleVideo = async () => {
     const s = streamRef.current;
     if (!s) return;
@@ -356,7 +348,6 @@ const InterviewSession = () => {
     const track = videoTracks[0];
 
     if (track.readyState === 'live') {
-      // 👉 STOP camera
       track.stop();
       setLocalVideoActive(false);
 
@@ -365,7 +356,6 @@ const InterviewSession = () => {
         if (sender) sender.replaceTrack(null);
       }
     } else {
-      // 👉 RE-ENABLE camera
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const newTrack = newStream.getVideoTracks()[0];
@@ -399,7 +389,6 @@ const InterviewSession = () => {
       }
     }
 
-    // 📡 Sync state
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({
         type: 'media_update',
@@ -409,7 +398,7 @@ const InterviewSession = () => {
     }
   };
 
-  // 🎤 Toggle MIC (lightweight)
+  // 🎤 Toggle MIC
   const toggleAudio = () => {
     const s = streamRef.current;
     if (!s) return;
@@ -442,7 +431,6 @@ const InterviewSession = () => {
   const handleCodeChange = (e) => {
     const newCode = e.target.value;
     setCode(newCode);
-    console.log('📤 Sending code update:', newCode.substring(0, 30) + '...'); // 🔴 ADD THIS
     syncCode(newCode, language);
   };
 
@@ -463,73 +451,71 @@ const InterviewSession = () => {
       <div style={{
         height: '100%',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        background: '#ffffff',
+        borderRadius: '12px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+        overflow: 'hidden'
       }}>
         <div style={{
+          padding: '16px',
+          borderBottom: '1px solid #e2e8f0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '10px',
-          fontSize: '0.95em'
+          background: '#f8fafc'
         }}>
-          <strong>📄 Shared Document</strong>
-          {pdfUploader && <span>by {pdfUploader.split('@')[0]}</span>}
+          <div>
+            <strong style={{ fontSize: '1.1em', color: '#1e293b' }}>📄 Shared Document</strong>
+            {pdfUploader && <span style={{ marginLeft: '10px', color: '#64748b', fontSize: '0.9em' }}>by {pdfUploader.split('@')[0]}</span>}
+          </div>
+
+          {role === 'interviewer' && (
+            <label style={{
+              background: '#3b82f6',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.9em',
+              fontWeight: '500',
+              boxShadow: '0 2px 4px rgba(59,130,246,0.3)'
+            }}>
+              📤 Upload PDF
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={handlePDFUpload}
+                style={{ display: 'none' }}
+              />
+            </label>
+          )}
         </div>
 
-        {role === 'interviewer' && (
-          <label style={{
-            marginBottom: '12px',
-            background: '#3b82f6',
-            color: 'white',
-            padding: '6px 12px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '0.85em',
-            width: 'fit-content'
-          }}>
-            📤 Upload PDF
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={handlePDFUpload}
-              style={{ display: 'none' }}
-            />
-          </label>
-        )}
-
-        <div style={{
-          flex: 1,
-          border: '1px solid #e2e8f0',
-          borderRadius: '6px',
-          overflow: 'hidden',
-          background: 'white'
-        }}>
+        <div style={{ flex: 1, position: 'relative' }}>
           {absolutePdfUrl ? (
             <embed
               src={absolutePdfUrl}
               type="application/pdf"
               width="100%"
               height="100%"
-              style={{ display: 'block' }}
-              title="Shared PDF"
+              style={{ border: 'none' }}
             />
           ) : (
             <div style={{
+              height: '100%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              height: '100%',
-              color: '#64748b',
+              color: '#94a3b8',
               textAlign: 'center',
-              padding: '20px'
+              padding: '40px'
             }}>
               <div>
-                <p>📄 No PDF shared yet.</p>
-                {role === 'interviewer' ? (
-                  <p>Upload a PDF to collaborate.</p>
-                ) : (
-                  <p>Waiting for interviewer...</p>
-                )}
+                <p style={{ fontSize: '1.1em', marginBottom: '8px' }}>📄 No PDF shared yet.</p>
+                <p style={{ fontSize: '0.95em' }}>
+                  {role === 'interviewer' ? 'Upload a PDF to get started.' : 'Waiting for interviewer to upload...'}
+                </p>
               </div>
             </div>
           )}
@@ -543,29 +529,36 @@ const InterviewSession = () => {
     <div style={{
       height: '100%',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      background: '#0f172a',
+      borderRadius: '12px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      overflow: 'hidden'
     }}>
       <div style={{
+        padding: '16px',
+        borderBottom: '1px solid #1e293b',
         display: 'flex',
-        gap: '10px',
-        marginBottom: '10px',
-        flexWrap: 'wrap'
+        flexWrap: 'wrap',
+        gap: '12px',
+        alignItems: 'center'
       }}>
         <select
           value={language}
           onChange={handleLanguageChange}
           style={{
-            padding: '6px 10px',
+            padding: '10px 14px',
             background: '#1e293b',
-            color: 'white',
+            color: '#e2e8f0',
             border: '1px solid #334155',
-            borderRadius: '4px',
-            fontSize: '0.9em'
+            borderRadius: '8px',
+            fontSize: '0.95em',
+            minWidth: '140px'
           }}
         >
           <option value="python">🐍 Python</option>
           <option value="java">☕ Java</option>
-          <option value="c++">CppClass C++</option>
+          <option value="cpp">C++</option>
           <option value="c">C</option>
           <option value="javascript">📜 JavaScript</option>
           <option value="go">🐹 Go</option>
@@ -576,23 +569,23 @@ const InterviewSession = () => {
           onClick={compile}
           disabled={isCompiling}
           style={{
-            padding: '6px 12px',
-            background: isCompiling ? '#64748b' : '#10b981',
+            padding: '10px 20px',
+            background: isCompiling ? '#475569' : '#10b981',
             color: 'white',
             border: 'none',
-            borderRadius: '4px',
+            borderRadius: '8px',
             cursor: isCompiling ? 'not-allowed' : 'pointer',
-            fontSize: '0.9em'
+            fontWeight: '600',
+            fontSize: '0.95em',
+            boxShadow: isCompiling ? 'none' : '0 4px 10px rgba(16,185,129,0.3)'
           }}
         >
-          {isCompiling ? '⏳ Compiling...' : '▶️ Run Code'}
+          {isCompiling ? '⏳ Running...' : '▶️ Run Code'}
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
-        <label style={{ color: '#94a3b8', fontSize: '0.8em', whiteSpace: 'nowrap' }}>
-          Stdin:
-        </label>
+      <div style={{ padding: '0 16px 12px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <label style={{ color: '#94a3b8', fontSize: '0.9em', whiteSpace: 'nowrap' }}>Input (stdin):</label>
         <input
           type="text"
           value={stdin}
@@ -600,86 +593,102 @@ const InterviewSession = () => {
           placeholder="e.g., 5 10"
           style={{
             flex: 1,
-            padding: '4px 8px',
+            padding: '10px 12px',
             background: '#1e293b',
-            color: 'white',
+            color: '#e2e8f0',
             border: '1px solid #334155',
-            borderRadius: '4px',
-            fontSize: '0.85em'
+            borderRadius: '8px',
+            fontSize: '0.9em'
           }}
         />
       </div>
 
-      <textarea
-        value={code}
-        onChange={handleCodeChange}
-        spellCheck="false"
-        style={{
-          flex: 3,
-          background: '#020814',
-          color: '#e2e8f0',
-          fontFamily: 'Consolas, monaco, monospace',
-          fontSize: '14px',
-          padding: '12px',
-          border: '1px solid #334155',
-          borderRadius: '6px',
-          resize: 'none',
-          lineHeight: 1.5
-        }}
-        placeholder="Write your code here..."
-      />
+      <div style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', padding: '0 16px' }}>
+        <textarea
+          value={code}
+          onChange={handleCodeChange}
+          spellCheck="false"
+          style={{
+            flex: 1,
+            background: '#020817',
+            color: '#e2e8f0',
+            fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+            fontSize: '14.5px',
+            padding: '16px',
+            border: '1px solid #334155',
+            borderRadius: '10px',
+            resize: 'none',
+            lineHeight: '1.6',
+            outline: 'none'
+          }}
+          placeholder="// Start coding here..."
+        />
+      </div>
 
       <div style={{
-        flex: 2,
-        marginTop: '10px',
-        background: '#020814',
+        margin: '16px',
+        marginTop: '12px',
+        background: '#020817',
         border: '1px solid #334155',
-        borderRadius: '6px',
-        padding: '12px',
-        overflow: 'auto',
-        whiteSpace: 'pre-wrap',
+        borderRadius: '10px',
+        padding: '16px',
+        minHeight: '120px',
         color: '#cbd5e1',
-        fontFamily: 'Consolas, monaco, monospace',
+        fontFamily: 'Consolas, Monaco, monospace',
         fontSize: '14px',
-        lineHeight: 1.5
+        lineHeight: '1.6'
       }}>
-        <strong style={{ color: '#60a5fa' }}>Output:</strong>
-        <div style={{ marginTop: '8px', minHeight: '40px' }}>
-          {output || 'Click "Run Code" to execute'}
-        </div>
+        <strong style={{ color: '#60a5fa', display: 'block', marginBottom: '8px' }}>Output:</strong>
+        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+          {output || 'Click "Run Code" to see output here'}
+        </pre>
       </div>
     </div>
   );
 
   return (
     <div style={{
-      padding: '15px',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr 1fr',
-      gap: '16px',
+      padding: '20px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif',
+      background: '#f1f5f9',
       minHeight: '100vh',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      display: 'grid',
+      gridTemplateColumns: '380px 1fr 1fr',
+      gap: '20px',
+      alignItems: 'start'
     }}>
-      {/* Left: Video */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Left Column: Video + Controls */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px',
+        height: 'calc(100vh - 40px)',
+        position: 'sticky',
+        top: '20px'
+      }}>
+        {/* Videos */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Local Video */}
-          <div style={{ borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
+          <div style={{
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            background: '#1e293b'
+          }}>
             <div style={{
-              background: '#3b82f6',
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
               color: 'white',
-              padding: '6px 10px',
-              fontSize: '0.9em',
+              padding: '12px 16px',
+              fontSize: '0.95em',
+              fontWeight: '600',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '8px'
             }}>
-              <span>{getMediaIcon(localAudioActive, 'audio')}</span>
-              <span>{getMediaIcon(localVideoActive, 'video')}</span>
-              <strong>{myRoleLabel} (You)</strong>
-              {!localVideoActive && <span style={{ fontSize: '0.8em' }}>(cam off)</span>}
-              {!localAudioActive && <span style={{ fontSize: '0.8em' }}>(muted)</span>}
+              {getMediaIcon(localAudioActive, 'audio')}
+              {getMediaIcon(localVideoActive, 'video')}
+              {myRoleLabel} (You)
             </div>
             <video
               ref={localVideoRef}
@@ -688,7 +697,8 @@ const InterviewSession = () => {
               playsInline
               style={{
                 width: '100%',
-                aspectRatio: '16/9',
+                height: '220px',
+                objectFit: 'cover',
                 background: '#0f172a',
                 display: 'block'
               }}
@@ -696,21 +706,25 @@ const InterviewSession = () => {
           </div>
 
           {/* Remote Video */}
-          <div style={{ borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
+          <div style={{
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            background: '#1e293b'
+          }}>
             <div style={{
-              background: '#10b981',
+              background: 'linear-gradient(135deg, #10b981, #059669)',
               color: 'white',
-              padding: '6px 10px',
-              fontSize: '0.9em',
+              padding: '12px 16px',
+              fontSize: '0.95em',
+              fontWeight: '600',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '8px'
             }}>
-              <span>{getMediaIcon(remoteAudioEnabled, 'audio')}</span>
-              <span>{getMediaIcon(remoteVideoEnabled, 'video')}</span>
-              <strong>{remoteRoleLabel}</strong>
-              {!remoteVideoEnabled && <span style={{ fontSize: '0.8em' }}>(cam off)</span>}
-              {!remoteAudioEnabled && <span style={{ fontSize: '0.8em' }}>(muted)</span>}
+              {getMediaIcon(remoteAudioEnabled, 'audio')}
+              {getMediaIcon(remoteVideoEnabled, 'video')}
+              {remoteRoleLabel}
             </div>
             <video
               ref={remoteVideoRef}
@@ -718,75 +732,107 @@ const InterviewSession = () => {
               playsInline
               style={{
                 width: '100%',
-                aspectRatio: '16/9',
+                height: '220px',
+                objectFit: 'cover',
                 background: '#0f172a',
                 display: 'block',
-                opacity: remoteVideoEnabled ? 1 : 0.4,
-                filter: remoteVideoEnabled ? 'none' : 'grayscale(80%)'
+                opacity: remoteVideoEnabled ? 1 : 0.5,
+                filter: remoteVideoEnabled ? 'none' : 'grayscale(100%)'
               }}
             />
           </div>
         </div>
 
-        {/* Controls */}
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button
-            onClick={toggleVideo}
-            disabled={permissionState.video === 'denied'}
-            style={{
-              padding: '10px 16px',
-              background: localVideoActive ? '#ef4444' : '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontWeight: '600',
-              cursor: permissionState.video === 'denied' ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            {localVideoActive ? '📷 Camera Off' : '🎥 Camera On'}
-          </button>
+        {/* Media Controls */}
+        <div style={{
+          background: 'white',
+          padding: '16px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={toggleVideo}
+              disabled={permissionState.video === 'denied'}
+              style={{
+                flex: 1,
+                padding: '14px',
+                background: localVideoActive ? '#ef4444' : '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '1em',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
+              }}
+            >
+              {localVideoActive ? '📷 Turn Off Camera' : '🎥 Turn On Camera'}
+            </button>
 
-          <button
-            onClick={toggleAudio}
-            disabled={permissionState.audio === 'denied'}
-            style={{
-              padding: '10px 16px',
-              background: localAudioActive ? '#ef4444' : '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontWeight: '600',
-              cursor: permissionState.audio === 'denied' ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            {localAudioActive ? '🔇 Mute Mic' : '🎤 Unmute Mic'}
-          </button>
+            <button
+              onClick={toggleAudio}
+              disabled={permissionState.audio === 'denied'}
+              style={{
+                flex: 1,
+                padding: '14px',
+                background: localAudioActive ? '#ef4444' : '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '1em',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
+              }}
+            >
+              {localAudioActive ? '🔇 Mute Mic' : '🎤 Unmute Mic'}
+            </button>
+          </div>
         </div>
 
         {/* Participants */}
-        <div style={{ fontSize: '0.85em', color: '#475569' }}>
-          <strong>👥 Participants ({participants.length}/2)</strong>
+        <div style={{
+          background: 'white',
+          padding: '16px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          fontSize: '0.9em'
+        }}>
+          <strong style={{ display: 'block', marginBottom: '10px', color: '#1e293b' }}>
+            👥 Participants ({participants.length}/2)
+          </strong>
           {participants.map((p, i) => (
-            <div key={i} style={{ margin: '3px 0' }}>
-              <span style={{ fontWeight: '500' }}>{p.role}</span>: {p.email.split('@')[0]}
+            <div key={i} style={{ margin: '8px 0', color: '#475569' }}>
+              <strong>{p.role.charAt(0).toUpperCase() + p.role.slice(1)}:</strong> {p.email.split('@')[0]}
             </div>
           ))}
         </div>
+
+        {error && (
+          <div style={{
+            background: '#fee2e2',
+            color: '#991b1b',
+            padding: '12px',
+            borderRadius: '8px',
+            fontSize: '0.9em',
+            border: '1px solid #fecaca'
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
       </div>
 
-      {/* Middle: PDF */}
-      <div style={{ height: '100%' }}>
+      {/* Middle: PDF Viewer */}
+      <div style={{ height: 'calc(100vh - 40px)' }}>
         {renderPDFViewer()}
       </div>
 
-      {/* Right: IDE */}
-      <div style={{ height: '100%' }}>
+      {/* Right: Code Editor */}
+      <div style={{ height: 'calc(100vh - 40px)' }}>
         {renderIDE()}
       </div>
     </div>
