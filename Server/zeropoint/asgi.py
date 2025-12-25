@@ -1,15 +1,12 @@
-# zeropoint/asgi.py
 import os
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 from django.core.asgi import get_asgi_application
 from channels.security.websocket import AllowedHostsOriginValidator
-import interview.routing
+import videoconference.routing
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "zeropoint.settings")
 
-# Initialize Django ASGI application early to ensure the AppRegistry
-# is populated before importing code that may import ORM models.
 django_asgi_app = get_asgi_application()
 
 application = ProtocolTypeRouter({
@@ -17,7 +14,7 @@ application = ProtocolTypeRouter({
     "websocket": AllowedHostsOriginValidator(
         AuthMiddlewareStack(
             URLRouter(
-                interview.routing.websocket_urlpatterns
+                videoconference.routing.websocket_urlpatterns
             )
         )
     ),

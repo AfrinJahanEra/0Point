@@ -7,23 +7,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 load_dotenv(dotenv_path=BASE_DIR / '.env')
+
 SECRET_KEY = os.getenv('SECRET_KEY')
-
-DEBUG = True
-
-ALLOWED_HOSTS = ['*']
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'daphne',
     'django.contrib.staticfiles',
     'rest_framework',
+    'corsheaders',
+    'channels',
     'account',
     'contest',
     'problem',
@@ -32,14 +32,13 @@ INSTALLED_APPS = [
     'leaderboard',
     'announcement',
     'tutorial',
-    'corsheaders',
-    'channels',
-    'interview',
     'executor',
+    'mock_interview',
+    'videoconference',
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # must be high up
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -58,6 +57,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -67,19 +67,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'zeropoint.wsgi.application'
-
-connect(
-    db=os.getenv('MONGO_DB_NAME', 'zeropoint'),
-    host=os.getenv('MONGO_URI'),
-    alias='default',
-    # ssl=True,
-    # retryWrites=True,
-    # w='majority'
-
-)
-
-
-ASGI_APPLICATION ="zeropoint.asgi.application"
+ASGI_APPLICATION = "zeropoint.asgi.application"
 
 CHANNEL_LAYERS = {
     "default": {
@@ -90,29 +78,38 @@ CHANNEL_LAYERS = {
     },
 }
 
-# if os.getenv('DJANGO_ENV') == 'production':
-#     REDIS_URL = os.getenv('REDIS_URL') 
-# else:
-#     REDIS_URL = 'redis://127.0.0.1:6379' 
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
 
+USE_MONGO = os.getenv('USE_MONGO', 'true').lower() == 'true'
+MONGO_URI = os.getenv('MONGO_URI')
+
+if USE_MONGO and MONGO_URI:
+    try:
+        connect(
+            db=os.getenv('MONGO_DB_NAME', 'zeropoint'),
+            host=MONGO_URI,
+            alias='default',
+        )
+    except Exception as e:
+        print(f"MongoDB connection failed: {e}")
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
-    ],
     'UNAUTHENTICATED_USER': None,
 }
 
 CORS_ALLOWED_ORIGINS = [
-    # 'https://tech-sage-5poh.vercel.app',
-    'http://localhost:5173',  
+    "http://localhost:5173",
+    os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173'),
 ]
-
 CORS_ALLOW_CREDENTIALS = True
 
 cloudinary.config(
@@ -122,26 +119,17 @@ cloudinary.config(
     secure=True
 )
 
+STATIC_URL = 'static/'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.dummy',
-    }
-}
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 LANGUAGE_CODE = 'en-us'
@@ -149,14 +137,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
-# STATICFILES_DIRS = [BASE_DIR / 'static']  # Temporarily commented out
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
@@ -164,3 +144,5 @@ EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
+
+FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173')

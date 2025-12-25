@@ -21,15 +21,14 @@ import Community from './pages/Community';
 import Dashboard from './pages/Dashboard';
 import CreateBlog from './pages/CreateBlog';
 import Submissions from './pages/Submissions';
-import Interview from './pages/Interview';
-import InterviewSession from './pages/InterviewSession';
+import Interview from './pages/Interview';  // Updated import
+import InterviewSession from './pages/InterviewSession';  // Updated import
 import ContestInside from './pages/ContestInside';
 import MySubmissions from './pages/MySubmissions';
 import ContestLeaderboard from './pages/ContestLeaderboard';
 import ContestEditorial from './pages/ContestEditorial';
 import ContestDiscussion from './pages/ContestDiscussion';
 import ContestClarification from './pages/ContestClarification';
-
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -40,7 +39,6 @@ const Layout = ({ children }) => (
     <Footer />
   </>
 );
-
 // Layout component that includes Header, NavigationBar and Footer
 const NavLayout = ({ children }) => (
   <>
@@ -52,20 +50,18 @@ const NavLayout = ({ children }) => (
     <Footer />
   </>
 );
-
 // Full-screen layout (no header/footer)
 const FullScreenLayout = ({ children }) => (
   <main className="flex-grow">
     {children}
   </main>
 );
-
 function App() {
   return (
     <AppProvider>
       <Router>
         <div className="flex flex-col min-h-screen">
-          <Toaster 
+          <Toaster
             toastOptions={{
               style: {
                 background: '#1e40af',
@@ -80,129 +76,127 @@ function App() {
           <Routes>
             {/* Landing page without Header and Footer */}
             <Route path="/" element={<Landing />} />
-            
+           
             {/* Login and Register pages without Header and Footer */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            
+           
             {/* Visualizer and InterviewSession take full screen without Header and Footer */}
             <Route path="/visualizer" element={<Visualizer />} />
-            <Route path="/interview-session" element={<InterviewSession />} />
-            
+            <Route path="/interview-room/:sessionId" element={<InterviewSession />} />  {/* Updated dynamic route */}
+           
             {/* Pages with Header and Footer only */}
             <Route path="/home" element={
               <Layout>
                 <Home />
               </Layout>
             } />
-            
+           
             {/* Contest-specific routes */}
             <Route path="/contests/:contestId/register" element={
               <Layout>
                 <RegisterNow />
               </Layout>
             } />
-            
+           
             <Route path="/contests/:contestId/edit" element={
               <Layout>
                 <CreateContest />
               </Layout>
             } />
-            
+           
             <Route path="/contests/:contestId/problems/:problemIndex" element={
               <Layout>
                 <ProblemInside />
               </Layout>
             } />
-            
+           
             <Route path="/contests/:contestId/submissions" element={
               <Layout>
                 <MySubmissions />
               </Layout>
             } />
-
             <Route path="/contests/:contestId/discussion" element={
               <Layout>
                 <ContestDiscussion />
               </Layout>
             } />
-
             <Route path="/contests/:contestId/clarifications" element={
               <Layout>
                 <ContestClarification />
               </Layout>
             } />
-            
+           
             <Route path="/contests/:contestId/leaderboard" element={
               <Layout>
                 <ContestLeaderboard />
               </Layout>
             } />
-            
+           
             <Route path="/contests/:contestId/editorial" element={<ContestEditorial />} />
-            
+           
             {/* General contest route */}
             <Route path="/contests/:contestId" element={
               <Layout>
                 <ContestInside />
               </Layout>
             } />
-            
+           
             <Route path="/contests" element={
               <Layout>
                 <Contests />
               </Layout>
             } />
-            
+           
             <Route path="/create-contest" element={
               <Layout>
                 <CreateContest />
               </Layout>
             } />
-          
+         
             <Route path="/practice" element={
               <Layout>
                 <Practice />
               </Layout>
             } />
-            
+           
             <Route path="/leaderboard" element={
               <Layout>
                 <Leaderboard />
               </Layout>
             } />
-            
+           
             <Route path="/community" element={
               <Layout>
                 <Community />
               </Layout>
             } />
-            
+           
             {/* Pages with Header, NavigationBar and Footer */}
             <Route path="/blog" element={
               <NavLayout>
                 <Blog />
               </NavLayout>
             } />
-            
+           
             <Route path="/dashboard" element={
               <NavLayout>
                 <Dashboard />
               </NavLayout>
             } />
-            
+           
             <Route path="/create-blog" element={
               <NavLayout>
                 <CreateBlog />
               </NavLayout>
             } />
-            
+           
             <Route path="/submissions" element={
               <NavLayout>
                 <Submissions />
               </NavLayout>
             } />
-            
+           
             <Route path="/interview" element={
               <NavLayout>
                 <Interview />
@@ -214,5 +208,4 @@ function App() {
     </AppProvider>
   );
 }
-
 export default App;

@@ -1,7 +1,8 @@
+// src/components/Header.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Code2, LogOut, User, BarChart2, Video, Monitor } from 'lucide-react';
+import { Code2, LogOut, User, BarChart2, Video, Monitor, Users, Copy, Send } from 'lucide-react';
 
 const Header = () => {
   const { user, logout } = useApp();
@@ -10,9 +11,12 @@ const Header = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
   const [isCreateLinkModalOpen, setIsCreateLinkModalOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareRole, setShareRole] = useState('');
   const [sessionId, setSessionId] = useState('');
+  const [joinSessionId, setJoinSessionId] = useState('');
+  const [joinRole, setJoinRole] = useState('candidate');
   const [interviewerLink, setInterviewerLink] = useState('');
   const [candidateLink, setCandidateLink] = useState('');
   const [email, setEmail] = useState('');
@@ -63,32 +67,27 @@ const Header = () => {
   const handleCreateInterview = async () => {
     setIsCreating(true);
     try {
-      // Generate a new session ID
-      const newSessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Create a new session in the backend
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/interview/api/sessions/create/`, {
+      const response = await fetch(`${backendUrl}/api/interview/create-session/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          session_id: newSessionId,
           title: 'Interview Session',
-          duration: 3600
+          description: 'Real-time collaborative interview'
         }),
       });
       
       const result = await response.json();
       
-      if (response.ok && result.status === 'success') {
-        setSessionId(newSessionId);
+      if (response.ok && result.success) {
+        setSessionId(result.session.session_id);
         
         // Generate links
         const baseURL = window.location.origin;
-        const interviewerURL = `${baseURL}/interview-session?session=${newSessionId}&role=interviewer`;
-        const candidateURL = `${baseURL}/interview-session?session=${newSessionId}&role=candidate`;
+        const interviewerURL = `${baseURL}/interview/${result.session.session_id}?role=interviewer`;
+        const candidateURL = `${baseURL}/interview/${result.session.session_id}?role=candidate`;
         
         setInterviewerLink(interviewerURL);
         setCandidateLink(candidateURL);
@@ -97,13 +96,38 @@ const Header = () => {
         setIsInterviewModalOpen(false);
         setIsCreateLinkModalOpen(true);
       } else {
-        throw new Error(result.message || 'Failed to create session');
+        throw new Error(result.error || 'Failed to create session');
       }
     } catch (error) {
       console.error('Error creating session:', error);
       alert('Failed to create session: ' + error.message);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleJoinInterview = async () => {
+    if (!joinSessionId.trim()) {
+      alert('Please enter a session ID');
+      return;
+    }
+
+    try {
+      // Validate session exists
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/api/interview/session/${joinSessionId}/`);
+      
+      if (response.ok) {
+        // Redirect to interview session
+        navigate(`/interview/${joinSessionId}?role=${joinRole}`);
+        setIsJoinModalOpen(false);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Session not found');
+      }
+    } catch (error) {
+      console.error('Error joining session:', error);
+      alert('Failed to join session');
     }
   };
 
@@ -129,7 +153,7 @@ const Header = () => {
     setIsSending(true);
     try {
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/interview/api/sessions/send-invitation/`, {
+      const response = await fetch(`${backendUrl}/api/interview/send-invitation/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -137,17 +161,18 @@ const Header = () => {
         body: JSON.stringify({
           session_id: sessionId,
           email: email,
-          role: shareRole
+          role: shareRole,
+          message: 'You are invited to join an interview session'
         }),
       });
       
       const result = await response.json();
       
-      if (response.ok && result.status === 'success') {
+      if (response.ok && result.success) {
         alert(`Invitation sent successfully to ${email}`);
         setIsShareModalOpen(false);
       } else {
-        alert(`Failed to send invitation: ${result.message || 'Unknown error'}`);
+        alert(`Failed to send invitation: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error sending invitation:', error);
@@ -165,7 +190,6 @@ const Header = () => {
   const openLink = (url) => {
     window.open(url, '_blank');
   };
-
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -298,14 +322,26 @@ const Header = () => {
               <Video className="w-5 h-5" />
               Interview Options
             </h2>
-            <button
-              onClick={handleCreateInterview}
-              disabled={isCreating}
-              className="w-full bg-blue-800 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <Video className="w-4 h-4" />
-              {isCreating ? 'Creating...' : 'Create Interview Link'}
-            </button>
+            
+            <div className="space-y-3">
+              <button
+                onClick={handleCreateInterview}
+                disabled={isCreating}
+                className="w-full bg-blue-800 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Video className="w-4 h-4" />
+                {isCreating ? 'Creating...' : 'Create Interview Session'}
+              </button>
+              
+              <button
+                onClick={() => setIsJoinModalOpen(true)}
+                className="w-full bg-green-800 text-white py-2 px-4 rounded hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Join Existing Session
+              </button>
+            </div>
+            
             <button
               onClick={() => setIsInterviewModalOpen(false)}
               className="w-full mt-2 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
@@ -316,39 +352,98 @@ const Header = () => {
         </div>
       )}
 
+      {/* Join Session Modal */}
+      {isJoinModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Join Interview Session
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Session ID
+                </label>
+                <input
+                  type="text"
+                  value={joinSessionId}
+                  onChange={(e) => setJoinSessionId(e.target.value)}
+                  placeholder="Enter session ID"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Your Role
+                </label>
+                <select
+                  value={joinRole}
+                  onChange={(e) => setJoinRole(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="candidate">Candidate</option>
+                  <option value="interviewer">Interviewer</option>
+                  <option value="observer">Observer</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setIsJoinModalOpen(false)}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleJoinInterview}
+                className="flex-1 bg-green-800 text-white py-2 px-4 rounded hover:bg-green-700 transition-colors"
+              >
+                Join Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create Link Modal Popup */}
       {isCreateLinkModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <Video className="w-5 h-5" />
-              Interview Links
+              Interview Session Created!
             </h2>
-            <p className="text-gray-600 mb-4">Session ID: {sessionId.substring(0, 8)}</p>
+            <p className="text-gray-600 mb-4">Session ID: <strong>{sessionId}</strong></p>
             
             <div className="space-y-4">
               {/* Interviewer Link */}
               <div className="border border-gray-200 rounded-lg p-3">
                 <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-medium text-blue-800">Interviewer Link</h3>
+                  <h3 className="font-medium text-blue-800 flex items-center gap-2">
+                    <User className="w-4 h-4" /> Interviewer Link
+                  </h3>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => copyToClipboard(interviewerLink)}
-                      className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
+                      className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 transition-colors flex items-center gap-1"
                     >
-                      Copy
+                      <Copy className="w-3 h-3" /> Copy
                     </button>
                     <button 
                       onClick={() => openLink(interviewerLink)}
-                      className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200 transition-colors"
+                      className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200 transition-colors flex items-center gap-1"
                     >
-                      Open
+                      <Video className="w-3 h-3" /> Open
                     </button>
                     <button 
                       onClick={() => handleShareClick('interviewer')}
-                      className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded hover:bg-purple-200 transition-colors"
+                      className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded hover:bg-purple-200 transition-colors flex items-center gap-1"
                     >
-                      Share
+                      <Send className="w-3 h-3" /> Share
                     </button>
                   </div>
                 </div>
@@ -358,25 +453,27 @@ const Header = () => {
               {/* Candidate Link */}
               <div className="border border-gray-200 rounded-lg p-3">
                 <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-medium text-green-800">Candidate Link</h3>
+                  <h3 className="font-medium text-green-800 flex items-center gap-2">
+                    <Users className="w-4 h-4" /> Candidate Link
+                  </h3>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => copyToClipboard(candidateLink)}
-                      className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
+                      className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 transition-colors flex items-center gap-1"
                     >
-                      Copy
+                      <Copy className="w-3 h-3" /> Copy
                     </button>
                     <button 
                       onClick={() => openLink(candidateLink)}
-                      className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200 transition-colors"
+                      className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200 transition-colors flex items-center gap-1"
                     >
-                      Open
+                      <Video className="w-3 h-3" /> Open
                     </button>
                     <button 
                       onClick={() => handleShareClick('candidate')}
-                      className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded hover:bg-purple-200 transition-colors"
+                      className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded hover:bg-purple-200 transition-colors flex items-center gap-1"
                     >
-                      Share
+                      <Send className="w-3 h-3" /> Share
                     </button>
                   </div>
                 </div>
@@ -399,7 +496,7 @@ const Header = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Video className="w-5 h-5" />
+              <Send className="w-5 h-5" />
               Share {shareRole === 'interviewer' ? 'Interviewer' : 'Candidate'} Link
             </h2>
             <p className="text-gray-600 mb-4">Enter email to send invitation:</p>
@@ -423,9 +520,14 @@ const Header = () => {
               <button
                 onClick={handleSendInvitation}
                 disabled={isSending}
-                className="flex-1 bg-purple-800 text-white py-2 px-4 rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
+                className="flex-1 bg-purple-800 text-white py-2 px-4 rounded hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isSending ? 'Sending...' : 'Send Invitation'}
+                {isSending ? 'Sending...' : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Send Invitation
+                  </>
+                )}
               </button>
             </div>
           </div>
