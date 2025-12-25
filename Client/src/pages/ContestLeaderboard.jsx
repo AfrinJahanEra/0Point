@@ -25,6 +25,7 @@ const ContestLeaderboard = () => {
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [contestProblems, setContestProblems] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -40,14 +41,20 @@ const ContestLeaderboard = () => {
         const data = await response.json();
         setLeaderboardData(data.leaderboard || []);
         
+        // Store the actual problems from backend
+        if (data.problems) {
+          setContestProblems(data.problems);
+          console.log("Contest problems:", data.problems);
+        }
+        
         // Set initial time remaining if provided by backend
         if (data.time_remaining) {
           setTimeRemaining(data.time_remaining);
         }
         
         // Set contest status if provided
-        if (data.status) {
-          setContestStatus(data.status);
+        if (data.contest_status) {
+          setContestStatus(data.contest_status);
         }
         
         setError(null);
@@ -189,39 +196,47 @@ const ContestLeaderboard = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <div className="font-bold text-gray-900">{participant.score}</div>
+                      <div>
+                        <div className="font-bold text-gray-900">{participant.score}</div>
+                        <div className="text-xs text-gray-600">points</div>
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <span className="font-bold text-green-600">{participant.problemsSolved}</span>
-                        <span className="text-gray-500">/6</span>
+                        {/* FIXED: Use contestProblems state instead of data.problems */}
+                        <span className="text-gray-500">/{contestProblems.length || 6}</span>
                       </div>
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="text-gray-700">{participant.penalty}</div>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="font-semibold text-gray-900">{participant.rating}</span>
-                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${participant.ratingChange > 0 ? 'bg-green-100 text-green-800' : participant.ratingChange < 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+                      <div className="flex flex-col items-center">
+                        <span className="font-bold text-gray-900">{participant.rating}</span>
+                        <span className="text-xs text-gray-600">rating</span>
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full mt-1 ${participant.ratingChange > 0 ? 'bg-green-100 text-green-800' : participant.ratingChange < 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
                           {getRatingChangeIcon(participant.ratingChange)}
                           {participant.ratingChange > 0 ? '+' : ''}{participant.ratingChange}
                         </span>
                       </div>
                     </td>
-<td className="py-3 px-4">
-  <div className="flex gap-1 justify-center">
-    {participant.submissions.map((submission, idx) => (
-      <div 
-        key={idx} 
-        className={`w-6 h-6 flex items-center justify-center rounded text-xs font-bold ${submission.status === 'AC' ? 'text-green-700' : submission.status === 'WA' ? 'text-red-700' : 'text-gray-400'}`}
-        title={`Problem ${submission.problem}: ${submission.status === 'AC' ? 'Accepted' : submission.status === 'WA' ? 'Wrong Answer' : 'Not Attempted'}`}
-      >
-        {submission.problem}
-      </div>
-    ))}
-  </div>
-</td>
+                    <td className="py-3 px-4">
+                      <div className="flex gap-1 justify-center">
+                        {participant.submissions.map((submission, idx) => (
+                          <div 
+                            key={idx} 
+                            className={`w-8 h-8 flex flex-col items-center justify-center rounded text-xs ${submission.status === 'AC' ? 'bg-green-50 text-green-700 border border-green-200' : submission.status === 'WA' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-50 text-gray-400 border border-gray-200'}`}
+                            title={`Problem ${submission.problem}: ${submission.status === 'AC' ? `Accepted (${submission.points} pts)` : submission.status === 'WA' ? 'Wrong Answer' : 'Not Attempted'}`}
+                          >
+                            <div className="font-bold">{submission.problem}</div>
+                            {submission.status === 'AC' && (
+                              <div className="text-[10px] font-semibold">{submission.points}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -232,7 +247,7 @@ const ContestLeaderboard = () => {
           <div className="border-t border-gray-200 px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="text-xs text-gray-600">
-                Showing <span className="font-semibold">1-10</span> of <span className="font-semibold">{leaderboardData.length}</span> participants
+                Showing <span className="font-semibold">1-50</span> of <span className="font-semibold">{leaderboardData.length}</span> participants
               </div>
               <div className="flex items-center gap-2">
                 <button className="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 text-xs disabled:opacity-50">

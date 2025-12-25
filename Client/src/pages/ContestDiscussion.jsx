@@ -1,4 +1,12 @@
 // ContestDiscussion.jsx - UPDATED WITH FIXED COMMENTS SYSTEM
+// Add these imports from CreateContest.jsx
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import rehypeHighlight from 'rehype-highlight';
+import rehypeRaw from 'rehype-raw';
+import 'katex/dist/katex.min.css';
+import 'highlight.js/styles/github.css';
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
@@ -44,6 +52,99 @@ const ContestDiscussion = () => {
   const [commentInputs, setCommentInputs] = useState({}); // {postId: string}
   // FIX: Separate reply state for each post
   const [replyingTo, setReplyingTo] = useState({}); // {postId: commentId}
+
+    const customComponents = {
+  h1: ({ children }) => (
+    <h1 className="text-2xl font-bold mt-6 mb-4 text-gray-900 border-b border-gray-200 pb-2">
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="text-xl font-bold mt-5 mb-3 text-gray-800">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="text-lg font-semibold mt-4 mb-2 text-gray-700">
+      {children}
+    </h3>
+  ),
+  p: ({ children }) => (
+    <p className="my-3 text-gray-700 leading-relaxed">
+      {children}
+    </p>
+  ),
+  ul: ({ children }) => (
+    <ul className="my-4 ml-6 list-disc space-y-2 text-gray-700">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-4 ml-6 list-decimal space-y-2 text-gray-700">
+      {children}
+    </ol>
+  ),
+  code: ({ inline, className, children, ...props }) => {
+    const match = /language-(\w+)/.exec(className || '');
+    return !inline && match ? (
+      <div className="my-4 rounded-md overflow-hidden">
+        <div className="bg-gray-800 text-gray-300 text-xs px-4 py-2 font-mono">
+          {match[1]}
+        </div>
+        <pre className="bg-gray-900 text-gray-100 p-4 overflow-x-auto text-sm">
+          <code className={className} {...props}>
+            {children}
+          </code>
+        </pre>
+      </div>
+    ) : (
+      <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
+        {children}
+      </code>
+    );
+  },
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-4 border-blue-400 pl-4 py-2 my-4 bg-blue-50 italic text-gray-700">
+      {children}
+    </blockquote>
+  ),
+  table: ({ children }) => (
+    <div className="overflow-x-auto my-6">
+      <table className="min-w-full divide-y divide-gray-200 border border-gray-300">
+        {children}
+    </table>
+    </div>
+  ),
+  tr: ({ children }) => (
+    <tr className="divide-x divide-gray-200">{children}</tr>
+  ),
+  th: ({ children }) => (
+    <th className="px-4 py-3 bg-gray-100 text-left text-sm font-semibold text-gray-700">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="px-4 py-3 text-sm text-gray-700 border-t border-gray-200">
+      {children}
+    </td>
+  ),
+  a: ({ href, children }) => (
+    <a href={href} className="text-blue-600 hover:text-blue-800 hover:underline" target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
+  spoiler: ({ children, summary }) => (
+    <details className="my-4 bg-gray-50 border border-gray-300 rounded-lg">
+      <summary className="cursor-pointer px-4 py-3 font-medium text-gray-700 hover:bg-gray-100">
+        {summary || 'Solution / Spoiler'}
+      </summary>
+      <div className="px-4 py-3 border-t border-gray-300 bg-white">
+        {children}
+      </div>
+    </details>
+  )
+};
+
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
 
@@ -424,9 +525,15 @@ const handleSavePost = async (postId) => {
                   </button>
                 </div>
                 
-                <p className="text-gray-700 text-sm mb-3 whitespace-pre-wrap">
-                  {comment.content || 'No content'}
-                </p>
+                <div className="text-gray-700 text-sm mb-3 prose prose-sm max-w-none">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkMath]}
+                    rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                    components={customComponents}
+                  >
+                    {comment.content || 'No content'}
+                  </ReactMarkdown>
+                </div>
                 
                 <div className="flex items-center gap-4">
                   <button 
@@ -891,10 +998,18 @@ const handleSavePost = async (postId) => {
                     {post.title}
                   </h3>
 
-                  <div className="text-gray-600 text-xs mb-6 line-clamp-3">
-                    {post.content.split('\n')[0]}
-                    {post.content.split('\n').length > 1 && '...'}
-                  </div>
+                  <div className="text-gray-600 text-xs mb-6 prose prose-sm max-w-none">
+  <ReactMarkdown
+    remarkPlugins={[remarkMath]}
+    rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+    components={customComponents}
+  >
+    {post.content.length > 150 
+      ? post.content.substring(0, 150) + '...' 
+      : post.content
+    }
+  </ReactMarkdown>
+</div>
 
                   {/* Actions - Bottom Row */}
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
