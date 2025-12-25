@@ -14,6 +14,7 @@ const InterviewSession = () => {
   const remoteVideoRef = useRef(null);
   const pc = useRef(null);
   const ws = useRef(null);
+  const codeWs = useRef(null);
   const streamRef = useRef(null);
 
   // Media state
@@ -26,6 +27,13 @@ const InterviewSession = () => {
   const [pdfUrl, setPdfUrl] = useState(null);
   const [pdfUploader, setPdfUploader] = useState('');
 
+  // IDE state
+  const [code, setCode] = useState('# Start coding here\nprint("Hello, Interview!")');
+  const [language, setLanguage] = useState('python');
+  const [output, setOutput] = useState('');
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [stdin, setStdin] = useState('');
+
   // UI state
   const [participants, setParticipants] = useState([]);
   const [permissionState, setPermissionState] = useState({ audio: 'prompt', video: 'prompt' });
@@ -34,7 +42,7 @@ const InterviewSession = () => {
   const myRoleLabel = role === 'interviewer' ? 'Interviewer' : 'Candidate';
   const remoteRoleLabel = role === 'interviewer' ? 'Candidate' : 'Interviewer';
 
-  // 🔍 Check permissions
+  // 🔍 Check browser media permissions
   const checkPermissions = useCallback(async () => {
     try {
       const audioStatus = await navigator.permissions.query({ name: 'microphone' });
@@ -44,11 +52,11 @@ const InterviewSession = () => {
         video: videoStatus.state
       });
     } catch (err) {
-      console.warn('Permission API not supported');
+      console.warn('Permission API not supported in this browser');
     }
   }, []);
 
-  // 📤 Upload PDF
+  // 📤 Upload PDF to backend
   const handlePDFUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -77,17 +85,15 @@ const InterviewSession = () => {
       const data = await res.json();
       console.log('✅ PDF upload SUCCESS:', data);
 
-      // Update UI immediately
       setPdfUrl(data.url);
       setPdfUploader(data.uploader_email);
-
     } catch (err) {
       console.error('❌ PDF upload failed:', err);
       alert(`Failed to upload PDF: ${err.message}`);
     }
   };
 
-  // 📥 Fetch latest PDF
+  // 📥 Fetch latest PDF for this session
   const fetchLatestPDF = useCallback(async () => {
     try {
       const res = await fetch(`/api/pdf/upload/session/${sessionId}/`);
@@ -105,6 +111,82 @@ const InterviewSession = () => {
     }
   }, [sessionId]);
 
+  // ✅ Initialize IDE WebSocket
+  const initCodeSync = useCallback(() => {
+    const codeSocket = new WebSocket(`ws://localhost:8000/ws/code/${sessionId}/`);
+    codeWs.current = codeSocket;
+
+    codeSocket.onopen = () => {
+      console.log('✅ IDE WebSocket connected');
+    };
+
+    codeSocket.onmessage = (event) => {
+      console.log('📥 IDE WS Message:', event.data); // 🔴 ADD THIS
+      const data = JSON.parse(event.data);
+      if (data.type === 'code_update') {
+        setCode(data.code);
+        setLanguage(data.language);
+      }
+    };
+
+    codeSocket.onclose = () => {
+      console.log('IDE WebSocket disconnected');
+    };
+
+    return () => {
+      codeSocket.close();
+    };
+  }, [sessionId]);
+
+  // ✅ Debounced code sync
+  const debouncedSync = useRef(null);
+  const syncCode = useCallback((newCode, newLang) => {
+    if (debouncedSync.current) clearTimeout(debouncedSync.current);
+    debouncedSync.current = setTimeout(() => {
+      if (codeWs.current?.readyState === WebSocket.OPEN) {
+        console.log('📤 WebSocket sending:', { type: 'code_update', code: newCode.substring(0, 30) + '...', language: newLang }); // 🔴 ADD THIS
+        codeWs.current.send(JSON.stringify({
+          type: 'code_update',
+          code: newCode,
+          language: newLang
+        }));
+      }
+    }, 500);
+  }, []);
+
+  // ✅ Compile code via JDoodle API
+  const compile = async () => {
+    setIsCompiling(true);
+    setOutput('Compiling...\n');
+    
+    try {
+      const res = await fetch('/api/ide/compile/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language, stdin })
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      
+      if (data.error) {
+        setOutput(`❌ Error:\n${data.error}`);
+      } else {
+        setOutput(
+          `✅ Output:\n${data.output || '(no output)'}\n\n` +
+          `Memory: ${data.memory} | CPU Time: ${data.cpuTime}`
+        );
+      }
+    } catch (err) {
+      setOutput(`💥 Compilation failed: ${err.message}`);
+    } finally {
+      setIsCompiling(false);
+    }
+  };
+
   // 🎯 Initialize session
   useEffect(() => {
     let cleanupScheduled = false;
@@ -112,9 +194,11 @@ const InterviewSession = () => {
     const init = async () => {
       await checkPermissions();
       await fetchLatestPDF();
+      initCodeSync();
 
       try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const constraints = { video: true, audio: true };
+        const s = await navigator.mediaDevices.getUserMedia(constraints);
         if (cleanupScheduled) return;
 
         streamRef.current = s;
@@ -130,7 +214,9 @@ const InterviewSession = () => {
         });
         pc.current = peerConnection;
 
-        s.getTracks().forEach(track => peerConnection.addTrack(track, s));
+        s.getTracks().forEach(track => {
+          peerConnection.addTrack(track, s);
+        });
 
         const websocket = new WebSocket(`ws://localhost:8000/ws/video/${sessionId}/?role=${role}&email=${encodeURIComponent(email)}`);
         ws.current = websocket;
@@ -157,6 +243,7 @@ const InterviewSession = () => {
           try {
             data = JSON.parse(event.data);
           } catch (e) {
+            console.warn('Invalid WS message:', event.data);
             return;
           }
 
@@ -166,7 +253,7 @@ const InterviewSession = () => {
             setPdfUrl(data.pdf_url);
             setPdfUploader(data.uploader_email);
           }
-          // 👉 Media state
+          // 👉 Media state from remote peer
           else if (data.type === 'media_update' && data.role !== role) {
             if (data.media_type === 'audio') setRemoteAudioEnabled(data.enabled);
             if (data.media_type === 'video') setRemoteVideoEnabled(data.enabled);
@@ -175,7 +262,7 @@ const InterviewSession = () => {
           else if (data.type === 'participant_list') {
             setParticipants(data.participants);
           }
-          // 👉 Signaling
+          // 👉 WebRTC signaling
           else if (data.type === 'offer') {
             try {
               await peerConnection.setRemoteDescription(data.offer);
@@ -183,13 +270,13 @@ const InterviewSession = () => {
               await peerConnection.setLocalDescription(answer);
               websocket.send(JSON.stringify({ type: 'answer', answer: peerConnection.localDescription }));
             } catch (err) {
-              console.error('Offer error:', err);
+              console.error('Error handling offer:', err);
             }
           } else if (data.type === 'answer') {
             try {
               await peerConnection.setRemoteDescription(data.answer);
             } catch (err) {
-              console.error('Answer error:', err);
+              console.error('Error handling answer:', err);
             }
           } else if (data.type === 'ice_candidate') {
             try {
@@ -197,27 +284,34 @@ const InterviewSession = () => {
                 await peerConnection.addIceCandidate(data.ice_candidate);
               }
             } catch (err) {
-              console.error('ICE error:', err);
+              console.error('Error adding ICE candidate:', err);
             }
           }
         };
 
         peerConnection.onicecandidate = (e) => {
           if (e.candidate && websocket.readyState === WebSocket.OPEN) {
-            websocket.send(JSON.stringify({ type: 'ice_candidate', ice_candidate: e.candidate }));
+            websocket.send(JSON.stringify({
+              type: 'ice_candidate',
+              ice_candidate: e.candidate
+            }));
           }
         };
 
         peerConnection.ontrack = (e) => {
-          if (remoteVideoRef.current && e.streams[0]) {
+          if (remoteVideoRef.current && e.streams && e.streams[0]) {
             remoteVideoRef.current.srcObject = e.streams[0];
           }
         };
 
       } catch (err) {
-        console.error('Init error:', err);
+        console.error('❌ Media/init failed:', err);
         let msg = 'Failed to access camera/microphone.';
-        if (err.name === 'NotAllowedError') msg = 'Camera/mic blocked. Click address bar icon to allow.';
+        if (err.name === 'NotAllowedError') {
+          msg = 'You blocked camera/mic. Click the camera icon in the address bar to allow.';
+        } else if (err.name === 'NotFoundError') {
+          msg = 'No camera or microphone detected.';
+        }
         setError(msg);
       }
     };
@@ -226,15 +320,32 @@ const InterviewSession = () => {
 
     return () => {
       cleanupScheduled = true;
+
+      // Close WebSockets
       ws.current?.close();
-      pc.current?.close();
-      streamRef.current?.getTracks().forEach(t => t.stop());
+      codeWs.current?.close();
+
+      // Close PeerConnection
+      if (pc.current) {
+        pc.current.close();
+        pc.current = null;
+      }
+
+      // Stop media tracks
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          if (track.readyState === 'live') track.stop();
+        });
+        streamRef.current = null;
+      }
+
+      // Clear video elements
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     };
-  }, [sessionId, role, email, checkPermissions, fetchLatestPDF]);
+  }, [sessionId, role, email, checkPermissions, fetchLatestPDF, initCodeSync]);
 
-  // 🎯 Toggle CAMERA (hardware level)
+  // 🎯 Toggle CAMERA (real hardware control)
   const toggleVideo = async () => {
     const s = streamRef.current;
     if (!s) return;
@@ -245,42 +356,50 @@ const InterviewSession = () => {
     const track = videoTracks[0];
 
     if (track.readyState === 'live') {
-      // STOP camera
+      // 👉 STOP camera
       track.stop();
       setLocalVideoActive(false);
+
       if (pc.current) {
         const sender = pc.current.getSenders().find(s => s.track === track);
         if (sender) sender.replaceTrack(null);
       }
     } else {
-      // RE-ENABLE camera
+      // 👉 RE-ENABLE camera
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const newTrack = newStream.getVideoTracks()[0];
+        
         s.addTrack(newTrack);
         if (pc.current) {
           const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
-          if (sender) sender.replaceTrack(newTrack);
-          else pc.current.addTrack(newTrack, s);
-        }
-        if (localVideoRef.current) {
-          const current = localVideoRef.current.srcObject;
-          if (current) {
-            const newMedia = new MediaStream([
-              ...current.getTracks().filter(t => t.kind !== 'video'),
-              newTrack
-            ]);
-            localVideoRef.current.srcObject = newMedia;
-            streamRef.current = newMedia;
+          if (sender) {
+            sender.replaceTrack(newTrack);
+          } else {
+            pc.current.addTrack(newTrack, s);
           }
         }
+
+        if (localVideoRef.current) {
+          const currentSrc = localVideoRef.current.srcObject;
+          if (currentSrc) {
+            const newMediaStream = new MediaStream([
+              ...currentSrc.getTracks().filter(t => t.kind !== 'video'),
+              newTrack
+            ]);
+            localVideoRef.current.srcObject = newMediaStream;
+            streamRef.current = newMediaStream;
+          }
+        }
+
         setLocalVideoActive(true);
       } catch (err) {
-        alert('Could not re-enable camera.');
+        console.error('Failed to re-enable camera:', err);
+        alert('Could not re-enable camera. Check permissions.');
       }
     }
 
-    // Sync state
+    // 📡 Sync state
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({
         type: 'media_update',
@@ -290,7 +409,7 @@ const InterviewSession = () => {
     }
   };
 
-  // 🎤 Toggle MIC
+  // 🎤 Toggle MIC (lightweight)
   const toggleAudio = () => {
     const s = streamRef.current;
     if (!s) return;
@@ -300,6 +419,7 @@ const InterviewSession = () => {
 
     const track = audioTracks[0];
     const newState = !track.enabled;
+
     track.enabled = newState;
     setLocalAudioActive(newState);
 
@@ -312,24 +432,35 @@ const InterviewSession = () => {
     }
   };
 
-  const getMediaIcon = (enabled, type) => enabled ? (type === 'audio' ? '🎤' : '🎥') : (type === 'audio' ? '🔇' : '📷');
+  // 🎨 Helper: Media icons
+  const getMediaIcon = (enabled, type) => {
+    if (type === 'audio') return enabled ? '🎤' : '🔇';
+    return enabled ? '🎥' : '📷';
+  };
 
-  // 📄 PDF Viewer (Native iframe)
+  // ✅ Handle code change
+  const handleCodeChange = (e) => {
+    const newCode = e.target.value;
+    setCode(newCode);
+    console.log('📤 Sending code update:', newCode.substring(0, 30) + '...'); // 🔴 ADD THIS
+    syncCode(newCode, language);
+  };
+
+  // ✅ Handle language change
+  const handleLanguageChange = (e) => {
+    const newLang = e.target.value;
+    setLanguage(newLang);
+    syncCode(code, newLang);
+  };
+
+  // 📄 Render PDF viewer
   const renderPDFViewer = () => {
-    // Construct absolute URL for iframe using direct media serving
     const absolutePdfUrl = pdfUrl 
-      ? (pdfUrl.startsWith('http') 
-          ? pdfUrl 
-          : `http://localhost:8000${pdfUrl}#toolbar=1&navpanes=0`)
+      ? (pdfUrl.startsWith('http') ? pdfUrl : `http://localhost:8000${pdfUrl}`)
       : null;
-
-    console.log('PDF URL being used:', absolutePdfUrl); // Debug log
 
     return (
       <div style={{
-        padding: '12px',
-        background: '#f8fafc',
-        borderRadius: '8px',
         height: '100%',
         display: 'flex',
         flexDirection: 'column'
@@ -338,14 +469,11 @@ const InterviewSession = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '10px'
+          marginBottom: '10px',
+          fontSize: '0.95em'
         }}>
-          <strong style={{ fontSize: '1.1em' }}>📄 Shared Document</strong>
-          {pdfUploader && (
-            <span style={{ fontSize: '0.85em', color: '#64748b' }}>
-              by {pdfUploader.split('@')[0]}
-            </span>
-          )}
+          <strong>📄 Shared Document</strong>
+          {pdfUploader && <span>by {pdfUploader.split('@')[0]}</span>}
         </div>
 
         {role === 'interviewer' && (
@@ -356,7 +484,7 @@ const InterviewSession = () => {
             padding: '6px 12px',
             borderRadius: '4px',
             cursor: 'pointer',
-            fontSize: '0.9em',
+            fontSize: '0.85em',
             width: 'fit-content'
           }}>
             📤 Upload PDF
@@ -377,16 +505,14 @@ const InterviewSession = () => {
           background: 'white'
         }}>
           {absolutePdfUrl ? (
-            <div style={{ width: '100%', height: '100%' }}>
-              <embed
-                src={absolutePdfUrl}
-                type="application/pdf"
-                width="100%"
-                height="100%"
-                style={{ display: 'block' }}
-                title="Shared PDF"
-              />
-            </div>
+            <embed
+              src={absolutePdfUrl}
+              type="application/pdf"
+              width="100%"
+              height="100%"
+              style={{ display: 'block' }}
+              title="Shared PDF"
+            />
           ) : (
             <div style={{
               display: 'flex',
@@ -400,9 +526,9 @@ const InterviewSession = () => {
               <div>
                 <p>📄 No PDF shared yet.</p>
                 {role === 'interviewer' ? (
-                  <p>Upload a PDF to collaborate in real time.</p>
+                  <p>Upload a PDF to collaborate.</p>
                 ) : (
-                  <p>Waiting for interviewer to share a document...</p>
+                  <p>Waiting for interviewer...</p>
                 )}
               </div>
             </div>
@@ -412,24 +538,132 @@ const InterviewSession = () => {
     );
   };
 
+  // 💻 Render IDE
+  const renderIDE = () => (
+    <div style={{
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <div style={{
+        display: 'flex',
+        gap: '10px',
+        marginBottom: '10px',
+        flexWrap: 'wrap'
+      }}>
+        <select
+          value={language}
+          onChange={handleLanguageChange}
+          style={{
+            padding: '6px 10px',
+            background: '#1e293b',
+            color: 'white',
+            border: '1px solid #334155',
+            borderRadius: '4px',
+            fontSize: '0.9em'
+          }}
+        >
+          <option value="python">🐍 Python</option>
+          <option value="java">☕ Java</option>
+          <option value="c++">CppClass C++</option>
+          <option value="c">C</option>
+          <option value="javascript">📜 JavaScript</option>
+          <option value="go">🐹 Go</option>
+          <option value="rust">🦀 Rust</option>
+        </select>
+
+        <button
+          onClick={compile}
+          disabled={isCompiling}
+          style={{
+            padding: '6px 12px',
+            background: isCompiling ? '#64748b' : '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: isCompiling ? 'not-allowed' : 'pointer',
+            fontSize: '0.9em'
+          }}
+        >
+          {isCompiling ? '⏳ Compiling...' : '▶️ Run Code'}
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+        <label style={{ color: '#94a3b8', fontSize: '0.8em', whiteSpace: 'nowrap' }}>
+          Stdin:
+        </label>
+        <input
+          type="text"
+          value={stdin}
+          onChange={(e) => setStdin(e.target.value)}
+          placeholder="e.g., 5 10"
+          style={{
+            flex: 1,
+            padding: '4px 8px',
+            background: '#1e293b',
+            color: 'white',
+            border: '1px solid #334155',
+            borderRadius: '4px',
+            fontSize: '0.85em'
+          }}
+        />
+      </div>
+
+      <textarea
+        value={code}
+        onChange={handleCodeChange}
+        spellCheck="false"
+        style={{
+          flex: 3,
+          background: '#020814',
+          color: '#e2e8f0',
+          fontFamily: 'Consolas, monaco, monospace',
+          fontSize: '14px',
+          padding: '12px',
+          border: '1px solid #334155',
+          borderRadius: '6px',
+          resize: 'none',
+          lineHeight: 1.5
+        }}
+        placeholder="Write your code here..."
+      />
+
+      <div style={{
+        flex: 2,
+        marginTop: '10px',
+        background: '#020814',
+        border: '1px solid #334155',
+        borderRadius: '6px',
+        padding: '12px',
+        overflow: 'auto',
+        whiteSpace: 'pre-wrap',
+        color: '#cbd5e1',
+        fontFamily: 'Consolas, monaco, monospace',
+        fontSize: '14px',
+        lineHeight: 1.5
+      }}>
+        <strong style={{ color: '#60a5fa' }}>Output:</strong>
+        <div style={{ marginTop: '8px', minHeight: '40px' }}>
+          {output || 'Click "Run Code" to execute'}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{
       padding: '15px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      display: 'flex',
-      gap: '20px',
-      flexWrap: 'wrap',
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr 1fr',
+      gap: '16px',
       minHeight: '100vh',
       boxSizing: 'border-box'
     }}>
-      {/* Left: Video & Controls */}
-      <div style={{ flex: 2, minWidth: '320px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '16px',
-          flex: 1
-        }}>
+      {/* Left: Video */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Local Video */}
           <div style={{ borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
             <div style={{
@@ -494,6 +728,7 @@ const InterviewSession = () => {
           </div>
         </div>
 
+        {/* Controls */}
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button
             onClick={toggleVideo}
@@ -534,37 +769,25 @@ const InterviewSession = () => {
           </button>
         </div>
 
-        {error && (
-          <div style={{
-            background: '#fee2e2',
-            color: '#b91c1c',
-            padding: '10px',
-            borderRadius: '6px',
-            fontSize: '0.9em'
-          }}>
-            ❗ {error}
-          </div>
-        )}
-
-        <div style={{ fontSize: '0.9em', color: '#475569' }}>
+        {/* Participants */}
+        <div style={{ fontSize: '0.85em', color: '#475569' }}>
           <strong>👥 Participants ({participants.length}/2)</strong>
           {participants.map((p, i) => (
-            <div key={i} style={{ margin: '4px 0' }}>
+            <div key={i} style={{ margin: '3px 0' }}>
               <span style={{ fontWeight: '500' }}>{p.role}</span>: {p.email.split('@')[0]}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Right: PDF Viewer */}
-      <div style={{
-        flex: 3,
-        minWidth: '500px',
-        height: 'calc(100vh - 80px)',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+      {/* Middle: PDF */}
+      <div style={{ height: '100%' }}>
         {renderPDFViewer()}
+      </div>
+
+      {/* Right: IDE */}
+      <div style={{ height: '100%' }}>
+        {renderIDE()}
       </div>
     </div>
   );

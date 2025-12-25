@@ -18,6 +18,7 @@ urlpatterns = [
     path('mock-interview/', include('mock_interview.urls')),
     path('videoconference/', include('videoconference.urls')),
     path('api/pdf/', include('pdf.urls')),
+    path('api/ide/', include('ide.urls')),
 ]
 
 # Serve media files during development

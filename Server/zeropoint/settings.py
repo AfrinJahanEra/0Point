@@ -40,7 +40,10 @@ INSTALLED_APPS = [
     'mock_interview',
     'videoconference',
     'pdf',
+    'ide',
 ]
+JD_CLIENT_ID = os.getenv('JD_CLIENT_ID')
+JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET')
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
