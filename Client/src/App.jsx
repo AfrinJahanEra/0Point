@@ -27,6 +27,8 @@ import ContestLeaderboard from './pages/ContestLeaderboard';
 import ContestEditorial from './pages/ContestEditorial';
 import ContestDiscussion from './pages/ContestDiscussion';
 import ContestClarification from './pages/ContestClarification';
+import VirtualContestInside from './pages/VirtualContestInside';
+import VirtualProblem from './pages/VirtualProblem';
 
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
@@ -124,7 +126,7 @@ function App() {
               </Layout>
             } />
             
-            <Route path="/contests/:contestId/leaderboard" element={
+            <Route path="/contests/:contestId/standings" element={
               <Layout>
                 <ContestLeaderboard /> {/* Make sure this component exists */}
               </Layout>
@@ -149,6 +151,21 @@ function App() {
                 <CreateContest />
               </Layout>
             } />
+
+        
+
+            <Route path="/contests/:contestId/virtual/:virtualContestId" element={
+              <VirtualContestInside />
+              } />
+            <Route path="/contests/:contestId/virtual/:virtualContestId/problems/:problemIndex" element={
+              <VirtualProblem />
+              } />
+
+            {/* <Route path="/virtual/:virtualContestId/submissions" element={<VirtualContestSubmissions />} />
+
+            <Route path="/virtual/:virtualContestId/leaderboard" element={<VirtualContestLeaderboard />} />
+            
+            <Route path="/virtual/:virtualContestId/stats" element={<VirtualContestStats />} /> */}
           
             <Route path="/practice" element={
               <Layout>
