@@ -24,6 +24,7 @@ def compile_code(request):
             'python': 'python3',
             'java': 'java',
             'c++': 'cpp17',
+            'cpp': 'cpp17',  # Also map 'cpp' to 'cpp17' for consistency
             'c': 'c',
             'javascript': 'nodejs',
             'ruby': 'ruby',
