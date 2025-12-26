@@ -34,6 +34,11 @@ const InterviewSession = () => {
   const [isCompiling, setIsCompiling] = useState(false);
   const [stdin, setStdin] = useState('');
 
+  // Connection status state
+  const [videoConnectionStatus, setVideoConnectionStatus] = useState('connecting'); // 'connected' | 'disconnected' | 'connecting'
+  const [codeConnectionStatus, setCodeConnectionStatus] = useState('connecting');
+  const [peerConnectionStatus, setPeerConnectionStatus] = useState('connecting');
+
   // UI state
   const [participants, setParticipants] = useState([]);
   const [permissionState, setPermissionState] = useState({ audio: 'prompt', video: 'prompt' });
@@ -118,6 +123,7 @@ const InterviewSession = () => {
 
     codeSocket.onopen = () => {
       console.log('✅ IDE WebSocket connected');
+      setCodeConnectionStatus('connected');
     };
 
     codeSocket.onmessage = (event) => {
@@ -131,6 +137,18 @@ const InterviewSession = () => {
 
     codeSocket.onclose = () => {
       console.log('IDE WebSocket disconnected');
+      setCodeConnectionStatus('disconnected');
+      // Auto-reconnect after 2s
+      setTimeout(() => {
+        if (codeWs.current?.readyState !== WebSocket.OPEN) {
+          initCodeSync();
+        }
+      }, 2000);
+    };
+
+    codeSocket.onerror = (e) => {
+      console.error('IDE WebSocket error:', e);
+      setCodeConnectionStatus('disconnected');
     };
 
     return () => {
@@ -223,6 +241,7 @@ const InterviewSession = () => {
 
         websocket.onopen = () => {
           console.log(`✅ WebSocket connected as ${role} (${email})`);
+          setVideoConnectionStatus('connected');
           if (role === 'client') {
             peerConnection.createOffer()
               .then(offer => peerConnection.setLocalDescription(offer))
@@ -236,6 +255,17 @@ const InterviewSession = () => {
               })
               .catch(err => console.error('Offer error:', err));
           }
+        };
+
+        websocket.onclose = () => {
+          console.log('Video WebSocket disconnected');
+          setVideoConnectionStatus('disconnected');
+          // Optional: auto-reconnect
+        };
+
+        websocket.onerror = (e) => {
+          console.error('Video WebSocket error:', e);
+          setVideoConnectionStatus('disconnected');
         };
 
         websocket.onmessage = async (event) => {
@@ -292,6 +322,15 @@ const InterviewSession = () => {
               ice_candidate: e.candidate
             }));
           }
+        };
+
+        peerConnection.onconnectionstatechange = () => {
+          console.log('PeerConnection state:', peerConnection.connectionState);
+          setPeerConnectionStatus(peerConnection.connectionState);
+        };
+
+        peerConnection.onsignalingstatechange = () => {
+          console.log('Signaling state:', peerConnection.signalingState);
         };
 
         peerConnection.ontrack = (e) => {
@@ -814,6 +853,72 @@ const InterviewSession = () => {
               <strong>{p.role.charAt(0).toUpperCase() + p.role.slice(1)}:</strong> {p.email.split('@')[0]}
             </div>
           ))}
+        </div>
+
+        {/* Connection Status */}
+        <div style={{
+          background: 'white',
+          padding: '16px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          fontSize: '0.9em'
+        }}>
+          <strong style={{ display: 'block', marginBottom: '10px', color: '#1e293b' }}>
+            🌐 Connection Status
+          </strong>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: videoConnectionStatus === 'connected' ? '#10b981' : 
+                         videoConnectionStatus === 'disconnected' ? '#ef4444' : '#f59e0b'
+              }} />
+              <span>Video WS: <strong>{videoConnectionStatus}</strong></span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: codeConnectionStatus === 'connected' ? '#10b981' : 
+                         codeConnectionStatus === 'disconnected' ? '#ef4444' : '#f59e0b'
+              }} />
+              <span>Code WS: <strong>{codeConnectionStatus}</strong></span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: peerConnectionStatus === 'connected' ? '#10b981' : 
+                         peerConnectionStatus === 'failed' ? '#ef4444' : '#f59e0b'
+              }} />
+              <span>WebRTC: <strong>{peerConnectionStatus}</strong></span>
+            </div>
+          </div>
+
+          {videoConnectionStatus === 'disconnected' && (
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                marginTop: '12px',
+                padding: '8px 12px',
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '0.85em',
+                cursor: 'pointer'
+              }}
+            >
+              🔁 Reconnect
+            </button>
+          )}
         </div>
 
         {error && (
