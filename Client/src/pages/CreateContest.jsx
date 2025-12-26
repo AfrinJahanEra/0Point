@@ -572,6 +572,11 @@ const formattedProblems = problems.map((problem) => ({
   };
 
 const handlePublishContest = async (type) => {
+  // ✅ DECLARE THESE VARIABLES AT THE TOP
+  let payload;
+  let url;
+  let method;
+
   // Validate contest data
   if (!contestData.title.trim()) {
     alert("Please enter a contest title");
@@ -599,18 +604,47 @@ const handlePublishContest = async (type) => {
 
   // Validate required fields for test contest
   if (type === "test") {
-    if (!publishSettings.testContest) {
-      alert('Please enable "Test Contest" first');
+    // ✅ Use the already-declared variables
+    payload = {
+      test_start_time: publishSettings.testStartTime + ":00Z",
+      testers: publishSettings.testers.map(t => t.email),
+      duration: parseFloat(contestData.duration) || 3.0
+    };
+
+    url = `http://localhost:8000/contests/${contestId}/publish-test/`;
+    method = "POST";
+    
+    // ✅ If using the new test endpoint, skip the rest of the function
+    try {
+      const response = await fetch(url, {
+        method: method,
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY"
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Server error:", data);
+        alert(data.error || "Failed to publish test contest");
+        return;
+      }
+
+      alert(`Contest published as test successfully!`);
+      navigate("/contests");
+      return; // ✅ IMPORTANT: Exit the function here
+    } catch (err) {
+      console.error("Request failed:", err);
+      alert("Could not reach server.");
       return;
     }
-    if (!validateTestContest()) return;
   }
 
+  // ✅ Only execute this code for REGULAR (non-test) contests
   try {
-    let payload;
-    let url;
-    let method;
-
     // Format problems (common for both edit and create modes)
     const formattedProblems = problems.map((problem) => ({
       index: problem.problemIndex || '',
@@ -645,7 +679,7 @@ const handlePublishContest = async (type) => {
         editorial_published: publishSettings.editorialPublished
       };
       
-      // Add test contest data if applicable
+      // Add test contest data if applicable (this is OLD way - keep for backward compatibility)
       if (type === "test") {
         payload.convert_to_test = true;
         payload.testers = publishSettings.testers.map(t => t.email);
@@ -664,7 +698,7 @@ const handlePublishContest = async (type) => {
         type: contestData.type,
         platform: contestData.platform,
         problems: formattedProblems,
-        status: type === "test" ? "test" : "upcoming",  // IMPORTANT: Set status here
+        status: type === "test" ? "test" : "upcoming",
         visibility: publishSettings.visibility,
         registration_required: publishSettings.registrationRequired,
         email_notifications: publishSettings.emailNotifications,
@@ -1559,7 +1593,8 @@ const addTestCase = (problemId) => {
               ← Back to Edit
             </button>
             {publishSettings.testContest && (
-              <button type="button" onClick={() => handlePublishContest('test')} className="w-full sm:w-auto px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex items-center gap-2">
+              <button type="button" onClick={() => handlePublishContest('test')} 
+              className="w-full sm:w-auto px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex items-center gap-2">
                 Publish as Test
               </button>
             )}
