@@ -16,7 +16,8 @@ const Contests = () => {
 
   const navigate = useNavigate();
 
-  const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
+  // const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
+  const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjk0NGQyNGI2ZTQ5YWZhNGNhNmVmOTgyIiwiZW1haWwiOiJlcmFAZ29vZ2xlLmNvbSIsInJvbGUiOiJ1c2VyIn0.alZAb6lwSVKVehGwgCq4Z1NIPSwKjJ6naA0IoEeLl_o";
 
   // Initial data fetch
   useEffect(() => {
@@ -193,62 +194,78 @@ const Contests = () => {
     }
   };
 
-  const handleContestEntry = async (contestId, contestStatus) => {
-    if (contestStatus === 'draft') {
-      navigate(`/contests/${contestId}/edit`);
+  const refreshRegisteredContests = async () => {
+  try {
+    const registrationsRes = await axios.get('http://localhost:8000/contests/registrations/', {
+      headers: { Authorization: `Bearer ${TOKEN}` }
+    });
+    console.log('✅ Updated registrations:', registrationsRes.data.registered_contests?.length || 0);
+    setRegisteredContests(registrationsRes.data.registered_contests || []);
+  } catch (regErr) {
+    console.warn('⚠️ Could not refresh registrations:', regErr);
+  }
+};
+
+
+const handleContestEntry = async (contestId, contestStatus) => {
+  if (contestStatus === 'draft') {
+    navigate(`/contests/${contestId}/edit`);
+    return;
+  }
+  
+  try {
+    const problemsRes = await axios.get(
+      `http://localhost:8000/contests/${contestId}/problems/`,
+      { headers: { Authorization: `Bearer ${TOKEN}` } }
+    );
+    
+    const problems = problemsRes.data.problems || [];
+    
+    if (problems.length === 0) {
+      alert('This contest has no problems yet.');
       return;
     }
     
-    try {
-      const problemsRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/problems/`,
-        { headers: { Authorization: `Bearer ${TOKEN}` } }
-      );
+    navigate(`/contests/${contestId}`);
+    
+  } catch (error) {
+    console.error('Error fetching contest problems:', error);
+    
+    if (error.response?.status === 403) {
+      const errorData = error.response.data;
       
-      const problems = problemsRes.data.problems || [];
-      
-      if (problems.length === 0) {
-        alert('This contest has no problems yet.');
-        return;
-      }
-      
-      navigate(`/contests/${contestId}`);
-      
-    } catch (error) {
-      console.error('Error fetching contest problems:', error);
-      
-      if (error.response?.status === 403) {
-        const errorData = error.response.data;
+      if (errorData.can_register) {
+        const shouldRegister = window.confirm(
+          `You need to register for this ${contestStatus} contest. Register now?`
+        );
         
-        if (errorData.can_register) {
-          const shouldRegister = window.confirm(
-            `You need to register for this ${contestStatus} contest. Register now?`
-          );
-          
-          if (shouldRegister) {
-            try {
-              await axios.post(
-                `http://localhost:8000/contests/${contestId}/register/`,
-                {},
-                { headers: { Authorization: `Bearer ${TOKEN}` } }
-              );
-              
-              alert('Successfully registered! You can now enter the contest.');
-              navigate(`/contests/${contestId}`);
-              
-            } catch (registerError) {
-              console.error('Registration error:', registerError);
-              navigate(`/contests/${contestId}/register`);
-            }
+        if (shouldRegister) {
+          try {
+            await axios.post(
+              `http://localhost:8000/contests/${contestId}/register/`,
+              {},
+              { headers: { Authorization: `Bearer ${TOKEN}` } }
+            );
+            
+            // Refresh the registered contests list after successful registration
+            await refreshRegisteredContests();
+            
+            alert('Successfully registered! You can now enter the contest.');
+            navigate(`/contests/${contestId}`);
+            
+          } catch (registerError) {
+            console.error('Registration error:', registerError);
+            navigate(`/contests/${contestId}/register`);
           }
-        } else {
-          alert(errorData.message || 'Access denied to this contest.');
         }
       } else {
-        alert('Failed to load contest. Please try again.');
+        alert(errorData.message || 'Access denied to this contest.');
       }
+    } else {
+      alert('Failed to load contest. Please try again.');
     }
-  };
+  }
+};
 
   const handleDraftEdit = (contestId, e) => {
     e.stopPropagation();
