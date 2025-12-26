@@ -82,7 +82,7 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
     const nodes = Array.from(allNodes);
     if (nodes.length === 0) return;
     
-    // Position nodes in a circle with support for dragged positions
+
     const nodePositions = {};
     nodes.forEach((node, index) => {
       // Check if node has been dragged
@@ -129,6 +129,7 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
           
           // Highlight MST edges
           if (stepData.mst && stepData.mst.some(edge => 
+            edge && edge.from && edge.to &&
             (edge.from === fromNode && edge.to === toNode) || 
             (edge.from === toNode && edge.to === fromNode))) {
             edge.attr("stroke", "#1E40AF") // Dark blue for MST edges
@@ -136,9 +137,10 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
           }
           
           // Highlight current edge being considered
-          if (stepData.currentEdge && 
-            ((stepData.currentEdge.from === fromNode && stepData.currentEdge.to === toNode) ||
-             (stepData.currentEdge.from === toNode && stepData.currentEdge.to === fromNode))) {
+          const currentEdge = stepData.currentEdge || stepData.addEdge || stepData.skipEdge;
+          if (currentEdge && currentEdge.from && currentEdge.to &&
+            ((currentEdge.from === fromNode && currentEdge.to === toNode) ||
+             (currentEdge.from === toNode && currentEdge.to === fromNode))) {
             edge.attr("stroke", "#93C5FD") // Light blue for current edge
                 .attr("stroke-width", 2)
                 .attr("stroke-dasharray", "5,5");
@@ -462,24 +464,38 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         
         // Check if this edge is in MST
         const isInMST = stepData && stepData.mst && stepData.mst.some(edge => 
+          edge && edge.from && edge.to &&
           (edge.from === node && edge.to === neighbor) || 
           (edge.from === neighbor && edge.to === node)
         );
         
+        // Check if this is the current edge being considered
+        const currentEdge = stepData && (stepData.currentEdge || stepData.addEdge || stepData.skipEdge);
+        const isCurrentEdge = currentEdge && currentEdge.from && currentEdge.to &&
+          ((currentEdge.from === node && currentEdge.to === neighbor) ||
+           (currentEdge.from === neighbor && currentEdge.to === node));
+        
         // Draw edge
-        if (isInMST) {
+        if (isCurrentEdge) {
+          doc.setDrawColor(59, 130, 246); // blue for current edge
+          doc.setLineWidth(0.8 * optimalScale); // Slightly thicker for current edge
+        } else if (isInMST) {
           doc.setDrawColor(16, 185, 129); // green-500
         } else {
           doc.setDrawColor(156, 163, 175); // gray-400
         }
-        doc.setLineWidth(0.5 * optimalScale);
+        if (!isCurrentEdge) {
+          doc.setLineWidth(0.5 * optimalScale);
+        }
         doc.line(x1, y1, x2, y2);
         
         // Draw edge weight
         const midX = (x1 + x2) / 2;
         const midY = (y1 + y2) / 2;
         doc.setFontSize(6 * optimalScale);
-        if (isInMST) {
+        if (isCurrentEdge) {
+          doc.setTextColor(59, 130, 246); // blue for current edge
+        } else if (isInMST) {
           doc.setTextColor(16, 185, 129); // green-500
         } else {
           doc.setTextColor(156, 163, 175); // gray-400
@@ -530,11 +546,14 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
     if (operation === 'start') {
       return 'Starting Kruskal algorithm';
     } else if (operation === 'consider_edge') {
+      if (!stepData.currentEdge) return 'Processing...';
       return `Considering edge from ${stepData.currentEdge.from} to ${stepData.currentEdge.to} with weight ${stepData.currentEdge.weight}`;
     } else if (operation === 'add_edge') {
-      return `Adding edge from ${stepData.currentEdge.from} to ${stepData.currentEdge.to} to MST`;
+      if (!stepData.addEdge) return 'Processing...';
+      return `Adding edge from ${stepData.addEdge.from} to ${stepData.addEdge.to} to MST`;
     } else if (operation === 'skip_edge') {
-      return `Skipping edge from ${stepData.currentEdge.from} to ${stepData.currentEdge.to} (would create cycle)`;
+      if (!stepData.skipEdge) return 'Processing...';
+      return `Skipping edge from ${stepData.skipEdge.from} to ${stepData.skipEdge.to} (would create cycle)`;
     } else if (operation === 'complete') {
       return 'Kruskal algorithm complete!';
     } else {
@@ -866,6 +885,7 @@ const renderStaticGraph = (step) => {
     <g>
       {/* Draw MST edges first (in green) */}
       {step.mst && step.mst.map((edge, index) => {
+        if (!edge || !edge.from || !edge.to) return null;
         const pos1 = nodePositions[edge.from];
         const pos2 = nodePositions[edge.to];
         
@@ -909,9 +929,16 @@ const renderStaticGraph = (step) => {
           
           // Check if this edge is in MST
           const isInMST = step.mst && step.mst.some(edge => 
-            (edge.from === fromNode && edge.to === toNode) || 
-            (edge.from === toNode && edge.to === fromNode)
+            edge && edge.from && edge.to &&
+            ((edge.from === fromNode && edge.to === toNode) || 
+             (edge.from === toNode && edge.to === fromNode))
           );
+          
+          // Check if this is the current edge being considered
+          const currentEdge = step.currentEdge || step.addEdge || step.skipEdge;
+          const isCurrentEdge = currentEdge && currentEdge.from && currentEdge.to &&
+            ((currentEdge.from === fromNode && currentEdge.to === toNode) ||
+             (currentEdge.from === toNode && currentEdge.to === fromNode));
           
           // Skip if already drawn as MST edge
           if (isInMST) return null;
@@ -932,14 +959,14 @@ const renderStaticGraph = (step) => {
                 y1={pos1.y}
                 x2={pos2.x}
                 y2={pos2.y}
-                stroke="#93C5FD"
-                strokeWidth="2"
+                stroke={isCurrentEdge ? "#3B82F6" : "#93C5FD"} // Blue for current edge, light blue for others
+                strokeWidth={isCurrentEdge ? "3" : "2"} // Thicker for current edge
               />
               <text
                 x={midX}
                 y={midY - 5}
                 textAnchor="middle"
-                className="font-bold text-gray-600 text-xs"
+                className={`font-bold ${isCurrentEdge ? 'text-blue-600' : 'text-gray-600'} text-xs`}
               >
                 {weight}
               </text>

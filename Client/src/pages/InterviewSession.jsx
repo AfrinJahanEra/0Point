@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { FaVideo, FaVideoSlash, FaMicrophone, FaMicrophoneSlash } from 'react-icons/fa';
 import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python';
 import java from 'react-syntax-highlighter/dist/esm/languages/hljs/java';
 import cpp from 'react-syntax-highlighter/dist/esm/languages/hljs/cpp';
@@ -444,53 +445,66 @@ const InterviewSession = () => {
     const track = videoTracks[0];
 
     if (track.readyState === 'live') {
+      // 👉 Turn OFF
       track.stop();
       setLocalVideoActive(false);
+
+      // ✅ Clear video element
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
 
       if (pc.current) {
         const sender = pc.current.getSenders().find(s => s.track === track);
         if (sender) sender.replaceTrack(null);
       }
+
+      // ✅ Send update
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({
+          type: 'media_update',
+          media_type: 'video',
+          enabled: false
+        }));
+      }
     } else {
+      // 👉 Turn ON
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const newTrack = newStream.getVideoTracks()[0];
-        
-        s.addTrack(newTrack);
+
+        // ✅ Assign to video element
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = newStream;
+        }
+
+        // ✅ Add to WebRTC
         if (pc.current) {
           const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
           if (sender) {
             sender.replaceTrack(newTrack);
           } else {
-            pc.current.addTrack(newTrack, s);
+            pc.current.addTrack(newTrack, newStream);
           }
         }
 
-        if (localVideoRef.current) {
-          const currentSrc = localVideoRef.current.srcObject;
-          if (currentSrc) {
-            const newMediaStream = new MediaStream([
-              ...currentSrc.getTracks().filter(t => t.kind !== 'video'),
-              newTrack
-            ]);
-            localVideoRef.current.srcObject = newMediaStream;
-            streamRef.current = newMediaStream;
-          }
-        }
-
+        // ✅ Update state
         setLocalVideoActive(true);
+        streamRef.current = newStream;
+
+        // ✅ Send update
+        if (ws.current?.readyState === WebSocket.OPEN) {
+          ws.current.send(JSON.stringify({
+            type: 'media_update',
+            media_type: 'video',
+            enabled: true
+          }));
+        }
+
       } catch (err) {
         console.error('Failed to re-enable camera:', err);
         alert('Could not re-enable camera. Check permissions.');
       }
-    }
-
-    if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({
-        type: 'media_update',
-        media_type: 'video',
-        enabled: localVideoActive
-      }));
     }
   };
 
@@ -519,8 +533,10 @@ const InterviewSession = () => {
 
 
   const getMediaIcon = (enabled, type) => {
-    if (type === 'audio') return enabled ? '' : '';
-    return enabled ? '' : '';
+    if (type === 'audio') {
+      return enabled ? <FaMicrophone style={{ fontSize: '1.2em' }} /> : <FaMicrophoneSlash style={{ fontSize: '1.2em' }} />;
+    }
+    return enabled ? <FaVideo style={{ fontSize: '1.2em' }} /> : <FaVideoSlash style={{ fontSize: '1.2em' }} />;
   };
 
   // ✅ Handle code change
@@ -870,8 +886,8 @@ const InterviewSession = () => {
               <video
                 ref={localVideoRef}
                 autoPlay
-                muted
                 playsInline
+                muted
                 style={
                   {
                     width: '100%',
@@ -895,7 +911,7 @@ const InterviewSession = () => {
                 fontSize: '1.2em',
                 fontWeight: '600'
               }}>
-                <div style={{ fontSize: '2em', marginBottom: '10px' }}>📷</div>
+                <div style={{ fontSize: '2em', marginBottom: '10px' }}><FaVideoSlash /></div>
                 <div>Camera Off</div>
               </div>
             )}
@@ -929,6 +945,7 @@ const InterviewSession = () => {
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
+                muted
                 style={{
                   width: '100%',
                   height: '220px',
@@ -952,7 +969,7 @@ const InterviewSession = () => {
                 fontSize: '1.2em',
                 fontWeight: '600'
               }}>
-                <div style={{ fontSize: '2em', marginBottom: '10px' }}>📷</div>
+                <div style={{ fontSize: '2em', marginBottom: '10px' }}><FaVideoSlash /></div>
                 <div>Remote Camera Off</div>
               </div>
             )}
@@ -1019,7 +1036,7 @@ const InterviewSession = () => {
           fontSize: '0.9em'
         }}>
           <strong style={{ display: 'block', marginBottom: '10px', color: '#1e293b' }}>
-            👥 Participants ({participants.length}/2)
+            Participants ({participants.length}/2)
           </strong>
           {participants.map((p, i) => (
             <div key={i} style={{ margin: '8px 0', color: '#475569' }}>
