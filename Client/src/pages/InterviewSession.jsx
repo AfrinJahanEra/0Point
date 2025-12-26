@@ -472,14 +472,18 @@ const InterviewSession = () => {
 
           {role === 'interviewer' && (
             <label style={{
-              background: '#3b82f6',
+              background: '#1e40af',
               color: 'white',
-              padding: '10px 16px',
+              padding: '12px 20px',
               borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: '0.9em',
-              fontWeight: '500',
-              boxShadow: '0 2px 4px rgba(59,130,246,0.3)'
+              fontSize: '0.95em',
+              fontWeight: '600',
+              boxShadow: '0 4px 6px rgba(30,64,175,0.3)',
+              border: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
               📤 Upload PDF
               <input
@@ -569,15 +573,15 @@ const InterviewSession = () => {
           onClick={compile}
           disabled={isCompiling}
           style={{
-            padding: '10px 20px',
-            background: isCompiling ? '#475569' : '#10b981',
+            padding: '12px 20px',
+            background: isCompiling ? '#475569' : '#1e40af',
             color: 'white',
             border: 'none',
             borderRadius: '8px',
             cursor: isCompiling ? 'not-allowed' : 'pointer',
             fontWeight: '600',
             fontSize: '0.95em',
-            boxShadow: isCompiling ? 'none' : '0 4px 10px rgba(16,185,129,0.3)'
+            boxShadow: isCompiling ? 'none' : '0 4px 6px rgba(30,64,175,0.3)'
           }}
         >
           {isCompiling ? '⏳ Running...' : '▶️ Run Code'}
@@ -759,15 +763,15 @@ const InterviewSession = () => {
               disabled={permissionState.video === 'denied'}
               style={{
                 flex: 1,
-                padding: '14px',
-                background: localVideoActive ? '#ef4444' : '#10b981',
+                padding: '12px 20px',
+                background: localVideoActive ? '#1e40af' : '#1e40af',
                 color: 'white',
                 border: 'none',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 fontWeight: '600',
                 cursor: 'pointer',
-                fontSize: '1em',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
+                fontSize: '0.95em',
+                boxShadow: '0 4px 6px rgba(30,64,175,0.3)'
               }}
             >
               {localVideoActive ? '📷 Turn Off Camera' : '🎥 Turn On Camera'}
@@ -778,15 +782,15 @@ const InterviewSession = () => {
               disabled={permissionState.audio === 'denied'}
               style={{
                 flex: 1,
-                padding: '14px',
-                background: localAudioActive ? '#ef4444' : '#10b981',
+                padding: '12px 20px',
+                background: localAudioActive ? '#1e40af' : '#1e40af',
                 color: 'white',
                 border: 'none',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 fontWeight: '600',
                 cursor: 'pointer',
-                fontSize: '1em',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
+                fontSize: '0.95em',
+                boxShadow: '0 4px 6px rgba(30,64,175,0.3)'
               }}
             >
               {localAudioActive ? '🔇 Mute Mic' : '🎤 Unmute Mic'}
