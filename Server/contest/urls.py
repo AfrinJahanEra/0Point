@@ -26,6 +26,7 @@ from .views import (
     UserProblemStatusAPIView,
     ContestProblemTutorialAPIView,  # Import the new view
     ContestEditorialAPIView,  # Import the new v,
+    ContestPublishTestAPIView,
 )
 
 from compiler.views import (
@@ -139,4 +140,6 @@ urlpatterns = [
     path('contests/<str:contest_id>/virtual/<str:virtual_contest_id>/submit/', VirtualContestSubmitAPIView.as_view(), name='virtual-contest-submit'),
     path('contests/<str:contest_id>/virtual/<str:virtual_contest_id>/problems/', VirtualContestProblemsAPIView.as_view(), name='virtual-contest-problems'),
     path('contests/<str:contest_id>/virtual/<str:virtual_contest_id>/problems/<str:problem_index>/', VirtualContestProblemDetailAPIView.as_view(), name='virtual-contest-problem-detail'),
+
+    path('contests/<contest_id>/publish-test/', ContestPublishTestAPIView.as_view(), name='publish-test-contest'),
 ]

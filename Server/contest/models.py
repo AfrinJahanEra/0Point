@@ -62,3 +62,45 @@ class ContestRegistration(Document):
     meta = {'collection': 'contest_registration'}
     contest = ReferenceField(Contest)
     user = ReferenceField(Account)
+
+# contest/models.py - Add this after ContestRegistration class
+
+class TestContest(Document):
+    """Test contest copy that references the original draft contest"""
+    meta = {'collection': 'test_contest'}
+    
+    # Reference to original draft contest
+    original_contest = ReferenceField(Contest, required=True)
+    
+    # Test contest specific fields (copy of contest fields)
+    title = StringField(required=True)
+    description = StringField()
+    start_time = DateTimeField(required=True)
+    duration = FloatField(required=True)
+    type = StringField()
+    platform = StringField()
+    
+    # Testers who can access this test contest
+    testers = ListField(StringField(), default=list)  # List of emails
+    
+    # Problems (embedded copy)
+    problems = EmbeddedDocumentListField(ContestProblem, default=list)
+    
+    # Creator reference
+    created_by = ReferenceField(Account, null=True)
+    
+    # Test contest settings
+    visibility = StringField(choices=["test"], default="test")  # Always "test" for test contests
+    status = StringField(choices=["upcoming", "live", "past"], default="upcoming")
+    
+    # Timestamps
+    created_at = DateTimeField()
+    test_start_time = DateTimeField(required=True)  # Separate from original contest start time
+    
+    # Contest settings copy
+    registration_required = BooleanField(default=True)
+    email_notifications = BooleanField(default=True)
+    leaderboard_public = BooleanField(default=True)
+    allow_practice = BooleanField(default=True)
+    rating_changes = BooleanField(default=True)
+    editorial_published = BooleanField(default=False)

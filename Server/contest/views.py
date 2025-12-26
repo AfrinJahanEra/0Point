@@ -7,8 +7,8 @@ from datetime import datetime, timedelta, timezone
 from mongoengine.errors import ValidationError as MEValidationError
 import pytz
 from .broadcast import broadcast_contest_update
-from .models import Contest, ContestProblem, ContestRegistration, TestCase
-from .serializers import ContestCreateSerializer
+from .models import Contest, ContestProblem, ContestRegistration, TestCase, TestContest
+from .serializers import ContestCreateSerializer, TestContestCreateSerializer
 from .utils.auth import get_user_from_request
 from account.models import Account
 from rest_framework.permissions import IsAuthenticated
@@ -249,152 +249,6 @@ class ContestProblemTutorialAPIView(APIView):
         """Partial update of tutorial"""
         return self.put(request, contest_id, problem_index)  # Same as PUT for now
     
-# class ContestEditorialAPIView(APIView):
-    
-#     def get(self, request, contest_id):
-#         """Get editorial overview for a contest"""
-#         print(f"DEBUG: ContestEditorialAPIView - contest: {contest_id}")
-        
-#         try:
-#             contest = Contest.objects.get(id=contest_id)
-#             print(f"DEBUG: Found contest: {contest.title}, Status: {get_contest_status(contest)}")
-#         except Contest.DoesNotExist:
-#             print("DEBUG: Contest not found")
-#             return Response({"error": "Contest not found"}, status=404)
-        
-#         user = get_user_from_request(request)
-#         user_id = user.id if user else None
-#         print(f"DEBUG: User ID: {user_id}")
-        
-#         # Check if editorial can be accessed
-#         can_access_editorial = False
-#         access_error = None
-        
-#         # ADD THIS: For past contests, always set editorial_published to True
-#         if get_contest_status(contest) == "past":
-#             # Past contests - editorial is accessible to everyone
-#             can_access_editorial = True
-#             # FORCE editorial_published to be True for past contests
-#             contest.editorial_published = True  # ADD THIS LINE
-#             print("DEBUG: Past contest - editorial access granted to all")
-#         elif get_contest_status(contest) == "draft":
-#             # Drafts - only creator can access
-#             if user and contest.created_by and str(contest.created_by.id) == str(user.id):
-#                 can_access_editorial = True
-#                 print("DEBUG: Draft contest - creator can access editorial")
-#             else:
-#                 access_error = "Editorial not available in draft contests"
-#                 print("DEBUG: Draft contest - editorial access denied")
-#         elif get_contest_status(contest) in ["live", "upcoming", "test"]:
-#             # During contest, editorial is restricted
-#             if getattr(contest, 'editorial_published', False):
-#                 # If editorial is explicitly published, allow access
-#                 can_access_editorial = True
-#                 print("DEBUG: Contest in progress - editorial published, access granted")
-#             elif user and contest.created_by and str(contest.created_by.id) == str(user.id):
-#                 # Creator can always access
-#                 can_access_editorial = True
-#                 print("DEBUG: Contest in progress - creator access to editorial")
-#             else:
-#                 access_error = "Editorial will be available after the contest ends"
-#                 print("DEBUG: Contest in progress - editorial not published yet")
-        
-#         if not can_access_editorial:
-#             print(f"DEBUG: Editorial access denied: {access_error}")
-#             return Response({
-#                 "error": "Access denied",
-#                 "message": access_error or "You don't have access to the editorial",
-#                 "contest_status": get_contest_status(contest),
-#                 "editorial_published": getattr(contest, 'editorial_published', False),
-#                 "can_access": False
-#             }, status=403)
-        
-#         # Prepare editorial overview
-#         try:
-#             # Get all problems with tutorials
-#             problems_with_tutorials = []
-#             total_problems = len(contest.problems)
-            
-#             for problem in contest.problems:
-#                 has_tutorial = bool(problem.tutorial and problem.tutorial.strip())
-                
-#                 problem_data = {
-#                     "index": problem.index,
-#                     "title": problem.title,
-#                     "difficulty": problem.difficulty or "Medium",
-#                     "tags": problem.tags or [],
-#                     "points": getattr(problem, 'points', 0) or 0,  # ADD THIS LINE
-#                     "has_tutorial": has_tutorial,
-#                     "tutorial_length": len(problem.tutorial) if has_tutorial else 0,
-#                     "tutorial_preview": problem.tutorial[:100] + "..." if has_tutorial and len(problem.tutorial) > 100 else (problem.tutorial if has_tutorial else "")
-#                 }
-                
-#                 problems_with_tutorials.append(problem_data)
-            
-#             # Count stats
-#             tutorials_count = sum(1 for p in problems_with_tutorials if p["has_tutorial"])
-            
-#             print(f"DEBUG: Prepared editorial overview - {tutorials_count}/{total_problems} tutorials available")
-            
-#             response_data = {
-#                 "contest_id": str(contest.id),
-#                 "contest_title": contest.title,
-#                 "contest_status": get_contest_status(contest),
-#                 "editorial_published": getattr(contest, 'editorial_published', False),  # This will now be True for past contests
-#                 "total_problems": total_problems,
-#                 "tutorials_available": tutorials_count,
-#                 "problems": problems_with_tutorials,
-#                 "can_access": True,
-#                 "created_at": contest.start_time.isoformat() if contest.start_time else None,
-#                 "created_by": {
-#                     "id": str(contest.created_by.id) if contest.created_by else None,
-#                     "name": contest.created_by.name if contest.created_by else None
-#                 } if contest.created_by else None
-#             }
-            
-#             return Response(response_data)
-            
-#         except Exception as e:
-#             print(f"DEBUG: Error preparing editorial: {str(e)}")
-#             return Response({
-#                 "error": f"Error preparing editorial: {str(e)}",
-#                 "can_access": False
-#             }, status=500)
-        
-#     def post(self, request, contest_id):
-#         """Publish/unpublish editorial"""
-#         user = get_user_from_request(request)
-#         if not user:
-#             return Response({"error": "Authentication required"}, status=401)
-        
-#         try:
-#             contest = Contest.objects.get(id=contest_id)
-#         except Contest.DoesNotExist:
-#             return Response({"error": "Contest not found"}, status=404)
-        
-#         # Check if user is the creator
-#         if not contest.created_by or str(contest.created_by.id) != str(user.id):
-#             return Response({"error": "Only contest creator can manage editorial"}, status=403)
-        
-#         action = request.data.get('action', 'publish')
-        
-#         if action == 'publish':
-#             contest.editorial_published = True
-#         elif action == 'unpublish':
-#             contest.editorial_published = False
-#         else:
-#             return Response({"error": "Invalid action. Use 'publish' or 'unpublish'"}, status=400)
-        
-#         try:
-#             contest.save()
-#             return Response({
-#                 "message": f"Editorial {action}ed successfully",
-#                 "contest_id": str(contest.id),
-#                 "editorial_published": contest.editorial_published
-#             })
-#         except Exception as e:
-#             return Response({"error": f"Failed to update editorial: {str(e)}"}, status=400)
-
 class ContestProblemsAPIView(APIView):
     def get(self, request, contest_id):
         print(f"DEBUG: Starting ContestProblemsAPIView for contest: {contest_id}")
@@ -906,16 +760,34 @@ class ContestPublishAPIView(APIView):
             return Response({"error": f"Failed to save contest: {str(e)}"}, status=400)
         
 def get_contest_status(contest):
-    """
-    Calculate contest status based on current time.
-    Duration is in hours (not minutes).
-    Returns: "draft", "upcoming", "live", "past", or "test"
-    """
+
+    is_test_contest = hasattr(contest, 'original_contest')
     
-    # If contest has status field and it's draft, return immediately
+    if is_test_contest:
+        dhaka_tz = pytz.timezone('Asia/Dhaka')
+        now = datetime.now(dhaka_tz)
+
+        start_time = contest.test_start_time
+
+        if start_time.tzinfo is None:
+            start_time = dhaka_tz.localize(start_time)
+        elif str(start_time.tzinfo) != 'Asia/Dhaka':
+            start_time = start_time.astimezone(dhaka_tz)
+
+        duration_minutes = contest.duration * 60 if contest.duration else 0
+        end_time = start_time + timedelta(minutes=duration_minutes)
+
+        if now < start_time:
+            return "upcoming"
+        elif start_time <= now <= end_time:
+            return "live"
+        else:
+            return "past"
+
     if hasattr(contest, 'status') and contest.status == "draft":
         return "draft"
     
+
     # Check for test contests first
     if hasattr(contest, 'test_start_time') and contest.test_start_time:
         dhaka_tz = pytz.timezone('Asia/Dhaka')
@@ -1015,6 +887,14 @@ class ContestListCreateAPIView(APIView):
         
         # Get all contests (no status filter needed now)
         contests = Contest.objects.all().order_by("-start_time").limit(200)
+
+        test_contests = []
+
+        if user:
+            # Get test contests where user is a tester or creator
+            test_contests = TestContest.objects.filter(
+                Q(testers__contains=user.email) | Q(created_by=user)
+            ).order_by("-test_start_time").limit(50)
         
         data = []
 
@@ -1043,6 +923,28 @@ class ContestListCreateAPIView(APIView):
                 "is_creator": is_creator,
                 "status": status_value,  # Use calculated status
                 "participants": participant_count,
+            })
+
+        for tc in test_contests:
+            status_value = get_contest_status(tc)
+            
+            participant_count = ContestRegistration.objects(contest=tc).count()
+            
+            data.append({
+                "id": str(tc.id),
+                "title": f"[TEST] {tc.title}",
+                "description": tc.description,
+                "start_time": tc.test_start_time.isoformat() if tc.test_start_time else None,
+                "duration": tc.duration,
+                "type": tc.type,
+                "platform": tc.platform,
+                "created_by": str(tc.created_by.id) if tc.created_by else None,
+                "is_creator": user and tc.created_by and str(tc.created_by.id) == str(user.id),
+                "status": status_value,
+                "participants": participant_count,
+                "is_test_contest": True,  # Flag to identify test contests
+                "original_contest_id": str(tc.original_contest.id) if tc.original_contest else None,
+                "testers_count": len(tc.testers)
             })
 
         # Broadcast update
@@ -1525,4 +1427,68 @@ class ContestEditorialAPIView(APIView):
         except Exception as e:
             return Response({"error": f"Failed to update editorial: {str(e)}"}, status=400)
 
+from .serializers import TestContestCreateSerializer
+
+class ContestPublishTestAPIView(APIView):
+    """
+    Publish a draft contest as a test contest (creates separate test contest copy)
+    """
+    
+    def post(self, request, contest_id):
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+        
+        try:
+            # Get original draft contest
+            original_contest = Contest.objects.get(id=contest_id, created_by=user)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found or access denied"}, status=404)
+        
+        # Ensure contest is a draft
+        if original_contest.status != "draft":
+            return Response({
+                "error": "Only draft contests can be published as test",
+                "current_status": original_contest.status
+            }, status=400)
+        
+        # Validate test contest data
+        serializer = TestContestCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        
+        try:
+            # Create test contest copy
+            test_contest = serializer.create_test_contest(original_contest, serializer.validated_data)
+            
+            # Save test contest
+            test_contest.save()
+            
+            # Keep original contest as draft (no changes needed)
+            # Optionally, you could add a field to track that it has a test version
+            if not hasattr(original_contest, 'has_test_version'):
+                original_contest.has_test_version = True
+                original_contest.save()
+            
+            # Calculate test contest status based on start time
+            test_status = get_contest_status(test_contest)
+            test_contest.status = test_status
+            test_contest.save()
+            
+            return Response({
+                "message": "Test contest published successfully",
+                "test_contest_id": str(test_contest.id),
+                "original_contest_id": str(original_contest.id),
+                "test_status": test_status,
+                "test_start_time": test_contest.test_start_time,
+                "testers_count": len(test_contest.testers),
+                "problems_count": len(test_contest.problems)
+            }, status=201)
+            
+        except Exception as e:
+            print(f"DEBUG: Error creating test contest: {str(e)}")
+            return Response({
+                "error": f"Failed to create test contest: {str(e)}"
+            }, status=400)
+        
 
