@@ -29,6 +29,10 @@ import ContestDiscussion from './pages/ContestDiscussion';
 import ContestClarification from './pages/ContestClarification';
 import VirtualContestInside from './pages/VirtualContestInside';
 import VirtualProblem from './pages/VirtualProblem';
+import TestContestInside from './pages/TestContestInside';
+import TestContestProblemDetail from './pages/TestContestProblemDetail';
+import TestContestLeaderboard  from './pages/TestContestLeaderboard';
+import TestContestSubmission from './pages/TestContestSubmission';
 
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
@@ -152,7 +156,29 @@ function App() {
               </Layout>
             } />
 
-        
+            <Route path="/test-contests/:testContestId/standings" 
+            element={
+              <Layout>
+                <TestContestLeaderboard />
+              </Layout>
+            } />
+
+            <Route path="/test-contests/:testContestId/submissions" 
+            element={
+              <Layout>
+                <TestContestSubmission />
+              </Layout>
+            } />
+
+            <Route path="/test-contests/:testContestId/problems" element={
+              <TestContestInside />
+              } />
+
+            <Route path="/test-contests/:testContestId/problems/:problemIndex" 
+            element={
+            <TestContestProblemDetail />
+            } />
+
 
             <Route path="/contests/:contestId/virtual/:virtualContestId" element={
               <VirtualContestInside />
