@@ -69,6 +69,15 @@ from virtual.views import (
     VirtualContestProblemDetailAPIView,
 )
 
+from testcontest.views import (
+    TestContestCreateAPIView,
+    TestContestDetailAPIView,
+    TestContestRegisterAPIView,
+    TestContestProblemsAPIView,
+    TestContestProblemDetailAPIView,
+    UserTestContestsAPIView,
+)
+
 urlpatterns = [
     path('contests/', ContestListCreateAPIView.as_view()),
     path('contests/registrations/', MyContestRegistrationsAPIView.as_view()),
@@ -141,5 +150,15 @@ urlpatterns = [
     path('contests/<str:contest_id>/virtual/<str:virtual_contest_id>/problems/', VirtualContestProblemsAPIView.as_view(), name='virtual-contest-problems'),
     path('contests/<str:contest_id>/virtual/<str:virtual_contest_id>/problems/<str:problem_index>/', VirtualContestProblemDetailAPIView.as_view(), name='virtual-contest-problem-detail'),
 
+    # Test contest URLs
     path('contests/<contest_id>/publish-test/', ContestPublishTestAPIView.as_view(), name='publish-test-contest'),
+
+    # Get user's accessible test contests
+    path('test-contests/my/', UserTestContestsAPIView.as_view(), name='my-test-contests'),
+    
+    # Test contest operations
+    path('test-contests/<test_contest_id>/', TestContestDetailAPIView.as_view(), name='test-contest-detail'),
+    path('test-contests/<test_contest_id>/register/', TestContestRegisterAPIView.as_view(), name='test-contest-register'),
+    path('test-contests/<test_contest_id>/problems/', TestContestProblemsAPIView.as_view(), name='test-contest-problems'),
+    path('test-contests/<test_contest_id>/problems/<problem_index>/', TestContestProblemDetailAPIView.as_view(), name='test-contest-problem-detail'),
 ]
