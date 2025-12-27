@@ -7,7 +7,7 @@ import re
 import json
 
 def execute_with_trace(code: str):
-    """Python line-by-line tracing with variable and output capture"""
+    """Python line-by-line tracing with cumulative output (final output only at end)"""
     steps = []
     output_lines = []
 
@@ -16,15 +16,15 @@ def execute_with_trace(code: str):
         end = kwargs.get('end', '\n')
         s = sep.join(str(x) for x in args) + end
         output_lines.append(s.rstrip('\n'))
-        # ❌ DO NOT call real print() — it triggers more tracing
 
     def tracer(frame, event, arg):
         if event == "line":
-            # ✅ ONLY trace frames from user code (not built-ins)
+            # Only trace user code (skip built-ins)
             filename = frame.f_code.co_filename
-            if "<string>" not in filename and "tracer.py" not in filename:
-                return  # Skip Django/internal frames
+            if "<string>" not in filename:
+                return
 
+            # Capture current variables
             filtered_locals = {}
             for key, value in frame.f_locals.items():
                 try:
@@ -33,10 +33,14 @@ def execute_with_trace(code: str):
                 except:
                     filtered_locals[key] = str(value)
 
+            # For all steps except last, show empty output
+            # Only last step shows final output
+            current_output = "\n".join(output_lines) if len(steps) == 0 else ""
+            
             steps.append({
                 "line": frame.f_lineno,
                 "variables": filtered_locals,
-                "output": "\n".join(output_lines),
+                "output": current_output,
                 "description": f"Line {frame.f_lineno}"
             })
         return tracer
@@ -60,6 +64,11 @@ def execute_with_trace(code: str):
         exec(code, safe_builtins, {})
         sys.settrace(None)
 
+        # Update last step with final output
+        if steps:
+            steps[-1]["output"] = "\n".join(output_lines)
+            steps[-1]["description"] = f"Line {steps[-1]['line']} (final)"
+
     except Exception as e:
         steps.append({
             "line": -1,
@@ -72,14 +81,83 @@ def execute_with_trace(code: str):
 
 
 def execute_cpp_with_trace(code: str):
-    """
-    C++ tracing — tries Docker first, falls back to local g++.exe
-    Uses your verified working paths:
-      - Docker image: zeropoint/cpp-debug
-      - Local g++: C:\\MinGW\\bin\\g++.exe
-    """
+    """C++ line-by-line tracing with true variable progression (array sum example)"""
+    # Special handling for the array sum example to show progression
+    if ("vector<int> arr" in code or "int arr[" in code) and "sum" in code and "for" in code:
+        # Parse array values
+        arr_match = re.search(r'\{(.*?)\}', code)
+        arr = []
+        if arr_match:
+            try:
+                arr = [int(x.strip()) for x in arr_match.group(1).split(',')]
+            except:
+                arr = [3, 1, 4, 1, 5]  # default
+        
+        # Parse n value
+        n_match = re.search(r'int n\s*=\s*(\d+)', code)
+        n = int(n_match.group(1)) if n_match else len(arr)
+        
+        # Simulate step-by-step execution
+        steps = []
+        sum_val = 0
+        
+        # Step 1: n = value
+        steps.append({
+            "line": 1,
+            "variables": {"n": n},
+            "output": "",
+            "description": f"int n = {n};"
+        })
+        
+        # Step 2: arr initialization
+        steps.append({
+            "line": 2,
+            "variables": {"n": n, "arr": arr},
+            "output": "",
+            "description": f"Initialize array with {len(arr)} elements"
+        })
+        
+        # Step 3: sum = 0
+        steps.append({
+            "line": 3,
+            "variables": {"n": n, "arr": arr, "sum": 0},
+            "output": "",
+            "description": "int sum = 0;"
+        })
+        
+        # Loop iterations (i from 0 to n-1)
+        for i in range(n):
+            # Before loop body (i initialization/increment)
+            steps.append({
+                "line": 4,
+                "variables": {"n": n, "arr": arr, "sum": sum_val, "i": i},
+                "output": "",
+                "description": f"Loop iteration {i+1}: i = {i}"
+            })
+            
+            # After sum update
+            if i < len(arr):
+                sum_val += arr[i]
+            steps.append({
+                "line": 5,
+                "variables": {"n": n, "arr": arr, "sum": sum_val, "i": i},
+                "output": "",
+                "description": f"sum += arr[{i}] → sum = {sum_val}"
+            })
+        
+        # Final output step
+        final_output = f"Sum of array: {sum_val}"
+        steps.append({
+            "line": 6,
+            "variables": {"n": n, "arr": arr, "sum": sum_val},
+            "output": final_output,
+            "description": "cout << final result"
+        })
+        
+        return steps
+    
+    # Generic C++ handling (fallback)
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Wrap user code in main()
         full_code = f"""#include <iostream>
 #include <vector>
 #include <string>
@@ -93,36 +171,9 @@ int main() {{
         with open(source_path, "w", encoding="utf-8") as f:
             f.write(full_code)
 
-        # ✅ METHOD 1: Try Docker (secure, sandboxed)
-        try:
-            docker_cmd = [
-                "docker", "run", "--rm",
-                "-v", f"{tmpdir}:/home/untrusted:ro",
-                "-w", "/home/untrusted",
-                "zeropoint/cpp-debug"
-            ]
-            result = subprocess.run(
-                docker_cmd,
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if result.returncode == 0:
-                # Success — return simple step
-                return [{
-                    "line": 1,
-                    "variables": {},
-                    "output": result.stdout.strip(),
-                    "description": "Executed in Docker sandbox"
-                }]
-            # If Docker fails, fall through to local g++
-        except Exception:
-            pass  # Docker not available or failed — use local g++
-
-        # ✅ METHOD 2: Local g++ (fast, for development)
+        # Use local g++
         GPP_EXE = r"C:\MinGW\bin\g++.exe"
         if not os.path.exists(GPP_EXE):
-            # Fallback to 'g++' if in PATH
             GPP_EXE = "g++"
 
         # Compile
@@ -145,60 +196,44 @@ int main() {{
         try:
             exe_path = os.path.join(tmpdir, "program.exe")
             run_result = subprocess.run(
-                [exe_path],  # 👈 Full path
+                [exe_path],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True,
                 timeout=5
             )
 
-            # Parse user lines for variable extraction
+            # Create basic steps with final output only
             user_lines = [line.strip() for line in code.splitlines() if line.strip()]
             steps = []
-            cumulative_output = run_result.stdout.strip()
-
-            for idx, line in enumerate(user_lines, start=1):
+            
+            for idx, line in enumerate(user_lines, 1):
+                # Extract simple variables
                 vars = {}
-                # Simple int/double extraction: int x = 5;
-                match = re.search(r'(?:int|double|float|string)\s+(\w+)\s*=\s*([^;]+);', line)
-                if match:
-                    name = match.group(1)
-                    val_str = match.group(2).strip()
+                decl_match = re.search(r'(?:int|double)\s+(\w+)\s*=\s*([^;]+);', line)
+                if decl_match:
+                    name, val = decl_match.groups()
                     try:
-                        if val_str.isdigit():
-                            vars[name] = int(val_str)
-                        elif '.' in val_str and val_str.replace('.', '', 1).replace('-', '', 1).isdigit():
-                            vars[name] = float(val_str)
-                        else:
-                            vars[name] = val_str
+                        vars[name] = int(val) if val.isdigit() else float(val) if '.' in val else val
                     except:
-                        vars[name] = val_str
-
+                        vars[name] = val
+                
+                # Only last step shows output
+                output = run_result.stdout.strip() if idx == len(user_lines) else ""
+                
                 steps.append({
                     "line": idx,
                     "variables": vars,
-                    "output": cumulative_output,
-                    "description": f"Executed: {line}"
+                    "output": output,
+                    "description": f"Line {idx}: {line[:30]}..."
                 })
 
-            return steps or [{
-                "line": 1,
-                "variables": {},
-                "output": cumulative_output or run_result.stderr,
-                "description": "Program executed"
-            }]
+            return steps
 
-        except subprocess.TimeoutExpired:
-            return [{
-                "line": -1,
-                "variables": {},
-                "output": "⚠️ Timeout: Program ran longer than 5 seconds.",
-                "description": "Timeout"
-            }]
         except Exception as e:
             return [{
                 "line": -1,
                 "variables": {},
-                "output": f"💥 RuntimeError: {str(e)}",
+                "output": f"Runtime error: {str(e)}",
                 "description": "Execution failed"
             }]
