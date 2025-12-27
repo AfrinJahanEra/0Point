@@ -59,7 +59,7 @@ const simulateCompilation = async () => {
 
   try {
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-    const response = await fetch(`${backendUrl}/api/execute/`, {
+    const response = await fetch(`${backendUrl}/api/executor/execute/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

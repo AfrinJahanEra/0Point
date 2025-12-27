@@ -14,7 +14,7 @@ urlpatterns = [
     path("", include("announcement.urls")),
     path("", include("tutorial.urls")),
     path('admin/', admin.site.urls),
-    path('api/', include('executor.urls')),
+    path('api/executor/', include('executor.urls')),
     path('mock-interview/', include('mock_interview.urls')),
     path('videoconference/', include('videoconference.urls')),
     path('api/pdf/', include('pdf.urls')),
