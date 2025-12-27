@@ -225,22 +225,18 @@ const LoopVisualizer = () => {
     };
   }, []);
 
-  // Enhanced variable tracking with print/cout tracking
+  // Variable tracking (without print statements)
   const variableData = useMemo(() => {
     if (iterations.length === 0) return { currentVars: [] };
 
     const currentStepVars = iterations[currentStep]?.variables || [];
     const prevStepVars = currentStep > 0 ? iterations[currentStep - 1]?.variables || [] : [];
     
-    // Get current output (cumulative)
-    const currentOutput = iterations[currentStep]?.output || '';
-    const prevOutput = currentStep > 0 ? iterations[currentStep - 1]?.output || '' : '';
-    
-    // Build variables list including print statements
+    // Build variables list (only real variables, no print statements)
     const vars = [];
-    
-    // Add regular variables
     const allVarNames = new Set();
+    
+    // Add all variables from current and previous steps
     currentStepVars.forEach(v => allVarNames.add(v.name));
     prevStepVars.forEach(v => allVarNames.add(v.name));
     
@@ -252,42 +248,30 @@ const LoopVisualizer = () => {
         name,
         type: currentVar?.type || prevVar?.type || 'unknown',
         value: currentVar?.value || '—',
-        changed: currentVar && prevVar && currentVar.value !== prevVar.value,
-        category: 'variable'
+        changed: currentVar && prevVar && currentVar.value !== prevVar.value
       });
     });
     
-    // Add print/cout tracking
-    if (currentOutput && currentOutput !== prevOutput) {
-      // Extract new output lines
-      const newLines = currentOutput.split('\n').slice(prevOutput ? prevOutput.split('\n').length : 0);
-      newLines.forEach((line, idx) => {
-        if (line.trim()) {
-          vars.push({
-            name: `print${vars.filter(v => v.name.startsWith('print')).length + 1}`,
-            type: 'output',
-            value: line.trim(),
-            changed: true,
-            category: 'output'
-          });
-        }
-      });
-    } else if (currentOutput && currentStep === iterations.length - 1) {
-      // Final output
-      currentOutput.split('\n').forEach((line, idx) => {
-        if (line.trim()) {
-          vars.push({
-            name: `print${idx + 1}`,
-            type: 'output',
-            value: line.trim(),
-            changed: currentStep === 0,
-            category: 'output'
-          });
-        }
-      });
+    return { currentVars: vars };
+  }, [iterations, currentStep]);
+
+  // Get output for current step (shows cumulative output up to this step)
+  const currentOutput = useMemo(() => {
+    if (iterations.length === 0) return '';
+    
+    // Get output up to current step
+    const outputs = [];
+    for (let i = 0; i <= currentStep && i < iterations.length; i++) {
+      const output = iterations[i].output || '';
+      if (output && !outputs.includes(output)) {
+        // Add only new lines
+        const existingLines = outputs.join('\n').split('\n').filter(l => l.trim());
+        const newLines = output.split('\n').filter(l => l.trim() && !existingLines.includes(l));
+        outputs.push(...newLines);
+      }
     }
     
-    return { currentVars: vars };
+    return outputs.join('\n');
   }, [iterations, currentStep]);
 
   return (
@@ -296,7 +280,7 @@ const LoopVisualizer = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Code Visualizer</h2>
-            <p className="text-gray-600 mt-1">Line-by-line execution with variable and output tracking</p>
+            <p className="text-gray-600 mt-1">Line-by-line execution with variable tracking</p>
           </div>
           {fileName && (
             <div className="flex items-center space-x-2">
@@ -532,13 +516,13 @@ const LoopVisualizer = () => {
           
           {/* Right: Variables & Output */}
           <div className="space-y-6">
-            {/* Variable Tracking Table with Print Statements */}
+            {/* Variable Tracking Table (only real variables) */}
             <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Variables & Output
+                Variables
               </h3>
               
               {variableData.currentVars.length > 0 ? (
@@ -559,9 +543,6 @@ const LoopVisualizer = () => {
                         >
                           <td className="px-4 py-3 text-sm font-mono font-medium text-gray-800">
                             {variable.name}
-                            {variable.category === 'output' && (
-                              <span className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-800 text-xs rounded">print</span>
-                            )}
                           </td>
                           <td className="px-4 py-3 text-sm">
                             <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -570,10 +551,9 @@ const LoopVisualizer = () => {
                               variable.type === 'array' ? 'bg-purple-100 text-purple-800' :
                               variable.type === 'bool' ? 'bg-red-100 text-red-800' :
                               variable.type === 'string' ? 'bg-amber-100 text-amber-800' :
-                              variable.type === 'output' ? 'bg-green-100 text-green-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {variable.type === 'output' ? 'print' : variable.type}
+                              {variable.type}
                             </span>
                           </td>
                           <td className={`px-4 py-3 text-sm font-mono ${
@@ -582,7 +562,7 @@ const LoopVisualizer = () => {
                               : 'text-gray-800'
                           }`}>
                             {variable.value}
-                            {variable.changed && variable.category !== 'output' && (
+                            {variable.changed && (
                               <span className="ml-2 text-xs text-blue-600">↑ changed</span>
                             )}
                           </td>
@@ -601,7 +581,7 @@ const LoopVisualizer = () => {
               )}
             </div>
             
-            {/* Output Display */}
+            {/* Output Display (step-by-step print output) */}
             <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -609,23 +589,24 @@ const LoopVisualizer = () => {
                 </svg>
                 Console Output
               </h3>
-              <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm min-h-32">
-                {finalOutput ? (
-                  <div>
-                    <div className="flex items-center mb-2">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></div>
-                      <span className="text-gray-400 text-xs">Final Output:</span>
-                    </div>
-                    <div className="whitespace-pre-wrap bg-gray-800/30 p-3 rounded">
-                      {finalOutput}
-                    </div>
+              <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm min-h-32 max-h-64 overflow-y-auto">
+                {currentOutput ? (
+                  <div className="whitespace-pre-wrap">
+                    {currentOutput.split('\n').map((line, index) => (
+                      <div 
+                        key={index} 
+                        className={`py-1 ${index === currentOutput.split('\n').length - 1 && currentStep < iterations.length - 1 ? 'animate-pulse bg-blue-900/20 rounded' : ''}`}
+                      >
+                        {line}
+                      </div>
+                    ))}
                   </div>
                 ) : iterations.length > 0 ? (
                   <div className="text-gray-500 text-center py-4">
                     <svg className="w-6 h-6 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Execution in progress...
+                    <div>Waiting for output...</div>
                   </div>
                 ) : (
                   <div className="text-gray-500 text-center py-4">
