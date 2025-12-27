@@ -225,18 +225,17 @@ const LoopVisualizer = () => {
     };
   }, []);
 
-  // Variable tracking (without print statements)
+  // Variable tracking (only real variables)
   const variableData = useMemo(() => {
     if (iterations.length === 0) return { currentVars: [] };
 
     const currentStepVars = iterations[currentStep]?.variables || [];
     const prevStepVars = currentStep > 0 ? iterations[currentStep - 1]?.variables || [] : [];
     
-    // Build variables list (only real variables, no print statements)
+    // Build variables list
     const vars = [];
     const allVarNames = new Set();
     
-    // Add all variables from current and previous steps
     currentStepVars.forEach(v => allVarNames.add(v.name));
     prevStepVars.forEach(v => allVarNames.add(v.name));
     
@@ -255,23 +254,34 @@ const LoopVisualizer = () => {
     return { currentVars: vars };
   }, [iterations, currentStep]);
 
-  // Get output for current step (shows cumulative output up to this step)
-  const currentOutput = useMemo(() => {
-    if (iterations.length === 0) return '';
+  // Get output lines that have appeared up to current step
+  const outputLines = useMemo(() => {
+    if (iterations.length === 0) return [];
+
+    const lines = [];
+    let lastOutput = '';
     
-    // Get output up to current step
-    const outputs = [];
+    // Process each step up to current
     for (let i = 0; i <= currentStep && i < iterations.length; i++) {
-      const output = iterations[i].output || '';
-      if (output && !outputs.includes(output)) {
+      const currentOutput = iterations[i].output || '';
+      
+      // Find new lines since last step
+      if (currentOutput && currentOutput !== lastOutput) {
+        const allLines = currentOutput.split('\n').filter(l => l.trim());
+        const lastLines = lastOutput.split('\n').filter(l => l.trim());
+        
         // Add only new lines
-        const existingLines = outputs.join('\n').split('\n').filter(l => l.trim());
-        const newLines = output.split('\n').filter(l => l.trim() && !existingLines.includes(l));
-        outputs.push(...newLines);
+        allLines.forEach(line => {
+          if (!lastLines.includes(line) && !lines.includes(line)) {
+            lines.push(line);
+          }
+        });
       }
+      
+      lastOutput = currentOutput;
     }
     
-    return outputs.join('\n');
+    return lines;
   }, [iterations, currentStep]);
 
   return (
@@ -280,7 +290,7 @@ const LoopVisualizer = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Code Visualizer</h2>
-            <p className="text-gray-600 mt-1">Line-by-line execution with variable tracking</p>
+            <p className="text-gray-600 mt-1">Line-by-line execution with real-time output</p>
           </div>
           {fileName && (
             <div className="flex items-center space-x-2">
@@ -327,7 +337,7 @@ const LoopVisualizer = () => {
                     {fileName && (
                       <button
                         onClick={resetAll}
-                        className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                        className="px-3 py-2 bg-[#001F3F] text-white rounded-lg hover:bg-[#001429] transition-colors text-sm"
                       >
                         Clear
                       </button>
@@ -461,7 +471,7 @@ const LoopVisualizer = () => {
                         {isPlaying ? (
                           <button
                             onClick={stopPlayback}
-                            className="px-3 py-1.5 bg-red-500 text-white rounded text-sm hover:bg-red-600 flex items-center"
+                            className="px-3 py-1.5 bg-[#001F3F] text-white rounded text-sm hover:bg-[#001429] flex items-center"
                           >
                             ⏹ Stop
                           </button>
@@ -472,7 +482,7 @@ const LoopVisualizer = () => {
                             className={`px-3 py-1.5 rounded text-sm flex items-center ${
                               currentStep === iterations.length - 1
                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-green-500 text-white hover:bg-green-600'
+                                : 'bg-[#001F3F] text-white hover:bg-[#001429]'
                             }`}
                           >
                             ▶ Play
@@ -516,7 +526,7 @@ const LoopVisualizer = () => {
           
           {/* Right: Variables & Output */}
           <div className="space-y-6">
-            {/* Variable Tracking Table (only real variables) */}
+            {/* Variable Tracking Table */}
             <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -581,7 +591,7 @@ const LoopVisualizer = () => {
               )}
             </div>
             
-            {/* Output Display (step-by-step print output) */}
+            {/* Real-Time Output Display */}
             <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -590,12 +600,16 @@ const LoopVisualizer = () => {
                 Console Output
               </h3>
               <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm min-h-32 max-h-64 overflow-y-auto">
-                {currentOutput ? (
-                  <div className="whitespace-pre-wrap">
-                    {currentOutput.split('\n').map((line, index) => (
+                {outputLines.length > 0 ? (
+                  <div className="space-y-1">
+                    {outputLines.map((line, index) => (
                       <div 
-                        key={index} 
-                        className={`py-1 ${index === currentOutput.split('\n').length - 1 && currentStep < iterations.length - 1 ? 'animate-pulse bg-blue-900/20 rounded' : ''}`}
+                        key={index}
+                        className={`py-1 pl-2 border-l-2 ${
+                          index === outputLines.length - 1 && currentStep < iterations.length - 1
+                            ? 'border-l-green-400 bg-green-900/20 animate-pulse rounded-r'
+                            : 'border-l-gray-700'
+                        }`}
                       >
                         {line}
                       </div>
@@ -603,9 +617,11 @@ const LoopVisualizer = () => {
                   </div>
                 ) : iterations.length > 0 ? (
                   <div className="text-gray-500 text-center py-4">
-                    <svg className="w-6 h-6 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <div className="flex justify-center mb-2">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full mr-1 animate-pulse"></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full mr-1 animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                    </div>
                     <div>Waiting for output...</div>
                   </div>
                 ) : (
