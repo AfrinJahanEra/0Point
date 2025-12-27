@@ -119,39 +119,28 @@ const LoopVisualizer = () => {
     }
   };
 
-  // Determine variable type from value (fixed version)
+  // Determine variable type from value
   const getVariableType = (value) => {
-    // Handle numbers
     if (typeof value === 'number') {
       return Number.isInteger(value) ? 'int' : 'float';
     }
     
-    // Handle strings
     if (typeof value === 'string') {
-      // Check for boolean
       if (value === 'true' || value === 'false' || value === 'True' || value === 'False') {
         return 'bool';
       }
-      
-      // Check for array/vector representation
       if (value.startsWith('[') && value.endsWith(']')) {
         return 'array';
       }
-      
-      // Check for numeric string
       if (!isNaN(value) && !isNaN(parseFloat(value))) {
         return value.includes('.') ? 'float' : 'int';
       }
-      
-      // Check for common C++ types
       if (value.includes('vector') || value.includes('std::')) {
         return 'array';
       }
-      
       return 'string';
     }
     
-    // Handle arrays/objects from JSON
     if (Array.isArray(value)) {
       return 'array';
     }
@@ -236,47 +225,78 @@ const LoopVisualizer = () => {
     };
   }, []);
 
-  // Variable tracking logic
+  // Enhanced variable tracking with print/cout tracking
   const variableData = useMemo(() => {
-    if (iterations.length === 0) return { allVariables: [], currentVars: [] };
+    if (iterations.length === 0) return { currentVars: [] };
 
-    // Collect all variable names across all steps
-    const allVariableNames = new Set();
-    iterations.forEach(step => {
-      step.variables.forEach(v => allVariableNames.add(v.name));
-    });
-
-    // Get current step variables with change detection
-    const currentVars = [];
     const currentStepVars = iterations[currentStep]?.variables || [];
     const prevStepVars = currentStep > 0 ? iterations[currentStep - 1]?.variables || [] : [];
-
-    Array.from(allVariableNames).forEach(name => {
+    
+    // Get current output (cumulative)
+    const currentOutput = iterations[currentStep]?.output || '';
+    const prevOutput = currentStep > 0 ? iterations[currentStep - 1]?.output || '' : '';
+    
+    // Build variables list including print statements
+    const vars = [];
+    
+    // Add regular variables
+    const allVarNames = new Set();
+    currentStepVars.forEach(v => allVarNames.add(v.name));
+    prevStepVars.forEach(v => allVarNames.add(v.name));
+    
+    Array.from(allVarNames).sort().forEach(name => {
       const currentVar = currentStepVars.find(v => v.name === name);
       const prevVar = prevStepVars.find(v => v.name === name);
       
-      currentVars.push({
+      vars.push({
         name,
         type: currentVar?.type || prevVar?.type || 'unknown',
         value: currentVar?.value || '—',
         changed: currentVar && prevVar && currentVar.value !== prevVar.value,
-        exists: !!currentVar
+        category: 'variable'
       });
     });
-
-    return { 
-      allVariables: Array.from(allVariableNames),
-      currentVars: currentVars.sort((a, b) => a.name.localeCompare(b.name))
-    };
+    
+    // Add print/cout tracking
+    if (currentOutput && currentOutput !== prevOutput) {
+      // Extract new output lines
+      const newLines = currentOutput.split('\n').slice(prevOutput ? prevOutput.split('\n').length : 0);
+      newLines.forEach((line, idx) => {
+        if (line.trim()) {
+          vars.push({
+            name: `print${vars.filter(v => v.name.startsWith('print')).length + 1}`,
+            type: 'output',
+            value: line.trim(),
+            changed: true,
+            category: 'output'
+          });
+        }
+      });
+    } else if (currentOutput && currentStep === iterations.length - 1) {
+      // Final output
+      currentOutput.split('\n').forEach((line, idx) => {
+        if (line.trim()) {
+          vars.push({
+            name: `print${idx + 1}`,
+            type: 'output',
+            value: line.trim(),
+            changed: currentStep === 0,
+            category: 'output'
+          });
+        }
+      });
+    }
+    
+    return { currentVars: vars };
   }, [iterations, currentStep]);
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div className="flex flex-col h-full bg-white rounded-lg border border-gray-300 shadow-sm">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Code Visualizer</h2>
-            <p className="text-gray-600 mt-1">Line-by-line execution with variable tracking</p>
+            <p className="text-gray-600 mt-1">Line-by-line execution with variable and output tracking</p>
           </div>
           {fileName && (
             <div className="flex items-center space-x-2">
@@ -394,8 +414,8 @@ const LoopVisualizer = () => {
                           disabled={currentStep === 0}
                           className={`px-3 py-1.5 rounded text-sm ${
                             currentStep === 0
-                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-[#001F3F] text-white hover:bg-[#001429]'
                           }`}
                         >
                           ⏪ First
@@ -405,8 +425,8 @@ const LoopVisualizer = () => {
                           disabled={currentStep === 0}
                           className={`px-3 py-1.5 rounded text-sm ${
                             currentStep === 0
-                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                              : 'bg-blue-500 text-white hover:bg-blue-600'
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-[#001F3F] text-white hover:bg-[#001429]'
                           }`}
                         >
                           ⬅ Prev
@@ -416,8 +436,8 @@ const LoopVisualizer = () => {
                           disabled={currentStep === iterations.length - 1}
                           className={`px-3 py-1.5 rounded text-sm ${
                             currentStep === iterations.length - 1
-                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                              : 'bg-blue-500 text-white hover:bg-blue-600'
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-[#001F3F] text-white hover:bg-[#001429]'
                           }`}
                         >
                           Next ➡
@@ -427,8 +447,8 @@ const LoopVisualizer = () => {
                           disabled={currentStep === iterations.length - 1}
                           className={`px-3 py-1.5 rounded text-sm ${
                             currentStep === iterations.length - 1
-                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-[#001F3F] text-white hover:bg-[#001429]'
                           }`}
                         >
                           Last ⏩
@@ -437,7 +457,7 @@ const LoopVisualizer = () => {
                       
                       <div className="flex items-center space-x-3">
                         <div className="text-sm text-gray-700">
-                          Step <span className="font-bold text-blue-700">{currentStep + 1}</span> of {iterations.length}
+                          Step <span className="font-bold text-[#001F3F]">{currentStep + 1}</span> of {iterations.length}
                         </div>
                         
                         <div className="flex items-center space-x-2">
@@ -467,7 +487,7 @@ const LoopVisualizer = () => {
                             disabled={currentStep === iterations.length - 1}
                             className={`px-3 py-1.5 rounded text-sm flex items-center ${
                               currentStep === iterations.length - 1
-                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                 : 'bg-green-500 text-white hover:bg-green-600'
                             }`}
                           >
@@ -490,7 +510,7 @@ const LoopVisualizer = () => {
                     className={`px-6 py-3 rounded-lg font-medium flex items-center ${
                       !uploadedCode || isProcessing
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-md'
+                        : 'bg-[#001F3F] text-white hover:bg-[#001429] transition-colors shadow-md'
                     }`}
                   >
                     {isProcessing ? (
@@ -512,13 +532,13 @@ const LoopVisualizer = () => {
           
           {/* Right: Variables & Output */}
           <div className="space-y-6">
-            {/* Variable Tracking Table */}
+            {/* Variable Tracking Table with Print Statements */}
             <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Variables
+                Variables & Output
               </h3>
               
               {variableData.currentVars.length > 0 ? (
@@ -539,6 +559,9 @@ const LoopVisualizer = () => {
                         >
                           <td className="px-4 py-3 text-sm font-mono font-medium text-gray-800">
                             {variable.name}
+                            {variable.category === 'output' && (
+                              <span className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-800 text-xs rounded">print</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-sm">
                             <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -547,9 +570,10 @@ const LoopVisualizer = () => {
                               variable.type === 'array' ? 'bg-purple-100 text-purple-800' :
                               variable.type === 'bool' ? 'bg-red-100 text-red-800' :
                               variable.type === 'string' ? 'bg-amber-100 text-amber-800' :
+                              variable.type === 'output' ? 'bg-green-100 text-green-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {variable.type}
+                              {variable.type === 'output' ? 'print' : variable.type}
                             </span>
                           </td>
                           <td className={`px-4 py-3 text-sm font-mono ${
@@ -558,7 +582,7 @@ const LoopVisualizer = () => {
                               : 'text-gray-800'
                           }`}>
                             {variable.value}
-                            {variable.changed && (
+                            {variable.changed && variable.category !== 'output' && (
                               <span className="ml-2 text-xs text-blue-600">↑ changed</span>
                             )}
                           </td>
@@ -573,9 +597,6 @@ const LoopVisualizer = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M5 12h14M5 6h14M5 18h14" />
                   </svg>
                   <p className="text-sm">Upload and run code to see variables</p>
-                  <p className="text-xs mt-1 text-gray-400">
-                    Variables: {variableData.allVariables.length}
-                  </p>
                 </div>
               )}
             </div>
