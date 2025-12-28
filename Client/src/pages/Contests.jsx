@@ -206,12 +206,38 @@ const Contests = () => {
 };
 
 
-const handleContestEntry = async (contestId, contestStatus) => {
+const handleContestEntry = async (contestId, contestStatus, contestData) => {
+  console.log('🎯 Contest entry:', { contestId, contestStatus, contestData });
+  
+  // If it's a draft, navigate to edit page
   if (contestStatus === 'draft') {
     navigate(`/contests/${contestId}/edit`);
     return;
   }
   
+  // Check if it's a test contest by looking for specific fields
+  const isTestContest = contestData && (
+    contestData.is_test_contest || 
+    contestData.visibility === 'test' || 
+    contestData.original_contest_id !== undefined
+  );
+  
+  console.log('🔍 Contest type check:', { 
+    isTestContest, 
+    contestId,
+    hasIsTestField: contestData?.is_test_contest,
+    visibility: contestData?.visibility,
+    hasOriginalId: contestData?.original_contest_id !== undefined
+  });
+  
+  // If it's a test contest, navigate to test contest page
+  if (isTestContest) {
+    console.log('🔧 Navigating to test contest page:', contestId);
+    navigate(`/test-contests/${contestId}`);
+    return;
+  }
+  
+  // Regular contest flow...
   try {
     const problemsRes = await axios.get(
       `http://localhost:8000/contests/${contestId}/problems/`,
@@ -246,9 +272,7 @@ const handleContestEntry = async (contestId, contestStatus) => {
               { headers: { Authorization: `Bearer ${TOKEN}` } }
             );
             
-            // Refresh the registered contests list after successful registration
             await refreshRegisteredContests();
-            
             alert('Successfully registered! You can now enter the contest.');
             navigate(`/contests/${contestId}`);
             
@@ -436,7 +460,7 @@ const handleContestEntry = async (contestId, contestStatus) => {
                         ) : contest.status === 'past' ? (
                           // Past contest buttons
                           <button 
-                            onClick={() => handleContestEntry(contest.id, 'past')}
+                            onClick={() => handleContestEntry(contest.id, 'past', contest)}
                             className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200"
                           >
                             View
