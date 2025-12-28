@@ -372,13 +372,6 @@ const TestContestInside = () => {
     }
   };
 
-  // Handle back to original contest
-  const handleBackToOriginalContest = () => {
-    if (contestData?.original_contest_id) {
-      navigate(`/contests/${contestData.original_contest_id}`);
-    }
-  };
-
   // Loading state
   if (loading) {
     return (
@@ -453,7 +446,6 @@ const TestContestInside = () => {
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between">
             <div className="flex-1 mb-6 lg:mb-0">
               <div className="flex items-center gap-3 mb-4">
-                <TestTube className="w-8 h-8" />
                 <h1 className="text-3xl font-bold">{contestData.title}</h1>
                 <span className="px-3 py-1 bg-purple-800 text-purple-100 rounded-full text-sm font-medium">
                   TEST VERSION
@@ -476,30 +468,17 @@ const TestContestInside = () => {
                   <span>{formatDuration(contestData.duration)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  <span>{contestData.participants || 0} Testers</span>
-                </div>
-                <div className="flex items-center gap-2">
                   <School className="w-5 h-5" />
                   <span>{contestData.platform || 'Test Platform'}</span>
                 </div>
               </div>
               
-              {contestData.original_contest_id && (
-                <button
-                  onClick={handleBackToOriginalContest}
-                  className="text-purple-200 hover:text-white text-sm flex items-center gap-2"
-                >
-                  ← Back to Original Contest
-                </button>
-              )}
             </div>
             
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold ${getStatusBadge(contestData.status)}`}>
               {contestData.status === 'live' && (
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
               )}
-              <TestTube className="w-4 h-4" />
               <span>
                 {contestData.status === 'live' ? 'Test Live Now' : 
                  contestData.status === 'upcoming' ? 'Test Starting Soon' :
@@ -537,7 +516,7 @@ const TestContestInside = () => {
                   { 
                     id: 'leaderboard', 
                     icon: <Trophy className="w-5 h-5" />, 
-                    label: 'Test Standings',
+                    label: 'Standings',
                     onClick: () => console.log('Navigate to test contest standings') // TODO: Implement
                   },
                   { 
@@ -550,7 +529,7 @@ const TestContestInside = () => {
                   { 
                     id: 'editorial', 
                     icon: <BookOpen className="w-5 h-5" />, 
-                    label: 'Test Editorial',
+                    label: 'Editorial',
                     onClick: () => console.log('Navigate to test contest editorial'), // TODO: Implement
                     show: contestData.status === 'past'
                   }
@@ -628,13 +607,12 @@ const TestContestInside = () => {
                     onClick={handleRegister}
                     className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
                   >
-                    <TestTube className="w-5 h-5" />
                     Register for Test
                   </button>
                 )}
                 <button className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
                   <Download className="w-5 h-5" />
-                  Download Test Problems
+                  Download Problems
                 </button>
                 <button className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
                   <Flag className="w-5 h-5" />
@@ -736,7 +714,6 @@ const TestContestInside = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200">
               <div className="p-6 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <TestTube className="w-6 h-6 text-purple-600" />
                   Test Announcements
                 </h2>
                 {contestData.is_creator && (
@@ -745,7 +722,7 @@ const TestContestInside = () => {
                     className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center gap-2"
                   >
                     <Plus className="w-4 h-4" />
-                    New Test Announcement
+                    New Announcement
                   </button>
                 )}
               </div>
@@ -838,15 +815,12 @@ const TestContestInside = () => {
                     <h3 className="font-semibold text-blue-800 mb-2">About This Test Contest</h3>
                     <ul className="text-sm text-blue-700 space-y-2">
                       <li className="flex items-start gap-2">
-                        <TestTube className="w-4 h-4 mt-0.5 flex-shrink-0" />
                         <span>This is a test version of the original contest</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
                         <span>Only invited testers can participate</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <Users className="w-4 h-4 mt-0.5 flex-shrink-0" />
                         <span>{contestData.testers_count || 0} testers invited</span>
                       </li>
                     </ul>
