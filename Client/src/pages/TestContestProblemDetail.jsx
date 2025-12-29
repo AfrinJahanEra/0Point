@@ -661,7 +661,6 @@ const TestContestProblemDetail = () => {
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-4" />
           <div className="flex items-center justify-center gap-2 mb-2">
-            <TestTube className="w-6 h-6 text-purple-600" />
             <p className="text-gray-600">Loading test contest problem...</p>
           </div>
           <p className="text-xs text-gray-500">Test Contest ID: {testContestId}</p>
@@ -676,7 +675,6 @@ const TestContestProblemDetail = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <TestTube className="w-12 h-12 text-purple-600" />
             <AlertCircle className="w-12 h-12 text-red-500" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Test Contest Error</h3>
@@ -728,7 +726,6 @@ const TestContestProblemDetail = () => {
                 </button>
                 <div>
                   <div className="flex items-center gap-2">
-                    <TestTube className="w-5 h-5 text-purple-600" />
                     <h1 className="text-xl font-bold text-gray-900">
                       {contestData?.title || problemData?.contest_title || 'Test Contest'}
                     </h1>
@@ -745,7 +742,6 @@ const TestContestProblemDetail = () => {
         
         <div className="max-w-7xl mx-auto mt-10">
           <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-            <TestTube className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Test Problems Available</h3>
             <p className="text-gray-600 mb-4">This test contest doesn't have any problems yet.</p>
             <button
@@ -784,7 +780,6 @@ const TestContestProblemDetail = () => {
               </button>
               <div>
                 <div className="flex items-center gap-2">
-                  <TestTube className="w-5 h-5 text-purple-600" />
                   <h1 className="text-xl font-bold text-gray-900">{displayContestData.title}</h1>
                   <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs">
                     TEST CONTEST
@@ -841,7 +836,6 @@ const TestContestProblemDetail = () => {
                 <h3 className="text-xs font-semibold text-gray-900 uppercase tracking-wide">
                   Test Problems ({problemsList.length})
                 </h3>
-                <TestTube className="w-4 h-4 text-purple-600" />
               </div>
               <div className="space-y-2">
                 {problemsList.map((problem) => {
@@ -884,7 +878,7 @@ const TestContestProblemDetail = () => {
                 className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
               >
                 <Code2 className="w-4 h-4" />
-                <span className="text-xs font-semibold text-gray-900">Test Submissions</span>
+                <span className="text-xs font-semibold text-gray-900">Submissions</span>
               </button>
               
               {displayContestData.status === 'past' && (
@@ -893,7 +887,7 @@ const TestContestProblemDetail = () => {
                   className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span className="text-xs font-semibold text-gray-900">Test Discussions</span>
+                  <span className="text-xs font-semibold text-gray-900">Discussions</span>
                 </button>
               )}
               {displayContestData.status === 'live' && (
@@ -902,7 +896,7 @@ const TestContestProblemDetail = () => {
                   className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
                 >
                   <HelpCircle className="w-4 h-4" />
-                  <span className="text-xs font-semibold text-gray-900">Test Clarifications</span>
+                  <span className="text-xs font-semibold text-gray-900">Clarifications</span>
                 </button>
               )}
               
@@ -911,7 +905,7 @@ const TestContestProblemDetail = () => {
                 className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
               >
                 <Trophy className="w-4 h-4" />
-                <span className="text-xs font-semibold text-gray-900">Test Standings</span>
+                <span className="text-xs font-semibold text-gray-900">Standings</span>
               </button>
               {displayContestData.status === 'past' && (
                 <button
@@ -919,7 +913,7 @@ const TestContestProblemDetail = () => {
                   className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
                 >
                   <BookOpen className="w-4 h-4" />
-                  <span className="text-xs font-semibold text-gray-900">Test Editorial</span>
+                  <span className="text-xs font-semibold text-gray-900">Editorial</span>
                 </button>
               )}
             </div>
@@ -927,7 +921,7 @@ const TestContestProblemDetail = () => {
             {/* Test Problem Stats */}
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-gray-900">Test Problem Stats</h3>
+                <h3 className="text-xs font-semibold text-gray-900">Stats</h3>
                 <Shield className="w-4 h-4 text-purple-600" />
               </div>
               <div className="space-y-3 text-xs">
@@ -962,12 +956,10 @@ const TestContestProblemDetail = () => {
                 <div className="text-xs text-gray-600 mb-2">Test Contest Info</div>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center gap-2">
-                    <TestTube className="w-3 h-3 text-purple-600" />
                     <span className="text-purple-700">This is a test version</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Shield className="w-3 h-3 text-blue-600" />
-                    <span className="text-blue-700">Only visible to testers</span>
+                    <span className="text-blue-700">Only visible to testers ad contest organizers</span>
                   </div>
                 </div>
               </div>
@@ -1004,11 +996,6 @@ const TestContestProblemDetail = () => {
                       <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
                         {formatDifficulty(problemData?.difficulty)}
                       </span>
-                      {problemData?.points && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-bold">
-                          {problemData.points} points
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -1019,7 +1006,7 @@ const TestContestProblemDetail = () => {
                     <div className="mb-8 p-4 bg-white rounded-lg border border-gray-200">
                       <div className="mb-2 flex items-center gap-2">
                         <FileText className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-700">Test Problem Statement</span>
+                        <span className="text-sm font-medium text-gray-700">Problem Statement</span>
                       </div>
                       <ReactMarkdown
                         remarkPlugins={[remarkMath]}
@@ -1042,7 +1029,7 @@ const TestContestProblemDetail = () => {
                         <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
                           <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                             <h4 className="font-semibold text-gray-900">
-                              Sample Test Case {index + 1} (Test Version)
+                              Sample Test Case {index + 1}
                             </h4>
                           </div>
                           
@@ -1117,7 +1104,6 @@ const TestContestProblemDetail = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center gap-2">
-                      <TestTube className="w-4 h-4 text-purple-600" />
                       <select 
                         value={language}
                         onChange={(e) => setLanguage(e.target.value)}
@@ -1188,7 +1174,6 @@ const TestContestProblemDetail = () => {
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-gray-600">
                     <div className="flex items-center gap-2">
-                      <TestTube className="w-3 h-3" />
                       <span>Test Contest Language: {language === 'cpp' ? 'C++ 17' : 
                                 language === 'java' ? 'Java' : 
                                 language === 'python' ? 'Python 3' : 'C'}</span>
@@ -1206,7 +1191,6 @@ const TestContestProblemDetail = () => {
                       onClick={handleSubmit}
                       className="px-6 py-2 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 transition-colors flex items-center space-x-2"
                     >
-                      <TestTube className="w-4 h-4" />
                       <span>Submit to Test</span>
                     </button>
                   </div>
@@ -1337,7 +1321,6 @@ const TestContestProblemDetail = () => {
                       {compilationStats.is_test_contest && (
                         <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded text-xs text-purple-800">
                           <div className="flex items-center gap-2">
-                            <TestTube className="w-3 h-3" />
                             <span>This is a test contest submission. Results are for testing purposes only.</span>
                           </div>
                         </div>
