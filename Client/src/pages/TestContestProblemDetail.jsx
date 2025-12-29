@@ -413,88 +413,97 @@ const TestContestProblemDetail = () => {
     }
   };
 
-  const handleRun = async () => {
-    if (!code.trim()) {
-      alert('Please write some code before running.');
-      return;
-    }
+const handleRun = async () => {
+  if (!code.trim()) {
+    alert('Please write some code before running.');
+    return;
+  }
 
-    try {
-      // Use sample test case input for running
-      const sampleInput = problemData?.sample_test_cases?.[0]?.input || '';
-      const expectedOutput = problemData?.sample_test_cases?.[0]?.output || '';
+  try {
+    // Use sample test case input for running
+    const sampleInput = problemData?.sample_test_cases?.[0]?.input || '';
+    const expectedOutput = problemData?.sample_test_cases?.[0]?.output || '';
 
-      const runData = {
-        language: language,
-        version_index: getVersionIndex(language),
-        code: code,
-        input_data: sampleInput,
-        expected_output: expectedOutput
-      };
+    const runData = {
+      code: code,
+      language: language,
+      input_data: sampleInput
+      // Remove version_index and expected_output if not needed by the backend
+    };
 
-      console.log('Running code against test contest:', runData);
-      
-      // Set loading state
-      setCompilationStats({
-        status: 'running',
-        message: 'Running against sample test case...',
-        type: 'run'
-      });
-      
-      // Note: You might need to create a separate execute endpoint for test contests
-      // For now, using the regular endpoint but with test contest ID
-      const response = await axios.post(
-        `http://localhost:8000/contests/${testContestId}/execute/`, // Using test contest ID
-        runData,
-        { 
-          headers: { 
-            Authorization: `Bearer ${TOKEN}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
-
-      console.log('Test contest run response:', response.data);
-      
-      // Update compilation stats based on actual API response
-      if (response.data.is_execution_success) {
-        const isCorrect = expectedOutput ? 
-          (response.data.output?.trim() === expectedOutput.trim()) : true;
-        
-        setCompilationStats({
-          status: isCorrect ? 'success' : 'error',
-          verdict: isCorrect ? 'AC' : 'WA',
-          time: response.data.execution_time_ms || 0,
-          memory: response.data.memory_kb || 0,
-          output: response.data.output || '',
-          message: isCorrect ? 'Test case passed!' : 'Wrong Answer',
-          type: 'run',
-          expectedOutput: expectedOutput,
-          is_test_contest: true
-        });
-      } else {
-        setCompilationStats({
-          status: 'error',
-          verdict: response.data.verdict || response.data.status || 'RE',
-          time: response.data.execution_time_ms || 0,
-          memory: response.data.memory_kb || 0,
-          output: response.data.output || '',
-          message: response.data.status || 'Runtime Error',
-          type: 'run',
-          is_test_contest: true
-        });
+    console.log('Running code against test contest:', runData);
+    
+    // Set loading state
+    setCompilationStats({
+      status: 'running',
+      message: 'Running against sample test case...',
+      type: 'run'
+    });
+    
+    const response = await axios.post(
+      `http://localhost:8000/test-contests/${testContestId}/execute/`,
+      runData,
+      { 
+        headers: { 
+          Authorization: `Bearer ${TOKEN}`,
+          'Content-Type': 'application/json'
+        } 
       }
+    );
+
+    console.log('Test contest run response:', response.data);
+    
+    // Handle the response based on actual structure
+    const result = response.data;
+    
+    // Check if execution was successful based on the actual response structure
+    const isSuccess = result.status === 'success' || 
+                     result.verdict === 'AC' || 
+                     result.is_execution_success ||
+                     (result.output !== undefined && result.error === undefined);
+    
+    if (isSuccess) {
+      const isCorrect = expectedOutput ? 
+        (result.output?.trim() === expectedOutput.trim()) : true;
       
-    } catch (error) {
-      console.error('Test contest run error:', error);
+      setCompilationStats({
+        status: isCorrect ? 'success' : 'error',
+        verdict: isCorrect ? 'AC' : 'WA',
+        time: result.execution_time || result.execution_time_ms || 0,
+        memory: result.memory || result.memory_kb || 0,
+        output: result.output || '',
+        message: isCorrect ? 'Test case passed!' : 'Wrong Answer',
+        type: 'run',
+        expectedOutput: expectedOutput,
+        is_test_contest: true,
+        rawResponse: result // Store full response for debugging
+      });
+    } else {
       setCompilationStats({
         status: 'error',
-        message: error.response?.data?.error || 'Run failed',
+        verdict: result.verdict || result.status || 'RE',
+        time: result.execution_time || result.execution_time_ms || 0,
+        memory: result.memory || result.memory_kb || 0,
+        output: result.output || result.error || '',
+        message: result.status || result.error || 'Runtime Error',
         type: 'run',
-        is_test_contest: true
+        is_test_contest: true,
+        rawResponse: result
       });
     }
-  };
+    
+  } catch (error) {
+    console.error('Test contest run error:', error);
+    console.error('Error response:', error.response?.data);
+    
+    setCompilationStats({
+      status: 'error',
+      message: error.response?.data?.error || error.message || 'Run failed',
+      type: 'run',
+      is_test_contest: true
+    });
+  }
+};
 
   // Helper function to map language to Ace editor mode
   const getEditorMode = (lang) => {
@@ -514,92 +523,95 @@ const TestContestProblemDetail = () => {
     }
   };
 
-  // Handle test contest submission
-  const handleSubmit = async () => {
-    if (!code.trim()) {
-      alert('Please write some code before submitting.');
-      return;
-    }
+const handleSubmit = async () => {
+  if (!code.trim()) {
+    alert('Please write some code before submitting.');
+    return;
+  }
 
-    // Show confirmation for submission
-    if (!window.confirm('Submit your solution to the test contest? This will be judged against all test cases.')) {
-      return;
-    }
+  // Show confirmation for submission
+  if (!window.confirm('Submit your solution to the test contest? This will be judged against all test cases.')) {
+    return;
+  }
 
-    try {
-      const submitData = {
-        language: language,
-        version_index: getVersionIndex(language),
-        code: code,
-        input_data: '', // Empty for full submission
-      };
+  try {
+    const submitData = {
+      code: code,
+      language: language,
+      create_submission: true  // Add this flag if your backend uses it
+    };
 
-      console.log('Submitting to test contest:', submitData);
-      
-      // Set loading state
-      setCompilationStats({
-        status: 'running',
-        message: 'Submitting to test contest and judging against all test cases...',
-        type: 'submit',
-        is_test_contest: true
-      });
-      
-      // Note: You might need to create a separate submit endpoint for test contests
-      const response = await axios.post(
-        `http://localhost:8000/contests/${testContestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
-        submitData,
-        { 
-          headers: { 
-            Authorization: `Bearer ${TOKEN}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
-
-      console.log('Test contest submit response:', response.data);
-      
-      if (response.data.verdict === 'AC') {
-        setCompilationStats({
-          status: 'success',
-          verdict: 'AC',
-          time: response.data.execution_time || 0,
-          memory: response.data.memory_used || 0,
-          passed: response.data.passed_test_cases || 0,
-          total: response.data.total_test_cases || 0,
-          message: `All ${response.data.total_test_cases} test cases passed!`,
-          submissionId: response.data.submission_id,
-          type: 'submit',
-          is_test_contest: true
-        });
-        
-        // Refresh status
-        fetchUserProblemStatus();
-        refreshProblemStatus();
-      } else {
-        setCompilationStats({
-          status: response.data.status === 'CE' ? 'compile_error' : 'error',
-          verdict: response.data.status || 'WA',
-          time: response.data.execution_time || 0,
-          memory: response.data.memory_used || 0,
-          passed: response.data.passed_test_cases || 0,
-          total: response.data.total_test_cases || 0,
-          failedTestCase: response.data.failed_test_case || 0,
-          message: `${response.data.passed_test_cases}/${response.data.total_test_cases} test cases passed`,
-          type: 'submit',
-          is_test_contest: true
-        });
+    console.log('Submitting to test contest:', submitData);
+    
+    // Set loading state
+    setCompilationStats({
+      status: 'running',
+      message: 'Submitting to test contest and judging against all test cases...',
+      type: 'submit',
+      is_test_contest: true
+    });
+    
+    const response = await axios.post(
+      `http://localhost:8000/test-contests/${testContestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
+      submitData,
+      { 
+        headers: { 
+          Authorization: `Bearer ${TOKEN}`,
+          'Content-Type': 'application/json'
+        } 
       }
-      
-    } catch (error) {
-      console.error('Test contest submission error:', error);
+    );
+
+    console.log('Test contest submit response:', response.data);
+    
+    const result = response.data;
+    
+    if (result.verdict === 'AC' || result.status === 'success') {
       setCompilationStats({
-        status: 'error',
-        message: error.response?.data?.error || 'Submission failed',
+        status: 'success',
+        verdict: 'AC',
+        time: result.execution_time || 0,
+        memory: result.memory_used || result.memory || 0,
+        passed: result.passed_test_cases || 0,
+        total: result.total_test_cases || 0,
+        message: result.message || `All ${result.total_test_cases || 0} test cases passed!`,
+        submissionId: result.test_submission_id || result.submission_id,
         type: 'submit',
-        is_test_contest: true
+        is_test_contest: true,
+        rawResponse: result
+      });
+      
+      // Refresh status
+      fetchUserProblemStatus();
+      refreshProblemStatus();
+    } else {
+      setCompilationStats({
+        status: result.verdict === 'CE' ? 'compile_error' : 'error',
+        verdict: result.verdict || result.status || 'WA',
+        time: result.execution_time || 0,
+        memory: result.memory_used || result.memory || 0,
+        passed: result.passed_test_cases || 0,
+        total: result.total_test_cases || 0,
+        failedTestCase: result.failed_test_case || 0,
+        message: result.message || `${result.passed_test_cases || 0}/${result.total_test_cases || 0} test cases passed`,
+        type: 'submit',
+        is_test_contest: true,
+        rawResponse: result
       });
     }
-  };
+    
+  } catch (error) {
+    console.error('Test contest submission error:', error);
+    console.error('Error response:', error.response?.data);
+    
+    setCompilationStats({
+      status: 'error',
+      message: error.response?.data?.error || error.message || 'Submission failed',
+      type: 'submit',
+      is_test_contest: true
+    });
+  }
+};
 
   // Helper function to get version index
   const getVersionIndex = (lang) => {
@@ -1174,7 +1186,7 @@ const TestContestProblemDetail = () => {
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-gray-600">
                     <div className="flex items-center gap-2">
-                      <span>Test Contest Language: {language === 'cpp' ? 'C++ 17' : 
+                      <span>Language: {language === 'cpp' ? 'C++ 17' : 
                                 language === 'java' ? 'Java' : 
                                 language === 'python' ? 'Python 3' : 'C'}</span>
                     </div>
@@ -1185,13 +1197,13 @@ const TestContestProblemDetail = () => {
                       className="px-4 py-2 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
                     >
                       <Play className="w-3 h-3" />
-                      Run (Test)
+                      Run
                     </button>
                     <button 
                       onClick={handleSubmit}
                       className="px-6 py-2 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 transition-colors flex items-center space-x-2"
                     >
-                      <span>Submit to Test</span>
+                      <span>Submit</span>
                     </button>
                   </div>
                 </div>
