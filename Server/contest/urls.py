@@ -72,10 +72,15 @@ from virtual.views import (
 from testcontest.views import (
     TestContestCreateAPIView,
     TestContestDetailAPIView,
-    TestContestRegisterAPIView,
     TestContestProblemsAPIView,
     TestContestProblemDetailAPIView,
     UserTestContestsAPIView,
+    TestContestSubmissionCreateAPIView,
+    TestContestExecuteAPIView,
+    TestContestProblemExecuteAPIView,
+    TestContestSubmissionsAPIView,
+    TestContestSubmissionDetailAPIView,
+    
 )
 
 urlpatterns = [
@@ -158,7 +163,13 @@ urlpatterns = [
     
     # Test contest operations
     path('test-contests/<test_contest_id>/', TestContestDetailAPIView.as_view(), name='test-contest-detail'),
-    path('test-contests/<test_contest_id>/register/', TestContestRegisterAPIView.as_view(), name='test-contest-register'),
     path('test-contests/<test_contest_id>/problems/', TestContestProblemsAPIView.as_view(), name='test-contest-problems'),
     path('test-contests/<test_contest_id>/problems/<problem_index>/', TestContestProblemDetailAPIView.as_view(), name='test-contest-problem-detail'),
+
+    # Test contest submission endpoints
+    path('test-contests/submit/', TestContestSubmissionCreateAPIView.as_view(), name='test-contest-submit'),
+    path('test-contests/<str:test_contest_id>/execute/', TestContestExecuteAPIView.as_view(), name='test-contest-execute'),
+    path('test-contests/<str:test_contest_id>/problems/<str:problem_index>/execute/', TestContestProblemExecuteAPIView.as_view(), name='test-contest-problem-execute'),
+    path('test-contests/<str:test_contest_id>/submissions/', TestContestSubmissionsAPIView.as_view(), name='test-contest-submissions'),
+    path('test-contests/<str:test_contest_id>/submissions/<str:submission_id>/', TestContestSubmissionDetailAPIView.as_view(), name='test-contest-submission-detail'),
 ]
