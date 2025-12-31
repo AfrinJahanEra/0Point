@@ -8,9 +8,9 @@ from mongoengine.errors import ValidationError as MEValidationError
 import pytz
 from django.utils import timezone
 
-from .models import TestContest, TestContestRegistration
-from .serializers import TestContestCreateSerializer, TestContestSerializer
-from contest.models import Contest
+from .models import TestContest, TestContestSubmission
+from .serializers import TestContestCreateSerializer, TestContestSerializer, TestContestSubmissionCreateSerializer
+from contest.models import Contest, ContestProblem, TestCase
 from contest.utils.auth import get_user_from_request
 from account.models import Account
 
@@ -118,7 +118,7 @@ class TestContestCreateAPIView(APIView):
                 problems=problems_copy,
                 created_by=user,
                 # Copy contest settings
-                registration_required=original_contest.registration_required,
+                registration_required=False,  # CHANGE THIS: Test contests don't need registration
                 email_notifications=original_contest.email_notifications,
                 leaderboard_public=original_contest.leaderboard_public,
                 allow_practice=original_contest.allow_practice,
@@ -180,22 +180,16 @@ class TestContestDetailAPIView(APIView):
                 "message": "You are not authorized to view this test contest"
             }, status=403)
         
-        # Check registration status
-        is_registered = False
-        try:
-            registration = TestContestRegistration.objects.filter(
-                user=user, contest=test_contest
-            ).first()
-            is_registered = bool(registration)
-        except:
-            pass
+        # No registration needed for test contests
+        is_registered = True
         
         # Calculate current status
         current_status = get_test_contest_status(test_contest)
         test_contest.status = current_status
         test_contest.save()
         
-        participant_count = TestContestRegistration.objects(contest=test_contest).count()
+        # Count testers instead of registrations
+        participant_count = len(test_contest.testers)
         
         response_data = {
             "id": str(test_contest.id),
@@ -222,51 +216,12 @@ class TestContestDetailAPIView(APIView):
             "access": {
                 "can_access": can_access,
                 "is_registered": is_registered,
-                "can_register": current_status in ["upcoming", "live"]
+                "can_register": False  # No registration needed
             },
             "is_test_contest": True
         }
         
         return Response(response_data)
-
-class TestContestRegisterAPIView(APIView):
-    """Register for a test contest"""
-    
-    def post(self, request, test_contest_id):
-        user = get_user_from_request(request)
-        if not user:
-            return Response({"error": "Authentication required"}, status=401)
-        
-        try:
-            test_contest = TestContest.objects.get(id=test_contest_id)
-        except TestContest.DoesNotExist:
-            return Response({"error": "Test contest not found"}, status=404)
-        
-        # Check if user is authorized to register (tester or creator)
-        if user.email not in test_contest.testers and str(test_contest.created_by.id) != str(user.id):
-            return Response({
-                "error": "Access denied",
-                "message": "You are not authorized to register for this test contest"
-            }, status=403)
-        
-        # Check contest status
-        current_status = get_test_contest_status(test_contest)
-        if current_status not in ["upcoming", "live"]:
-            return Response({"error": "Registration is closed for this test contest"}, status=400)
-        
-        # Check if already registered
-        existing = TestContestRegistration.objects(user=user, contest=test_contest).first()
-        if existing:
-            return Response({"message": "Already registered"}, status=200)
-        
-        # Create registration
-        registration = TestContestRegistration(user=user, contest=test_contest)
-        try:
-            registration.save()
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
-        
-        return Response({"message": "Successfully registered for test contest"}, status=201)
 
 class TestContestProblemsAPIView(APIView):
     """Get problems for a test contest"""
@@ -288,17 +243,8 @@ class TestContestProblemsAPIView(APIView):
                 "message": "You are not authorized to view this test contest"
             }, status=403)
         
-        # Check registration for live/upcoming contests
+        # No registration needed for test contests
         current_status = get_test_contest_status(test_contest)
-        if current_status in ["upcoming", "live"]:
-            is_registered = TestContestRegistration.objects.filter(
-                user=user, contest=test_contest
-            ).first()
-            if not is_registered:
-                return Response({
-                    "error": "Registration required",
-                    "message": "You need to register for this test contest"
-                }, status=403)
         
         # Prepare problems list
         problems_list = []
@@ -320,8 +266,8 @@ class TestContestProblemsAPIView(APIView):
             }
             problems_list.append(problem_data)
         
-        # Contest info
-        participant_count = TestContestRegistration.objects(contest=test_contest).count()
+        # Contest info - count testers
+        participant_count = len(test_contest.testers)
         
         contest_info = {
             "id": str(test_contest.id),
@@ -364,15 +310,6 @@ class TestContestProblemDetailAPIView(APIView):
         
         # Check registration for live/upcoming contests
         current_status = get_test_contest_status(test_contest)
-        if current_status in ["upcoming", "live"]:
-            is_registered = TestContestRegistration.objects.filter(
-                user=user, contest=test_contest
-            ).first()
-            if not is_registered:
-                return Response({
-                    "error": "Registration required",
-                    "message": "You need to register for this test contest"
-                }, status=403)
         
         # Find the problem
         problem = None
@@ -458,8 +395,8 @@ class UserTestContestsAPIView(APIView):
             tc.status = status_value
             tc.save()
             
-            participant_count = TestContestRegistration.objects(contest=tc).count()
-            is_registered = bool(TestContestRegistration.objects(user=user, contest=tc).first())
+            participant_count = len(tc.testers)
+            is_registered = True
             
             data.append({
                 "id": str(tc.id),
@@ -481,5 +418,603 @@ class UserTestContestsAPIView(APIView):
         
         return Response({"test_contests": data})
     
+# testcontest/views.py - Add these imports at the top
+from datetime import datetime, timedelta
+import requests
+from django.conf import settings
+from mongoengine.queryset.visitor import Q
 
+# Add these classes after existing views
+
+class TestContestSubmissionCreateAPIView(APIView):
+    """Create a submission in test contest"""
+    
+    def post(self, request):
+        serializer = TestContestSubmissionCreateSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        
+        data = serializer.validated_data
+        user = data['user']
+        test_contest = data['test_contest']
+        problem_index = data['problem_index'].upper()
+        
+        # Calculate test contest time
+        current_time = datetime.now()
+        test_contest_time = 0
+        if test_contest.test_start_time:
+            time_diff = current_time - test_contest.test_start_time
+            test_contest_time = time_diff.total_seconds() / 60
+        
+        # Instead of calling the contest API, process directly here
+        # Find the problem
+        problem = None
+        for p in test_contest.problems:
+            if p.index == problem_index.upper():
+                problem = p
+                break
+        
+        if not problem:
+            return Response({"error": "Problem not found"}, status=404)
+        
+        # Create test contest submission record
+        test_submission = TestContestSubmission(
+            test_contest=test_contest,
+            user=user,
+            problem_index=problem_index,
+            problem_code=data['problem_code'],
+            problem_title=data['problem_title'],
+            code=data['code'][:1000],  # Store first 1000 chars
+            language=data['language'],
+            verdict='RUNNING',
+            submitted_at=current_time,
+            test_contest_time=test_contest_time
+        )
+        
+        try:
+            test_submission.save()
+        except Exception as e:
+            return Response({"error": f"Failed to create test submission: {str(e)}"}, status=500)
+        
+        # DIRECT EXECUTION (reuse contest execution logic)
+        # Import the actual execution logic from compiler views
+        from compiler.views import CodeExecuteAPIView, LANGUAGE_VERSION_MAP
+        
+        try:
+            # Prepare payload for JDoodle
+            language = data['language'].lower()
+            version_index = LANGUAGE_VERSION_MAP.get(language, "0")
+            
+            # Test each test case
+            all_passed = True
+            failed_test_case = None
+            actual_output = ""
+            passed_count = 0
+            total_test_cases = len(problem.test_cases)
+            error_message = None
+            compile_output = None
+            max_execution_time = 0
+            max_memory_used = 0
+            verdict = "RUNNING"
+            
+            # Test each test case (similar to ContestProblemExecuteAPIView)
+            for i, test_case in enumerate(problem.test_cases):
+                # Execute code with this test case
+                payload = {
+                    "clientId": "6c83bb2cd0b9e9a790f59a2484011318",  # Your JDoodle ID
+                    "clientSecret": "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4",
+                    "script": data['code'],
+                    "stdin": test_case.input,
+                    "language": language,
+                    "versionIndex": version_index
+                }
+                
+                try:
+                    res = requests.post("https://api.jdoodle.com/v1/execute", 
+                                      json=payload, timeout=15)
+                    res_data = res.json()
+                    
+                    jdoodle_output = res_data.get("output", "").strip()
+                    cpu_time_str = res_data.get("cpuTime")
+                    if cpu_time_str is None:
+                        cpu_time_seconds = 0.0
+                    else:
+                        cpu_time_seconds = float(cpu_time_str)
+                    cpu_time_ms = int(cpu_time_seconds * 1000)
+                    memory_kb = int(res_data.get("memory", 0))
+                    status_code = res_data.get("statusCode", 200)
+                    is_execution_success = res_data.get("isExecutionSuccess", False)
+                    
+                    # Update max values
+                    max_execution_time = max(max_execution_time, cpu_time_ms)
+                    max_memory_used = max(max_memory_used, memory_kb)
+                    
+                    # Check for compilation error
+                    if status_code == 400 or not is_execution_success:
+                        all_passed = False
+                        compile_output = jdoodle_output
+                        verdict = "CE"
+                        break
+                    
+                    # For first test case, save output
+                    if i == 0:
+                        actual_output = jdoodle_output
+                    
+                    # Check time limit
+                    time_limit_ms = problem.time_limit_seconds * 1000
+                    if cpu_time_ms > time_limit_ms:
+                        all_passed = False
+                        verdict = "TLE"
+                        error_message = f"Time limit exceeded: {cpu_time_ms}ms > {time_limit_ms}ms"
+                        break
+                    
+                    # Check memory limit
+                    memory_limit_kb = problem.memory_limit_mb * 1024
+                    if memory_kb > memory_limit_kb:
+                        all_passed = False
+                        verdict = "MLE"
+                        error_message = f"Memory limit exceeded: {memory_kb}KB > {memory_limit_kb}KB"
+                        break
+                    
+                    # Check if output matches expected
+                    expected_output = test_case.output.strip()
+                    if jdoodle_output == expected_output:
+                        passed_count += 1
+                    else:
+                        all_passed = False
+                        failed_test_case = i + 1
+                        verdict = "WA"
+                        error_message = f"Test case {i+1} failed\nExpected: {expected_output}\nGot: {jdoodle_output}"
+                        break
+                        
+                except requests.exceptions.Timeout:
+                    all_passed = False
+                    verdict = "TLE"
+                    error_message = "Execution timeout (15 seconds)"
+                    break
+                except Exception as e:
+                    all_passed = False
+                    verdict = "SE"
+                    error_message = f"System error: {str(e)}"
+                    break
+            
+            # Determine final verdict
+            if all_passed:
+                verdict = "AC"
+                status_msg = "Accepted"
+            elif verdict == "RUNNING":
+                verdict = "WA"
+                status_msg = f"Wrong Answer on test case {failed_test_case}"
+            else:
+                status_msg = verdict
+            
+            # Update submission with results
+            test_submission.verdict = verdict
+            test_submission.passed_test_cases = passed_count
+            test_submission.total_test_cases = total_test_cases
+            test_submission.failed_test_case = failed_test_case if not all_passed else -1
+            test_submission.error_message = error_message
+            test_submission.compile_output = compile_output
+            test_submission.judged_at = datetime.now()
+            test_submission.execution_time = max_execution_time
+            test_submission.memory = max_memory_used
+            
+            test_submission.save()
+            
+            return Response({
+                "message": "Test contest submission processed successfully",
+                "test_submission_id": str(test_submission.id),
+                "test_contest_time": test_contest_time,
+                "verdict": verdict,
+                "status": status_msg,
+                "output": actual_output or error_message or compile_output or "No output",
+                "all_passed": all_passed,
+                "passed_test_cases": passed_count,
+                "total_test_cases": total_test_cases,
+                "failed_test_case": failed_test_case,
+                "execution_time": max_execution_time,
+                "memory_used": max_memory_used,
+                "time_limit": problem.time_limit_seconds * 1000,
+                "memory_limit": problem.memory_limit_mb * 1024,
+                "is_test_contest": True
+            }, status=201)
+            
+        except Exception as e:
+            test_submission.verdict = 'SE'
+            test_submission.error_message = f"System error: {str(e)}"
+            test_submission.judged_at = datetime.now()
+            test_submission.save()
+            
+            return Response({
+                "error": f"Test contest submission error: {str(e)}",
+                "test_submission_id": str(test_submission.id)
+            }, status=500)
+        
+class TestContestExecuteAPIView(APIView):
+    """Direct code execution for test contests (without problem context)"""
+    
+    def post(self, request, test_contest_id):
+        # Authenticate user
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+        
+        # Get test contest
+        try:
+            test_contest = TestContest.objects.get(id=test_contest_id)
+        except TestContest.DoesNotExist:
+            return Response({"error": "Test contest not found"}, status=404)
+        
+        # Check access
+        if user.email not in test_contest.testers and str(test_contest.created_by.id) != str(user.id):
+            return Response({"error": "Access denied to test contest"}, status=403)
+        
+        # Check test contest status - allow execution even if not live for "Run" button
+        # current_status = get_test_contest_status(test_contest)
+        # if current_status != "live":
+        #     return Response({"error": f"Test contest is not live (current status: {current_status})"}, status=400)
+        
+        # Get code execution parameters from request
+        code = request.data.get('code')
+        language = request.data.get('language')
+        input_data = request.data.get('input_data', '')
+        expected_output = request.data.get('expected_output', '')
+        
+        if not code or not language:
+            return Response({"error": "Missing code or language"}, status=400)
+        
+        # Use JDoodle API directly (copy from compiler/views.py)
+        # JDoodle credentials
+        JD_CLIENT_ID = "6c83bb2cd0b9e9a790f59a2484011318"
+        JD_CLIENT_SECRET = "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4"
+        JD_URL = "https://api.jdoodle.com/v1/execute"
+        
+        # Map for language -> recommended versionIndex
+        LANGUAGE_VERSION_MAP = {
+            "python": "3",
+            "python3": "3",
+            "java": "4",
+            "c": "5",
+            "cpp": "5",
+            "javascript": "4"
+        }
+        
+        language_lower = language.lower()
+        version_index = LANGUAGE_VERSION_MAP.get(language_lower, "0")
+        
+        # JDoodle payload
+        payload = {
+            "clientId": JD_CLIENT_ID,
+            "clientSecret": JD_CLIENT_SECRET,
+            "script": code,
+            "stdin": input_data,
+            "language": language_lower,
+            "versionIndex": version_index
+        }
+        
+        try:
+            res = requests.post(JD_URL, json=payload, timeout=15)
+            res_data = res.json()
+            
+            jdoodle_output = res_data.get("output", "").strip()
+            cpu_time_str = res_data.get("cpuTime")
+            cpu_time_seconds = 0.0 if cpu_time_str is None else float(cpu_time_str)
+            cpu_time_ms = int(cpu_time_seconds * 1000)
+            memory_kb = int(res_data.get("memory", 0))
+            status_code = res_data.get("statusCode", 200)
+            is_execution_success = res_data.get("isExecutionSuccess", False)
+            
+            # Check expected output if provided
+            verdict = "OK"
+            if expected_output:
+                verdict = "AC" if jdoodle_output == expected_output.strip() else "WA"
+            
+            # Check for compilation/runtime errors
+            status = "success" if is_execution_success else "error"
+            if status_code == 400:
+                status = "compilation_error"
+            elif not is_execution_success:
+                status = "runtime_error"
+            
+            # Return response
+            return Response({
+                "submission_id": None,  # No submission ID for direct execution
+                "contest_id": str(test_contest.original_contest.id),
+                "test_contest_id": test_contest_id,
+                "problem_id": None,  # No problem for direct execution
+                "output": jdoodle_output,
+                "status": status,
+                "verdict": verdict,
+                "execution_time_ms": cpu_time_ms,
+                "execution_time_seconds": cpu_time_seconds,
+                "memory_kb": memory_kb,
+                "memory_mb": round(memory_kb / 1024, 2),
+                "status_code": status_code,
+                "is_execution_success": is_execution_success,
+                "is_test_contest": True,
+                "jdoodle_response": res_data
+            })
+            
+        except requests.exceptions.Timeout:
+            return Response({
+                "error": "Execution timeout (15 seconds)",
+                "is_test_contest": True
+            }, status=408)
+            
+        except Exception as e:
+            return Response({
+                "error": f"Execution error: {str(e)}",
+                "is_test_contest": True
+            }, status=500)
+        
+class TestContestProblemExecuteAPIView(APIView):
+    """Execute code for a specific problem in test contest"""
+    
+    def post(self, request, test_contest_id, problem_index):
+        # Authenticate user
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+        
+        # Get test contest
+        try:
+            test_contest = TestContest.objects.get(id=test_contest_id)
+        except TestContest.DoesNotExist:
+            return Response({"error": "Test contest not found"}, status=404)
+        
+        # Check access
+        if user.email not in test_contest.testers and str(test_contest.created_by.id) != str(user.id):
+            return Response({"error": "Access denied to test contest"}, status=403)
+        
+        # # Check if user is registered
+        # registration = TestContestRegistration.objects.filter(
+        #     user=user, contest=test_contest
+        # ).first()
+        # if not registration:
+        #     return Response({"error": "You are not registered for this test contest"}, status=403)
+        
+        # Check test contest status
+        current_status = get_test_contest_status(test_contest)
+        if current_status != "live":
+            return Response({"error": f"Test contest is not live (current status: {current_status})"}, status=400)
+        
+        # Find the problem in test contest
+        problem = None
+        for p in test_contest.problems:
+            if p.index == problem_index.upper():
+                problem = p
+                break
+        
+        if not problem:
+            return Response({"error": "Problem not found in test contest"}, status=404)
+        
+        # Get code execution parameters
+        code = request.data.get('code')
+        language = request.data.get('language')
+        input_data = request.data.get('input_data', '')
+        expected_output = request.data.get('expected_output', '')
+        
+        if not code or not language:
+            return Response({"error": "Missing code or language"}, status=400)
+        
+        # Forward to regular contest problem execute endpoint
+        original_contest = test_contest.original_contest
+        
+        if hasattr(request, 'get_host'):
+            base_url = f"{request.scheme}://{request.get_host()}"
+        else:
+            base_url = "http://localhost:8000"
+        
+        payload = {
+            'code': code,
+            'language': language,
+            'version_index': '0'
+        }
+        
+        # Add optional fields
+        if input_data:
+            payload['input_data'] = input_data
+        if expected_output:
+            payload['expected_output'] = expected_output
+        
+        headers = {
+            'Content-Type': 'application/json',
+        }
+        
+        if 'HTTP_AUTHORIZATION' in request.META:
+            headers['Authorization'] = request.META['HTTP_AUTHORIZATION']
+        
+        try:
+            # Call the regular contest problem execute endpoint
+            execute_url = f"{base_url}/contests/{str(original_contest.id)}/problems/{problem_index}/execute/"
+            
+            response = requests.post(
+                execute_url,
+                json=payload,
+                headers=headers,
+                timeout=30
+            )
+            
+            if response.status_code in [200, 201]:
+                result = response.json()
+                
+                # Add test contest context
+                result['is_test_contest'] = True
+                result['test_contest_id'] = test_contest_id
+                result['problem_index'] = problem_index
+                result['problem_title'] = problem.title
+                
+                # Calculate test contest time
+                current_time = datetime.now()
+                test_contest_time = 0
+                if test_contest.test_start_time:
+                    time_diff = current_time - test_contest.test_start_time
+                    test_contest_time = time_diff.total_seconds() / 60
+                
+                result['test_contest_time'] = test_contest_time
+                
+                # Optionally create a test submission record
+                if request.data.get('create_submission', False):
+                    test_submission = TestContestSubmission(
+                        test_contest=test_contest,
+                        user=user,
+                        problem_index=problem_index.upper(),
+                        problem_code=problem.index,
+                        problem_title=problem.title,
+                        code=code[:1000],  # Store first 1000 chars
+                        language=language,
+                        verdict=result.get('verdict', 'WA'),
+                        execution_time=result.get('execution_time', 0),
+                        memory=result.get('memory_used', 0),
+                        passed_test_cases=result.get('passed_test_cases', 0),
+                        total_test_cases=result.get('total_test_cases', 0),
+                        failed_test_case=result.get('failed_test_case', -1),
+                        error_message=result.get('error_message'),
+                        compile_output=result.get('compile_output'),
+                        submitted_at=current_time,
+                        test_contest_time=test_contest_time,
+                        judged_at=datetime.now()
+                    )
+                    test_submission.save()
+                    result['test_submission_id'] = str(test_submission.id)
+                
+                return Response(result)
+            else:
+                return Response({
+                    "error": f"Execution failed: {response.text}",
+                    "status_code": response.status_code,
+                    "is_test_contest": True
+                }, status=response.status_code)
+                
+        except requests.exceptions.Timeout:
+            return Response({
+                "error": "Execution timeout",
+                "is_test_contest": True
+            }, status=408)
+            
+        except Exception as e:
+            return Response({
+                "error": f"Execution error: {str(e)}",
+                "is_test_contest": True
+            }, status=500)
+
+# Add these helper views for listing and viewing submissions
+
+class TestContestSubmissionsAPIView(APIView):
+    """Get submissions for a test contest"""
+    
+    def get(self, request, test_contest_id):
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+        
+        try:
+            test_contest = TestContest.objects.get(id=test_contest_id)
+        except TestContest.DoesNotExist:
+            return Response({"error": "Test contest not found"}, status=404)
+        
+        # Check access
+        if user.email not in test_contest.testers and str(test_contest.created_by.id) != str(user.id):
+            return Response({"error": "Access denied to test contest"}, status=403)
+        
+        # Get query parameters
+        filter_type = request.GET.get('filter', 'my')  # 'my' or 'all'
+        verdict = request.GET.get('verdict', 'all')
+        problem = request.GET.get('problem', 'all')
+        limit = int(request.GET.get('limit', 50))
+        skip = int(request.GET.get('skip', 0))
+        
+        # Build query
+        query = Q(test_contest=test_contest)
+        
+        # Apply user filter
+        if filter_type == 'my':
+            query &= Q(user=user)
+        
+        # Apply verdict filter
+        if verdict != 'all':
+            query &= Q(verdict=verdict)
+        
+        # Apply problem filter
+        if problem != 'all':
+            query &= Q(problem_index=problem)
+        
+        # Fetch submissions
+        submissions = TestContestSubmission.objects(query).order_by('-submitted_at').skip(skip).limit(limit)
+        
+        # Serialize data
+        submissions_data = []
+        for submission in submissions:
+            sub_data = submission.to_dict()
+            sub_data['can_view_code'] = sub_data['user_id'] == str(user.id)
+            submissions_data.append(sub_data)
+        
+        # Get available problems for filtering
+        problems_list = []
+        for p in test_contest.problems:
+            problems_list.append({
+                'code': p.index,
+                'title': p.title,
+                'value': p.index
+            })
+        
+        return Response({
+            'submissions': submissions_data,
+            'total': TestContestSubmission.objects(query).count(),
+            'filters': {
+                'problems': problems_list,
+                'verdicts': [
+                    {'value': 'all', 'label': 'All Verdicts'},
+                    {'value': 'AC', 'label': 'Accepted'},
+                    {'value': 'WA', 'label': 'Wrong Answer'},
+                    {'value': 'TLE', 'label': 'Time Limit Exceeded'},
+                    {'value': 'MLE', 'label': 'Memory Limit Exceeded'},
+                    {'value': 'CE', 'label': 'Compilation Error'},
+                    {'value': 'RE', 'label': 'Runtime Error'},
+                    {'value': 'PENDING', 'label': 'Pending'},
+                    {'value': 'RUNNING', 'label': 'Running'},
+                ]
+            },
+            'test_contest_id': str(test_contest.id),
+            'test_contest_title': test_contest.title,
+            'test_contest_status': get_test_contest_status(test_contest)
+        })
+
+class TestContestSubmissionDetailAPIView(APIView):
+    """Get details of a specific test contest submission"""
+    
+    def get(self, request, test_contest_id, submission_id):
+        try:
+            submission = TestContestSubmission.objects.get(id=submission_id)
+        except TestContestSubmission.DoesNotExist:
+            return Response({"error": "Submission not found"}, status=404)
+        
+        # Verify the submission belongs to the test contest
+        if str(submission.test_contest.id) != test_contest_id:
+            return Response({"error": "Submission does not belong to this test contest"}, status=400)
+        
+        user = get_user_from_request(request)
+        
+        # Check access - only the submitter or test contest creator can view
+        can_view = False
+        if user:
+            if str(submission.user.id) == str(user.id):
+                can_view = True
+            elif str(submission.test_contest.created_by.id) == str(user.id):
+                can_view = True
+            elif user.email in submission.test_contest.testers:
+                can_view = True
+        
+        if not can_view:
+            return Response({"error": "Access denied to this submission"}, status=403)
+        
+        sub_data = submission.to_dict()
+        sub_data['can_view_code'] = str(submission.user.id) == str(user.id)
+        
+        return Response(sub_data)
+    
     
