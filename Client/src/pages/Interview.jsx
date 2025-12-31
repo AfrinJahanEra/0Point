@@ -1,15 +1,55 @@
 import React, { useState } from 'react';
 
 const Interview = () => {
+  const [interviewerEmail, setInterviewerEmail] = useState('');
+  const [candidateEmail, setCandidateEmail] = useState('');
+  const [links, setLinks] = useState(null);
+
+  const handleCreate = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/mock-interview/create-session/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          interviewer_email: interviewerEmail,
+          candidate_email: candidateEmail
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setLinks(data);
+      } else {
+        console.error('Error:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error creating session:', error);
+    }
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Interview Sessions</h1>
-      <p className="text-gray-600 mb-8">Manage your interview sessions and create new ones.</p>
-      
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4">Upcoming Interviews</h2>
-        <p className="text-gray-500">No upcoming interviews scheduled.</p>
-      </div>
+    <div style={{ padding: '20px' }}>
+      <h1>Create Interview Room</h1>
+      <input
+        type="email"
+        placeholder="Interviewer Email"
+        value={interviewerEmail}
+        onChange={(e) => setInterviewerEmail(e.target.value)}
+        style={{ display: 'block', margin: '10px 0' }}
+      />
+      <input
+        type="email"
+        placeholder="Candidate Email"
+        value={candidateEmail}
+        onChange={(e) => setCandidateEmail(e.target.value)}
+        style={{ display: 'block', margin: '10px 0' }}
+      />
+      <button onClick={handleCreate} style={{ padding: '10px 20px' }}>Create Room and Send Invitations</button>
+      {links && (
+        <div style={{ marginTop: '20px' }}>
+          <p>Interviewer Link: <a href={links.interviewer_link}>{links.interviewer_link}</a></p>
+          <p>Candidate Link: <a href={links.candidate_link}>{links.candidate_link}</a></p>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,1057 +1,1139 @@
-import React, { useState, useRef, useEffect } from 'react';
-import Editor from '@monaco-editor/react';
-import { toast } from 'react-hot-toast';
-import { 
-  Video, 
-  Mail, 
-  Send, 
-  User, 
-  CameraOff, 
-  Camera, 
-  X, 
-  ChevronLeft, 
-  ChevronRight,
-  FileText,
-  Maximize2,
-  Minimize2,
-  MessageSquare,
-  Clock,
-  CheckCircle,
-  Upload,
-  Eye,
-  EyeOff,
-  Users,
-  Download
-} from 'lucide-react';
+// src/pages/InterviewSession.jsx
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { FaVideo, FaVideoSlash, FaMicrophone, FaMicrophoneSlash } from 'react-icons/fa';
+import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python';
+import java from 'react-syntax-highlighter/dist/esm/languages/hljs/java';
+import cpp from 'react-syntax-highlighter/dist/esm/languages/hljs/cpp';
+import c from 'react-syntax-highlighter/dist/esm/languages/hljs/c';
+import javascript from 'react-syntax-highlighter/dist/esm/languages/hljs/javascript';
+import go from 'react-syntax-highlighter/dist/esm/languages/hljs/go';
+import rust from 'react-syntax-highlighter/dist/esm/languages/hljs/rust';
+import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+
+SyntaxHighlighter.registerLanguage('python', python);
+SyntaxHighlighter.registerLanguage('java', java);
+SyntaxHighlighter.registerLanguage('cpp', cpp);
+SyntaxHighlighter.registerLanguage('c', c);
+SyntaxHighlighter.registerLanguage('javascript', javascript);
+SyntaxHighlighter.registerLanguage('go', go);
+SyntaxHighlighter.registerLanguage('rust', rust);
 
 const InterviewSession = () => {
-  // Layout States
-  const [showQuestions, setShowQuestions] = useState(false);
-  const [isVideoOpen, setIsVideoOpen] = useState(true);
-  const [questionsPanelCollapsed, setQuestionsPanelCollapsed] = useState(false);
-  
-  // Video States
-  const [candidateJoined, setCandidateJoined] = useState(false);
-  const [isInterviewerVideoOn, setIsInterviewerVideoOn] = useState(true);
-  const [isCandidateVideoOn, setIsCandidateVideoOn] = useState(false);
-  
-  // Question Management
-  const [questionFile, setQuestionFile] = useState(null);
-  const [showQuestionUploadPopup, setShowQuestionUploadPopup] = useState(false);
-  const [questionContent, setQuestionContent] = useState('');
-  const [fileUrl, setFileUrl] = useState(null);
-  
-  // Code Editor States
-  const [code, setCode] = useState('// Write your code here...\nfunction solution() {\n  \n}\n');
+  const { sessionId } = useParams();
+  const [searchParams] = useSearchParams();
+  const role = searchParams.get('role');
+  const email = searchParams.get('email') ||
+    (role === 'interviewer' ? 'interviewer@example.com' : 'candidate@example.com');
+
+  // Video refs
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const pc = useRef(null);
+  const ws = useRef(null);
+  const codeWs = useRef(null);
+  const streamRef = useRef(null);
+
+  // Media state
+  const [localAudioActive, setLocalAudioActive] = useState(false);
+  const [localVideoActive, setLocalVideoActive] = useState(false);
+  const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true);
+  const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true);
+
+  // PDF state
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [pdfUploader, setPdfUploader] = useState('');
+
+  // IDE state
+  const [code, setCode] = useState('# Start coding here\nprint("Hello, Interview!")');
+  const [language, setLanguage] = useState('python');
   const [output, setOutput] = useState('');
-  const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
-  const [collaboratorCursor, setCollaboratorCursor] = useState(null);
-  const [language, setLanguage] = useState('javascript');
-  const [isRunning, setIsRunning] = useState(false);
-  
-  // Invitation States
-  const [showInvitePopup, setShowInvitePopup] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [invitationSent, setInvitationSent] = useState(false);
-  
-  // Timer State
-  const [timeRemaining, setTimeRemaining] = useState(3600); // 60 minutes in seconds
-  
-  // Refs
-  const editorRef = useRef(null);
-  const socketRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const fileUrlRef = useRef(null);
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [stdin, setStdin] = useState('');
 
-  // Initialize - Check if question exists on mount
-  useEffect(() => {
-    const savedQuestion = localStorage.getItem('interviewQuestion');
-    if (savedQuestion) {
-      setQuestionContent(savedQuestion);
-    } else {
-      setTimeout(() => {
-        setShowQuestionUploadPopup(true);
-      }, 1000);
-    }
-    
-    // Cleanup function to revoke object URLs
-    return () => {
-      if (fileUrlRef.current) {
-        URL.revokeObjectURL(fileUrlRef.current);
-      }
-    };
-  }, []);
-
-  // Simulate candidate joining after invitation
-  useEffect(() => {
-    if (invitationSent) {
-      const timer = setTimeout(() => {
-        setCandidateJoined(true);
-        setIsCandidateVideoOn(true);
-        toast.success('Candidate has joined the session!', {
-          style: {
-            background: '#1e40af',
-            color: '#ffffff',
-          },
-        });
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [invitationSent]);
-
-  // Timer countdown
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 0) {
-          clearInterval(interval);
-          toast('Interview time has ended!', {
-            icon: '⏰',
-            style: {
-              background: '#dc2626',
-              color: '#ffffff',
-            },
-          });
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  const formatTime = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  // Code examples
+  const codeExamples = {
+    python: [
+      { name: 'Hello World', code: 'print("Hello, World!")' },
+      { name: 'Fibonacci', code: 'def fibonacci(n):\n    if n <= 1:\n        return n\n    else:\n        return fibonacci(n-1) + fibonacci(n-2)\n\nprint(fibonacci(10))' },
+      { name: 'Bubble Sort', code: 'def bubble_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if arr[j] > arr[j+1]:\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n    return arr\n\nprint(bubble_sort([64, 34, 25, 12, 22, 11, 90]))' }
+    ],
+    java: [
+      { name: 'Hello World', code: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}' },
+      { name: 'Fibonacci', code: 'public class Fibonacci {\n    public static int fibonacci(int n) {\n        if (n <= 1) {\n            return n;\n        }\n        return fibonacci(n-1) + fibonacci(n-2);\n    }\n    public static void main(String[] args) {\n        System.out.println(fibonacci(10));\n    }\n}' },
+      { name: 'Bubble Sort', code: 'public class BubbleSort {\n    static void bubbleSort(int arr[]) {\n        int n = arr.length;\n        for (int i = 0; i < n - 1; i++) {\n            for (int j = 0; j < n - i - 1; j++) {\n                if (arr[j] > arr[j + 1]) {\n                    int temp = arr[j];\n                    arr[j] = arr[j + 1];\n                    arr[j + 1] = temp;\n                }\n            }\n        }\n    }\n    public static void main(String[] args) {\n        int arr[] = {64, 34, 25, 12, 22, 11, 90};\n        bubbleSort(arr);\n        for (int i = 0; i < arr.length; i++) {\n            System.out.print(arr[i] + " ");\n        }\n    }\n}' }
+    ],
+    cpp: [
+      { name: 'Hello World', code: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, World!" << endl;\n    return 0;\n}' },
+      { name: 'Fibonacci', code: '#include <iostream>\nusing namespace std;\n\nint fibonacci(int n) {\n    if (n <= 1) {\n        return n;\n    }\n    return fibonacci(n-1) + fibonacci(n-2);\n}\n\nint main() {\n    cout << fibonacci(10) << endl;\n    return 0;\n}' },
+      { name: 'Bubble Sort', code: '#include <iostream>\nusing namespace std;\n\nvoid bubbleSort(int arr[], int n) {\n    for (int i = 0; i < n - 1; i++) {\n        for (int j = 0; j < n - i - 1; j++) {\n            if (arr[j] > arr[j + 1]) {\n                int temp = arr[j];\n                arr[j] = arr[j + 1];\n                arr[j + 1] = temp;\n            }\n        }\n    }\n}\n\nint main() {\n    int arr[] = {64, 34, 25, 12, 22, 11, 90};\n    int n = sizeof(arr) / sizeof(arr[0]);\n    bubbleSort(arr, n);\n    for (int i = 0; i < n; i++) {\n        cout << arr[i] << " ";\n    }\n    cout << endl;\n    return 0;\n}' }
+    ],
+    c: [
+      { name: 'Hello World', code: '#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}' },
+      { name: 'Fibonacci', code: '#include <stdio.h>\n\nint fibonacci(int n) {\n    if (n <= 1) {\n        return n;\n    }\n    return fibonacci(n-1) + fibonacci(n-2);\n}\n\nint main() {\n    printf("%d\\n", fibonacci(10));\n    return 0;\n}' },
+      { name: 'Bubble Sort', code: '#include <stdio.h>\n\nvoid bubbleSort(int arr[], int n) {\n    for (int i = 0; i < n-1; i++) {\n        for (int j = 0; j < n-i-1; j++) {\n            if (arr[j] > arr[j+1]) {\n                int temp = arr[j];\n                arr[j] = arr[j+1];\n                arr[j+1] = temp;\n            }\n        }\n    }\n}\n\nint main() {\n    int arr[] = {64, 34, 25, 12, 22, 11, 90};\n    int n = sizeof(arr) / sizeof(arr[0]);\n    bubbleSort(arr, n);\n    for (int i = 0; i < n; i++) {\n        printf("%d ", arr[i]);\n    }\n    printf("\\n");\n    return 0;\n}' }
+    ],
+    javascript: [
+      { name: 'Hello World', code: 'console.log("Hello, World!");' },
+      { name: 'Fibonacci', code: 'function fibonacci(n) {\n    if (n <= 1) {\n        return n;\n    }\n    return fibonacci(n-1) + fibonacci(n-2);\n}\n\nconsole.log(fibonacci(10));' },
+      { name: 'Bubble Sort', code: 'function bubbleSort(arr) {\n    const n = arr.length;\n    for (let i = 0; i < n - 1; i++) {\n        for (let j = 0; j < n - i - 1; j++) {\n            if (arr[j] > arr[j + 1]) {\n                [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];\n            }\n        }\n    }\n    return arr;\n}\n\nconsole.log(bubbleSort([64, 34, 25, 12, 22, 11, 90]));' }
+    ],
+    go: [
+      { name: 'Hello World', code: 'package main\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, World!")\n}' },
+      { name: 'Fibonacci', code: 'package main\nimport "fmt"\n\nfunc fibonacci(n int) int {\n    if n <= 1 {\n        return n\n    }\n    return fibonacci(n-1) + fibonacci(n-2)\n}\n\nfunc main() {\n    fmt.Println(fibonacci(10))\n}' },
+      { name: 'Bubble Sort', code: 'package main\nimport "fmt"\n\nfunc bubbleSort(arr []int) {\n    n := len(arr)\n    for i := 0; i < n-1; i++ {\n        for j := 0; j < n-i-1; j++ {\n            if arr[j] > arr[j+1] {\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n            }\n        }\n    }\n}\n\nfunc main() {\n    arr := []int{64, 34, 25, 12, 22, 11, 90}\n    bubbleSort(arr)\n    fmt.Println(arr)\n}' }
+    ],
+    rust: [
+      { name: 'Hello World', code: 'fn main() {\n    println!("Hello, world!");\n}' },
+      { name: 'Fibonacci', code: 'fn fibonacci(n: u32) -> u32 {\n    match n {\n        0 => 0,\n        1 => 1,\n        _ => fibonacci(n-1) + fibonacci(n-2)\n    }\n}\n\nfn main() {\n    println!("{}", fibonacci(10));\n}' },
+      { name: 'Bubble Sort', code: 'fn bubble_sort(arr: &mut [i32]) {\n    let n = arr.len();\n    for i in 0..n {\n        for j in 0..n-i-1 {\n            if arr[j] > arr[j+1] {\n                arr.swap(j, j+1);\n            }\n        }\n    }\n}\n\nfn main() {\n    let mut arr = [64, 34, 25, 12, 22, 11, 90];\n    bubble_sort(&mut arr);\n    println!("{:?}", arr);\n}' }
+    ]
   };
 
-  // Layout Controls
-  const toggleQuestions = () => {
-    if (!questionContent && !questionFile) {
-      setShowQuestionUploadPopup(true);
+  const [selectedExample, setSelectedExample] = useState('');
+
+  // Connection status state
+  const [videoConnectionStatus, setVideoConnectionStatus] = useState('connecting'); // 'connected' | 'disconnected' | 'connecting'
+  const [codeConnectionStatus, setCodeConnectionStatus] = useState('connecting');
+  const [peerConnectionStatus, setPeerConnectionStatus] = useState('connecting');
+
+  // UI state
+  const [participants, setParticipants] = useState([]);
+  const [permissionState, setPermissionState] = useState({ audio: 'prompt', video: 'prompt' });
+  const [error, setError] = useState('');
+
+  const myRoleLabel = role === 'interviewer' ? 'Interviewer' : 'Candidate';
+  const remoteRoleLabel = role === 'interviewer' ? 'Candidate' : 'Interviewer';
+
+
+  const checkPermissions = useCallback(async () => {
+    try {
+      const audioStatus = await navigator.permissions.query({ name: 'microphone' });
+      const videoStatus = await navigator.permissions.query({ name: 'camera' });
+      setPermissionState({
+        audio: audioStatus.state,
+        video: videoStatus.state
+      });
+    } catch (err) {
+      console.warn('Permission API not supported in this browser');
+    }
+  }, []);
+
+
+  const handlePDFUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please select a PDF file.');
       return;
     }
-    setShowQuestions(!showQuestions);
-  };
 
-  const toggleVideoPanel = () => {
-    setIsVideoOpen(!isVideoOpen);
-  };
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('email', email);
 
-  const toggleQuestionsPanel = () => {
-    setQuestionsPanelCollapsed(!questionsPanelCollapsed);
-  };
-
-  // Video Controls
-  const toggleInterviewerVideo = () => {
-    setIsInterviewerVideoOn(!isInterviewerVideoOn);
-  };
-
-  const toggleCandidateVideo = () => {
-    if (candidateJoined) {
-      setIsCandidateVideoOn(!isCandidateVideoOn);
-    }
-  };
-
-  // Question Management
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file && (file.type === 'application/pdf' || 
-                 file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-      setQuestionFile(file);
-      
-      // Create a URL for the file to display it
-      // Revoke the previous URL if it exists
-      if (fileUrlRef.current) {
-        URL.revokeObjectURL(fileUrlRef.current);
-      }
-      const url = URL.createObjectURL(file);
-      setFileUrl(url);
-      fileUrlRef.current = url;
-      
-      const mockContent = `Extracted content from: ${file.name}
-      
-      Question 1: Array Manipulation
-      -------------------------------
-      Given an array of integers, find the maximum product of any two numbers in the array.
-      
-      Example:
-      Input: [1, 2, 3, 4]
-      Output: 12 (3 * 4)
-      
-      Question 2: String Operations
-      -----------------------------
-      Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
-      
-      Example:
-      Input: "A man, a plan, a canal: Panama"
-      Output: true
-      
-      Question 3: System Design
-      -------------------------
-      Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.`;
-      
-      setQuestionContent(mockContent);
-      localStorage.setItem('interviewQuestion', mockContent);
-      
-      toast.success('Question file uploaded successfully!', {
-        style: {
-          background: '#1e40af',
-          color: '#ffffff',
-        },
-      });
-      
-      setShowQuestionUploadPopup(false);
-    } else {
-      toast.error('Please upload a PDF or DOCX file', {
-        style: {
-          background: '#dc2626',
-          color: '#ffffff',
-        },
-      });
-    }
-  };
-
-  const handleManualQuestion = () => {
-    const manualQuestion = `Interview Questions
-    ==================
-    
-    1. Coding Questions:
-    --------------------
-    a) Given an array, find the maximum product of any two numbers.
-    b) Check if a string is a palindrome (ignore special characters).
-    c) Design a URL shortening service (system design).
-    
-    2. Behavioral Questions:
-    ------------------------
-    a) Tell me about a challenging project.
-    b) How do you handle conflicting priorities?
-    c) Describe your experience with agile methodologies.`;
-    
-    setQuestionContent(manualQuestion);
-    localStorage.setItem('interviewQuestion', manualQuestion);
-    
-    // Clear file state when manually adding questions
-    setQuestionFile(null);
-    if (fileUrlRef.current) {
-      URL.revokeObjectURL(fileUrlRef.current);
-      fileUrlRef.current = null;
-      setFileUrl(null);
-    }
-    
-    setShowQuestionUploadPopup(false);
-    
-    toast.success('Question set added successfully!', {
-      style: {
-        background: '#1e40af',
-        color: '#ffffff',
-      },
-    });
-  };
-
-  // Code Editor Functions
-  const handleEditorDidMount = (editor, monaco) => {
-    editorRef.current = editor;
-    
-    editor.onDidChangeCursorPosition((e) => {
-      setCursorPosition({
-        lineNumber: e.position.lineNumber,
-        column: e.position.column
-      });
-    });
-  };
-
-  const handleRunCode = () => {
     try {
-      setOutput(`> Compiling code...
-> Code executed successfully!
-> 
-> Output: 
-${evalCode(code)}
-> 
-> Execution time: 0.002s
-> Memory used: 4.2 MB
-> 
-> Process exited with code 0`);
-    } catch (error) {
-      setOutput(`> Compiling code...
-> Error: ${error.message}
-> 
-> Please fix the syntax errors and try again.`);
-    }
-  };
+      console.log('Uploading PDF:', file.name, 'size:', file.size);
+      const res = await fetch(`/api/pdf/upload/session/${sessionId}/`, {
+        method: 'POST',
+        body: formData,
+      });
 
-  const executeJavaScript = (codeString) => {
-    const timestamp = new Date().toLocaleTimeString();
-    
-    if (codeString.includes('console.log')) {
-      return `[${timestamp}] JavaScript Runtime
-> Compiling code...
-> Code executed successfully!
-> 
-> Output:
-Hello, Interview! Code executed successfully.
-> 
-> Execution time: 0.003s
-> Memory used: 5.1 MB
-> 
-> Process exited with code 0`;
-    } else if (codeString.includes('function solution')) {
-      return `[${timestamp}] JavaScript Runtime
-> Compiling code...
-> Code executed successfully!
-> 
-> Output:
-Solution function defined. Add implementation.
-> 
-> Execution time: 0.002s
-> Memory used: 4.8 MB
-> 
-> Process exited with code 0`;
-    }
-    return `[${timestamp}] JavaScript Runtime
-> Compiling code...
-> Code executed successfully!
-> 
-> Output:
-Code executed. No output generated.
-> 
-> Execution time: 0.001s
-> Memory used: 3.9 MB
-> 
-> Process exited with code 0`;
-  };
-  
-  const executePython = (codeString) => {
-    const timestamp = new Date().toLocaleTimeString();
-    return `[${timestamp}] Python 3.9.7 Runtime
-> Compiling code...
-> Code executed successfully!
-> 
-> Output:
-Python execution simulation complete.
-> 
-> Execution time: 0.012s
-> Memory used: 8.2 MB
-> 
-> Process exited with code 0`;
-  };
-  
-  const executeJava = (codeString) => {
-    const timestamp = new Date().toLocaleTimeString();
-    return `[${timestamp}] Java 11 Runtime
-> Compiling code...
-> Code compiled successfully!
-> 
-> Output:
-Java execution simulation complete.
-> 
-> Execution time: 0.156s
-> Memory used: 24.5 MB
-> 
-> Process exited with code 0`;
-  };
-  
-  const executeCpp = (codeString) => {
-    const timestamp = new Date().toLocaleTimeString();
-    return `[${timestamp}] C++ GCC 11 Runtime
-> Compiling code...
-> Code compiled successfully!
-> 
-> Output:
-C++ execution simulation complete.
-> 
-> Execution time: 0.008s
-> Memory used: 3.1 MB
-> 
-> Process exited with code 0`;
-  };
-  
-  const evalCode = (codeString) => {
-    if (codeString.includes('console.log')) {
-      return 'Hello, Interview! Code executed successfully.';
-    } else if (codeString.includes('function solution')) {
-      return 'Solution function defined. Add implementation.';
-    }
-    return 'Code executed. No output generated.';
-  };
-
-  const handleEditorChange = (value, event) => {
-    setCode(value);
-  };
-
-  // Simulate collaborator cursor movement
-  useEffect(() => {
-    if (!candidateJoined) return;
-    
-    const moveInterval = setInterval(() => {
-      if (editorRef.current) {
-        const maxLines = code.split('\n').length;
-        const lineNumber = Math.floor(Math.random() * maxLines) + 1;
-        const column = Math.floor(Math.random() * 20) + 1;
-        
-        setCollaboratorCursor({
-          lineNumber,
-          column,
-          username: 'Candidate'
-        });
+      console.log('POST response status:', res.status);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || err.detail || `HTTP ${res.status}`);
       }
-    }, 2000);
-    
-    return () => clearInterval(moveInterval);
-  }, [candidateJoined, code]);
 
-  // Invitation Functions
-  const handleInviteClick = () => {
-    setShowInvitePopup(true);
+      const data = await res.json();
+      console.log('PDF upload SUCCESS:', data);
+
+      setPdfUrl(data.url);
+      setPdfUploader(data.uploader_email);
+    } catch (err) {
+      console.error('PDF upload failed:', err);
+      alert(`Failed to upload PDF: ${err.message}`);
+    }
   };
 
-  const handleSendInvite = () => {
-    if (inviteEmail) {
-      console.log('Sending invitation to:', inviteEmail);
-      
-      setShowInvitePopup(false);
-      setInvitationSent(true);
-      
-      toast.success(`Invitation sent to ${inviteEmail}`, {
-        style: {
-          background: '#1e40af',
-          color: '#ffffff',
-        },
-        duration: 4000,
+  const fetchLatestPDF = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/pdf/upload/session/${sessionId}/`);
+      const contentType = res.headers.get('content-type');
+      if (!res.ok || !contentType?.includes('application/json')) {
+        throw new Error('Invalid API response');
+      }
+      const data = await res.json();
+      if (data.pdf) {
+        setPdfUrl(data.pdf.url);
+        setPdfUploader(data.pdf.uploader_email);
+      }
+    } catch (err) {
+      console.warn('PDF fetch failed:', err.message);
+    }
+  }, [sessionId]);
+
+
+  const initCodeSync = useCallback(() => {
+    const codeSocket = new WebSocket(`ws://localhost:8000/ws/code/${sessionId}/`);
+    codeWs.current = codeSocket;
+
+    codeSocket.onopen = () => {
+      console.log('IDE WebSocket connected');
+      setCodeConnectionStatus('connected');
+    };
+
+    codeSocket.onmessage = (event) => {
+      console.log('IDE WS Message:', event.data);
+      const data = JSON.parse(event.data);
+      if (data.type === 'code_update') {
+        setCode(data.code);
+        setLanguage(data.language);
+      }
+    };
+
+    codeSocket.onclose = () => {
+      console.log('IDE WebSocket disconnected');
+      setCodeConnectionStatus('disconnected');
+      // Auto-reconnect after 2s
+      setTimeout(() => {
+        if (codeWs.current?.readyState !== WebSocket.OPEN) {
+          initCodeSync();
+        }
+      }, 2000);
+    };
+
+    codeSocket.onerror = (e) => {
+      console.error('IDE WebSocket error:', e);
+      setCodeConnectionStatus('disconnected');
+    };
+
+    return () => {
+      codeSocket.close();
+    };
+  }, [sessionId]);
+
+
+  const debouncedSync = useRef(null);
+  const syncCode = useCallback((newCode, newLang) => {
+    if (debouncedSync.current) clearTimeout(debouncedSync.current);
+    debouncedSync.current = setTimeout(() => {
+      if (codeWs.current?.readyState === WebSocket.OPEN) {
+        console.log('WebSocket sending:', { type: 'code_update', code: newCode.substring(0, 30) + '...', language: newLang });
+        codeWs.current.send(JSON.stringify({
+          type: 'code_update',
+          code: newCode,
+          language: newLang
+        }));
+      }
+    }, 500);
+  }, []);
+
+
+  const compile = async () => {
+    setIsCompiling(true);
+    setOutput('Compiling...\n');
+    
+    try {
+      const res = await fetch('/api/ide/compile/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language, stdin })
       });
       
-      setInviteEmail('');
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      
+      if (data.error) {
+        setOutput(`Error:\n${data.error}`);
+      } else {
+        setOutput(
+          `Output:\n${data.output || '(no output)'}\n\n` +
+          `Memory: ${data.memory} | CPU Time: ${data.cpuTime}`
+        );
+      }
+    } catch (err) {
+      setOutput(`Compilation failed: ${err.message}`);
+    } finally {
+      setIsCompiling(false);
     }
   };
 
-  // Calculate widths based on layout state
-  const getLeftPanelWidth = () => {
-    if (!isVideoOpen) return 'w-0';
-    return 'w-1/2'; // Keep left panel at 1/2 width regardless of questions visibility
+
+  useEffect(() => {
+    let cleanupScheduled = false;
+
+    const init = async () => {
+      await checkPermissions();
+      await fetchLatestPDF();
+      initCodeSync();
+
+      try {
+        const constraints = { video: true, audio: true };
+        const s = await navigator.mediaDevices.getUserMedia(constraints);
+        if (cleanupScheduled) return;
+
+        streamRef.current = s;
+        setLocalAudioActive(true);
+        setLocalVideoActive(true);
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = s;
+        }
+
+        const peerConnection = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+        pc.current = peerConnection;
+
+        s.getTracks().forEach(track => {
+          peerConnection.addTrack(track, s);
+        });
+
+        const websocket = new WebSocket(`ws://localhost:8000/ws/video/${sessionId}/?role=${role}&email=${encodeURIComponent(email)}`);
+        ws.current = websocket;
+
+        websocket.onopen = () => {
+          console.log(`WebSocket connected as ${role} (${email})`);
+          setVideoConnectionStatus('connected');
+          if (role === 'client') {
+            peerConnection.createOffer()
+              .then(offer => peerConnection.setLocalDescription(offer))
+              .then(() => {
+                if (websocket.readyState === WebSocket.OPEN) {
+                  websocket.send(JSON.stringify({
+                    type: 'offer',
+                    offer: peerConnection.localDescription
+                  }));
+                }
+              })
+              .catch(err => console.error('Offer error:', err));
+          }
+        };
+
+        websocket.onclose = () => {
+          console.log('Video WebSocket disconnected');
+          setVideoConnectionStatus('disconnected');
+          // Optional: auto-reconnect
+        };
+
+        websocket.onerror = (e) => {
+          console.error('Video WebSocket error:', e);
+          setVideoConnectionStatus('disconnected');
+        };
+
+        websocket.onmessage = async (event) => {
+          let data;
+          try {
+            data = JSON.parse(event.data);
+          } catch (e) {
+            console.warn('Invalid WS message:', event.data);
+            return;
+          }
+
+          if (data.type === 'pdf_update') {
+            console.log('PDF received:', data.pdf_url);
+            setPdfUrl(data.pdf_url);
+            setPdfUploader(data.uploader_email);
+          }
+          else if (data.type === 'media_update' && data.role !== role) {
+            if (data.media_type === 'audio') setRemoteAudioEnabled(data.enabled);
+            if (data.media_type === 'video') setRemoteVideoEnabled(data.enabled);
+          }
+          else if (data.type === 'participant_list') {
+            setParticipants(data.participants);
+          }
+          else if (data.type === 'offer') {
+            try {
+              await peerConnection.setRemoteDescription(data.offer);
+              const answer = await peerConnection.createAnswer();
+              await peerConnection.setLocalDescription(answer);
+              websocket.send(JSON.stringify({ type: 'answer', answer: peerConnection.localDescription }));
+            } catch (err) {
+              console.error('Error handling offer:', err);
+            }
+          } else if (data.type === 'answer') {
+            try {
+              await peerConnection.setRemoteDescription(data.answer);
+            } catch (err) {
+              console.error('Error handling answer:', err);
+            }
+          } else if (data.type === 'ice_candidate') {
+            try {
+              if (data.ice_candidate) {
+                await peerConnection.addIceCandidate(data.ice_candidate);
+              }
+            } catch (err) {
+              console.error('Error adding ICE candidate:', err);
+            }
+          }
+        };
+
+        peerConnection.onicecandidate = (e) => {
+          if (e.candidate && websocket.readyState === WebSocket.OPEN) {
+            websocket.send(JSON.stringify({
+              type: 'ice_candidate',
+              ice_candidate: e.candidate
+            }));
+          }
+        };
+
+        peerConnection.onconnectionstatechange = () => {
+          console.log('PeerConnection state:', peerConnection.connectionState);
+          setPeerConnectionStatus(peerConnection.connectionState);
+        };
+
+        peerConnection.onsignalingstatechange = () => {
+          console.log('Signaling state:', peerConnection.signalingState);
+        };
+
+        peerConnection.ontrack = (e) => {
+          if (remoteVideoRef.current && e.streams && e.streams[0]) {
+            remoteVideoRef.current.srcObject = e.streams[0];
+          }
+        };
+
+      } catch (err) {
+        console.error('Media/init failed:', err);
+        let msg = 'Failed to access camera/microphone.';
+        if (err.name === 'NotAllowedError') {
+          msg = 'You blocked camera/mic. Click the camera icon in the address bar to allow.';
+        } else if (err.name === 'NotFoundError') {
+          msg = 'No camera or microphone detected.';
+        }
+        setError(msg);
+      }
+    };
+
+    init();
+
+    return () => {
+      cleanupScheduled = true;
+
+      ws.current?.close();
+      codeWs.current?.close();
+
+      if (pc.current) {
+        pc.current.close();
+        pc.current = null;
+      }
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          if (track.readyState === 'live') track.stop();
+        });
+        streamRef.current = null;
+      }
+
+      if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    };
+  }, [sessionId, role, email, checkPermissions, fetchLatestPDF, initCodeSync]);
+
+
+  const toggleVideo = async () => {
+    const s = streamRef.current;
+    if (!s) return;
+
+    const videoTracks = s.getVideoTracks();
+    if (videoTracks.length === 0) return;
+
+    const track = videoTracks[0];
+
+    if (track.readyState === 'live') {
+      // 👉 Turn OFF
+      track.stop();
+      setLocalVideoActive(false);
+
+      // ✅ Clear video element
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+
+      if (pc.current) {
+        const sender = pc.current.getSenders().find(s => s.track === track);
+        if (sender) sender.replaceTrack(null);
+      }
+
+      // ✅ Send update
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({
+          type: 'media_update',
+          media_type: 'video',
+          enabled: false
+        }));
+      }
+    } else {
+      // 👉 Turn ON
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newTrack = newStream.getVideoTracks()[0];
+
+        // ✅ Assign to video element
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = newStream;
+        }
+
+        // ✅ Add to WebRTC
+        if (pc.current) {
+          const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(newTrack);
+          } else {
+            pc.current.addTrack(newTrack, newStream);
+          }
+        }
+
+        // ✅ Update state
+        setLocalVideoActive(true);
+        streamRef.current = newStream;
+
+        // ✅ Send update
+        if (ws.current?.readyState === WebSocket.OPEN) {
+          ws.current.send(JSON.stringify({
+            type: 'media_update',
+            media_type: 'video',
+            enabled: true
+          }));
+        }
+
+      } catch (err) {
+        console.error('Failed to re-enable camera:', err);
+        alert('Could not re-enable camera. Check permissions.');
+      }
+    }
   };
 
-  const getEditorWidth = () => {
-    if (!isVideoOpen) return 'w-full';
-    return 'w-1/2'; // Editor takes remaining 1/2 of screen
+  // 🎤 Toggle MIC
+  const toggleAudio = () => {
+    const s = streamRef.current;
+    if (!s) return;
+
+    const audioTracks = s.getAudioTracks();
+    if (audioTracks.length === 0) return;
+
+    const track = audioTracks[0];
+    const newState = !track.enabled;
+
+    track.enabled = newState;
+    setLocalAudioActive(newState);
+
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({
+        type: 'media_update',
+        media_type: 'audio',
+        enabled: newState
+      }));
+    }
   };
 
-  const getVideosWidth = () => {
-    if (showQuestions && !questionsPanelCollapsed) return 'w-1/4'; // Videos take 1/4 of left panel
-    return 'w-full';
+
+  const getMediaIcon = (enabled, type) => {
+    if (type === 'audio') {
+      return enabled ? <FaMicrophone style={{ fontSize: '1.2em' }} /> : <FaMicrophoneSlash style={{ fontSize: '1.2em' }} />;
+    }
+    return enabled ? <FaVideo style={{ fontSize: '1.2em' }} /> : <FaVideoSlash style={{ fontSize: '1.2em' }} />;
   };
 
-  const getQuestionsWidth = () => {
-    if (showQuestions && !questionsPanelCollapsed) return 'w-3/4'; // Questions take 3/4 of left panel
-    return 'w-0';
+  // ✅ Handle code change
+  const handleCodeChange = (e) => {
+    const newCode = e.target.value;
+    setCode(newCode);
+    syncCode(newCode, language);
   };
 
-  return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm p-4 flex justify-between items-center border-b">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Video className="w-5 h-5" />
-            Interview Session
-          </h1>
-          <div className="flex items-center bg-blue-50 px-3 py-1 rounded">
-            <Clock className="w-4 h-4 text-blue-600 mr-2" />
-            <span className="text-blue-700 font-medium">{formatTime(timeRemaining)}</span>
+  // ✅ Handle language change
+  const handleLanguageChange = (e) => {
+    const newLang = e.target.value;
+    setLanguage(newLang);
+    setSelectedExample('');
+    syncCode(code, newLang);
+  };
+
+  // ✅ Handle example change
+  const handleExampleChange = (e) => {
+    const exampleName = e.target.value;
+    setSelectedExample(exampleName);
+    
+    if (exampleName) {
+      const example = codeExamples[language].find(ex => ex.name === exampleName);
+      if (example) {
+        setCode(example.code);
+        syncCode(example.code, language);
+      }
+    }
+  };
+
+  // 📄 Render PDF viewer
+  const renderPDFViewer = () => {
+    const absolutePdfUrl = pdfUrl 
+      ? (pdfUrl.startsWith('http') ? pdfUrl : `http://localhost:8000${pdfUrl}`)
+      : null;
+
+    return (
+      <div style={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#ffffff',
+        borderRadius: '12px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          padding: '16px',
+          borderBottom: '1px solid #e2e8f0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: '#f8fafc'
+        }}>
+          <div>
+            <strong style={{ fontSize: '1.1em', color: '#1e293b' }}>Shared Document</strong>
+            {pdfUploader && <span style={{ marginLeft: '10px', color: '#64748b', fontSize: '0.9em' }}>by {pdfUploader.split('@')[0]}</span>}
           </div>
+
+          {role === 'interviewer' && (
+            <label style={{
+              background: '#1e40af',
+              color: 'white',
+              padding: '12px 20px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.95em',
+              fontWeight: '600',
+              boxShadow: '0 4px 6px rgba(30,64,175,0.3)',
+              border: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              Upload PDF
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={handlePDFUpload}
+                style={{ display: 'none' }}
+              />
+            </label>
+          )}
         </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-            <span className="text-sm">Interviewer Connected</span>
-          </div>
-          {candidateJoined ? (
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-sm">Candidate Connected</span>
-            </div>
+
+        <div style={{ flex: 1, position: 'relative' }}>
+          {absolutePdfUrl ? (
+            <embed
+              src={absolutePdfUrl}
+              type="application/pdf"
+              width="100%"
+              height="100%"
+              style={{ border: 'none' }}
+            />
           ) : (
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-              <span className="text-sm">Waiting for Candidate</span>
+            <div style={{
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#94a3b8',
+              textAlign: 'center',
+              padding: '40px'
+            }}>
+              <div>
+                <p style={{ fontSize: '1.1em', marginBottom: '8px' }}>No PDF shared yet.</p>
+                <p style={{ fontSize: '0.95em' }}>
+                  {role === 'interviewer' ? 'Upload a PDF to get started.' : 'Waiting for interviewer to upload...'}
+                </p>
+              </div>
             </div>
           )}
         </div>
-      </header>
+      </div>
+    );
+  };
 
-      {/* Main Content */}
-      <div className="flex flex-1 flex-grow" >
-        {/* Left Panel (Combined Videos + Questions) */}
-        {isVideoOpen && (
-          <div className={`${getLeftPanelWidth()} flex transition-all duration-300 ease-in-out flex-grow overflow-visible`}>
-            {/* Collapsed Videos Panel (Left side of left panel) */}
-            <div className={`${getVideosWidth()} flex flex-col border-r bg-gray-900 transition-all duration-300 ease-in-out flex-shrink-0`}>
-              {/* Videos Header */}
-              <div className="p-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-white" />
-                  <span className="text-white text-sm font-medium">Participants (2)</span>
-                </div>
-                <div className="flex space-x-1">
-                  <button 
-                    onClick={toggleQuestions}
-                    className="bg-blue-800 hover:bg-blue-900 text-white p-1.5 rounded text-xs flex items-center gap-1 transition-colors"
-                    title={showQuestions ? 'Hide Questions' : 'Show Questions'}
-                  >
-                    {showQuestions ? <EyeOff className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
-                  </button>
-                  <button 
-                    onClick={toggleVideoPanel}
-                    className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded text-xs transition-colors"
-                    title="Minimize Video"
-                  >
-                    <Minimize2 className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
+  // 💻 Render IDE
+  const renderIDE = () => (
+    <div style={{
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      background: '#0f172a',
+      borderRadius: '12px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      overflow: 'hidden'
+    }}>
+      <div style={{
+        padding: '16px',
+        borderBottom: '1px solid #1e293b',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '12px',
+        alignItems: 'center'
+      }}>
+        <select
+          value={language}
+          onChange={handleLanguageChange}
+          style={{
+            padding: '10px 14px',
+            background: '#1e293b',
+            color: '#e2e8f0',
+            border: '1px solid #334155',
+            borderRadius: '8px',
+            fontSize: '0.95em',
+            minWidth: '140px'
+          }}
+        >
+          <option value="python">Python</option>
+          <option value="java">Java</option>
+          <option value="cpp">C++</option>
+          <option value="c">C</option>
+          <option value="javascript">JavaScript</option>
+          <option value="go">Go</option>
+          <option value="rust">Rust</option>
+        </select>
+                
+        <select
+          value={selectedExample}
+          onChange={handleExampleChange}
+          style={{
+            padding: '10px 14px',
+            background: '#1e293b',
+            color: '#e2e8f0',
+            border: '1px solid #334155',
+            borderRadius: '8px',
+            fontSize: '0.95em',
+            minWidth: '140px'
+          }}
+        >
+          <option value="">Select Example</option>
+          {codeExamples[language]?.map((example, index) => (
+            <option key={index} value={example.name}>{example.name}</option>
+          ))}
+        </select>
 
-              {/* Collapsed Videos List */}
-              <div className="flex-1 p-2 flex flex-col space-y-3">
-                {/* Interviewer Video Card */}
-                <div className="bg-gray-800 rounded-lg flex flex-col h-[calc(50%-12px)]">
-                  <div className="relative bg-gray-700 pt-2 pb-2 flex-grow">
-                    {isInterviewerVideoOn ? (
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="w-12 h-12 bg-blue-700 rounded-full flex items-center justify-center mx-auto mb-2">
-                            <User className="w-6 h-6 text-white" />
-                          </div>
-                          <span className="text-white text-xs">Interviewer</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
-                        <CameraOff className="w-8 h-8 text-gray-500" />
-                      </div>
-                    )}
-                    {/* Camera Status */}
-                    <div className="absolute bottom-1 right-1">
-                      {isInterviewerVideoOn ? (
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      ) : (
-                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="p-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-white text-xs">You</span>
-                      <button 
-                        onClick={toggleInterviewerVideo}
-                        className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white"
-                      >
-                        {isInterviewerVideoOn ? 'Off' : 'On'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+        <button
+          onClick={compile}
+          disabled={isCompiling}
+          style={{
+            padding: '12px 20px',
+            background: isCompiling ? '#475569' : '#1e40af',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: isCompiling ? 'not-allowed' : 'pointer',
+            fontWeight: '600',
+            fontSize: '0.95em',
+            boxShadow: isCompiling ? 'none' : '0 4px 6px rgba(30,64,175,0.3)'
+          }}
+        >
+          {isCompiling ? 'Running...' : '▶Run Code'}
+        </button>
+      </div>
 
-                {/* Candidate Video Card */}
-                <div className="bg-gray-800 rounded-lg flex flex-col h-[calc(50%-12px)]">
-                  <div className="relative bg-gray-700 pt-2 pb-2 flex-grow">
-                    {candidateJoined && isCandidateVideoOn ? (
-                      <div className="absolute inset-0 bg-gradient-to-br from-green-900 to-blue-900 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="w-12 h-12 bg-green-700 rounded-full flex items-center justify-center mx-auto mb-2">
-                            <User className="w-6 h-6 text-white" />
-                          </div>
-                          <span className="text-white text-xs">Candidate</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
-                        {candidateJoined ? (
-                          <CameraOff className="w-8 h-8 text-gray-500" />
-                        ) : (
-                          <div className="text-center">
-                            <CameraOff className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-                            <span className="text-gray-400 text-xs block">Not Joined</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* Invite Button for Candidate */}
-                    {!candidateJoined && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70">
-                        {!invitationSent ? (
-                          <button 
-                            onClick={handleInviteClick}
-                            className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1 transition-colors"
-                          >
-                            <Mail className="w-3 h-3" />
-                            Invite
-                          </button>
-                        ) : (
-                          <button 
-                            disabled
-                            className="bg-gray-600 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1 cursor-not-allowed"
-                          >
-                            <Mail className="w-3 h-3" />
-                            Invited
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {/* Camera Status */}
-                    {candidateJoined && (
-                      <div className="absolute bottom-1 right-1">
-                        {isCandidateVideoOn ? (
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        ) : (
-                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-white text-xs">
-                        {candidateJoined ? 'Candidate' : 'Waiting...'}
-                      </span>
-                      {candidateJoined && (
-                        <button 
-                          onClick={toggleCandidateVideo}
-                          className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white"
-                        >
-                          {isCandidateVideoOn ? 'Off' : 'On'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+      <div style={{ padding: '0 16px 12px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <label style={{ color: '#94a3b8', fontSize: '0.9em', whiteSpace: 'nowrap' }}>Input (stdin):</label>
+        <input
+          type="text"
+          value={stdin}
+          onChange={(e) => setStdin(e.target.value)}
+          placeholder="e.g., 5 10"
+          style={{
+            flex: 1,
+            padding: '10px 12px',
+            background: '#1e293b',
+            color: '#e2e8f0',
+            border: '1px solid #334155',
+            borderRadius: '8px',
+            fontSize: '0.9em'
+          }}
+        />
+      </div>
 
-                {/* Video Controls at Bottom */}
-                <div className="p-2 bg-gray-800 rounded-lg">
-                  <div className="flex justify-center space-x-2">
-                    <button 
-                      onClick={toggleInterviewerVideo}
-                      className={`p-2 rounded flex items-center gap-1 text-xs ${
-                        isInterviewerVideoOn 
-                          ? 'bg-red-600 hover:bg-red-700 text-white' 
-                          : 'bg-green-600 hover:bg-green-700 text-white'
-                      }`}
-                    >
-                      {isInterviewerVideoOn ? <CameraOff className="w-3 h-3" /> : <Camera className="w-3 h-3" />}
-                    </button>
-                    {candidateJoined && (
-                      <button 
-                        onClick={toggleCandidateVideo}
-                        className="p-2 rounded flex items-center gap-1 text-xs bg-gray-700 hover:bg-gray-600 text-white"
-                      >
-                        {isCandidateVideoOn ? <CameraOff className="w-3 h-3" /> : <Camera className="w-3 h-3" />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Questions Panel (Right side of left panel) */}
-            {showQuestions && (
-              <div className={`${getQuestionsWidth()} flex flex-col bg-white border-r transition-all duration-300 ease-in-out flex-grow`}>
-                {/* Questions Header */}
-                <div className="p-3 border-b flex justify-between items-center flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4" />
-                    <span className="font-medium">Interview Questions</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <button 
-                      onClick={toggleQuestionsPanel}
-                      className="p-1 hover:bg-gray-100 rounded"
-                      title={questionsPanelCollapsed ? 'Expand questions' : 'Collapse questions'}
-                    >
-                      {questionsPanelCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-                    </button>
-                    <button 
-                      onClick={() => setShowQuestions(false)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                      title="Close questions"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Questions Content */}
-                <div className="flex-1 p-4 flex flex-col">
-                  {questionContent ? (
-                    <div className="space-y-4 flex-grow flex flex-col">
-                      {questionFile && fileUrl ? (
-                        <div className="flex flex-col h-full flex-grow">
-                          <div className="bg-blue-50 border border-blue-200 p-3 rounded flex-shrink-0">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <FileText className="w-4 h-4 text-blue-600 mr-2" />
-                                <div>
-                                  <p className="font-medium text-blue-800 text-sm">
-                                    {questionFile ? `Uploaded: ${questionFile.name}` : 'Manual Question Set'}
-                                  </p>
-                                  <p className="text-xs text-blue-600">{(questionFile.size / 1024).toFixed(2)} KB</p>
-                                </div>
-                              </div>
-                              <a 
-                                href={fileUrl} 
-                                download={questionFile.name}
-                                className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-xs flex items-center gap-1"
-                              >
-                                <Download className="w-3 h-3" />
-                                Download
-                              </a>
-                            </div>
-                          </div>
-                          
-                          <div className="border rounded-lg overflow-hidden flex-grow mt-4">
-                            {questionFile.type === 'application/pdf' ? (
-                              <iframe 
-                                src={fileUrl} 
-                                className="w-full h-full" 
-                                title="PDF Viewer"
-                              />
-                            ) : (
-                              <div className="flex items-center justify-center h-full bg-gray-100">
-                                <div className="text-center">
-                                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                                  <p className="text-gray-600 mb-2">Document Preview Unavailable</p>
-                                  <p className="text-sm text-gray-500 mb-3">DOCX files cannot be previewed directly in browser</p>
-                                  <a 
-                                    href={fileUrl} 
-                                    download={questionFile.name}
-                                    className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 rounded text-sm"
-                                  >
-                                    Download File
-                                  </a>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="bg-blue-50 border border-blue-200 p-3 rounded">
-                            <div className="flex items-center">
-                              <FileText className="w-4 h-4 text-blue-600 mr-2" />
-                              <div>
-                                <p className="font-medium text-blue-800 text-sm">Manual Question Set</p>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-3">
-                            <div className="border-l-4 border-blue-500 pl-3 py-2">
-                              <h3 className="font-semibold text-sm">Question 1: Array Manipulation</h3>
-                              <p className="text-gray-700 text-xs mt-1">
-                                Given an array of integers, find the maximum product of any two numbers in the array.
-                              </p>
-                            </div>
-                            
-                            <div className="border-l-4 border-blue-500 pl-3 py-2">
-                              <h3 className="font-semibold text-sm">Question 2: String Operations</h3>
-                              <p className="text-gray-700 text-xs mt-1">
-                                Write a function to check if a string is a palindrome, ignoring non-alphanumeric characters.
-                              </p>
-                            </div>
-                            
-                            <div className="border-l-4 border-blue-500 pl-3 py-2">
-                              <h3 className="font-semibold text-sm">Question 3: System Design</h3>
-                              <p className="text-gray-700 text-xs mt-1">
-                                Design a URL shortening service like TinyURL. Discuss the database schema and API endpoints.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="pt-4 border-t">
-                            <h3 className="font-semibold text-sm mb-2">Behavioral Questions</h3>
-                            <ul className="space-y-1 text-sm">
-                              <li className="flex items-center">
-                                <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
-                                <span>Tell me about a challenging project</span>
-                              </li>
-                              <li className="flex items-center">
-                                <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
-                                <span>How do you handle conflicting priorities?</span>
-                              </li>
-                              <li className="flex items-center">
-                                <CheckCircle className="w-3 h-3 text-green-500 mr-2" />
-                                <span>Describe your experience with agile methodologies</span>
-                              </li>
-                            </ul>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center p-4">
-                      <FileText className="w-12 h-12 text-gray-300 mb-3" />
-                      <p className="text-gray-500 text-sm text-center mb-4">No questions available</p>
-                      <button 
-                        onClick={() => setShowQuestionUploadPopup(true)}
-                        className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-2 rounded text-sm flex items-center gap-1"
-                      >
-                        <Upload className="w-3 h-3" />
-                        Upload Questions
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Questions Footer */}
-                <div className="p-3 border-t">
-                  <button 
-                    onClick={() => setShowQuestionUploadPopup(true)}
-                    className="w-full bg-blue-800 hover:bg-blue-900 text-white py-2 px-4 rounded text-sm flex items-center justify-center gap-2"
-                  >
-                    <Upload className="w-3 h-3" />
-                    Update Questions
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Video Toggle Button (when minimized) */}
-        {!isVideoOpen && (
-          <div className="absolute left-4 top-20 z-10">
-            <button 
-              onClick={toggleVideoPanel}
-              className="bg-blue-800 hover:bg-blue-900 text-white p-3 rounded-full shadow-lg flex items-center gap-2"
-              title="Show video panel"
-            >
-              <Video className="w-5 h-5" />
-            </button>
-          </div>
-        )}
-
-        {/* Code Editor / IDE */}
-        <div className={`${getEditorWidth()} flex flex-col transition-all duration-300 ease-in-out`}>
-          <div className="p-4 border-b flex justify-between items-center bg-white">
-            <div className="flex items-center space-x-4">
-              <h2 className="text-lg font-semibold">Collaborative Code Editor</h2>
-              {!isVideoOpen && (
-                <button 
-                  onClick={toggleVideoPanel}
-                  className="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
-                >
-                  <Video className="w-4 h-4" />
-                  Show Video
-                </button>
-              )}
-            </div>
-            <div className="flex items-center space-x-4">
-              <select 
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="border border-gray-300 rounded px-3 py-1 text-sm"
-                disabled={isRunning}
-              >
-                <option value="javascript">JavaScript</option>
-                <option value="python">Python</option>
-                <option value="java">Java</option>
-                <option value="cpp">C++</option>
-              </select>
-              <div className="text-sm text-gray-600">
-                Cursor: Line {cursorPosition.lineNumber}, Column {cursorPosition.column}
-              </div>
-              <button 
-                onClick={handleRunCode}
-                disabled={isRunning}
-                className={`px-4 py-2 rounded text-sm flex items-center gap-1 transition-colors ${isRunning ? 'bg-gray-500 cursor-not-allowed' : 'bg-blue-800 hover:bg-blue-900 text-white'}`}
-              >
-                <Send className="w-4 h-4" />
-                {isRunning ? 'Running...' : 'Run Code'}
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex-1 flex flex-col">
-            {/* Code Editor Area */}
-            <div className="flex-1 relative">
-              <Editor
-                height="100%"
-                language={language}
-                defaultValue={code}
-                onChange={handleEditorChange}
-                onMount={handleEditorDidMount}
-                theme="vs-dark"
-                options={{
-                  minimap: { enabled: true },
-                  fontSize: 14,
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  readOnly: !candidateJoined,
-                }}
-              />
-              
-              {/* Real-time Collaborator Cursor Indicator */}
-              {collaboratorCursor && (
-                <div 
-                  className="absolute w-0.5 h-6 bg-yellow-400 animate-pulse"
-                  style={{
-                    top: `${(collaboratorCursor.lineNumber - 1) * 20}px`,
-                    left: `${(collaboratorCursor.column - 1) * 8}px`,
-                  }}
-                >
-                  <div className="absolute -top-6 left-0 bg-yellow-500 text-white text-xs px-2 py-1 rounded">
-                    {collaboratorCursor.username}
-                  </div>
-                </div>
-              )}
-              
-              {/* Collaboration Status */}
-              <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                {candidateJoined ? 'Collaborating with Candidate' : 'Waiting for Candidate...'}
-              </div>
-            </div>
-            
-            {/* Output Panel */}
-            <div className="h-1/3 bg-black text-green-400 p-4 font-mono text-sm overflow-auto">
-              <div className="mb-2 flex items-center justify-between">
-                <span>Interview Compiler v{language === 'javascript' ? '1.0' : language === 'python' ? '2.1' : language === 'java' ? '3.5' : '4.2'}</span>
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-400 text-xs">
-                    {candidateJoined ? 'Real-time collaboration active' : 'Single user mode'}
-                  </span>
-                  <button 
-                    onClick={() => setOutput('')}
-                    className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded border border-gray-600"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-              <div className="whitespace-pre-wrap">{output || `$ Ready to execute ${language} code`}</div>
-            </div>
-          </div>
+      <div style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', padding: '0 16px' }}>
+        <div style={{
+          position: 'relative',
+          flex: 1,
+          background: '#020817',
+          border: '1px solid #334155',
+          borderRadius: '10px',
+          overflow: 'hidden',
+          fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+          fontSize: '14.5px',
+          lineHeight: '1.6'
+        }}>
+          <textarea
+            value={code}
+            onChange={handleCodeChange}
+            spellCheck="false"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: 'transparent',
+              color: 'transparent',
+              caretColor: '#e2e8f0',
+              padding: '16px',
+              border: 'none',
+              outline: 'none',
+              resize: 'none',
+              zIndex: 2,
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              lineHeight: 'inherit'
+            }}
+            placeholder="// Start coding here..."
+          />
+          <SyntaxHighlighter
+            language={language}
+            style={atomOneDark}
+            customStyle={{
+              margin: 0,
+              padding: '16px',
+              background: 'transparent',
+              borderRadius: 0,
+              height: '100%',
+              overflow: 'auto',
+              position: 'relative',
+              zIndex: 1,
+              border: 'none'
+            }}
+            codeTagProps={{
+              style: {
+                background: 'transparent',
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                lineHeight: 'inherit'
+              }
+            }}
+          >
+            {code}
+          </SyntaxHighlighter>
         </div>
       </div>
 
-      {/* Question Upload Popup */}
-      {showQuestionUploadPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Set Interview Questions
-            </h2>
-            <p className="text-gray-600 mb-4">Upload a question file or add questions manually</p>
-            
-            <div className="space-y-4">
-              {/* File Upload Option */}
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 mb-4">Upload PDF or DOCX file</p>
-                <label className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 rounded cursor-pointer flex items-center justify-center gap-2 transition-colors mb-2">
-                  <Upload className="w-4 h-4" />
-                  Choose File
-                  <input 
-                    ref={fileInputRef}
-                    type="file" 
-                    accept=".pdf,.docx" 
-                    className="hidden" 
-                    onChange={handleFileUpload}
-                  />
-                </label>
-                <p className="text-sm text-gray-500">Supports PDF and DOCX formats</p>
-              </div>
-              
-              {/* Manual Option */}
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-semibold mb-2">Or add questions manually</h3>
-                <p className="text-sm text-gray-600 mb-4">You can type questions directly</p>
-                <button 
-                  onClick={handleManualQuestion}
-                  className="w-full bg-gray-800 hover:bg-gray-900 text-white py-2 px-4 rounded transition-colors flex items-center justify-center gap-2"
-                >
-                  <FileText className="w-4 h-4" />
-                  Use Sample Questions
-                </button>
-              </div>
-              
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setShowQuestionUploadPopup(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (!questionContent) {
-                      toast.error('Please upload or add questions first', {
-                        style: {
-                          background: '#dc2626',
-                          color: '#ffffff',
-                        },
-                      });
-                      return;
-                    }
-                    setShowQuestionUploadPopup(false);
-                  }}
-                  className="flex-1 bg-blue-800 hover:bg-blue-900 text-white py-2 px-4 rounded transition-colors"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <div style={{
+        margin: '16px',
+        marginTop: '12px',
+        background: '#020817',
+        border: '1px solid #334155',
+        borderRadius: '10px',
+        padding: '16px',
+        minHeight: '120px',
+        color: '#cbd5e1',
+        fontFamily: 'Consolas, Monaco, monospace',
+        fontSize: '14px',
+        lineHeight: '1.6'
+      }}>
+        <strong style={{ color: '#60a5fa', display: 'block', marginBottom: '8px' }}>Output:</strong>
+        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+          {output || 'Click "Run Code" to see output here'}
+        </pre>
+      </div>
+    </div>
+  );
 
-      {/* Invite Candidate Popup */}
-      {showInvitePopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 shadow-2xl border border-gray-200">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Mail className="w-5 h-5" />
-              Invite Candidate
-            </h2>
-            <p className="text-gray-600 mb-4">Enter candidate's email to send invitation link</p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Candidate Email
-              </label>
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="candidate@example.com"
-                className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+  return (
+    <div style={{
+      padding: '20px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif',
+      background: '#f1f5f9',
+      minHeight: '100vh',
+      boxSizing: 'border-box',
+      display: 'grid',
+      gridTemplateColumns: '380px 1fr 1fr',
+      gap: '20px',
+      alignItems: 'start'
+    }}>
+      {/* Left Column: Video + Controls */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px',
+        height: 'calc(100vh - 40px)',
+        position: 'sticky',
+        top: '20px'
+      }}>
+        {/* Videos */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Local Video */}
+          <div style={{
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            background: '#1e293b'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #1e40af, #1e3a8a)',
+              color: 'white',
+              padding: '12px 16px',
+              fontSize: '0.95em',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              {getMediaIcon(localAudioActive, 'audio')}
+              {getMediaIcon(localVideoActive, 'video')}
+              {myRoleLabel} (You)
+            </div>
+            {localVideoActive ? (
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                style={
+                  {
+                    width: '100%',
+                    height: '220px',
+                    objectFit: 'cover',
+                    background: '#0f172a',
+                    display: 'block'
+                  }
+                }
               />
+            ) : (
+              <div style={{
+                width: '100%',
+                height: '220px',
+                background: '#0f172a',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1.2em',
+                fontWeight: '600'
+              }}>
+                <div style={{ fontSize: '2em', marginBottom: '10px' }}><FaVideoSlash /></div>
+                <div>Camera Off</div>
+              </div>
+            )}
+          </div>
+
+          {/* Remote Video */}
+          <div style={{
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            background: '#1e293b'
+          }}>
+            <div style={
+              {
+                background: 'linear-gradient(135deg, #1e40af, #1e3a8a)',
+                color: 'white',
+                padding: '12px 16px',
+                fontSize: '0.95em',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }
+            }>
+              {getMediaIcon(remoteAudioEnabled, 'audio')}
+              {getMediaIcon(remoteVideoEnabled, 'video')}
+              {remoteRoleLabel}
             </div>
-            <div className="text-sm text-gray-500 mb-4">
-              <p>Candidate will receive an email with a link to join this interview session.</p>
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={handleSendInvite}
-                className="flex-1 bg-blue-800 hover:bg-blue-900 text-white py-2 px-4 rounded transition-colors flex items-center justify-center gap-2"
-              >
-                <Send className="w-4 h-4" />
-                Send Invitation
-              </button>
-              <button
-                onClick={() => {
-                  setShowInvitePopup(false);
-                  setInviteEmail('');
+            {remoteVideoEnabled ? (
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  width: '100%',
+                  height: '220px',
+                  objectFit: 'cover',
+                  background: '#0f172a',
+                  display: 'block',
+                  opacity: remoteVideoEnabled ? 1 : 0.5,
+                  filter: remoteVideoEnabled ? 'none' : 'grayscale(100%)'
                 }}
-                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+              />
+            ) : (
+              <div style={{
+                width: '100%',
+                height: '220px',
+                background: '#0f172a',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1.2em',
+                fontWeight: '600'
+              }}>
+                <div style={{ fontSize: '2em', marginBottom: '10px' }}><FaVideoSlash /></div>
+                <div>Remote Camera Off</div>
+              </div>
+            )}
           </div>
         </div>
-      )}
+
+        {/* Media Controls */}
+        <div style={{
+          background: 'white',
+          padding: '16px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={toggleVideo}
+              disabled={permissionState.video === 'denied'}
+              style={{
+                flex: 1,
+                padding: '12px 20px',
+                background: localVideoActive ? '#1e40af' : '#1e40af',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '0.95em',
+                boxShadow: '0 4px 6px rgba(30,64,175,0.3)'
+              }}
+            >
+              {localVideoActive ? 'Turn Off Camera' : 'Turn On Camera'}
+            </button>
+
+            <button
+              onClick={toggleAudio}
+              disabled={permissionState.audio === 'denied'}
+              style={{
+                flex: 1,
+                padding: '12px 20px',
+                background: localAudioActive ? '#1e40af' : '#1e40af',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '0.95em',
+                boxShadow: '0 4px 6px rgba(30,64,175,0.3)'
+              }}
+            >
+              {localAudioActive ? 'Mute Mic' : 'Unmute Mic'}
+            </button>
+          </div>
+        </div>
+
+        {/* Participants */}
+        <div style={{
+          background: 'white',
+          padding: '16px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          fontSize: '0.9em'
+        }}>
+          <strong style={{ display: 'block', marginBottom: '10px', color: '#1e293b' }}>
+            Participants ({participants.length}/2)
+          </strong>
+          {participants.map((p, i) => (
+            <div key={i} style={{ margin: '8px 0', color: '#475569' }}>
+              <strong>{p.role.charAt(0).toUpperCase() + p.role.slice(1)}:</strong> {p.email.split('@')[0]}
+            </div>
+          ))}
+        </div>
+
+        {/* Connection Status */}
+        <div style={{
+          background: 'white',
+          padding: '16px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          fontSize: '0.9em'
+        }}>
+          <strong style={{ display: 'block', marginBottom: '10px', color: '#1e293b' }}>
+            Connection Status
+          </strong>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: videoConnectionStatus === 'connected' ? '#10b981' : 
+                         videoConnectionStatus === 'disconnected' ? '#ef4444' : '#f59e0b'
+              }} />
+              <span>Video WS: <strong>{videoConnectionStatus}</strong></span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: codeConnectionStatus === 'connected' ? '#10b981' : 
+                         codeConnectionStatus === 'disconnected' ? '#ef4444' : '#f59e0b'
+              }} />
+              <span>Code WS: <strong>{codeConnectionStatus}</strong></span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: peerConnectionStatus === 'connected' ? '#10b981' : 
+                         peerConnectionStatus === 'failed' ? '#ef4444' : '#f59e0b'
+              }} />
+              <span>WebRTC: <strong>{peerConnectionStatus}</strong></span>
+            </div>
+          </div>
+
+          {videoConnectionStatus === 'disconnected' && (
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                marginTop: '12px',
+                padding: '8px 12px',
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '0.85em',
+                cursor: 'pointer'
+              }}
+            >
+              Reconnect
+            </button>
+          )}
+        </div>
+
+        {error && (
+          <div style={{
+            background: '#fee2e2',
+            color: '#991b1b',
+            padding: '12px',
+            borderRadius: '8px',
+            fontSize: '0.9em',
+            border: '1px solid #fecaca'
+          }}>
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Middle: PDF Viewer */}
+      <div style={{ height: 'calc(100vh - 40px)' }}>
+        {renderPDFViewer()}
+      </div>
+
+      {/* Right: Code Editor */}
+      <div style={{ height: 'calc(100vh - 40px)' }}>
+        {renderIDE()}
+      </div>
     </div>
   );
 };

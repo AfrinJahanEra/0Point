@@ -1,11 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 
 const LoopVisualizer = () => {
   const [uploadedCode, setUploadedCode] = useState('');
   const [fileName, setFileName] = useState('');
-  const [variables, setVariables] = useState([]);
   const [iterations, setIterations] = useState([]);
-  const [output, setOutput] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -36,9 +34,7 @@ const LoopVisualizer = () => {
       const content = e.target.result;
       setUploadedCode(content);
       // Reset previous results
-      setVariables([]);
       setIterations([]);
-      setOutput([]);
       setFinalOutput('');
       setCurrentStep(0);
       setIsPlaying(false);
@@ -48,86 +44,113 @@ const LoopVisualizer = () => {
     reader.readAsText(file);
   };
 
+  // Auto-detect language from file extension
+  const getLanguageFromExtension = (filename) => {
+    const ext = '.' + filename.split('.').pop().toLowerCase();
+    const langMap = {
+      '.py': 'python',
+      '.js': 'javascript',
+      '.cpp': 'cpp',
+      '.c': 'cpp',
+      '.java': 'java'
+    };
+    return langMap[ext] || 'python';
+  };
+
   // Simulate code compilation and line-by-line execution
-const simulateCompilation = async () => {
-  if (!uploadedCode) {
-    alert("Upload code first");
-    return;
-  }
-
-  setIsProcessing(true);
-
-  try {
-    const response = await fetch("http://127.0.0.1:8000/api/execute/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        language: "python",
-        code: uploadedCode
-      })
-    });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || "Execution failed");
+  const simulateCompilation = async () => {
+    if (!uploadedCode) {
+      alert("Upload code first");
+      return;
     }
 
-    const data = await response.json();
+    setIsProcessing(true);
 
-    // Convert backend steps → frontend format
-    const mappedIterations = data.steps.map((step, index) => ({
-      step: index + 1,
-      executingLine: step.line,
-      description: step.description,
-      variables: Object.entries(step.variables).map(
-        ([name, value]) => ({
-          name,
-          type: typeof value,
-          value
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const language = getLanguageFromExtension(fileName);
+      
+      const response = await fetch(`${backendUrl}/api/executor/execute/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          language: language,
+          code: uploadedCode
         })
-      )
-    }));
-
-    setIterations(mappedIterations);
-    // Set variables to all unique variables across all steps
-    const allUniqueVariables = [];
-    const variableNames = new Set();
-    
-    mappedIterations.forEach(iteration => {
-      iteration.variables.forEach(variable => {
-        if (!variableNames.has(variable.name)) {
-          variableNames.add(variable.name);
-          allUniqueVariables.push(variable);
-        }
       });
-    });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || `Execution failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Convert backend steps → frontend format
+      const mappedIterations = data.steps.map((step, index) => {
+        const displayLine = step.line > 0 ? step.line : 1;
+        
+        return {
+          step: index + 1,
+          line: displayLine,
+          description: step.description || `Line ${displayLine}`,
+          variables: Object.entries(step.variables || {}).map(
+            ([name, value]) => ({
+              name,
+              value: String(value),
+              type: getVariableType(value)
+            })
+          ),
+          output: step.output || ''
+        };
+      });
+
+      setIterations(mappedIterations);
+      setFinalOutput(data.final_output || data.steps[data.steps.length - 1]?.output || '');
+      setCurrentStep(0);
+      setExecutingLine(mappedIterations[0]?.line || 1);
+    } catch (error) {
+      console.error('Execution error:', error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Determine variable type from value
+  const getVariableType = (value) => {
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? 'int' : 'float';
+    }
     
-    setVariables(allUniqueVariables);
-    setOutput(
-      data.steps.map((s, i) => [
-        `Step ${i + 1}: ${s.description}`,
-        ...Object.entries(s.variables).map(
-          ([k, v]) => `${k} = ${v}`
-        )
-      ])
-    );
-
-    setFinalOutput(data.final_output);
-    setCurrentStep(0);
-    setExecutingLine(mappedIterations[0]?.executingLine ?? -1);
-  } catch (error) {
-    console.error(error);
-    alert(error.message);
-  } finally {
-    setIsProcessing(false);
-  }
-};
-
-
-  // Extract line-by-line execution data
-
+    if (typeof value === 'string') {
+      if (value === 'true' || value === 'false' || value === 'True' || value === 'False') {
+        return 'bool';
+      }
+      if (value.startsWith('[') && value.endsWith(']')) {
+        return 'array';
+      }
+      if (!isNaN(value) && !isNaN(parseFloat(value))) {
+        return value.includes('.') ? 'float' : 'int';
+      }
+      if (value.includes('vector') || value.includes('std::')) {
+        return 'array';
+      }
+      return 'string';
+    }
+    
+    if (Array.isArray(value)) {
+      return 'array';
+    }
+    
+    if (value !== null && typeof value === 'object') {
+      return 'object';
+    }
+    
+    return 'unknown';
+  };
 
   // Navigation functions
   const goToNextStep = () => {
@@ -180,9 +203,7 @@ const simulateCompilation = async () => {
   const resetAll = () => {
     setUploadedCode('');
     setFileName('');
-    setVariables([]);
     setIterations([]);
-    setOutput([]);
     setFinalOutput('');
     setCurrentStep(0);
     setIsPlaying(false);
@@ -196,7 +217,7 @@ const simulateCompilation = async () => {
   };
 
   // Cleanup on unmount
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -204,21 +225,94 @@ const simulateCompilation = async () => {
     };
   }, []);
 
+  // Variable tracking (only real variables)
+  const variableData = useMemo(() => {
+    if (iterations.length === 0) return { currentVars: [] };
+
+    const currentStepVars = iterations[currentStep]?.variables || [];
+    const prevStepVars = currentStep > 0 ? iterations[currentStep - 1]?.variables || [] : [];
+    
+    // Build variables list
+    const vars = [];
+    const allVarNames = new Set();
+    
+    currentStepVars.forEach(v => allVarNames.add(v.name));
+    prevStepVars.forEach(v => allVarNames.add(v.name));
+    
+    Array.from(allVarNames).sort().forEach(name => {
+      const currentVar = currentStepVars.find(v => v.name === name);
+      const prevVar = prevStepVars.find(v => v.name === name);
+      
+      vars.push({
+        name,
+        type: currentVar?.type || prevVar?.type || 'unknown',
+        value: currentVar?.value || '—',
+        changed: currentVar && prevVar && currentVar.value !== prevVar.value
+      });
+    });
+    
+    return { currentVars: vars };
+  }, [iterations, currentStep]);
+
+  // Get output lines that have appeared up to current step
+  const outputLines = useMemo(() => {
+    if (iterations.length === 0) return [];
+
+    const lines = [];
+    let lastOutput = '';
+    
+    // Process each step up to current
+    for (let i = 0; i <= currentStep && i < iterations.length; i++) {
+      const currentOutput = iterations[i].output || '';
+      
+      // Find new lines since last step
+      if (currentOutput && currentOutput !== lastOutput) {
+        const allLines = currentOutput.split('\n').filter(l => l.trim());
+        const lastLines = lastOutput.split('\n').filter(l => l.trim());
+        
+        // Add only new lines
+        allLines.forEach(line => {
+          if (!lastLines.includes(line) && !lines.includes(line)) {
+            lines.push(line);
+          }
+        });
+      }
+      
+      lastOutput = currentOutput;
+    }
+    
+    return lines;
+  }, [iterations, currentStep]);
+
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg border border-black shadow-sm">
+    <div className="flex flex-col h-full bg-white rounded-lg border border-gray-300 shadow-sm">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-black">Code Visualizer</h2>
-            <p className="text-gray-600 mt-1">Upload code files and visualize line-by-line execution</p>
+            <h2 className="text-2xl font-bold text-gray-800">Code Visualizer</h2>
+            <p className="text-gray-600 mt-1">Line-by-line execution with real-time output</p>
           </div>
+          {fileName && (
+            <div className="flex items-center space-x-2">
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                getLanguageFromExtension(fileName) === 'cpp' 
+                  ? 'bg-red-100 text-red-800' 
+                  : getLanguageFromExtension(fileName) === 'python'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {getLanguageFromExtension(fileName).toUpperCase()}
+              </span>
+              <span className="text-sm text-gray-600">{fileName}</span>
+            </div>
+          )}
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Side - File Upload and Code Display */}
+          {/* Left: Code Editor */}
           <div className="space-y-6">
-            <div className="bg-gray-50 p-5 rounded-xl border border-black">
-              <h3 className="text-lg font-semibold text-black mb-4">Code Upload</h3>
+            <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Code Upload</h3>
               
               <div className="space-y-4">
                 <div>
@@ -236,79 +330,193 @@ const simulateCompilation = async () => {
                     />
                     <label 
                       htmlFor="code-file-upload"
-                      className="flex-1 px-4 py-2 bg-white border border-black rounded-lg cursor-pointer hover:bg-gray-100 transition-colors text-center"
+                      className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors text-center"
                     >
-                      {fileName || 'Choose a file (.cpp, .c, .java, .js, .py)'}
+                      {fileName || 'Choose a file (.cpp, .py, etc.)'}
                     </label>
                     {fileName && (
                       <button
                         onClick={resetAll}
-                        className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                        className="px-3 py-2 bg-[#001F3F] text-white rounded-lg hover:bg-[#001429] transition-colors text-sm"
                       >
                         Clear
                       </button>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Supported formats: C++, C, Java, JavaScript, Python
-                  </p>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Uploaded Code
+                    Code Editor
                   </label>
-                  <div className="bg-black text-green-400 p-4 rounded-lg overflow-x-auto font-mono text-sm h-64 relative">
+                  <div className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto font-mono text-sm h-96 relative">
                     {uploadedCode ? (
-                      <pre>
+                      <pre className="whitespace-pre">
                         {uploadedCode.split('\n').map((line, index) => (
                           <div 
                             key={index} 
-                            className="flex items-center"
+                            className={`flex items-center py-0.5 ${
+                              iterations.length > 0 && 
+                              currentStep < iterations.length && 
+                              iterations[currentStep].line === index + 1 
+                                ? 'bg-yellow-900/30' 
+                                : ''
+                            }`}
                           >
-                            <span className="text-gray-500 w-8 flex-shrink-0 select-none text-right pr-2">
+                            <span className={`text-gray-500 w-8 flex-shrink-0 select-none text-right pr-2 font-mono ${
+                              iterations.length > 0 && 
+                              currentStep < iterations.length && 
+                              iterations[currentStep].line === index + 1 
+                                ? 'text-yellow-400 font-bold' 
+                                : ''
+                            }`}>
                               {index + 1}
                             </span>
-                            {iterations.length > 0 && currentStep < iterations.length && 
-                             iterations[currentStep].executingLine === index + 1 ? (
-                              <span className="text-yellow-400 mr-2">→</span>
+                            {iterations.length > 0 && 
+                             currentStep < iterations.length && 
+                             iterations[currentStep].line === index + 1 ? (
+                              <span className="text-yellow-400 mr-2">▶</span>
                             ) : (
                               <span className="w-4 mr-2"></span>
                             )}
                             <span className="flex-grow">
-                              {line}
+                              {line || ' '}
                             </span>
                           </div>
                         ))}
                       </pre>
                     ) : (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        <p>No code uploaded yet. Please upload a file to begin.</p>
+                      <div className="flex items-center justify-center h-full text-gray-500 text-center px-4">
+                        <div>
+                          <div className="mb-2">📤 Upload a code file to visualize execution</div>
+                          <div className="text-xs text-gray-400">
+                            Supported: C++, Python, Java, JavaScript
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
                 
+                {/* Execution Controls */}
+                {iterations.length > 0 && (
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={goToFirstStep}
+                          disabled={currentStep === 0}
+                          className={`px-3 py-1.5 rounded text-sm ${
+                            currentStep === 0
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-[#001F3F] text-white hover:bg-[#001429]'
+                          }`}
+                        >
+                          ⏪ First
+                        </button>
+                        <button
+                          onClick={goToPrevStep}
+                          disabled={currentStep === 0}
+                          className={`px-3 py-1.5 rounded text-sm ${
+                            currentStep === 0
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-[#001F3F] text-white hover:bg-[#001429]'
+                          }`}
+                        >
+                          ⬅ Prev
+                        </button>
+                        <button
+                          onClick={goToNextStep}
+                          disabled={currentStep === iterations.length - 1}
+                          className={`px-3 py-1.5 rounded text-sm ${
+                            currentStep === iterations.length - 1
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-[#001F3F] text-white hover:bg-[#001429]'
+                          }`}
+                        >
+                          Next ➡
+                        </button>
+                        <button
+                          onClick={goToLastStep}
+                          disabled={currentStep === iterations.length - 1}
+                          className={`px-3 py-1.5 rounded text-sm ${
+                            currentStep === iterations.length - 1
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-[#001F3F] text-white hover:bg-[#001429]'
+                          }`}
+                        >
+                          Last ⏩
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3">
+                        <div className="text-sm text-gray-700">
+                          Step <span className="font-bold text-[#001F3F]">{currentStep + 1}</span> of {iterations.length}
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-600">Speed:</span>
+                          <select
+                            value={playbackSpeed}
+                            onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm bg-white"
+                          >
+                            <option value={0.5}>0.5x</option>
+                            <option value={1}>1x</option>
+                            <option value={2}>2x</option>
+                            <option value={3}>3x</option>
+                          </select>
+                        </div>
+                        
+                        {isPlaying ? (
+                          <button
+                            onClick={stopPlayback}
+                            className="px-3 py-1.5 bg-[#001F3F] text-white rounded text-sm hover:bg-[#001429] flex items-center"
+                          >
+                            ⏹ Stop
+                          </button>
+                        ) : (
+                          <button
+                            onClick={startPlayback}
+                            disabled={currentStep === iterations.length - 1}
+                            className={`px-3 py-1.5 rounded text-sm flex items-center ${
+                              currentStep === iterations.length - 1
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-[#001F3F] text-white hover:bg-[#001429]'
+                            }`}
+                          >
+                            ▶ Play
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3 p-2 bg-blue-50 rounded text-sm text-blue-800 font-medium text-center">
+                      {iterations[currentStep]?.description || `Line ${iterations[currentStep]?.line || '?'}`}
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex justify-center">
                   <button
                     onClick={simulateCompilation}
                     disabled={!uploadedCode || isProcessing}
-                    className={`px-6 py-3 rounded-lg font-medium ${
+                    className={`px-6 py-3 rounded-lg font-medium flex items-center ${
                       !uploadedCode || isProcessing
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-[#001F3F] text-white hover:bg-[#001F3F]/90 transition-colors'
+                        : 'bg-[#001F3F] text-white hover:bg-[#001429] transition-colors shadow-md'
                     }`}
                   >
                     {isProcessing ? (
-                      <span className="flex items-center">
+                      <>
                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         Processing...
-                      </span>
+                      </>
                     ) : (
-                      'Compile and Visualize Code'
+                      '▶ Visualize Execution'
                     )}
                   </button>
                 </div>
@@ -316,216 +524,109 @@ const simulateCompilation = async () => {
             </div>
           </div>
           
-          {/* Right Side - Visualization and Output */}
+          {/* Right: Variables & Output */}
           <div className="space-y-6">
-            {/* Step Navigation Controls */}
-            {iterations.length > 0 && (
-              <div className="bg-gray-50 p-5 rounded-xl border border-black">
-                <h3 className="text-lg font-semibold text-black mb-4">Execution Navigation</h3>
-                <div className="flex flex-col space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={goToFirstStep}
-                        disabled={currentStep === 0}
-                        className={`px-4 py-2 rounded-lg ${
-                          currentStep === 0
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-[#001F3F] text-white hover:bg-[#001F3F]/90'
-                        }`}
-                      >
-                        First
-                      </button>
-                      <button
-                        onClick={goToPrevStep}
-                        disabled={currentStep === 0}
-                        className={`px-4 py-2 rounded-lg ${
-                          currentStep === 0
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-[#001F3F] text-white hover:bg-[#001F3F]/90'
-                        }`}
-                      >
-                        Prev
-                      </button>
-                      <button
-                        onClick={goToNextStep}
-                        disabled={currentStep === iterations.length - 1}
-                        className={`px-4 py-2 rounded-lg ${
-                          currentStep === iterations.length - 1
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-[#001F3F] text-white hover:bg-[#001F3F]/90'
-                        }`}
-                      >
-                        Next
-                      </button>
-                      <button
-                        onClick={goToLastStep}
-                        disabled={currentStep === iterations.length - 1}
-                        className={`px-4 py-2 rounded-lg ${
-                          currentStep === iterations.length - 1
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-[#001F3F] text-white hover:bg-[#001F3F]/90'
-                        }`}
-                      >
-                        Last
-                      </button>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-700">Speed:</span>
-                      <select
-                        value={playbackSpeed}
-                        onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
-                        className="p-2 border border-black rounded-md"
-                      >
-                        <option value="0.5">0.5x</option>
-                        <option value="1">1x</option>
-                        <option value="2">2x</option>
-                        <option value="3">3x</option>
-                      </select>
-                      
-                      {isPlaying ? (
-                        <button
-                          onClick={stopPlayback}
-                          className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                        >
-                          Stop
-                        </button>
-                      ) : (
-                        <button
-                          onClick={startPlayback}
-                          disabled={currentStep === iterations.length - 1}
-                          className={`px-4 py-2 rounded-lg ${
-                            currentStep === iterations.length - 1
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'bg-green-500 text-white hover:bg-green-600'
-                          }`}
-                        >
-                          Play
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="text-center text-sm text-gray-700">
-                    Step {currentStep + 1} of {iterations.length}
-                  </div>
-                  
-                  {iterations.length > 0 && currentStep < iterations.length && (
-                    <div className="text-center text-sm text-yellow-600 font-medium">
-                      {iterations[currentStep].description}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
             {/* Variable Tracking Table */}
-            <div className="bg-gray-50 p-5 rounded-xl border border-black">
-              <h3 className="text-lg font-semibold text-black mb-4">Variable Tracking</h3>
+            <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Variables
+              </h3>
               
-              {variables.length > 0 ? (
+              {variableData.currentVars.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-300">
+                  <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Variable</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Type</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Current Value</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Type</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Value</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {(() => {
-                        try {
-                          // Get current step variables
-                          const currentStepVariables = iterations[currentStep]?.variables || [];
-                          
-                          // Check if we have any variables to display
-                          if (currentStepVariables.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan="3" className="px-4 py-3 text-center text-gray-500">
-                                  No variable data available for current step
-                                </td>
-                              </tr>
-                            );
-                          }
-                          
-                          return currentStepVariables.map((variable, index) => {
-                            try {
-                              return (
-                                <tr key={index} className="bg-white">
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{variable.name}</td>
-                                  <td className="px-4 py-3 text-sm text-gray-700">{variable.type}</td>
-                                  <td className="px-4 py-3 text-sm text-gray-700 font-mono">{String(variable.value)}</td>
-                                </tr>
-                              );
-                            } catch (rowError) {
-                              console.error('Error rendering variable row:', rowError);
-                              return (
-                                <tr key={index}>
-                                  <td colSpan="3" className="px-4 py-3 text-red-500">
-                                    Error displaying variable {variable.name}
-                                  </td>
-                                </tr>
-                              );
-                            }
-                          });
-                        } catch (tableError) {
-                          console.error('Error in variable tracking table:', tableError);
-                          return (
-                            <tr>
-                              <td colSpan="3" className="px-4 py-3 text-red-500">
-                                Error loading variable tracking data
-                              </td>
-                            </tr>
-                          );
-                        }
-                      })()}
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {variableData.currentVars.map((variable, index) => (
+                        <tr 
+                          key={index} 
+                          className={`${variable.changed ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}
+                        >
+                          <td className="px-4 py-3 text-sm font-mono font-medium text-gray-800">
+                            {variable.name}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              variable.type === 'int' ? 'bg-blue-100 text-blue-800' :
+                              variable.type === 'float' ? 'bg-green-100 text-green-800' :
+                              variable.type === 'array' ? 'bg-purple-100 text-purple-800' :
+                              variable.type === 'bool' ? 'bg-red-100 text-red-800' :
+                              variable.type === 'string' ? 'bg-amber-100 text-amber-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {variable.type}
+                            </span>
+                          </td>
+                          <td className={`px-4 py-3 text-sm font-mono ${
+                            variable.changed 
+                              ? 'text-blue-700 font-bold bg-blue-50 rounded' 
+                              : 'text-gray-800'
+                          }`}>
+                            {variable.value}
+                            {variable.changed && (
+                              <span className="ml-2 text-xs text-blue-600">↑ changed</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-32 text-gray-500">
-                  <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 11-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <svg className="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M5 12h14M5 6h14M5 18h14" />
                   </svg>
-                  <p>Upload and compile code to track variables</p>
-                  <p className="text-xs mt-2">Variables: {variables.length}, Iterations: {iterations.length}</p>
+                  <p className="text-sm">Upload and run code to see variables</p>
                 </div>
               )}
             </div>
             
-            {/* Output Display */}
-            <div className="bg-gray-50 p-5 rounded-xl border border-black">
-              <h3 className="text-lg font-semibold text-black mb-4">Output</h3>
-              <div className="bg-black text-green-400 p-4 rounded-lg font-mono text-sm h-48 overflow-y-auto">
-                {finalOutput && currentStep === iterations.length - 1 ? (
-                  <div>
-                    <div className="text-gray-400 mb-2">Final Output:</div>
-                    <div>{finalOutput}</div>
-                  </div>
-                ) : output.length > 0 && currentStep < output.length ? (
-                  <div>
-                    <div className="text-gray-400 mb-2">Step {currentStep + 1} Output:</div>
-                    {output[currentStep].map((line, index) => (
-                      <div key={index}>{line}</div>
-                    ))}
-                  </div>
-                ) : output.length > 0 ? (
-                  <div>
-                    {output.map((stepOutput, stepIndex) => (
-                      <div key={stepIndex} className="mb-4">
-                        <div className="text-gray-400">Step {stepIndex + 1} Output:</div>
-                        {stepOutput.map((line, lineIndex) => (
-                          <div key={lineIndex}>{line}</div>
-                        ))}
+            {/* Real-Time Output Display */}
+            <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                Console Output
+              </h3>
+              <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm min-h-32 max-h-64 overflow-y-auto">
+                {outputLines.length > 0 ? (
+                  <div className="space-y-1">
+                    {outputLines.map((line, index) => (
+                      <div 
+                        key={index}
+                        className={`py-1 pl-2 border-l-2 ${
+                          index === outputLines.length - 1 && currentStep < iterations.length - 1
+                            ? 'border-l-green-400 bg-green-900/20 animate-pulse rounded-r'
+                            : 'border-l-gray-700'
+                        }`}
+                      >
+                        {line}
                       </div>
                     ))}
                   </div>
+                ) : iterations.length > 0 ? (
+                  <div className="text-gray-500 text-center py-4">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full mr-1 animate-pulse"></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full mr-1 animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                    </div>
+                    <div>Waiting for output...</div>
+                  </div>
                 ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Compilation output will appear here</p>
+                  <div className="text-gray-500 text-center py-4">
+                    Run code to see output
                   </div>
                 )}
               </div>
