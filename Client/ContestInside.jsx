@@ -16,10 +16,6 @@ const ContestInside = () => {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [activeTab, setActiveTab] = useState('problems');
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
-  // Add this with your other state variables (around line 32)
-  const [hasAnyVirtualContest, setHasAnyVirtualContest] = useState(false);
-  const [virtualContestId, setVirtualContestId] = useState(null);
-
   const [newAnnouncement, setNewAnnouncement] = useState('');
 
   const { contestId } = useParams();
@@ -41,6 +37,7 @@ const [solvedProblems, setSolvedProblems] = useState(new Set());
   });
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
+
   const getHeaders = () => ({
     Authorization: `Bearer ${TOKEN}`,
     'Content-Type': 'application/json'
@@ -106,227 +103,186 @@ const [solvedProblems, setSolvedProblems] = useState(new Set());
     }
   };
 
-// SIMPLIFIED fetch function - FIXED VERSION
-const fetchContestData = async () => {
-  console.log('🚀 Starting fetchContestData for contest:', contestId);
-  setLoading(true);
-  setError(null);
-  
-  try {
-    // 1. Fetch contest details (REQUIRED)
-    console.log('📡 Fetching contest details...');
-    const contestRes = await axios.get(
-      `http://localhost:8000/contests/${contestId}/`, 
-      { headers: getHeaders() }
-    ).catch(err => {
-      console.error('❌ Contest details error:', err.response?.data || err.message);
-      throw err;
-    });
+  // SIMPLIFIED fetch function - FIXED VERSION
+  const fetchContestData = async () => {
+    console.log('🚀 Starting fetchContestData for contest:', contestId);
+    setLoading(true);
+    setError(null);
     
-    console.log('✅ Contest details:', contestRes.data);
-    
-    if (!contestRes.data) {
-      throw new Error('No contest data received');
-    }
-
-    const contest = contestRes.data;
-    setContestData(contest);
-
-    // 2. Fetch problems (REQUIRED) - SIMPLIFIED
-    console.log('📡 Fetching problems...');
-    let problemsList = [];
     try {
-      const problemsRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/problems/`, 
+      // 1. Fetch contest details (REQUIRED)
+      console.log('📡 Fetching contest details...');
+      const contestRes = await axios.get(
+        `http://localhost:8000/contests/${contestId}/`, 
         { headers: getHeaders() }
       ).catch(err => {
-        console.error('⚠️ Problems fetch error (continuing):', err.response?.data || err.message);
-        return { data: [] };
+        console.error('❌ Contest details error:', err.response?.data || err.message);
+        throw err;
       });
       
-      console.log('📊 Problems response:', problemsRes.data);
+      console.log('✅ Contest details:', contestRes.data);
       
-      if (problemsRes.data) {
-        // Handle different response structures
-        if (Array.isArray(problemsRes.data)) {
-          problemsList = problemsRes.data;
-        } else if (problemsRes.data.problems && Array.isArray(problemsRes.data.problems)) {
-          problemsList = problemsRes.data.problems;
-        } else if (problemsRes.data.data && Array.isArray(problemsRes.data.data)) {
-          problemsList = problemsRes.data.data;
-        }
+      if (!contestRes.data) {
+        throw new Error('No contest data received');
       }
-      
-      console.log('✅ Parsed problems:', problemsList.length);
-      setProblems(problemsList);
-      
-    } catch (problemsError) {
-      console.error('⚠️ Problems error caught:', problemsError);
-      setProblems([]);
-    }
 
-    // 3. Fetch announcements
-    console.log('📡 Fetching announcements...');
-    try {
-      const announcementsRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/announcements/`,
-        { headers: getHeaders() }
-      ).catch(err => {
-        console.error('⚠️ Announcements fetch error (continuing):', err.response?.data || err.message);
-        return { data: { announcements: [] } };
-      });
-      
-      console.log('📢 Announcements response:', announcementsRes.data);
-      
-      if (announcementsRes.data && announcementsRes.data.announcements) {
-        setAnnouncements(announcementsRes.data.announcements);
-      }
-    } catch (announcementsError) {
-      console.error('⚠️ Announcements error:', announcementsError);
-    }
+      const contest = contestRes.data;
+      setContestData(contest);
 
-    // 4. Fetch user problem status
-    console.log('📡 Fetching user problem status...');
-    try {
-      const statusRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/problems/status/`,
-        { headers: getHeaders() }
-      ).catch(err => {
-        console.error('⚠️ Status fetch error (continuing):', err.response?.data || err.message);
-        return { data: { problem_statuses: {} } };
-      });
-      
-      console.log('👤 Problem status response:', statusRes.data);
-      
-      if (statusRes.data && statusRes.data.problem_statuses) {
-        const statuses = statusRes.data.problem_statuses;
-        setProblemStatuses(statuses);
-        
-        // Calculate stats
-        let solved = 0;
-        let attempted = 0;
-        
-        Object.values(statuses).forEach(status => {
-          if (status.solved) solved++;
-          if (status.status === 'attempted' || status.status === 'solved') attempted++;
-        });
-        
-        const totalAttempts = solved + (attempted - solved);
-        const accuracy = totalAttempts > 0 ? Math.round((solved / totalAttempts) * 100) : 0;
-        
-        setUserStats({
-          solved,
-          attempted: totalAttempts,
-          total: problemsList.length, 
-          accuracy: `${accuracy}%`
-        });
-        
-        const solvedSet = new Set();
-        Object.entries(statuses).forEach(([problemIndex, status]) => {
-          if (status.solved) {
-            solvedSet.add(problemIndex);
-          }
-        });
-        setSolvedProblems(solvedSet);
-      }
-    } catch (statusError) {
-      console.error('⚠️ Status error:', statusError);
-    }
-
-    // 5. Calculate time remaining (OPTIONAL)
-    if (contest.status === 'live' && contest.start_time && contest.duration) {
+      // 2. Fetch problems (REQUIRED) - SIMPLIFIED
+      console.log('📡 Fetching problems...');
       try {
-        const startTime = new Date(contest.start_time);
-        const endTime = new Date(startTime.getTime() + (contest.duration * 60 * 60 * 1000));
-        const now = new Date();
+        const problemsRes = await axios.get(
+          `http://localhost:8000/contests/${contestId}/problems/`, 
+          { headers: getHeaders() }
+        ).catch(err => {
+          console.error('⚠️ Problems fetch error (continuing):', err.response?.data || err.message);
+          return { data: [] }; // Return empty array on error
+        });
         
-        if (now >= startTime && now <= endTime) {
-          const remainingSeconds = Math.floor((endTime - now) / 1000);
-          setTimeRemaining(remainingSeconds);
-          console.log('⏰ Timer started:', remainingSeconds, 'seconds remaining');
-        } else if (now > endTime) {
-          setTimeRemaining(0);
+        console.log('📊 Problems response:', problemsRes.data);
+        
+        let problemsList = [];
+        if (problemsRes.data) {
+          // Handle different response structures
+          if (Array.isArray(problemsRes.data)) {
+            problemsList = problemsRes.data;
+          } else if (problemsRes.data.problems && Array.isArray(problemsRes.data.problems)) {
+            problemsList = problemsRes.data.problems;
+          } else if (problemsRes.data.data && Array.isArray(problemsRes.data.data)) {
+            problemsList = problemsRes.data.data;
+          }
         }
-      } catch (timeError) {
-        console.error('⚠️ Time calculation error:', timeError);
+        
+        console.log('✅ Parsed problems:', problemsList.length);
+        setProblems(problemsList);
+        
+      } catch (problemsError) {
+        console.error('⚠️ Problems error caught:', problemsError);
+        setProblems([]); // Set empty array and continue
       }
-    }
 
-
-    // 6. Check for ANY existing virtual contests (past or active)
-console.log('🔍 Checking for ANY virtual contests for this contest...');
+// In your fetchContestData function, add more logging:
+console.log('📡 Fetching announcements...');
 try {
-  const virtualResponse = await axios.get(
-    'http://localhost:8000/my-virtual/',
+  const announcementsRes = await axios.get(
+    `http://localhost:8000/contests/${contestId}/announcements/`,
     { headers: getHeaders() }
   ).catch(err => {
-    console.error('⚠️ Virtual contest check error (continuing):', err.response?.data || err.message);
-    return { data: { virtual_contests: [] } };
+    console.error('⚠️ Announcements fetch error (continuing):', err.response?.data || err.message);
+    return { data: { announcements: [] } };
   });
   
-  console.log('📊 All virtual contests response:', virtualResponse.data);
+  console.log('📢 Announcements response:', announcementsRes.data);
+  console.log('📢 Announcements array:', announcementsRes.data.announcements);
+  console.log('📢 Announcements count:', announcementsRes.data.announcements?.length);
   
-  if (virtualResponse.data && virtualResponse.data.virtual_contests) {
-    const virtualContests = virtualResponse.data.virtual_contests;
-    
-    // Find ANY virtual contest for this original contest (past or active)
-    const anyVirtualContest = virtualContests.find(vc => 
-      vc.original_contest_id === contestId
-    );
-    
-    if (anyVirtualContest) {
-      console.log('✅ Found virtual contest (active or past):', anyVirtualContest);
-      setHasAnyVirtualContest(true);  // Rename this to hasAnyVirtualContest if you prefer
-      setVirtualContestId(anyVirtualContest.id);
-    } else {
-      console.log('❌ No virtual contest found for this contest');
-      setHasAnyVirtualContest(false);
-      setVirtualContestId(null);
-    }
-  } else {
-    setHasAnyVirtualContest(false);
-    setVirtualContestId(null);
+  if (announcementsRes.data && announcementsRes.data.announcements) {
+    setAnnouncements(announcementsRes.data.announcements);
   }
-} catch (virtualError) {
-  console.error('⚠️ Virtual contest check error:', virtualError);
-  setHasAnyVirtualContest(false);
-  setVirtualContestId(null);
+} catch (announcementsError) {
+  console.error('⚠️ Announcements error:', announcementsError);
 }
 
-    console.log('🎉 All data loaded successfully!');
-    setLoading(false);
+// In your fetchContestData function, replace the status fetching section:
+// 4. Fetch user problem status
+console.log('📡 Fetching user problem status...');
+try {
+  const statusRes = await axios.get(
+    `http://localhost:8000/contests/${contestId}/problems/status/`,
+    { headers: getHeaders() }
+  ).catch(err => {
+    console.error('⚠️ Status fetch error (continuing):', err.response?.data || err.message);
+    return { data: { problem_statuses: {} } };
+  });
+  
+  console.log('👤 Problem status response:', statusRes.data);
+  
+  if (statusRes.data && statusRes.data.problem_statuses) {
+    const statuses = statusRes.data.problem_statuses;
+    setProblemStatuses(statuses);
     
-  } catch (err) {
-    console.error('💥 Critical error in fetchContestData:', err);
-    console.error('Error details:', {
-      message: err.message,
-      response: err.response?.data,
-      status: err.response?.status
+    // Calculate stats
+    let solved = 0;
+    let attempted = 0;
+    
+    Object.values(statuses).forEach(status => {
+      if (status.solved) solved++;
+      if (status.status === 'attempted' || status.status === 'solved') attempted++;
     });
     
-    // User-friendly error messages
-    if (err.response?.status === 404) {
-      setError('Contest not found');
-    } else if (err.response?.status === 403) {
-      setError('Access denied. You may need to register for this contest.');
-    } else if (err.response?.status === 401) {
-      setError('Please login to access this contest');
-    } else if (err.message.includes('Network Error')) {
-      setError('Cannot connect to server. Please check your connection.');
-    } else {
-      setError(err.response?.data?.error || err.message || 'Failed to load contest');
-    }
+    const totalAttempts = solved + (attempted - solved); // Unique attempted problems
+    const accuracy = totalAttempts > 0 ? Math.round((solved / totalAttempts) * 100) : 0;
     
-    setLoading(false);
+    setUserStats({
+      solved,
+      attempted: totalAttempts,
+      total: problemsList.length, 
+      accuracy: `${accuracy}%`
+    });
+    
+    // Also create a set of solved problems for quick checking
+    const solvedSet = new Set();
+    Object.entries(statuses).forEach(([problemIndex, status]) => {
+      if (status.solved) {
+        solvedSet.add(problemIndex);
+      }
+    });
+    setSolvedProblems(solvedSet);
   }
-};
+} catch (statusError) {
+  console.error('⚠️ Status error:', statusError);
+  // Don't block on error
+}
 
-// REMOVE THIS SECTION - It's in the wrong place!
-// console.log('🎉 All data loaded successfully!');
-// 
-// await checkVirtualContest();
-// 
-// setLoading(false);
+
+
+      // 5. Calculate time remaining (OPTIONAL)
+if (contest.status === 'live' && contest.start_time && contest.duration) {
+  try {
+    const startTime = new Date(contest.start_time);
+    const endTime = new Date(startTime.getTime() + (contest.duration * 60 * 60 * 1000));
+    const now = new Date();
+    
+    if (now >= startTime && now <= endTime) {
+      const remainingSeconds = Math.floor((endTime - now) / 1000);
+      setTimeRemaining(remainingSeconds);
+      console.log('⏰ Timer started:', remainingSeconds, 'seconds remaining');
+    } else if (now > endTime) {
+      setTimeRemaining(0);
+    }
+  } catch (timeError) {
+    console.error('⚠️ Time calculation error:', timeError);
+  }
+}
+
+      console.log('🎉 All data loaded successfully!');
+      setLoading(false);
+      
+    } catch (err) {
+      console.error('💥 Critical error in fetchContestData:', err);
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      
+      // User-friendly error messages
+      if (err.response?.status === 404) {
+        setError('Contest not found');
+      } else if (err.response?.status === 403) {
+        setError('Access denied. You may need to register for this contest.');
+      } else if (err.response?.status === 401) {
+        setError('Please login to access this contest');
+      } else if (err.message.includes('Network Error')) {
+        setError('Cannot connect to server. Please check your connection.');
+      } else {
+        setError(err.response?.data?.error || err.message || 'Failed to load contest');
+      }
+      
+      setLoading(false);
+    }
+  };
 
 useEffect(() => {
   if (contestId) {
@@ -393,31 +349,6 @@ useEffect(() => {
   }
 };
 
-// Add this function with your other handlers (around line 150-250 area)
-const handleStartVirtualContest = async () => {
-  try {
-    console.log('🎯 Starting virtual contest for:', contestId);
-    const response = await axios.post(
-      `http://localhost:8000/contests/${contestId}/virtual-start/`,  // Virtual contest API
-      { 
-        contest_id: contestId 
-      },
-      { headers: getHeaders() }
-    );
-    
-    console.log('✅ Virtual contest started:', response.data);
-    
-    if (response.data.virtual_contest_id) {
-      alert('Virtual contest started successfully!');
-      // Navigate to the virtual contest page
-      navigate(`/contests/${contestId}/virtual/${response.data.virtual_contest_id}`);
-    }
-  } catch (err) {
-    console.error('❌ Virtual contest error:', err.response?.data || err.message);
-    alert(err.response?.data?.error || 'Failed to start virtual contest');
-  }
-};
-
   // Handle registration
   const handleRegister = async () => {
     try {
@@ -462,19 +393,12 @@ const handlePostAnnouncement = async () => {
       setAnnouncements([response.data.announcement, ...announcements]);
       setNewAnnouncement('');
       setShowAnnouncementForm(false);
-      alert('New announcement posted: ' + response.data.announcement.text);
+      alert('Announcement posted successfully!');
     }
   } catch (err) {
     console.error('❌ Error posting announcement:', err);
     console.error('Error details:', err.response?.data);
     alert(err.response?.data?.error || 'Unknown error');
-  }
-};
-
-// Add a handler for going to existing virtual contest
-const handleGoToVirtualContest = () => {
-  if (virtualContestId) {
-    navigate(`/contests/${contestId}/virtual/${virtualContestId}`);
   }
 };
 
@@ -641,8 +565,8 @@ const getProblemStatusIcon = (problem) => {
                   { 
                     id: 'leaderboard', 
                     icon: <Trophy className="w-5 h-5" />, 
-                    label: 'Standings',
-                    onClick: () => navigate(`/contests/${contestId}/standings`)
+                    label: 'Leaderboard',
+                    onClick: () => navigate(`/contests/${contestId}/leaderboard`)
                   },
                   { 
                     id: 'clarifications', 
@@ -667,29 +591,25 @@ const getProblemStatusIcon = (problem) => {
                   }
                 ].map((item) => {
                   
-                  if ((item.id === 'editorial' || item.id === 'discussions') && contestData.status !== 'past') {
-                    return null;
-                  }
-
-                  if ((item.id === 'clarifications') && contestData.status !== 'live') {
-                    return null;
-                  }
+                  if (item.id === 'editorial' && contestData.status !== 'past') {
+    return null; // Don't render editorial
+  }
   
-                return (
-                    <button
-                      key={item.id}
-                      onClick={item.onClick}
-                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors mb-1 ${
-                        activeTab === item.id
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {item.icon}
-                      <span className="font-medium">{item.label}</span>
-                    </button>
-                  );
-                })}
+  return (
+    <button
+      key={item.id}
+      onClick={item.onClick}
+      className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors mb-1 ${
+        activeTab === item.id
+          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+          : 'text-gray-700 hover:bg-gray-50'
+      }`}
+    >
+      {item.icon}
+      <span className="font-medium">{item.label}</span>
+    </button>
+  );
+})}
               </div>
             </div>
 
@@ -729,43 +649,28 @@ const getProblemStatusIcon = (problem) => {
               </div>
             </div>
 
-{/* Quick Actions */}
-<div className="bg-white rounded-xl shadow-sm border border-gray-200">
-  <div className="p-4 border-b border-gray-200">
-    <h2 className="font-semibold text-gray-900">Quick Actions</h2>
-  </div>
-  <div className="p-4 space-y-3">
-
-{contestData.status === 'past' && (
-  hasAnyVirtualContest ? (
-    <button 
-      className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
-      onClick={handleGoToVirtualContest}
-    >
-      <Play className="w-5 h-5" />
-      Go to Virtual Contest
-    </button>
-  ) : (
-    <button 
-      className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-      onClick={handleStartVirtualContest}
-    >
-      <Play className="w-5 h-5" />
-      Start Virtual Contest
-    </button>
-  )
-)}
-
-    <button className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-      <Download className="w-5 h-5" />
-      Download Problems
-    </button>
-    <button className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-      <Flag className="w-5 h-5" />
-      Report Issue
-    </button>
-  </div>
-</div>
+            {/* Quick Actions */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <div className="p-4 border-b border-gray-200">
+                <h2 className="font-semibold text-gray-900">Quick Actions</h2>
+              </div>
+              <div className="p-4 space-y-3">
+                {contestData.status === 'past' && (
+                  <button className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                    <Play className="w-5 h-5" />
+                    Start Virtual Contest
+                  </button>
+                )}
+                <button className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                  <Download className="w-5 h-5" />
+                  Download Problems
+                </button>
+                <button className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                  <Flag className="w-5 h-5" />
+                  Report Issue
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Main Content Area */}

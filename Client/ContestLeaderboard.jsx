@@ -247,7 +247,7 @@ const ContestLeaderboard = () => {
           <div className="border-t border-gray-200 px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="text-xs text-gray-600">
-                Showing <span className="font-semibold">1-50</span> of <span className="font-semibold">{leaderboardData.length}</span> participants
+                Showing <span className="font-semibold">1-10</span> of <span className="font-semibold">{leaderboardData.length}</span> participants
               </div>
               <div className="flex items-center gap-2">
                 <button className="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 text-xs disabled:opacity-50">

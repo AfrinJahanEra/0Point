@@ -1,17 +1,3 @@
-import ReactMarkdown from 'react-markdown';
-import AceEditor from 'react-ace';
-import 'ace-builds/src-noconflict/mode-c_cpp';
-import 'ace-builds/src-noconflict/mode-python';
-import 'ace-builds/src-noconflict/mode-java';
-import 'ace-builds/src-noconflict/mode-javascript';
-import 'ace-builds/src-noconflict/theme-monokai';
-import 'ace-builds/src-noconflict/ext-language_tools';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import rehypeHighlight from 'rehype-highlight';
-import rehypeRaw from 'rehype-raw';
-import 'katex/dist/katex.min.css';
-import 'highlight.js/styles/github.css';
 import React, { useState, useEffect } from 'react';
 import { Clipboard } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
@@ -30,8 +16,7 @@ import {
   HelpCircle,
   Trophy,
   Loader2,
-  Users,
-  BookOpen
+  Users
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -50,100 +35,6 @@ const ProblemInside = () => {
   const [language, setLanguage] = useState('cpp');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [problemStats, setProblemStats] = useState(null);
-  // Add these with other useState declarations:
-  const [compilationStats, setCompilationStats] = useState(null);
-
-  const customComponents = {
-  h1: ({ children }) => (
-    <h1 className="text-2xl font-bold mt-6 mb-4 text-gray-900 border-b border-gray-200 pb-2">
-      {children}
-    </h1>
-  ),
-  h2: ({ children }) => (
-    <h2 className="text-xl font-bold mt-5 mb-3 text-gray-800">
-      {children}
-    </h2>
-  ),
-  h3: ({ children }) => (
-    <h3 className="text-lg font-semibold mt-4 mb-2 text-gray-700">
-      {children}
-    </h3>
-  ),
-  p: ({ children }) => (
-    <p className="my-3 text-gray-700 leading-relaxed">
-      {children}
-    </p>
-  ),
-  ul: ({ children }) => (
-    <ul className="my-4 ml-6 list-disc space-y-2 text-gray-700">
-      {children}
-    </ul>
-  ),
-  ol: ({ children }) => (
-    <ol className="my-4 ml-6 list-decimal space-y-2 text-gray-700">
-      {children}
-    </ol>
-  ),
-  code: ({ inline, className, children, ...props }) => {
-    const match = /language-(\w+)/.exec(className || '');
-    return !inline && match ? (
-      <div className="my-4 rounded-md overflow-hidden">
-        <div className="bg-gray-800 text-gray-300 text-xs px-4 py-2 font-mono">
-          {match[1]}
-        </div>
-        <pre className="bg-gray-900 text-gray-100 p-4 overflow-x-auto text-sm">
-          <code className={className} {...props}>
-            {children}
-          </code>
-        </pre>
-      </div>
-    ) : (
-      <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
-        {children}
-      </code>
-    );
-  },
-  blockquote: ({ children }) => (
-    <blockquote className="border-l-4 border-blue-400 pl-4 py-2 my-4 bg-blue-50 italic text-gray-700">
-      {children}
-    </blockquote>
-  ),
-  table: ({ children }) => (
-    <div className="overflow-x-auto my-6">
-      <table className="min-w-full divide-y divide-gray-200 border border-gray-300">
-        {children}
-    </table>
-    </div>
-  ),
-  tr: ({ children }) => (
-    <tr className="divide-x divide-gray-200">{children}</tr>
-  ),
-  th: ({ children }) => (
-    <th className="px-4 py-3 bg-gray-100 text-left text-sm font-semibold text-gray-700">
-      {children}
-    </th>
-  ),
-  td: ({ children }) => (
-    <td className="px-4 py-3 text-sm text-gray-700 border-t border-gray-200">
-      {children}
-    </td>
-  ),
-  a: ({ href, children }) => (
-    <a href={href} className="text-blue-600 hover:text-blue-800 hover:underline" target="_blank" rel="noopener noreferrer">
-      {children}
-    </a>
-  ),
-  spoiler: ({ children, summary }) => (
-    <details className="my-4 bg-gray-50 border border-gray-300 rounded-lg">
-      <summary className="cursor-pointer px-4 py-3 font-medium text-gray-700 hover:bg-gray-100">
-        {summary || 'Solution / Spoiler'}
-      </summary>
-      <div className="px-4 py-3 border-t border-gray-300 bg-white">
-        {children}
-      </div>
-    </details>
-  )
-};
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
 
@@ -403,217 +294,162 @@ const ProblemInside = () => {
     }
   };
 
-  const handleRun = async () => {
-    if (!code.trim()) {
-      alert('Please write some code before running.');
-      return;
-    }
 
-    try {
-      // Use sample test case input for running
-      const sampleInput = problemData?.sample_test_cases?.[0]?.input || '';
-      const expectedOutput = problemData?.sample_test_cases?.[0]?.output || '';
+  
 
-      const runData = {
-        language: language,
-        version_index: getVersionIndex(language),
-        code: code,
-        input_data: sampleInput,
-        expected_output: expectedOutput
-      };
+// Update handleRun function:
+const handleRun = async () => {
+  if (!code.trim()) {
+    alert('Please write some code before running.');
+    return;
+  }
 
-      console.log('Running code with data:', runData);
-      
-      // Set loading state
-      setCompilationStats({
-        status: 'running',
-        message: 'Running against sample test case...',
-        type: 'run'
-      });
-      
-      const response = await axios.post(
-        `http://localhost:8000/contests/${contestId}/execute/`,
-        runData,
-        { 
-          headers: { 
-            Authorization: `Bearer ${TOKEN}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
+  try {
+    // Use sample test case input for running
+    const sampleInput = problemData?.sample_test_cases?.[0]?.input || '';
+    const expectedOutput = problemData?.sample_test_cases?.[0]?.output || '';
 
-      console.log('Run response:', response.data);
-      
-      // Update compilation stats based on actual API response
-      if (response.data.is_execution_success) {
-       
-        const isCorrect = expectedOutput ? 
-          (response.data.output?.trim() === expectedOutput.trim()) : true;
-        
-        setCompilationStats({
-          status: isCorrect ? 'success' : 'error',
-          verdict: isCorrect ? 'AC' : 'WA',
-          time: response.data.execution_time_ms || 0,
-          memory: response.data.memory_kb || 0,
-          output: response.data.output || '',
-          message: isCorrect ? 'Test case passed!' : 'Wrong Answer',
-          type: 'run',
-          expectedOutput: expectedOutput
-        });
-      } else {
-        setCompilationStats({
-          status: 'error',
-          verdict: response.data.verdict || response.data.status || 'RE',
-          time: response.data.execution_time_ms || 0,
-          memory: response.data.memory_kb || 0,
-          output: response.data.output || '',
-          message: response.data.status || 'Runtime Error',
-          type: 'run'
-        });
+    const runData = {
+      language: language,
+      version_index: getVersionIndex(language),
+      code: code,
+      input_data: sampleInput,
+      expected_output: expectedOutput
+    };
+
+    console.log('Running code with data:', runData);
+    
+    const response = await axios.post(
+      `http://localhost:8000/contests/${contestId}/execute/`,
+      runData,
+      { 
+        headers: { 
+          Authorization: `Bearer ${TOKEN}`,
+          'Content-Type': 'application/json'
+        } 
       }
+    );
+
+    console.log('Run response:', response.data);
+    
+    if (response.data.is_execution_success || response.data.status === 'success') {
+      const timeMsg = response.data.execution_time_ms ? 
+        `\n⏱️ Time: ${response.data.execution_time_ms}ms (${response.data.execution_time_seconds}s)` : '';
+      const memoryMsg = response.data.memory_kb ? 
+        `\n💾 Memory: ${response.data.memory_kb}KB (${response.data.memory_mb}MB)` : '';
       
-    } catch (error) {
-      console.error('Run error:', error);
-      setCompilationStats({
-        status: 'error',
-        message: error.response?.data?.error || 'Run failed',
-        type: 'run'
-      });
-    }
-  };
-
-  // Helper function to map language to Ace editor mode
-  const getEditorMode = (lang) => {
-    switch(lang) {
-      case 'cpp':
-        return 'c_cpp';
-      case 'c':
-        return 'c_cpp';
-      case 'python':
-        return 'python';
-      case 'java':
-        return 'java';
-      case 'javascript':
-        return 'javascript';
-      default:
-        return 'text';
-    }
-  };
-
-  // Replace the entire handleSubmit function with this:
-  const handleSubmit = async () => {
-    if (!code.trim()) {
-      alert('Please write some code before submitting.');
-      return;
-    }
-
-    // Show confirmation for submission
-    if (!window.confirm('Submit your solution? This will be judged against all test cases.')) {
-      return;
-    }
-
-    try {
-      const submitData = {
-        language: language,
-        version_index: getVersionIndex(language),
-        code: code,
-        input_data: '', // Empty for full submission
-      };
-
-      console.log('Submitting code:', submitData);
+      alert(`✅ Execution successful!${timeMsg}${memoryMsg}\n📤 Output: ${response.data.output}\n🎯 Verdict: ${response.data.verdict}`);
+    } else {
+      const timeMsg = response.data.execution_time_ms ? 
+        `\n⏱️ Time: ${response.data.execution_time_ms}ms` : '';
+      const memoryMsg = response.data.memory_kb ? 
+        `\n💾 Memory: ${response.data.memory_kb}KB` : '';
       
-      // Set loading state
-      setCompilationStats({
-        status: 'running',
-        message: 'Submitting and judging against all test cases...',
-        type: 'submit'
-      });
-      
-      const response = await axios.post(
-        `http://localhost:8000/contests/${contestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
-        submitData,
-        { 
-          headers: { 
-            Authorization: `Bearer ${TOKEN}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
+      alert(`❌ Execution error!${timeMsg}${memoryMsg}\n📤 Output: ${response.data.output}\n🔴 Status: ${response.data.status}`);
+    }
+  } catch (error) {
+    console.error('Run error:', error);
+    alert(error.response?.data?.error || 'Run failed');
+  }
+};
 
-      console.log('Submit response:', response.data);
-      
-      if (response.data.verdict === 'AC') {
-        setCompilationStats({
-          status: 'success',
-          verdict: 'AC',
-          time: response.data.execution_time || 0,
-          memory: response.data.memory_used || 0,
-          passed: response.data.passed_test_cases || 0,
-          total: response.data.total_test_cases || 0,
-          message: `All ${response.data.total_test_cases} test cases passed!`,
-          submissionId: response.data.submission_id,
-          type: 'submit'
-        });
-        
-        // Refresh status
-        fetchUserProblemStatus();
-        refreshProblemStatus();
-      } else {
-        setCompilationStats({
-          status: response.data.status === 'CE' ? 'compile_error' : 'error',
-          verdict: response.data.status || 'WA',
-          time: response.data.execution_time || 0,
-          memory: response.data.memory_used || 0,
-          passed: response.data.passed_test_cases || 0,
-          total: response.data.total_test_cases || 0,
-          failedTestCase: response.data.failed_test_case || 0,
-          message: `${response.data.passed_test_cases}/${response.data.total_test_cases} test cases passed`,
-          type: 'submit'
-        });
+// Update handleSubmit function:
+const handleSubmit = async () => {
+  if (!code.trim()) {
+    alert('Please write some code before submitting.');
+    return;
+  }
+
+  // Show confirmation for submission
+  if (!window.confirm('Submit your solution? This will be judged against all test cases.')) {
+    return;
+  }
+
+  try {
+    const submitData = {
+      language: language,
+      version_index: getVersionIndex(language),
+      code: code,
+      input_data: '', // Empty for full submission
+    };
+
+    console.log('Submitting code:', submitData);
+    
+    const response = await axios.post(
+      `http://localhost:8000/contests/${contestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
+      submitData,
+      { 
+        headers: { 
+          Authorization: `Bearer ${TOKEN}`,
+          'Content-Type': 'application/json'
+        } 
       }
+    );
+
+    console.log('Submit response:', response.data);
+    
+    if (response.data.verdict === 'AC') {
+      const timeMsg = response.data.execution_time ? 
+        `\n⏱️ Time: ${response.data.execution_time}ms (${response.data.cpu_time_seconds}s)` : '';
+      const memoryMsg = response.data.memory_used ? 
+        `\n💾 Memory: ${response.data.memory_used}KB (${Math.round(response.data.memory_used / 1024 * 100) / 100}MB)` : '';
+      const limitsMsg = response.data.time_limit && response.data.memory_limit ? 
+        `\n📊 Limits: ${response.data.time_limit}ms, ${response.data.memory_limit}KB` : '';
       
-    } catch (error) {
-      console.error('Submission error:', error);
-      setCompilationStats({
-        status: 'error',
-        message: error.response?.data?.error || 'Submission failed',
-        type: 'submit'
-      });
-    }
-  };
-
-  // Helper function to get version index
-  const getVersionIndex = (lang) => {
-    switch(lang) {
-      case 'python': return '3';
-      case 'python3': return '3';
-      case 'java': return '4';
-      case 'c': return '5';
-      case 'cpp': return '5';
-      case 'javascript': return '4';
-      default: return '0';
-    }
-  };
-
-  // Add this function to fetch user problem status
-  const fetchUserProblemStatus = async () => {
-    try {
-      const response = await axios.get(
-        `http://localhost:8000/contests/${contestId}/problems/status/`,
-        { headers: { Authorization: `Bearer ${TOKEN}` } }
-      );
-      setUserStatus(response.data.problem_statuses || {});
-    } catch (error) {
-      console.error('Error fetching problem status:', error);
-    }
-  };
-
-  // Call this in your useEffect after loading problem data
-  useEffect(() => {
-    if (problemData && contestId) {
+      alert(`✅ Accepted! All ${response.data.total_test_cases} test cases passed.${timeMsg}${memoryMsg}${limitsMsg}\n🎫 Submission ID: ${response.data.submission_id}`);
+      
+      // Refresh status
       fetchUserProblemStatus();
+      refreshProblemStatus();
+    } else {
+      const timeMsg = response.data.execution_time ? 
+        `\n⏱️ Time: ${response.data.execution_time}ms` : '';
+      const memoryMsg = response.data.memory_used ? 
+        `\n💾 Memory: ${response.data.memory_used}KB` : '';
+      const limitsMsg = response.data.time_limit && response.data.memory_limit ? 
+        `\n📊 Limits: ${response.data.time_limit}ms, ${response.data.memory_limit}KB` : '';
+      
+      alert(`❌ ${response.data.status}${timeMsg}${memoryMsg}${limitsMsg}\n✅ Passed: ${response.data.passed_test_cases}/${response.data.total_test_cases}\n❌ Failed on test case: ${response.data.failed_test_case}`);
     }
-  }, [problemData, contestId]);
+    
+  } catch (error) {
+    console.error('Submission error:', error);
+    alert(error.response?.data?.error || 'Submission failed');
+  }
+};
+
+// Helper function to get version index
+const getVersionIndex = (lang) => {
+  switch(lang) {
+    case 'python': return '3';
+    case 'python3': return '3';
+    case 'java': return '4';
+    case 'c': return '5';
+    case 'cpp': return '5';
+    case 'javascript': return '4';
+    default: return '0';
+  }
+};
+
+// Add this function to fetch user problem status
+const fetchUserProblemStatus = async () => {
+  try {
+    const response = await axios.get(
+      `http://localhost:8000/contests/${contestId}/problems/status/`,
+      { headers: { Authorization: `Bearer ${TOKEN}` } }
+    );
+    setUserStatus(response.data.problem_statuses || {});
+  } catch (error) {
+    console.error('Error fetching problem status:', error);
+  }
+};
+
+// Call this in your useEffect after loading problem data
+useEffect(() => {
+  if (problemData && contestId) {
+    fetchUserProblemStatus();
+  }
+}, [problemData, contestId]);
 
 
   // Format problem difficulty
@@ -724,28 +560,30 @@ const ProblemInside = () => {
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                  <Menu className="w-5 h-5 text-gray-600" />
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <Menu className="w-5 h-5 text-gray-600" />
               </button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">{displayContestData.title}</h1>
-                  <div className="flex items-center space-x-3 text-xs text-gray-600">
-                    <span className="flex items-center space-x-1">
-                      <Users className="w-3 h-3" />
-                      <span>{problemData?.contest_platform || displayContestData?.platform || 'Custom Platform'}</span>
-                    </span>
-                    <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded-full text-xs">
-                      {problemData?.contest_type === 'team' ? 'Team' : 'Individual'}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      displayContestData?.status === 'live' ? 'bg-red-100 text-red-800' :
-                      displayContestData?.status === 'upcoming' ? 'bg-blue-100 text-blue-800' :
-                      displayContestData?.status === 'past' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {displayContestData?.status?.charAt(0).toUpperCase() + displayContestData?.status?.slice(1)}
-                    </span>
-                  </div>
+
+<div className="flex items-center space-x-3 text-xs text-gray-600">
+  <span className="flex items-center space-x-1">
+    <Users className="w-3 h-3" />
+    <span>{problemData?.contest_platform || displayContestData?.platform || 'Custom Platform'}</span>
+  </span>
+  <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded-full text-xs">
+    {problemData?.contest_type === 'team' ? 'Team' : 'Individual'}
+  </span>
+  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+    displayContestData?.status === 'live' ? 'bg-red-100 text-red-800' :
+    displayContestData?.status === 'upcoming' ? 'bg-blue-100 text-blue-800' :
+    displayContestData?.status === 'past' ? 'bg-green-100 text-green-800' :
+    'bg-gray-100 text-gray-800'
+  }`}>
+    {displayContestData?.status?.charAt(0).toUpperCase() + displayContestData?.status?.slice(1)}
+  </span>
+</div>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -817,7 +655,6 @@ const ProblemInside = () => {
                 <span className="text-xs font-semibold text-gray-900">My Submissions</span>
               </Link>
               
-              {displayContestData.status === 'past' && (
               <Link
                 to={`/contests/${contestId}/discussion`}
                 className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
@@ -825,8 +662,7 @@ const ProblemInside = () => {
                 <MessageSquare className="w-4 h-4" />
                 <span className="text-xs font-semibold text-gray-900">Discussions</span>
               </Link>
-              )}
-              {displayContestData.status === 'live' && (
+              
               <Link
                 to={`/contests/${contestId}/clarifications`}
                 className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
@@ -834,21 +670,20 @@ const ProblemInside = () => {
                 <HelpCircle className="w-4 h-4" />
                 <span className="text-xs font-semibold text-gray-900">Clarification</span>
               </Link>
-              )}
               
               <Link
-                to={`/contests/${contestId}/standings`}
+                to={`/contests/${contestId}/leaderboard`}
                 className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
               >
                 <Trophy className="w-4 h-4" />
-                <span className="text-xs font-semibold text-gray-900">Standings</span>
+                <span className="text-xs font-semibold text-gray-900">Leaderboard</span>
               </Link>
               {displayContestData.status === 'past' && (
                 <Link
                   to={`/contests/${contestId}/editorial`}
                   className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
                 >
-                  <BookOpen className="w-4 h-4" />
+                  <Trophy className="w-4 h-4" />
                   <span className="text-xs font-semibold text-gray-900">Editorial</span>
                 </Link>
               )}
@@ -962,96 +797,88 @@ const ProblemInside = () => {
                   </div>
                 </div>
 
-{/* Problem Statement Content */}
-<div className="prose prose-sm max-w-none">
-  {problemData?.statement ? (
-    <div className="mb-8 p-4 bg-white rounded-lg border border-gray-200">
-      <ReactMarkdown
-        remarkPlugins={[remarkMath]}
-        rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
-        components={customComponents}
-      >
-        {problemData.statement}
-      </ReactMarkdown>
-    </div>
-  ) : (
-    <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded">
-      <p className="text-yellow-800">No problem statement available.</p>
-    </div>
-  )}
-  
-  {/* Sample Test Cases */}
-  {problemData?.sample_test_cases && problemData.sample_test_cases.length > 0 ? (
-    <div className="space-y-8 mb-8">
-      {problemData.sample_test_cases.map((testCase, index) => (
-        <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
-          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-            <h4 className="font-semibold text-gray-900">
-              Sample Test Case {index + 1}
-            </h4>
-          </div>
-          
-          {/* Input and Output side by side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-            {/* Input Column */}
-            <div className="border-r border-gray-200">
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-200">
-                <h5 className="font-medium text-gray-900">Input</h5>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(testCase.input);
-                  }}
-                  className="text-gray-500 hover:text-gray-700 transition-colors" 
-                  title="Copy"
-                >
-                  <Clipboard className="w-4 h-4" />
-                </button>
-              </div>
-              <pre className="bg-gray-800 text-gray-100 p-4 font-mono text-xs overflow-x-auto whitespace-pre m-0">
-                {testCase.input}
-              </pre>
-            </div>
-            
-            {/* Output Column */}
-            <div>
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-200">
-                <h5 className="font-medium text-gray-900">Output</h5>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(testCase.output);
-                  }}
-                  className="text-gray-500 hover:text-gray-700 transition-colors" 
-                  title="Copy"
-                >
-                  <Clipboard className="w-4 h-4" />
-                </button>
-              </div>
-              <pre className="bg-gray-800 text-gray-100 p-4 font-mono text-xs overflow-x-auto whitespace-pre m-0">
-                {testCase.output}
-              </pre>
-            </div>
-          </div>
-          
-          {/* Explanation - Full width below */}
-          {testCase.explanation && (
-            <div className="border-t border-gray-200">
-              <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
-                <h5 className="font-medium text-blue-900">Explanation</h5>
-              </div>
-              <div className="p-4 bg-blue-50 text-blue-800 text-xs">
-                {testCase.explanation}
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  ) : (
-    <div className="mb-8 p-4 bg-gray-50 border border-gray-200 rounded">
-      <p className="text-gray-600 text-sm">No sample test cases available.</p>
-    </div>
-  )}
-</div>
+                {/* Problem Statement Content */}
+                <div className="prose prose-sm max-w-none">
+                  {problemData?.statement ? (
+                    <div className="mb-8" dangerouslySetInnerHTML={{ __html: problemData.statement }} />
+                  ) : (
+                    <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded">
+                      <p className="text-yellow-800">No problem statement available.</p>
+                    </div>
+                  )}
+                  
+                  {/* Sample Test Cases */}
+                  {problemData?.sample_test_cases && problemData.sample_test_cases.length > 0 ? (
+                    <div className="space-y-8 mb-8">
+                      {problemData.sample_test_cases.map((testCase, index) => (
+                        <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                            <h4 className="font-semibold text-gray-900">
+                              Sample Test Case {index + 1}
+                            </h4>
+                          </div>
+                          
+                          {/* Input and Output side by side */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                            {/* Input Column */}
+                            <div className="border-r border-gray-200">
+                              <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-200">
+                                <h5 className="font-medium text-gray-900">Input</h5>
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(testCase.input);
+                                  }}
+                                  className="text-gray-500 hover:text-gray-700 transition-colors" 
+                                  title="Copy"
+                                >
+                                  <Clipboard className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <pre className="bg-gray-800 text-gray-100 p-4 font-mono text-xs overflow-x-auto whitespace-pre m-0">
+                                {testCase.input}
+                              </pre>
+                            </div>
+                            
+                            {/* Output Column */}
+                            <div>
+                              <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-200">
+                                <h5 className="font-medium text-gray-900">Output</h5>
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(testCase.output);
+                                  }}
+                                  className="text-gray-500 hover:text-gray-700 transition-colors" 
+                                  title="Copy"
+                                >
+                                  <Clipboard className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <pre className="bg-gray-800 text-gray-100 p-4 font-mono text-xs overflow-x-auto whitespace-pre m-0">
+                                {testCase.output}
+                              </pre>
+                            </div>
+                          </div>
+                          
+                          {/* Explanation - Full width below */}
+                          {testCase.explanation && (
+                            <div className="border-t border-gray-200">
+                              <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
+                                <h5 className="font-medium text-blue-900">Explanation</h5>
+                              </div>
+                              <div className="p-4 bg-blue-50 text-blue-800 text-xs">
+                                {testCase.explanation}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mb-8 p-4 bg-gray-50 border border-gray-200 rounded">
+                      <p className="text-gray-600 text-sm">No sample test cases available.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1061,17 +888,18 @@ const ProblemInside = () => {
               <div className="border-b border-gray-200 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <select 
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                      className="border border-gray-300 rounded px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="python">Python 3</option>
-                      <option value="cpp">C++ 17</option>
-                      <option value="java">Java</option>
-                      <option value="c">C</option>
-                      <option value="javascript">JavaScript</option>
-                    </select>
+                    
+<select 
+  value={language}
+  onChange={(e) => setLanguage(e.target.value)}
+  className="border border-gray-300 rounded px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+>
+  <option value="python">Python 3</option>
+  <option value="cpp">C++ 17</option>
+  <option value="java">Java</option>
+  <option value="c">C</option>
+  <option value="javascript">JavaScript</option>
+</select>
                   </div>
                   <div className="flex items-center space-x-2">
                     <button 
@@ -1081,7 +909,7 @@ const ProblemInside = () => {
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `${problemData?.problem_index || problemIndex}.${language}`;
+                        a.download = `solution_${problemData?.problem_index || problemIndex}.${language}`;
                         a.click();
                         URL.revokeObjectURL(url);
                         alert('Code downloaded!');
@@ -1095,37 +923,19 @@ const ProblemInside = () => {
                 </div>
               </div>
 
-              {/* Code Editor with Syntax Highlighting */}
-              <div className="flex-1 bg-gray-900 overflow-hidden">
-                <AceEditor
-                  mode={getEditorMode(language)}
-                  theme="monokai"
+              {/* Code Editor */}
+              <div className="flex-1 bg-gray-900">
+                <textarea
                   value={code}
-                  onChange={setCode}
-                  name="code-editor"
-                  height="100%"
-                  width="100%"
-                  fontSize={14}
-                  showPrintMargin={true}
-                  showGutter={true}
-                  highlightActiveLine={true}
-                  setOptions={{
-                    enableBasicAutocompletion: true,
-                    enableLiveAutocompletion: true,
-                    enableSnippets: true,
-                    showLineNumbers: true,
-                    tabSize: 4,
-                    useWorker: false, // Disable worker for better performance
-                  }}
-                  style={{ 
-                    background: '#1f2937',
-                    fontFamily: 'Consolas, Monaco, "Andale Mono", monospace'
-                  }}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="w-full h-full font-mono text-sm text-gray-100 bg-gray-900 p-4 resize-none focus:outline-none"
+                  spellCheck="false"
                   placeholder={`// Write your ${language.toUpperCase()} code here...`}
+                  rows={20}
                 />
               </div>
 
-              {/* Action Buttons */}
+              {/* Editor Footer */}
               <div className="border-t border-gray-200 p-4">
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-gray-600">
@@ -1150,145 +960,7 @@ const ProblemInside = () => {
                   </div>
                 </div>
               </div>
-
-
-              {compilationStats && (
-                <div className="border-t border-gray-200">
-                  <div className={`p-4 ${compilationStats.status === 'running' ? 'bg-blue-50' : compilationStats.status === 'success' ? 'bg-green-50' : compilationStats.status === 'compile_error' ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center space-x-2">
-                        {compilationStats.status === 'running' ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                            <span className="text-sm font-medium text-blue-900">Running...</span>
-                          </>
-                        ) : compilationStats.status === 'success' ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-900">Success!</span>
-                          </>
-                        ) : compilationStats.status === 'compile_error' ? (
-                          <>
-                            <AlertCircle className="w-4 h-4 text-yellow-600" />
-                            <span className="text-sm font-medium text-yellow-900">Compilation Error</span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle className="w-4 h-4 text-red-600" />
-                            <span className="text-sm font-medium text-red-900">Failed</span>
-                          </>
-                        )}
-                        <span className="text-xs px-2 py-1 bg-white rounded border">
-                          {compilationStats.type === 'run' ? 'Run' : 'Submit'}
-                        </span>
-                      </div>
-                      <button 
-                        onClick={() => setCompilationStats(null)}
-                        className="text-gray-500 hover:text-gray-700 text-sm"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {/* Message */}
-                      <div className="text-sm">
-                        {compilationStats.message}
-                      </div>
-                      
-                      {/* Stats Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                        {/* Verdict */}
-                        <div className="bg-white p-2 rounded border">
-                          <div className="text-xs text-gray-600">Verdict</div>
-                          <div className={`font-medium text-sm ${
-                            compilationStats.verdict === 'AC' ? 'text-green-600' :
-                            compilationStats.verdict === 'WA' ? 'text-red-600' :
-                            compilationStats.verdict === 'TLE' ? 'text-orange-600' :
-                            compilationStats.verdict === 'MLE' ? 'text-purple-600' :
-                            compilationStats.verdict === 'CE' ? 'text-yellow-600' :
-                            compilationStats.verdict === 'RE' ? 'text-pink-600' :
-                            'text-gray-700'
-                          }`}>
-                            {compilationStats.verdict || 'N/A'}
-                          </div>
-                        </div>
-                        
-                        {/* Time */}
-                        {compilationStats.time > 0 && (
-                          <div className="bg-white p-2 rounded border">
-                            <div className="text-xs text-gray-600">Time</div>
-                            <div className="font-medium text-sm text-gray-900">
-                              {compilationStats.time} ms
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Memory */}
-                        {compilationStats.memory > 0 && (
-                          <div className="bg-white p-2 rounded border">
-                            <div className="text-xs text-gray-600">Memory</div>
-                            <div className="font-medium text-sm text-gray-900">
-                              {compilationStats.memory > 1024 
-                                ? `${(compilationStats.memory / 1024).toFixed(2)} MB` 
-                                : `${compilationStats.memory} KB`}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Test Cases */}
-                        {compilationStats.passed !== undefined && (
-                          <div className="bg-white p-2 rounded border">
-                            <div className="text-xs text-gray-600">Test Cases</div>
-                            <div className="font-medium text-sm text-gray-900">
-                              {compilationStats.passed}/{compilationStats.total}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Failed Test Case Info */}
-                      {compilationStats.failedTestCase && (
-                        <div className="mt-2 text-sm">
-                          <span className="text-gray-600">Failed on test case:</span>
-                          <span className="font-medium ml-2">#{compilationStats.failedTestCase}</span>
-                        </div>
-                      )}
-                      
-                      {/* Output (for run) */}
-              {compilationStats.output && compilationStats.type === 'run' && (
-                <div className="mt-3 space-y-2">
-                  <div className="text-xs text-gray-600 mb-1">Output:</div>
-                  <pre className="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto font-mono">
-                    {compilationStats.output}
-                  </pre>
-                  
-                  {/* Show expected output if available and mismatch */}
-                  {compilationStats.expectedOutput && 
-                  compilationStats.output?.trim() !== compilationStats.expectedOutput.trim() && (
-                    <>
-                      <div className="text-xs text-gray-600 mb-1">Expected Output:</div>
-                      <pre className="bg-gray-700 text-gray-100 p-3 rounded text-xs overflow-x-auto font-mono border-l-4 border-yellow-500">
-                        {compilationStats.expectedOutput}
-                      </pre>
-                    </>
-                  )}
-                </div>
-              )}
-                      
-                      {/* Submission ID */}
-                      {compilationStats.submissionId && (
-                        <div className="mt-2 text-sm">
-                          <span className="text-gray-600">Submission ID:</span>
-                          <span className="font-medium ml-2">{compilationStats.submissionId}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
-            
           </div>
         </div>
       </div>

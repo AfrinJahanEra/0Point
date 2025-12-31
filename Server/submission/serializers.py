@@ -1,16 +1,9 @@
 # submission/serializers.py
 from rest_framework import serializers
 from .models import Submission
-from contest.models import Contest, ContestRegistration
 from contest.utils.auth import get_user_from_request
 from datetime import datetime, timedelta
-
-# submission/serializers.py
-from rest_framework import serializers
-from datetime import datetime, timedelta
 from contest.models import Contest, ContestRegistration
-from contest.utils.auth import get_user_from_request
-import pytz
 
 class SubmissionCreateSerializer(serializers.Serializer):
     """Serializer for creating a new submission"""
@@ -60,35 +53,18 @@ class SubmissionCreateSerializer(serializers.Serializer):
         if not problem_exists:
             raise serializers.ValidationError("Problem not found in contest")
         
-        # FIXED: Check contest timing with proper timezone handling
-        # Alternative: Convert all times to UTC for comparison
+        # FIXED: Check contest timing with Asia/Dhaka timezone
         if contest.start_time and contest.duration:
-            # Get current time in UTC
-            current_time_utc = datetime.now(pytz.UTC)
-            
-            # Ensure start_time is in UTC
-            if contest.start_time.tzinfo is None:
-                # If naive, assume it's Asia/Dhaka and convert to UTC
-                dhaka_tz = pytz.timezone('Asia/Dhaka')
-                start_time_dhaka = dhaka_tz.localize(contest.start_time)
-                start_time_utc = start_time_dhaka.astimezone(pytz.UTC)
-            else:
-                # Already has timezone, convert to UTC
-                start_time_utc = contest.start_time.astimezone(pytz.UTC)
-            
-            # Calculate end time in UTC
+            current_time_dhaka = datetime.now()
+            start_time_dhaka = contest.start_time
             duration_minutes = contest.duration * 60
-            end_time_utc = start_time_utc + timedelta(minutes=duration_minutes)
+            end_time_dhaka = start_time_dhaka + timedelta(minutes=duration_minutes)
+        
             
-            # Debug logging
-            print(f"DEBUG TIMING CHECK (UTC):")
-            print(f"  Current time (UTC): {current_time_utc}")
-            print(f"  Contest start time (UTC): {start_time_utc}")
-            print(f"  Contest end time (UTC): {end_time_utc}")
-            
-            if current_time_utc < start_time_utc:
+            if current_time_dhaka < start_time_dhaka:
                 raise serializers.ValidationError("Contest has not started yet")
-            if current_time_utc > end_time_utc:
+            
+            if current_time_dhaka > end_time_dhaka:
                 raise serializers.ValidationError("Contest has ended")
         
         data['user'] = user
@@ -97,7 +73,6 @@ class SubmissionCreateSerializer(serializers.Serializer):
         return data
 
 class SubmissionSerializer(serializers.Serializer):
-    """Serializer for submission responses"""
     
     id = serializers.CharField()
     contest_id = serializers.CharField()
@@ -134,17 +109,18 @@ class SubmissionSerializer(serializers.Serializer):
         if obj['user'] == str(user.id):
             return True
         
-        # Check if contest has ended
         try:
             contest = Contest.objects.get(id=obj['contest_id'])
             
             if contest.status == "past":
                 return True
             
-            # For live contests, only show verdict unless contest ended
             if contest.start_time and contest.duration:
-                end_time = contest.start_time + timedelta(minutes=contest.duration * 60)
-                if datetime.utcnow() > end_time:
+                current_time_dhaka = datetime.now()
+                start_time_dhaka = contest.start_time
+                end_time_dhaka = start_time_dhaka + timedelta(minutes=contest.duration * 60)
+                
+                if current_time_dhaka > end_time_dhaka:
                     return True
                     
         except Contest.DoesNotExist:
@@ -161,3 +137,6 @@ class SubmissionSerializer(serializers.Serializer):
             return False
         
         return obj['user'] == str(user.id)
+    
+
+    

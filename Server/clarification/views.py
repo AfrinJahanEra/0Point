@@ -244,7 +244,6 @@ class ClarificationListCreateAPIView(APIView):
         """Check if any organizer is online (simplified - always true for now)"""
         return True
 
-
 class ClarificationDetailAPIView(APIView):
     """Retrieve, update, or delete a clarification"""
     
@@ -377,7 +376,6 @@ class ClarificationDetailAPIView(APIView):
         # Organizers can always edit
         return clarification.is_user_organizer_or_admin(user)
 
-
 class ClarificationStatusUpdateAPIView(APIView):
     """Update clarification status (organizers only)"""
     
@@ -474,7 +472,6 @@ class ClarificationStatusUpdateAPIView(APIView):
         print(f"DEBUG: Clarification {clarification.id} status changed from {old_status} to {new_status}")
         if new_status == 'rejected' and reason:
             print(f"DEBUG: Rejection reason: {reason}")
-
 
 class ClarificationReplyAPIView(APIView):
     """Add replies to clarifications (organizers only)"""
@@ -606,7 +603,6 @@ class ClarificationReplyAPIView(APIView):
             "reply": reply.to_dict()
         })
 
-
 class ClarificationWatchAPIView(APIView):
     """Watch/unwatch a clarification for updates"""
     
@@ -664,7 +660,6 @@ class ClarificationWatchAPIView(APIView):
             "watching": watching,
             "watchers_count": len(clarification.participants_watching)
         })
-
 
 # clarification/views.py - FIXED ClarificationVoteAPIView
 class ClarificationVoteAPIView(APIView):
@@ -760,7 +755,6 @@ class MyClarificationsAPIView(APIView):
                 "rejected": user_clarifications.filter(status='rejected').count()
             }
         })
-
 
 class OrganizerClarificationsAPIView(APIView):
     """Get clarifications that need organizer attention"""

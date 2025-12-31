@@ -72,7 +72,7 @@ const CreateBlog = () => {
 
   const togglePreview = () => setShowPreview(!showPreview);
 
-  const customComponents = {
+const customComponents = {
   spoiler: ({ summary, children }) => (
     <details className="my-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
       <summary className="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900 list-none">
@@ -109,29 +109,82 @@ const CreateBlog = () => {
     </h3>
   ),
   ol: ({ depth, ...props }) => {
-  const isTopLevel = depth === 0;
-  return (
-    <ol
-      className={`
-        my-5 space-y-3
-        ${isTopLevel
-          ? 'list-decimal ml-9 text-lg marker:font-bold marker:text-blue-800'
-          : 'list-decimal ml-8 text-base marker:font-medium marker:text-blue-600'
-        }
-      `}
+    const isTopLevel = depth === 0;
+    return (
+      <ol
+        className={`
+          my-5 space-y-3
+          ${isTopLevel
+            ? 'list-decimal ml-9 text-lg marker:font-bold marker:text-blue-800'
+            : 'list-decimal ml-8 text-base marker:font-medium marker:text-blue-600'
+          }
+        `}
+        {...props}
+      />
+    );
+  },
+  
+  // Unordered list component for -, *, + bullets
+  ul: ({ depth, ...props }) => {
+    const isTopLevel = depth === 0;
+    return (
+      <ul
+        className={`
+          my-5 space-y-3
+          ${isTopLevel
+            ? 'list-disc ml-9 text-lg marker:text-blue-600'
+            : 'list-disc ml-8 text-base marker:text-blue-500'
+          }
+        `}
+        {...props}
+      />
+    );
+  },
+  
+  li: ({ ordered, children, ...props }) => (
+    <li
+      className="leading-relaxed text-gray-800 pl-2 hover:text-gray-900 transition-colors"
       {...props}
-    />
-  );
-},
-
-li: ({ ordered, children, ...props }) => (
-  <li
-    className="leading-relaxed text-gray-800 pl-2 hover:text-gray-900 transition-colors"
-    {...props}
-  >
-    <span className="drop-cap:inline">{children}</span>
-  </li>
-),
+    >
+      <span className="drop-cap:inline">{children}</span>
+    </li>
+  ),
+  
+  // Blockquote component for > syntax (simple grey style)
+  blockquote: ({ children }) => (
+    <blockquote className="my-6 pl-5 border-l-4 border-gray-400 bg-gray-100 py-3 pr-4 rounded-r">
+      <div className="text-gray-800">
+        {children}
+      </div>
+    </blockquote>
+  ),
+  
+  // Image component supporting base64 and regular URLs
+  img: ({ src, alt, ...props }) => {
+    // Check if it's a base64 image
+    const isBase64 = src && (src.startsWith('data:image/') || src.startsWith('base64,'));
+    
+    return (
+      <div className="my-6 flex flex-col items-center">
+        <img
+          src={src}
+          alt={alt || 'Image'}
+          className="max-w-full h-auto rounded-lg shadow-md border border-gray-300"
+          {...props}
+        />
+        {alt && (
+          <p className="mt-2 text-sm text-gray-600 text-center italic">
+            {alt}
+          </p>
+        )}
+        {isBase64 && (
+          <p className="mt-1 text-xs text-gray-500 text-center">
+            (Base64 Image)
+          </p>
+        )}
+      </div>
+    );
+  },
 };
 
   return (

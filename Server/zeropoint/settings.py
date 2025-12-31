@@ -41,6 +41,14 @@ INSTALLED_APPS = [
     'videoconference',
     'pdf',
     'ide',
+    'corsheaders',
+    'channels',
+    # 'daphne',
+    'compiler',
+    'virtual',
+    'discussion',
+    'clarification',
+    'testcontest',
 ]
 JD_CLIENT_ID = os.getenv('JD_CLIENT_ID')
 JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET')
@@ -151,9 +159,11 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+
+TIME_ZONE = 'Asia/Dhaka'   # ✅ CHANGE THIS
+USE_TZ = False             # ✅ CHANGE THIS
+
 USE_I18N = True
-USE_TZ = True
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST')
@@ -164,3 +174,5 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
 
 FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173')
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
