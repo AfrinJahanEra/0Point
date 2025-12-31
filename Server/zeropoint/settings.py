@@ -36,6 +36,9 @@ INSTALLED_APPS = [
     # 'daphne',
     'compiler',
     'virtual',
+    'discussion',
+    'clarification',
+    'testcontest',
 ]
 
 MIDDLEWARE = [
