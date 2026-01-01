@@ -1017,4 +1017,273 @@ class TestContestSubmissionDetailAPIView(APIView):
         
         return Response(sub_data)
     
+# testcontest/leaderboard_views.py
+from datetime import datetime, timedelta
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from mongoengine.queryset.visitor import Q
+
+from contest.utils.auth import get_user_from_request
+from .models import TestContest, TestContestSubmission
+from .views import get_test_contest_status
+
+class TestContestLeaderboardAPIView(APIView):
+    """
+    GET /test-contests/<test_contest_id>/standings/
+    """
+    
+    def get(self, request, test_contest_id):
+        print(f"\n🔍 DEBUG: Leaderboard access check")
+        
+        try:
+            test_contest = TestContest.objects.get(id=test_contest_id)
+        except TestContest.DoesNotExist:
+            print(f"❌ Test contest not found: {test_contest_id}")
+            return Response({"error": "Test contest not found"}, status=404)
+        
+        # Get current user
+        current_user = get_user_from_request(request)
+        
+        if not current_user:
+            print("❌ No authenticated user")
+            return Response({"error": "Authentication required"}, status=401)
+        
+        print(f"✅ Authenticated user:")
+        print(f"   User ID: {current_user.id}")
+        print(f"   User Email: {current_user.email}")
+        
+        print(f"\n📋 Test Contest Details:")
+        print(f"   Contest ID: {test_contest.id}")
+        print(f"   Contest Title: {test_contest.title}")
+        print(f"   Created By ID: {test_contest.created_by.id}")
+        print(f"   Created By Email: {test_contest.created_by.email}")
+        print(f"   Testers: {test_contest.testers}")
+        
+        # Check access
+        can_access = False
+        
+        # Check if user is creator
+        creator_id_str = str(test_contest.created_by.id)
+        user_id_str = str(current_user.id)
+        
+        print(f"\n🔬 ID Comparison:")
+        print(f"   Creator ID (from DB): {creator_id_str}")
+        print(f"   User ID (from token): {user_id_str}")
+        print(f"   IDs equal? {creator_id_str == user_id_str}")
+        print(f"   Type of creator ID: {type(test_contest.created_by.id)}")
+        print(f"   Type of user ID: {type(current_user.id)}")
+        
+        if creator_id_str == user_id_str:
+            can_access = True
+            print("   ✅ Creator access granted!")
+        else:
+            print("   ❌ User is NOT the creator (ID mismatch)")
+        
+        # Check if user is tester
+        user_email = current_user.email
+        is_tester = user_email in test_contest.testers
+        
+        print(f"\n📧 Email Check:")
+        print(f"   User Email: {user_email}")
+        print(f"   In testers list? {is_tester}")
+        print(f"   Testers list: {test_contest.testers}")
+        
+        if is_tester:
+            can_access = True
+            print("   ✅ Tester access granted!")
+        
+        print(f"\n🎯 Final Access Decision: {can_access}")
+        
+        if not can_access:
+            print("❌ ACCESS DENIED")
+            return Response({
+                "error": "Access denied",
+                "message": "You are not authorized to view this test contest leaderboard",
+                "debug": {
+                    "user_id": user_id_str,
+                    "user_email": user_email,
+                    "contest_creator_id": creator_id_str,
+                    "contest_creator_email": test_contest.created_by.email,
+                    "id_match": creator_id_str == user_id_str,
+                    "is_tester": is_tester,
+                    "testers_list": test_contest.testers
+                }
+            }, status=403)
+        
+        print("✅ ACCESS GRANTED - Continuing with leaderboard logic...")
+        
+        # Rest of your leaderboard code...
+        
+        contest_status = get_test_contest_status(test_contest)
+        
+        # ====== Test contest timing ======
+        if test_contest.test_start_time and test_contest.duration:
+            start_time_dhaka = test_contest.test_start_time
+            contest_end_time = start_time_dhaka + timedelta(minutes=test_contest.duration * 60)
+        else:
+            start_time_dhaka = None
+            contest_end_time = None
+        
+        # ====== Filter submissions within test contest duration ======
+        if start_time_dhaka and contest_end_time:
+            valid_submissions = TestContestSubmission.objects(
+                test_contest=test_contest,
+                submitted_at__gte=start_time_dhaka,
+                submitted_at__lte=contest_end_time
+            ).order_by("submitted_at")
+        else:
+            valid_submissions = TestContestSubmission.objects(test_contest=test_contest).order_by("submitted_at")
+        
+        # ====== Group submissions by user ======
+        user_submissions = {}
+        for submission in valid_submissions:
+            user_id = str(submission.user.id)
+            if user_id not in user_submissions:
+                user_submissions[user_id] = {
+                    "user": submission.user,
+                    "submissions": []
+                }
+            user_submissions[user_id]["submissions"].append(submission)
+        
+        # ====== Get test contest problems ======
+        actual_problems = sorted([p.index for p in test_contest.problems])
+        problem_points = {p.index: getattr(p, "points", 100) for p in test_contest.problems}
+        
+        results = []
+        
+        for user_id, data in user_submissions.items():
+            user = data["user"]
+            problem_results = {}
+            total_score = 0
+            total_penalty = 0
+            problems_solved = 0
+            
+            # Group submissions by problem
+            problem_submissions = {}
+            for sub in data["submissions"]:
+                idx = sub.problem_index
+                if idx not in problem_submissions:
+                    problem_submissions[idx] = []
+                problem_submissions[idx].append(sub)
+            
+            for problem_index, subs_list in problem_submissions.items():
+                # Sort submissions by time
+                subs_list.sort(key=lambda x: x.submitted_at)
+                
+                accepted = False
+                tries = 0
+                penalty = 0
+                solved_time = 0
+                points_earned = 0
+                
+                for sub in subs_list:
+                    tries += 1
+                    if sub.verdict == "AC":
+                        accepted = True
+                        if start_time_dhaka:
+                            # Use test contest time if available, otherwise calculate from submitted_at
+                            if sub.test_contest_time > 0:
+                                solved_time = sub.test_contest_time
+                            else:
+                                solved_time = (sub.submitted_at - start_time_dhaka).total_seconds() / 60
+                        
+                        points_earned = problem_points.get(problem_index, 100)
+                        if tries > 1:
+                            penalty += (tries - 1) * 20  # 20 minutes penalty per wrong submission
+                        break
+                
+                time_penalty = solved_time + penalty
+                
+                problem_results[problem_index] = {
+                    "tries": tries,
+                    "time": solved_time,
+                    "penalty": penalty,
+                    "verdict": "ACCEPTED" if accepted else "WRONG_ANSWER",
+                    "points": points_earned,
+                    "max_points": problem_points.get(problem_index, 100),
+                    "accepted": accepted,
+                    "has_submissions": tries > 0,
+                    "submissions": [str(s.id) for s in subs_list]  # CONVERT TO STRING
+                }
+                
+                if accepted:
+                    total_score += points_earned
+                    total_penalty += time_penalty
+                    problems_solved += 1
+            
+            is_current_user = str(current_user.id) == user_id if current_user else False
+            user_rating = getattr(user, "rating", 1500)
+            
+            # Prepare submissions display for frontend
+            submissions_display = []
+            for problem in actual_problems:
+                pdata = problem_results.get(problem, {})
+                status = "NA"
+                points = 0
+                tries = 0
+                
+                if pdata:
+                    tries = pdata.get("tries", 0)
+                    if pdata.get("accepted"):
+                        status = "AC"
+                        points = pdata.get("points", 0)
+                    elif tries > 0:
+                        status = "WA"
+                
+                submissions_display.append({
+                    "problem": problem,
+                    "status": status,
+                    "points": points,
+                    "tries": tries
+                })
+            
+            results.append({
+                "rank": 0,  # Will be assigned after sorting
+                "username": getattr(user, "username", getattr(user, "name", "Anonymous")),
+                "name": getattr(user, "name", "Anonymous"),
+                "country": getattr(user, "country", "Unknown"),
+                "institution": getattr(user, "institution", "Unknown"),
+                "score": total_score,
+                "points": total_score,  # For compatibility with frontend
+                "problemsSolved": problems_solved,
+                "penalty": int(total_penalty),  # Ensure it's an integer
+                "rating": user_rating,
+                "ratingChange": 0,  # Test contests don't affect rating
+                "isCurrentUser": is_current_user,
+                "submissions": submissions_display,
+                "problemResults": problem_results  # For debugging
+            })
+        
+        # ====== Sort and assign ranks ======
+        results.sort(key=lambda x: (-x["score"], x["penalty"]))
+        
+        last_score = last_penalty = None
+        current_rank = 0
+        for i, participant in enumerate(results):
+            if participant["score"] != last_score or participant["penalty"] != last_penalty:
+                current_rank = i + 1
+                last_score = participant["score"]
+                last_penalty = participant["penalty"]
+            participant["rank"] = current_rank
+        
+        # ====== Prepare response ======
+        response_data = {
+            "leaderboard": results,
+            "contest_status": contest_status,
+            "total_participants": len(results),
+            "problems": actual_problems,
+            "contest_info": {
+                "id": str(test_contest.id),
+                "title": test_contest.title,
+                "start_time": start_time_dhaka.isoformat() if start_time_dhaka else None,
+                "end_time": contest_end_time.isoformat() if contest_end_time else None,
+                "duration": test_contest.duration,
+                "is_test_contest": True
+            }
+        }
+        
+        return Response(response_data)
+    
+        
     
