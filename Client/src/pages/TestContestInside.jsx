@@ -447,7 +447,7 @@ const TestContestInside = () => {
             <div className="flex-1 mb-6 lg:mb-0">
               <div className="flex items-center gap-3 mb-4">
                 <h1 className="text-3xl font-bold">{contestData.title}</h1>
-                <span className="px-3 py-1 bg-purple-800 text-purple-100 rounded-full text-sm font-medium">
+                <span className="px-3 py-1 bg-purple-800 text-purple-100 rounded-full text-xs font-medium">
                   TEST VERSION
                 </span>
               </div>
@@ -510,14 +510,14 @@ const TestContestInside = () => {
                   { 
                     id: 'submissions', 
                     icon: <History className="w-5 h-5" />, 
-                    label: 'My Submissions',
+                    label: 'Submissions',
                     onClick: () => console.log('Navigate to test contest submissions') // TODO: Implement
                   },
                   { 
                     id: 'leaderboard', 
                     icon: <Trophy className="w-5 h-5" />, 
                     label: 'Standings',
-                    onClick: () => console.log('Navigate to test contest standings') // TODO: Implement
+                    onClick: () => navigate(`/test-contests/${testContestId}/standings`)
                   },
                   { 
                     id: 'clarifications', 
@@ -525,13 +525,13 @@ const TestContestInside = () => {
                     label: 'Test Clarifications',
                     onClick: () => console.log('Navigate to test contest clarifications'), // TODO: Implement
                     show: contestData.status === 'live'
-                  },
-                  { 
-                    id: 'editorial', 
-                    icon: <BookOpen className="w-5 h-5" />, 
-                    label: 'Editorial',
-                    onClick: () => console.log('Navigate to test contest editorial'), // TODO: Implement
-                    show: contestData.status === 'past'
+                  // },
+                  // { 
+                  //   id: 'editorial', 
+                  //   icon: <BookOpen className="w-5 h-5" />, 
+                  //   label: 'Editorial',
+                  //   onClick: () => console.log('Navigate to test contest editorial'), // TODO: Implement
+                  //   show: contestData.status === 'past'
                   }
                 ].map((item) => {
                   if ((item.id === 'editorial' || item.id === 'discussions') && contestData.status !== 'past') {
@@ -813,7 +813,7 @@ const TestContestInside = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h3 className="font-semibold text-blue-800 mb-2">About This Test Contest</h3>
-                    <ul className="text-sm text-blue-700 space-y-2">
+                    <ul className="text-xs text-blue-700 space-y-2">
                       <li className="flex items-start gap-2">
                         <span>This is a test version of the original contest</span>
                       </li>
@@ -827,7 +827,7 @@ const TestContestInside = () => {
                   </div>
                   <div className="bg-purple-50 p-4 rounded-lg">
                     <h3 className="font-semibold text-purple-800 mb-2">Your Role</h3>
-                    <ul className="text-sm text-purple-700 space-y-2">
+                    <ul className="text-xs text-purple-700 space-y-2">
                       <li className="flex items-start gap-2">
                         <span className="font-medium">Status:</span>
                         <span>{contestData.access?.is_registered ? 'Registered Tester' : 'Invited Tester'}</span>
