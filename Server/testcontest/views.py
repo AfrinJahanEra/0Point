@@ -951,6 +951,9 @@ class TestContestSubmissionsAPIView(APIView):
         for submission in submissions:
             sub_data = submission.to_dict()
             sub_data['can_view_code'] = sub_data['user_id'] == str(user.id)
+            sub_data['is_current_user'] = sub_data['user_id'] == str(user.id)
+            sub_data['user_rating'] = getattr(submission.user, 'rating', 1500)
+            sub_data['user_name'] = getattr(submission.user, 'name', 'Anonymous')
             submissions_data.append(sub_data)
         
         # Get available problems for filtering
@@ -962,9 +965,17 @@ class TestContestSubmissionsAPIView(APIView):
                 'value': p.index
             })
         
+        # Get contest status
+        contest_status_value = get_test_contest_status(test_contest)
+        contest_ended = contest_status_value == 'past'
+        
         return Response({
             'submissions': submissions_data,
             'total': TestContestSubmission.objects(query).count(),
+            'current_user_id': str(user.id),
+            'current_user_name': user.name or "You",  # FIXED: use name, not username
+            'contest_ended': contest_ended,  # ADD THIS
+            'contest_status': contest_status_value,  # ADD THIS
             'filters': {
                 'problems': problems_list,
                 'verdicts': [
@@ -981,7 +992,7 @@ class TestContestSubmissionsAPIView(APIView):
             },
             'test_contest_id': str(test_contest.id),
             'test_contest_title': test_contest.title,
-            'test_contest_status': get_test_contest_status(test_contest)
+            'test_contest_status': contest_status_value
         })
 
 class TestContestSubmissionDetailAPIView(APIView):
@@ -1049,16 +1060,6 @@ class TestContestLeaderboardAPIView(APIView):
             print("❌ No authenticated user")
             return Response({"error": "Authentication required"}, status=401)
         
-        print(f"✅ Authenticated user:")
-        print(f"   User ID: {current_user.id}")
-        print(f"   User Email: {current_user.email}")
-        
-        print(f"\n📋 Test Contest Details:")
-        print(f"   Contest ID: {test_contest.id}")
-        print(f"   Contest Title: {test_contest.title}")
-        print(f"   Created By ID: {test_contest.created_by.id}")
-        print(f"   Created By Email: {test_contest.created_by.email}")
-        print(f"   Testers: {test_contest.testers}")
         
         # Check access
         can_access = False
@@ -1066,13 +1067,6 @@ class TestContestLeaderboardAPIView(APIView):
         # Check if user is creator
         creator_id_str = str(test_contest.created_by.id)
         user_id_str = str(current_user.id)
-        
-        print(f"\n🔬 ID Comparison:")
-        print(f"   Creator ID (from DB): {creator_id_str}")
-        print(f"   User ID (from token): {user_id_str}")
-        print(f"   IDs equal? {creator_id_str == user_id_str}")
-        print(f"   Type of creator ID: {type(test_contest.created_by.id)}")
-        print(f"   Type of user ID: {type(current_user.id)}")
         
         if creator_id_str == user_id_str:
             can_access = True
@@ -1083,11 +1077,6 @@ class TestContestLeaderboardAPIView(APIView):
         # Check if user is tester
         user_email = current_user.email
         is_tester = user_email in test_contest.testers
-        
-        print(f"\n📧 Email Check:")
-        print(f"   User Email: {user_email}")
-        print(f"   In testers list? {is_tester}")
-        print(f"   Testers list: {test_contest.testers}")
         
         if is_tester:
             can_access = True
@@ -1111,7 +1100,6 @@ class TestContestLeaderboardAPIView(APIView):
                 }
             }, status=403)
         
-        print("✅ ACCESS GRANTED - Continuing with leaderboard logic...")
         
         # Rest of your leaderboard code...
         
