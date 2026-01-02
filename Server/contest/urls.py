@@ -80,7 +80,7 @@ from testcontest.views import (
     TestContestProblemExecuteAPIView,
     TestContestSubmissionsAPIView,
     TestContestSubmissionDetailAPIView,
-    
+    TestContestLeaderboardAPIView,
 )
 
 urlpatterns = [
@@ -172,4 +172,6 @@ urlpatterns = [
     path('test-contests/<str:test_contest_id>/problems/<str:problem_index>/execute/', TestContestProblemExecuteAPIView.as_view(), name='test-contest-problem-execute'),
     path('test-contests/<str:test_contest_id>/submissions/', TestContestSubmissionsAPIView.as_view(), name='test-contest-submissions'),
     path('test-contests/<str:test_contest_id>/submissions/<str:submission_id>/', TestContestSubmissionDetailAPIView.as_view(), name='test-contest-submission-detail'),
+
+    path('test-contests/<str:test_contest_id>/standings/', TestContestLeaderboardAPIView.as_view(), name='test-contest-standings'),
 ]
