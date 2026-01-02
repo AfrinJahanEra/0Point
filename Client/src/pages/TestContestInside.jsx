@@ -391,10 +391,6 @@ const TestContestInside = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <TestTube className="w-12 h-12 text-purple-600" />
-            <Shield className="w-12 h-12 text-red-500" />
-          </div>
           <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">Test Contest Access Error</h3>
           <p className="text-gray-600 mb-6 text-center">{error}</p>
           <div className="space-y-3">
