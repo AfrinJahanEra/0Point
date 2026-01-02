@@ -157,8 +157,7 @@ const TestContestProblemDetail = () => {
       
       try {
         const problemIdentifier = problemData?.problem_index || problemIndex;
-        // Note: You might need to create a separate stats endpoint for test contests
-        // For now, we'll use original contest stats or show placeholder
+
         console.log('Test contest stats not yet implemented');
         setProblemStats({
           problem: {
@@ -812,7 +811,7 @@ const handleSubmit = async () => {
                     'bg-gray-100 text-gray-800'
                   }`}>
                     {displayContestData?.status?.charAt(0).toUpperCase() + displayContestData?.status?.slice(1)}
-                    {displayContestData?.is_test_contest && ' (Test)'}
+                    {displayContestData?.is_test_contest}
                   </span>
                 </div>
               </div>
@@ -886,14 +885,14 @@ const handleSubmit = async () => {
             {/* Test Contest Navigation */}
             <div className="space-y-1">
               <button
-                onClick={() => console.log('Navigate to test contest submissions')}
+                onClick={() => navigate(`/test-contests/${testContestId}/submissions`)}
                 className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
               >
                 <Code2 className="w-4 h-4" />
                 <span className="text-xs font-semibold text-gray-900">Submissions</span>
               </button>
               
-              {displayContestData.status === 'past' && (
+              {/* {displayContestData.status === 'past' && (
                 <button
                   onClick={() => console.log('Navigate to test contest discussions')}
                   className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
@@ -901,7 +900,7 @@ const handleSubmit = async () => {
                   <MessageSquare className="w-4 h-4" />
                   <span className="text-xs font-semibold text-gray-900">Discussions</span>
                 </button>
-              )}
+              )} */}
               {displayContestData.status === 'live' && (
                 <button
                   onClick={() => console.log('Navigate to test contest clarifications')}
@@ -913,13 +912,13 @@ const handleSubmit = async () => {
               )}
               
               <button
-                onClick={() => console.log('Navigate to test contest standings')}
+                onClick={() => navigate(`/test-contests/${testContestId}/standings`)}
                 className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
               >
                 <Trophy className="w-4 h-4" />
                 <span className="text-xs font-semibold text-gray-900">Standings</span>
               </button>
-              {displayContestData.status === 'past' && (
+              {/* {displayContestData.status === 'past' && (
                 <button
                   onClick={() => console.log('Navigate to test contest editorial')}
                   className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
@@ -927,7 +926,7 @@ const handleSubmit = async () => {
                   <BookOpen className="w-4 h-4" />
                   <span className="text-xs font-semibold text-gray-900">Editorial</span>
                 </button>
-              )}
+              )} */}
             </div>
 
             {/* Test Problem Stats */}
