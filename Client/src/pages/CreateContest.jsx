@@ -572,7 +572,7 @@ const formattedProblems = problems.map((problem) => ({
   };
 
 const handlePublishContest = async (type) => {
-  // ✅ DECLARE THESE VARIABLES AT THE TOP
+  
   let payload;
   let url;
   let method;
@@ -635,7 +635,7 @@ const handlePublishContest = async (type) => {
 
       alert(`Contest published as test successfully!`);
       navigate("/contests");
-      return; // ✅ IMPORTANT: Exit the function here
+      return; // Exit the function here
     } catch (err) {
       console.error("Request failed:", err);
       alert("Could not reach server.");
@@ -643,7 +643,7 @@ const handlePublishContest = async (type) => {
     }
   }
 
-  // ✅ Only execute this code for REGULAR (non-test) contests
+
   try {
     // Format problems (common for both edit and create modes)
     const formattedProblems = problems.map((problem) => ({
@@ -679,7 +679,7 @@ const handlePublishContest = async (type) => {
         editorial_published: publishSettings.editorialPublished
       };
       
-      // Add test contest data if applicable (this is OLD way - keep for backward compatibility)
+     
       if (type === "test") {
         payload.convert_to_test = true;
         payload.testers = publishSettings.testers.map(t => t.email);
