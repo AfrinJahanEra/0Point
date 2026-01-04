@@ -521,7 +521,7 @@ class TestContestSubmissionCreateAPIView(APIView):
                     jdoodle_output = res_data.get("output", "").strip()
                     cpu_time_str = res_data.get("cpuTime")
                     if cpu_time_str is None:
-                        cpu_time_seconds = 0.0
+                        cpu_time_seconds = 0.1
                     else:
                         cpu_time_seconds = float(cpu_time_str)
                     cpu_time_ms = int(cpu_time_seconds * 1000)
@@ -770,12 +770,6 @@ class TestContestProblemExecuteAPIView(APIView):
         if user.email not in test_contest.testers and str(test_contest.created_by.id) != str(user.id):
             return Response({"error": "Access denied to test contest"}, status=403)
         
-        # # Check if user is registered
-        # registration = TestContestRegistration.objects.filter(
-        #     user=user, contest=test_contest
-        # ).first()
-        # if not registration:
-        #     return Response({"error": "You are not registered for this test contest"}, status=403)
         
         # Check test contest status
         current_status = get_test_contest_status(test_contest)

@@ -100,14 +100,7 @@ class TestContestSubmissionCreateSerializer(serializers.Serializer):
         
         if current_status not in ["live"]:
             raise serializers.ValidationError(f"Test contest is not live (current status: {current_status})")
-        
-        # Check if user is registered
-        # registration = TestContestRegistration.objects.filter(
-        #     user=user, contest=test_contest
-        # ).first()
-        # if not registration:
-        #     raise serializers.ValidationError("You are not registered for this test contest")
-        
+
         # Check if problem exists
         problem_exists = False
         for problem in test_contest.problems:
@@ -138,7 +131,6 @@ class TestContestSubmissionCreateSerializer(serializers.Serializer):
         data['test_contest'] = test_contest
         
         return data
-
 
 class TestContestSubmissionSerializer(serializers.Serializer):
     """Serializer for test contest submission responses"""
