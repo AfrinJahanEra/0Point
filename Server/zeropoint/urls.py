@@ -19,6 +19,7 @@ urlpatterns = [
     path('videoconference/', include('videoconference.urls')),
     path('api/pdf/', include('pdf.urls')),
     path('api/ide/', include('ide.urls')),
+    path("", include("crossPlatform.urls")),
 ]
 
 # Serve media files during development
@@ -29,4 +30,5 @@ if settings.DEBUG:
         re_path(r'^media/(?P<path>.*)$', serve, {
             'document_root': settings.MEDIA_ROOT,
         }),
+
     ]
