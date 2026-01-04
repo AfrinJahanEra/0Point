@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'discussion',
     'clarification',
     'testcontest',
+    'crossPlatform',
 ]
 JD_CLIENT_ID = os.getenv('JD_CLIENT_ID')
 JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET')
@@ -175,4 +176,5 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
 
 FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 
