@@ -18,6 +18,21 @@ from account.models import Account
 from contest.views import get_contest_status as get_regular_contest_status
 from contest.broadcast import broadcast_contest_update, broadcast_global_update
 
+# JDoodle credentials (add these near the top of your views.py after other imports)
+JD_CLIENT_ID = "6c83bb2cd0b9e9a790f59a2484011318"
+JD_CLIENT_SECRET = "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4"
+JD_URL = "https://api.jdoodle.com/v1/execute"
+
+# Map for language -> recommended versionIndex
+LANGUAGE_VERSION_MAP = {
+    "python": "3",
+    "python3": "3",
+    "java": "4",
+    "c": "5",
+    "cpp": "5",
+    "javascript": "4"
+}
+
 def get_test_contest_status(test_contest):
     """Calculate test contest status based on test_start_time"""
     dhaka_tz = pytz.timezone('Asia/Dhaka')
@@ -770,7 +785,6 @@ class TestContestProblemExecuteAPIView(APIView):
         if user.email not in test_contest.testers and str(test_contest.created_by.id) != str(user.id):
             return Response({"error": "Access denied to test contest"}, status=403)
         
-        
         # Check test contest status
         current_status = get_test_contest_status(test_contest)
         if current_status != "live":
@@ -795,108 +809,196 @@ class TestContestProblemExecuteAPIView(APIView):
         if not code or not language:
             return Response({"error": "Missing code or language"}, status=400)
         
-        # Forward to regular contest problem execute endpoint
-        original_contest = test_contest.original_contest
+        # DIRECT EXECUTION LOGIC (copied from compiler/views.py)
+        language_lower = language.lower()
+        version_index = LANGUAGE_VERSION_MAP.get(language_lower, "0")
         
-        if hasattr(request, 'get_host'):
-            base_url = f"{request.scheme}://{request.get_host()}"
-        else:
-            base_url = "http://localhost:8000"
+        # Get current time
+        current_time = datetime.now()
         
-        payload = {
-            'code': code,
-            'language': language,
-            'version_index': '0'
-        }
+        # Calculate test contest time
+        test_contest_time = 0
+        if test_contest.test_start_time:
+            time_diff = current_time - test_contest.test_start_time
+            test_contest_time = time_diff.total_seconds() / 60
         
-        # Add optional fields
-        if input_data:
-            payload['input_data'] = input_data
-        if expected_output:
-            payload['expected_output'] = expected_output
-        
-        headers = {
-            'Content-Type': 'application/json',
-        }
-        
-        if 'HTTP_AUTHORIZATION' in request.META:
-            headers['Authorization'] = request.META['HTTP_AUTHORIZATION']
+        # Create test contest submission record
+        test_submission = TestContestSubmission(
+            test_contest=test_contest,
+            user=user,
+            problem_index=problem_index.upper(),
+            problem_code=problem.index,
+            problem_title=problem.title,
+            code=code[:1000],  # Store first 1000 chars
+            language=language,
+            verdict='RUNNING',
+            submitted_at=current_time,
+            test_contest_time=test_contest_time
+        )
         
         try:
-            # Call the regular contest problem execute endpoint
-            execute_url = f"{base_url}/contests/{str(original_contest.id)}/problems/{problem_index}/execute/"
-            
-            response = requests.post(
-                execute_url,
-                json=payload,
-                headers=headers,
-                timeout=30
-            )
-            
-            if response.status_code in [200, 201]:
-                result = response.json()
-                
-                # Add test contest context
-                result['is_test_contest'] = True
-                result['test_contest_id'] = test_contest_id
-                result['problem_index'] = problem_index
-                result['problem_title'] = problem.title
-                
-                # Calculate test contest time
-                current_time = datetime.now()
-                test_contest_time = 0
-                if test_contest.test_start_time:
-                    time_diff = current_time - test_contest.test_start_time
-                    test_contest_time = time_diff.total_seconds() / 60
-                
-                result['test_contest_time'] = test_contest_time
-                
-                # Optionally create a test submission record
-                if request.data.get('create_submission', False):
-                    test_submission = TestContestSubmission(
-                        test_contest=test_contest,
-                        user=user,
-                        problem_index=problem_index.upper(),
-                        problem_code=problem.index,
-                        problem_title=problem.title,
-                        code=code[:1000],  # Store first 1000 chars
-                        language=language,
-                        verdict=result.get('verdict', 'WA'),
-                        execution_time=result.get('execution_time', 0),
-                        memory=result.get('memory_used', 0),
-                        passed_test_cases=result.get('passed_test_cases', 0),
-                        total_test_cases=result.get('total_test_cases', 0),
-                        failed_test_case=result.get('failed_test_case', -1),
-                        error_message=result.get('error_message'),
-                        compile_output=result.get('compile_output'),
-                        submitted_at=current_time,
-                        test_contest_time=test_contest_time,
-                        judged_at=datetime.now()
-                    )
-                    test_submission.save()
-                    result['test_submission_id'] = str(test_submission.id)
-                
-                return Response(result)
-            else:
-                return Response({
-                    "error": f"Execution failed: {response.text}",
-                    "status_code": response.status_code,
-                    "is_test_contest": True
-                }, status=response.status_code)
-                
-        except requests.exceptions.Timeout:
-            return Response({
-                "error": "Execution timeout",
-                "is_test_contest": True
-            }, status=408)
-            
+            test_submission.save()
         except Exception as e:
-            return Response({
-                "error": f"Execution error: {str(e)}",
-                "is_test_contest": True
-            }, status=500)
-
-# Add these helper views for listing and viewing submissions
+            return Response({"error": f"Failed to create test submission: {str(e)}"}, status=500)
+        
+        # Test against problem test cases
+        all_passed = True
+        failed_test_case = None
+        actual_output = ""
+        passed_count = 0
+        total_test_cases = len(problem.test_cases)
+        error_message = None
+        compile_output = None
+        max_execution_time = 0
+        max_memory_used = 0
+        verdict = "RUNNING"
+        
+        # Test each test case (similar to ContestProblemExecuteAPIView)
+        for i, test_case in enumerate(problem.test_cases):
+            # Execute code with this test case
+            payload = {
+                "clientId": JD_CLIENT_ID,
+                "clientSecret": JD_CLIENT_SECRET,
+                "script": code,
+                "stdin": test_case.input,
+                "language": language_lower,
+                "versionIndex": version_index
+            }
+            
+            try:
+                res = requests.post(JD_URL, json=payload, timeout=15)
+                res_data = res.json()
+                
+                jdoodle_output = res_data.get("output", "").strip()
+                cpu_time_str = res_data.get("cpuTime")
+                
+                # Handle None cpuTime
+                if cpu_time_str is None:
+                    cpu_time_seconds = 0.0
+                else:
+                    cpu_time_seconds = float(cpu_time_str)
+                    
+                cpu_time_ms = int(cpu_time_seconds * 1000)
+                memory_kb = int(res_data.get("memory", 0))
+                status_code = res_data.get("statusCode", 200)
+                is_execution_success = res_data.get("isExecutionSuccess", False)
+                
+                # Update max values
+                max_execution_time = max(max_execution_time, cpu_time_ms)
+                max_memory_used = max(max_memory_used, memory_kb)
+                
+                # Check for compilation error
+                if status_code == 400 or not is_execution_success:
+                    all_passed = False
+                    compile_output = jdoodle_output
+                    verdict = "CE"
+                    break
+                
+                # For first test case, save output for display
+                if i == 0:
+                    actual_output = jdoodle_output
+                
+                # Check time limit
+                time_limit_ms = problem.time_limit_seconds * 1000
+                if cpu_time_ms > time_limit_ms:
+                    all_passed = False
+                    verdict = "TLE"
+                    error_message = f"Time limit exceeded: {cpu_time_ms}ms > {time_limit_ms}ms"
+                    break
+                
+                # Check memory limit
+                memory_limit_kb = problem.memory_limit_mb * 1024
+                if memory_kb > memory_limit_kb:
+                    all_passed = False
+                    verdict = "MLE"
+                    error_message = f"Memory limit exceeded: {memory_kb}KB > {memory_limit_kb}KB"
+                    break
+                
+                # Check if output matches expected
+                expected_test_output = test_case.output.strip()
+                if jdoodle_output == expected_test_output:
+                    passed_count += 1
+                else:
+                    all_passed = False
+                    failed_test_case = i + 1
+                    verdict = "WA"
+                    error_message = f"Test case {i+1} failed\nExpected: {expected_test_output}\nGot: {jdoodle_output}"
+                    break
+                    
+            except requests.exceptions.Timeout:
+                all_passed = False
+                verdict = "TLE"
+                error_message = "Execution timeout (15 seconds)"
+                break
+            except Exception as e:
+                all_passed = False
+                verdict = "SE"
+                error_message = f"System error: {str(e)}"
+                break
+        
+        # Determine final verdict
+        if all_passed:
+            verdict = "AC"
+            status_msg = "Accepted"
+        elif verdict == "RUNNING":
+            verdict = "WA"
+            status_msg = f"Wrong Answer on test case {failed_test_case}"
+        else:
+            status_msg = verdict
+        
+        # Update submission with results
+        test_submission.verdict = verdict
+        test_submission.passed_test_cases = passed_count
+        test_submission.total_test_cases = total_test_cases
+        test_submission.failed_test_case = failed_test_case if not all_passed else -1
+        test_submission.error_message = error_message
+        test_submission.compile_output = compile_output
+        test_submission.judged_at = datetime.now()
+        test_submission.execution_time = max_execution_time
+        test_submission.memory = max_memory_used
+        
+        test_submission.save()
+        
+        # Also save to CodeSubmission for debugging (optional)
+        try:
+            from compiler.models import CodeSubmission
+            code_submission = CodeSubmission(
+                user=user,
+                language=language_lower,
+                version_index=version_index,
+                code=code,
+                input_data=input_data,
+                output=actual_output or error_message or compile_output or "",
+                status="success" if all_passed else "error",
+                verdict=verdict,
+                execution_time_ms=max_execution_time,
+                execution_time_seconds=max_execution_time / 1000 if max_execution_time > 0 else 0,
+                memory_kb=max_memory_used,
+                memory_mb=round(max_memory_used / 1024, 2) if max_memory_used > 0 else 0,
+                status_code=200 if all_passed else 400,
+                is_execution_success=all_passed
+            )
+            code_submission.save()
+        except Exception:
+            pass  # Silently ignore if CodeSubmission fails
+        
+        return Response({
+            "message": "Test contest submission processed successfully",
+            "test_submission_id": str(test_submission.id),
+            "test_contest_time": test_contest_time,
+            "verdict": verdict,
+            "status": status_msg,
+            "output": actual_output or error_message or compile_output or "No output",
+            "all_passed": all_passed,
+            "passed_test_cases": passed_count,
+            "total_test_cases": total_test_cases,
+            "failed_test_case": failed_test_case,
+            "execution_time": max_execution_time,
+            "memory_used": max_memory_used,
+            "time_limit": problem.time_limit_seconds * 1000,
+            "memory_limit": problem.memory_limit_mb * 1024,
+            "is_test_contest": True
+        })
 
 class TestContestSubmissionsAPIView(APIView):
     """Get submissions for a test contest"""
