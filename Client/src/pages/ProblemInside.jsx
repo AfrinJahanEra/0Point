@@ -403,84 +403,94 @@ const ProblemInside = () => {
     }
   };
 
-  const handleRun = async () => {
-    if (!code.trim()) {
-      alert('Please write some code before running.');
-      return;
-    }
+const handleRun = async () => {
+  if (!code.trim()) {
+    alert('Please write some code before running.');
+    return;
+  }
 
-    try {
-      // Use sample test case input for running
-      const sampleInput = problemData?.sample_test_cases?.[0]?.input || '';
-      const expectedOutput = problemData?.sample_test_cases?.[0]?.output || '';
+  try {
+    const runData = {
+      language: language,
+      code: code,
+      // Don't need input_data or expected_output for run endpoint
+      // It will automatically use all test cases from the problem
+    };
 
-      const runData = {
-        language: language,
-        version_index: getVersionIndex(language),
-        code: code,
-        input_data: sampleInput,
-        expected_output: expectedOutput
-      };
-
-      console.log('Running code with data:', runData);
-      
-      // Set loading state
-      setCompilationStats({
-        status: 'running',
-        message: 'Running against sample test case...',
-        type: 'run'
-      });
-      
-      const response = await axios.post(
-        `http://localhost:8000/contests/${contestId}/execute/`,
-        runData,
-        { 
-          headers: { 
-            Authorization: `Bearer ${TOKEN}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
-
-      console.log('Run response:', response.data);
-      
-      // Update compilation stats based on actual API response
-      if (response.data.is_execution_success) {
-       
-        const isCorrect = expectedOutput ? 
-          (response.data.output?.trim() === expectedOutput.trim()) : true;
-        
-        setCompilationStats({
-          status: isCorrect ? 'success' : 'error',
-          verdict: isCorrect ? 'AC' : 'WA',
-          time: response.data.execution_time_ms || 0,
-          memory: response.data.memory_kb || 0,
-          output: response.data.output || '',
-          message: isCorrect ? 'Test case passed!' : 'Wrong Answer',
-          type: 'run',
-          expectedOutput: expectedOutput
-        });
-      } else {
-        setCompilationStats({
-          status: 'error',
-          verdict: response.data.verdict || response.data.status || 'RE',
-          time: response.data.execution_time_ms || 0,
-          memory: response.data.memory_kb || 0,
-          output: response.data.output || '',
-          message: response.data.status || 'Runtime Error',
-          type: 'run'
-        });
+    console.log('Running code with data:', runData);
+    
+    // Set loading state
+    setCompilationStats({
+      status: 'running',
+      message: 'Running against all test cases...',
+      type: 'run'
+    });
+    
+    // FIXED: Use the correct endpoint that exists in your urls.py
+    // path('contests/<str:contest_id>/problems/<str:problem_index>/run/', CodeExecuteAPIView.as_view(), name='code-run'),
+    const response = await axios.post(
+      `http://localhost:8000/contests/${contestId}/problems/${problemData?.problem_index || problemIndex}/run/`,
+      runData,
+      { 
+        headers: { 
+          Authorization: `Bearer ${TOKEN}`,
+          'Content-Type': 'application/json'
+        } 
       }
-      
-    } catch (error) {
-      console.error('Run error:', error);
-      setCompilationStats({
-        status: 'error',
-        message: error.response?.data?.error || 'Run failed',
-        type: 'run'
-      });
-    }
-  };
+    );
+
+    console.log('Run response:', response.data);
+    
+    // Update compilation stats based on actual API response
+    if (response.data.verdict === 'AC' || response.data.all_passed === true) {
+      // In handleRun function, update the response handling:
+setCompilationStats({
+  status: 'success',
+  verdict: response.data.verdict || 'AC',
+  time: response.data.execution_time || 0,
+  memory: response.data.memory_used || 0,
+  passed: response.data.passed_test_cases || response.data.total_test_cases || 0,
+  total: response.data.total_test_cases || 0,
+  // Show all test case outputs
+  testCaseOutputs: response.data.test_case_outputs || [],
+  // For backward compatibility, keep single output
+  output: response.data.output || '',
+  message: response.data.status || `All ${response.data.total_test_cases} test cases passed!`,
+  type: 'run'
+});
+    } 
+    
+    else {
+  setCompilationStats({
+    status: response.data.verdict === 'CE' ? 'compile_error' : 'error',
+    verdict: response.data.verdict || 'WA',
+    time: response.data.execution_time || 0,
+    memory: response.data.memory_used || 0,
+    passed: response.data.passed_test_cases || 0,
+    total: response.data.total_test_cases || 0,
+    failedTestCase: response.data.failed_test_case || 0,
+
+    // ✅ FIX: include test cases for WA too
+    testCaseOutputs: response.data.test_case_outputs || [],
+
+    output: response.data.output || '',
+    message:
+      response.data.error_message ||
+      `${response.data.passed_test_cases || 0}/${response.data.total_test_cases || 0} test cases passed`,
+    type: 'run'
+  });
+}
+
+    
+  } catch (error) {
+    console.error('Run error:', error);
+    setCompilationStats({
+      status: 'error',
+      message: error.response?.data?.error || 'Run failed',
+      type: 'run'
+    });
+  }
+};
 
   // Helper function to map language to Ace editor mode
   const getEditorMode = (lang) => {
@@ -542,23 +552,25 @@ const ProblemInside = () => {
 
       console.log('Submit response:', response.data);
       
-      if (response.data.verdict === 'AC') {
-        setCompilationStats({
-          status: 'success',
-          verdict: 'AC',
-          time: response.data.execution_time || 0,
-          memory: response.data.memory_used || 0,
-          passed: response.data.passed_test_cases || 0,
-          total: response.data.total_test_cases || 0,
-          message: `All ${response.data.total_test_cases} test cases passed!`,
-          submissionId: response.data.submission_id,
-          type: 'submit'
-        });
+      if (response.data.verdict === 'AC' || response.data.status === 'Accepted' || response.data.all_passed === true) {
+  setCompilationStats({
+    status: 'success',
+    verdict: 'AC',
+    time: response.data.execution_time || 0,
+    memory: response.data.memory_used || 0,
+    passed: response.data.passed_test_cases || response.data.total_test_cases || 0,
+    total: response.data.total_test_cases || 0,
+    message: response.data.status || `All ${response.data.total_test_cases} test cases passed!`,
+    submissionId: response.data.submission_id,
+    type: 'submit'
+  });
         
         // Refresh status
         fetchUserProblemStatus();
         refreshProblemStatus();
-      } else {
+      } 
+      
+      else {
         setCompilationStats({
           status: response.data.status === 'CE' ? 'compile_error' : 'error',
           verdict: response.data.status || 'WA',
@@ -606,7 +618,7 @@ const ProblemInside = () => {
     } catch (error) {
       console.error('Error fetching problem status:', error);
     }
-  };
+  }; 
 
   // Call this in your useEffect after loading problem data
   useEffect(() => {
@@ -751,10 +763,6 @@ const ProblemInside = () => {
             <div className="flex items-center space-x-4">
               {displayContestData.status === 'live' && timeRemaining > 0 && (
                 <div className="text-right">
-                  <div className="text-xs text-gray-600 flex items-center justify-end gap-1">
-                    <Clock className="w-3 h-3" />
-                    Time Remaining
-                  </div>
                   <div className="font-mono font-bold text-lg text-red-600 animate-pulse">
                     {formatTime(timeRemaining)}
                   </div>
@@ -1255,26 +1263,49 @@ const ProblemInside = () => {
                         </div>
                       )}
                       
-                      {/* Output (for run) */}
-              {compilationStats.output && compilationStats.type === 'run' && (
-                <div className="mt-3 space-y-2">
-                  <div className="text-xs text-gray-600 mb-1">Output:</div>
-                  <pre className="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto font-mono">
-                    {compilationStats.output}
-                  </pre>
-                  
-                  {/* Show expected output if available and mismatch */}
-                  {compilationStats.expectedOutput && 
-                  compilationStats.output?.trim() !== compilationStats.expectedOutput.trim() && (
-                    <>
-                      <div className="text-xs text-gray-600 mb-1">Expected Output:</div>
-                      <pre className="bg-gray-700 text-gray-100 p-3 rounded text-xs overflow-x-auto font-mono border-l-4 border-yellow-500">
-                        {compilationStats.expectedOutput}
-                      </pre>
-                    </>
-                  )}
-                </div>
-              )}
+{/* Output section - update to show all test cases */}
+{compilationStats.testCaseOutputs && compilationStats.testCaseOutputs.length > 0 && (
+  <div className="mt-3 space-y-4">
+    <div className="text-xs text-gray-600 mb-1">Test Case Results:</div>
+    {compilationStats.testCaseOutputs.map((tc, idx) => (
+      <div key={idx} className="border border-gray-300 rounded overflow-hidden">
+        <div className="bg-gray-100 px-3 py-2 text-xs font-medium">
+          Test Case {tc.test_case} {tc.passed ? '✓' : '✗'}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
+          <div className="p-2 border-r border-gray-300">
+            <div className="text-xs text-gray-600 mb-1">Input:</div>
+            <pre className="text-xs font-mono bg-gray-800 text-gray-100 p-2 rounded overflow-x-auto">
+              {tc.input}
+            </pre>
+          </div>
+          <div className="p-2 border-r border-gray-300">
+            <div className="text-xs text-gray-600 mb-1">Expected:</div>
+            <pre className="text-xs font-mono bg-gray-700 text-gray-100 p-2 rounded overflow-x-auto">
+              {tc.expected}
+            </pre>
+          </div>
+          <div className="p-2">
+            <div className="text-xs text-gray-600 mb-1">Actual:</div>
+            <pre className={`text-xs font-mono p-2 rounded overflow-x-auto ${
+              tc.passed ? 'bg-green-900 text-green-100' : 'bg-red-900 text-red-100'
+            }`}>
+              {tc.actual || tc.error || 'No output'}
+            </pre>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+
+{/* Submission ID */}
+{compilationStats.submissionId && (
+  <div className="mt-2 text-sm">
+    <span className="text-gray-600">Submission ID:</span>
+    <span className="font-medium ml-2">{compilationStats.submissionId}</span>
+  </div>
+)}
                       
                       {/* Submission ID */}
                       {compilationStats.submissionId && (
