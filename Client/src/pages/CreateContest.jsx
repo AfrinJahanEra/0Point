@@ -1,5 +1,12 @@
 // CreateContest.jsx - Fix the tutorial section
 import React, { useState, useEffect } from 'react';
+import AceEditor from 'react-ace';
+import 'ace-builds/src-noconflict/mode-c_cpp';
+import 'ace-builds/src-noconflict/mode-python';
+import 'ace-builds/src-noconflict/mode-java';
+import 'ace-builds/src-noconflict/mode-javascript';
+import 'ace-builds/src-noconflict/theme-monokai';
+import 'ace-builds/src-noconflict/ext-language_tools';
 import { Code2, Play, Download } from 'lucide-react';
 import { Link, useNavigate, useParams} from 'react-router-dom';
 import { 
@@ -54,13 +61,7 @@ const [sidebarOpen, setSidebarOpen] = useState(true);
     platform: 'IUT'
   });
   // Add this with other state declarations
-const [code, setCode] = useState(`#include <bits/stdc++.h>
-using namespace std;
-
-int main() {
-    // Your code here
-    return 0;
-}`);
+const [code, setCode] = useState(``);
 const [language, setLanguage] = useState('cpp');
 const [showStatementPreview, setShowStatementPreview] = useState(false);
 
@@ -560,6 +561,24 @@ const formattedProblems = problems.map((problem) => ({
     setPublishSettings(prev => ({ ...prev, testers: prev.testers.filter(t => t.id !== id) }));
   };
 
+  // Helper function to map language to Ace editor mode
+const getEditorMode = (lang) => {
+  switch(lang) {
+    case 'cpp':
+      return 'c_cpp';
+    case 'c':
+      return 'c_cpp';
+    case 'python':
+      return 'python';
+    case 'java':
+      return 'java';
+    case 'javascript':
+      return 'javascript';
+    default:
+      return 'text';
+  }
+};
+
   const validateTestContest = () => {
     const newErrors = {};
     if (publishSettings.testContest) {
@@ -792,7 +811,7 @@ const handlePublishContest = async (type) => {
       expected_output: testCase.output
     };
 
-    const response = await fetch('http://localhost:8000/contests/test-execute/', {
+    const response = await fetch('http://localhost:8000/contests/{contestId}/execute/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1296,7 +1315,7 @@ const addTestCase = (problemId) => {
                 </div>
               </div>
 
-              {/* Code Editor Section */}
+{/* Code Editor Section */}
 <div>
   <div className="flex items-center justify-between mb-4">
     <h3 className="font-semibold text-gray-900">Code Testing</h3>
@@ -1317,23 +1336,43 @@ const addTestCase = (problemId) => {
   
   {/* Code Editor */}
   <div className="border border-gray-300 rounded-lg overflow-hidden mb-4">
-    <div className="bg-gray-900 text-gray-100 p-4">
-      <textarea
+    <div className="h-64 bg-gray-900">
+      <AceEditor
+        mode={getEditorMode(language)}
+        theme="monokai"
         value={code}
-        onChange={(e) => setCode(e.target.value)}
-        rows={12}
-        className="w-full font-mono text-sm bg-gray-900 text-gray-100 resize-none focus:outline-none"
-        spellCheck="false"
+        onChange={setCode}
+        name="code-editor"
+        height="100%"
+        width="100%"
+        fontSize={14}
+        showPrintMargin={true}
+        showGutter={true}
+        highlightActiveLine={true}
+        setOptions={{
+          enableBasicAutocompletion: true,
+          enableLiveAutocompletion: true,
+          enableSnippets: true,
+          showLineNumbers: true,
+          tabSize: 4,
+          useWorker: false, // Disable worker for better performance
+        }}
+        style={{ 
+          background: '#1f2937',
+          fontFamily: 'Consolas, Monaco, "Andale Mono", monospace'
+        }}
         placeholder={`// Write your ${language.toUpperCase()} code here...`}
       />
     </div>
     
     <div className="bg-gray-800 px-4 py-2 border-t border-gray-700 flex justify-between items-center">
+
       <div className="text-xs text-gray-400">
         Language: {language === 'cpp' ? 'C++ 17' : 
                   language === 'java' ? 'Java' : 
                   language === 'python' ? 'Python 3' : 'C'}
       </div>
+
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -1416,6 +1455,7 @@ const addTestCase = (problemId) => {
     </div>
   )}
 </div>
+
             </div>
           </div>
         )}
