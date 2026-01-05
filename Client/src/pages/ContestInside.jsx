@@ -696,9 +696,8 @@ const getProblemStatusIcon = (problem) => {
             {/* Timer */}
             {contestData.status === 'live' && timeRemaining > 0 && (
               <div className="bg-gradient-to-br from-blue-900 to-blue-700 text-white rounded-xl p-6 text-center">
-                <div className="text-xs text-blue-100 mb-2">Time Remaining</div>
-                <div className="text-xl font-bold font-mono mb-2">{formatTime(timeRemaining)}</div>
                 <div className="text-xs text-blue-200">Contest ends in</div>
+                <div className="text-xl font-bold font-mono mb-2">{formatTime(timeRemaining)}</div>
               </div>
             )}
 
