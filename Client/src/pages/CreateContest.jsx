@@ -811,7 +811,7 @@ const handlePublishContest = async (type) => {
       expected_output: testCase.output
     };
 
-    const response = await fetch('http://localhost:8000/contests/{contestId}/execute/', {
+    const response = await fetch('http://localhost:8000/contests/{contestId}/run/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
