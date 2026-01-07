@@ -452,16 +452,11 @@ const handleRun = async () => {
   }
 
   try {
-    // Use sample test case input for running
-    const sampleInput = problemData?.sample_test_cases?.[0]?.input || '';
-    const expectedOutput = problemData?.sample_test_cases?.[0]?.output || '';
-
     const runData = {
       language: language,
-      version_index: getVersionIndex(language),
       code: code,
-      input_data: sampleInput,
-      expected_output: expectedOutput
+      // Don't need input_data or expected_output for run endpoint
+      // It will automatically use all test cases from the problem
     };
 
     console.log('Running code in virtual contest with data:', runData);
@@ -469,13 +464,13 @@ const handleRun = async () => {
     // Set loading state
     setCompilationStats({
       status: 'running',
-      message: 'Running against sample test case...',
+      message: 'Running against all test cases...',
       type: 'run'
     });
     
-    // Use original contest execution endpoint
+    // FIXED: Use the /run/ endpoint instead of /execute/
     const response = await axios.post(
-      `http://localhost:8000/contests/${originalContestData?.id || contestId}/execute/`,
+      `http://localhost:8000/contests/${originalContestData?.id || contestId}/problems/${problemData?.problem_index || problemIndex}/run/`,
       runData,
       { 
         headers: { 
@@ -488,28 +483,35 @@ const handleRun = async () => {
     console.log('Run response:', response.data);
     
     // Update compilation stats based on actual API response
-    if (response.data.is_execution_success || response.data.status === 'success') {
-      const isCorrect = expectedOutput ? 
-        (response.data.output?.trim() === expectedOutput.trim()) : true;
-      
+    if (response.data.verdict === 'AC' || response.data.all_passed === true) {
       setCompilationStats({
-        status: isCorrect ? 'success' : 'error',
-        verdict: isCorrect ? 'AC' : 'WA',
-        time: response.data.execution_time_ms || 0,
-        memory: response.data.memory_kb || 0,
+        status: 'success',
+        verdict: response.data.verdict || 'AC',
+        time: response.data.execution_time || 0,
+        memory: response.data.memory_used || 0,
+        passed: response.data.passed_test_cases || response.data.total_test_cases || 0,
+        total: response.data.total_test_cases || 0,
+        // Show all test case outputs
+        testCaseOutputs: response.data.test_case_outputs || [],
+        // For backward compatibility, keep single output
         output: response.data.output || '',
-        message: isCorrect ? 'Test case passed!' : 'Wrong Answer',
-        type: 'run',
-        expectedOutput: expectedOutput
+        message: response.data.status || `All ${response.data.total_test_cases} test cases passed!`,
+        type: 'run'
       });
     } else {
       setCompilationStats({
-        status: 'error',
-        verdict: response.data.verdict || response.data.status || 'RE',
-        time: response.data.execution_time_ms || 0,
-        memory: response.data.memory_kb || 0,
+        status: response.data.verdict === 'CE' ? 'compile_error' : 'error',
+        verdict: response.data.verdict || 'WA',
+        time: response.data.execution_time || 0,
+        memory: response.data.memory_used || 0,
+        passed: response.data.passed_test_cases || 0,
+        total: response.data.total_test_cases || 0,
+        failedTestCase: response.data.failed_test_case || 0,
+        // ✅ FIX: include test cases for WA too
+        testCaseOutputs: response.data.test_case_outputs || [],
         output: response.data.output || '',
-        message: response.data.status || 'Runtime Error',
+        message: response.data.error_message ||
+                `${response.data.passed_test_cases || 0}/${response.data.total_test_cases || 0} test cases passed`,
         type: 'run'
       });
     }
@@ -1200,152 +1202,189 @@ const handleSubmit = async () => {
               </div>
 
 
-              {/* Add this after the Editor Footer section */}
-              {compilationStats && (
-                <div className="border-t border-gray-200">
-                  <div className={`p-4 ${
-                    compilationStats.status === 'running' ? 'bg-blue-50' : 
-                    compilationStats.status === 'success' ? 'bg-green-50' : 
-                    compilationStats.status === 'compile_error' ? 'bg-yellow-50' : 
-                    'bg-red-50'
-                  }`}>
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center space-x-2">
-                        {compilationStats.status === 'running' ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                            <span className="text-sm font-medium text-blue-900">Running...</span>
-                          </>
-                        ) : compilationStats.status === 'success' ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-900">Success!</span>
-                          </>
-                        ) : compilationStats.status === 'compile_error' ? (
-                          <>
-                            <AlertCircle className="w-4 h-4 text-yellow-600" />
-                            <span className="text-sm font-medium text-yellow-900">Compilation Error</span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle className="w-4 h-4 text-red-600" />
-                            <span className="text-sm font-medium text-red-900">Failed</span>
-                          </>
-                        )}
-                        <span className="text-xs px-2 py-1 bg-white rounded border">
-                          {compilationStats.type === 'run' ? 'Run' : 'Virtual Submit'}
-                        </span>
-                      </div>
-                      <button 
-                        onClick={() => setCompilationStats(null)}
-                        className="text-gray-500 hover:text-gray-700 text-sm"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {/* Message */}
-                      <div className="text-sm">
-                        {compilationStats.message}
-                      </div>
-                      
-                      {/* Stats Grid */}
-                      {(compilationStats.time > 0 || compilationStats.memory > 0 || 
-                        compilationStats.passed !== undefined) && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                          {/* Verdict */}
-                          {compilationStats.verdict && (
-                            <div className="bg-white p-2 rounded border">
-                              <div className="text-xs text-gray-600">Verdict</div>
-                              <div className={`font-medium text-sm ${
-                                compilationStats.verdict === 'AC' ? 'text-green-600' :
-                                compilationStats.verdict === 'WA' ? 'text-red-600' :
-                                compilationStats.verdict === 'TLE' ? 'text-orange-600' :
-                                compilationStats.verdict === 'MLE' ? 'text-purple-600' :
-                                compilationStats.verdict === 'CE' ? 'text-yellow-600' :
-                                compilationStats.verdict === 'RE' ? 'text-pink-600' :
-                                'text-gray-700'
-                              }`}>
-                                {compilationStats.verdict || 'N/A'}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Time */}
-                          {compilationStats.time > 0 && (
-                            <div className="bg-white p-2 rounded border">
-                              <div className="text-xs text-gray-600">Time</div>
-                              <div className="font-medium text-sm text-gray-900">
-                                {compilationStats.time} ms
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Memory */}
-                          {compilationStats.memory > 0 && (
-                            <div className="bg-white p-2 rounded border">
-                              <div className="text-xs text-gray-600">Memory</div>
-                              <div className="font-medium text-sm text-gray-900">
-                                {compilationStats.memory > 1024 
-                                  ? `${(compilationStats.memory / 1024).toFixed(2)} MB` 
-                                  : `${compilationStats.memory} KB`}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Test Cases */}
-                          {compilationStats.passed !== undefined && (
-                            <div className="bg-white p-2 rounded border">
-                              <div className="text-xs text-gray-600">Test Cases</div>
-                              <div className="font-medium text-sm text-gray-900">
-                                {compilationStats.passed}/{compilationStats.total}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Failed Test Case Info */}
-                      {compilationStats.failedTestCase && (
-                        <div className="mt-2 text-sm">
-                          <span className="text-gray-600">Failed on test case:</span>
-                          <span className="font-medium ml-2">#{compilationStats.failedTestCase}</span>
-                        </div>
-                      )}
-                      
-                      {/* Output (for run) */}
-                      {compilationStats.output && compilationStats.type === 'run' && (
-                        <div className="mt-3 space-y-2">
-                          <div className="text-xs text-gray-600 mb-1">Output:</div>
-                          <pre className="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto font-mono">
-                            {compilationStats.output}
-                          </pre>
-                          
-                          {/* Show expected output if available and mismatch */}
-                          {compilationStats.expectedOutput && 
-                          compilationStats.output?.trim() !== compilationStats.expectedOutput.trim() && (
-                            <>
-                              <div className="text-xs text-gray-600 mb-1">Expected Output:</div>
-                              <pre className="bg-gray-700 text-gray-100 p-3 rounded text-xs overflow-x-auto font-mono border-l-4 border-yellow-500">
-                                {compilationStats.expectedOutput}
-                              </pre>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Virtual Submission ID */}
-                      {compilationStats.virtualSubmissionId && (
-                        <div className="mt-2 text-sm">
-                          <span className="text-gray-600">Virtual Submission ID:</span>
-                          <span className="font-medium ml-2">{compilationStats.virtualSubmissionId}</span>
-                        </div>
-                      )}
-                    </div>
+{/* Add this after the Editor Footer section */}
+{compilationStats && (
+  <div className="border-t border-gray-200">
+    <div className={`p-4 ${
+      compilationStats.status === 'running' ? 'bg-blue-50' : 
+      compilationStats.status === 'success' ? 'bg-green-50' : 
+      compilationStats.status === 'compile_error' ? 'bg-yellow-50' : 
+      'bg-red-50'
+    }`}>
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center space-x-2">
+          {compilationStats.status === 'running' ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">Running...</span>
+            </>
+          ) : compilationStats.status === 'success' ? (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-medium text-green-900">Success!</span>
+            </>
+          ) : compilationStats.status === 'compile_error' ? (
+            <>
+              <AlertCircle className="w-4 h-4 text-yellow-600" />
+              <span className="text-sm font-medium text-yellow-900">Compilation Error</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <span className="text-sm font-medium text-red-900">Failed</span>
+            </>
+          )}
+          <span className="text-xs px-2 py-1 bg-white rounded border">
+            {compilationStats.type === 'run' ? 'Run' : 'Virtual Submit'}
+          </span>
+        </div>
+        <button 
+          onClick={() => setCompilationStats(null)}
+          className="text-gray-500 hover:text-gray-700 text-sm"
+        >
+          ×
+        </button>
+      </div>
+      
+      <div className="space-y-2">
+        {/* Message */}
+        <div className="text-sm">
+          {compilationStats.message}
+        </div>
+        
+        {/* Stats Grid */}
+        {(compilationStats.time > 0 || compilationStats.memory > 0 || 
+          compilationStats.passed !== undefined) && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+            {/* Verdict */}
+            {compilationStats.verdict && (
+              <div className="bg-white p-2 rounded border">
+                <div className="text-xs text-gray-600">Verdict</div>
+                <div className={`font-medium text-sm ${
+                  compilationStats.verdict === 'AC' ? 'text-green-600' :
+                  compilationStats.verdict === 'WA' ? 'text-red-600' :
+                  compilationStats.verdict === 'TLE' ? 'text-orange-600' :
+                  compilationStats.verdict === 'MLE' ? 'text-purple-600' :
+                  compilationStats.verdict === 'CE' ? 'text-yellow-600' :
+                  compilationStats.verdict === 'RE' ? 'text-pink-600' :
+                  'text-gray-700'
+                }`}>
+                  {compilationStats.verdict || 'N/A'}
+                </div>
+              </div>
+            )}
+            
+            {/* Time */}
+            {compilationStats.time > 0 && (
+              <div className="bg-white p-2 rounded border">
+                <div className="text-xs text-gray-600">Time</div>
+                <div className="font-medium text-sm text-gray-900">
+                  {compilationStats.time} ms
+                </div>
+              </div>
+            )}
+            
+            {/* Memory */}
+            {compilationStats.memory > 0 && (
+              <div className="bg-white p-2 rounded border">
+                <div className="text-xs text-gray-600">Memory</div>
+                <div className="font-medium text-sm text-gray-900">
+                  {compilationStats.memory > 1024 
+                    ? `${(compilationStats.memory / 1024).toFixed(2)} MB` 
+                    : `${compilationStats.memory} KB`}
+                </div>
+              </div>
+            )}
+            
+            {/* Test Cases */}
+            {compilationStats.passed !== undefined && (
+              <div className="bg-white p-2 rounded border">
+                <div className="text-xs text-gray-600">Test Cases</div>
+                <div className="font-medium text-sm text-gray-900">
+                  {compilationStats.passed}/{compilationStats.total}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Failed Test Case Info */}
+        {compilationStats.failedTestCase && (
+          <div className="mt-2 text-sm">
+            <span className="text-gray-600">Failed on test cases</span>
+            {/* <span className="font-medium ml-2">#{compilationStats.failedTestCase}</span> */}
+          </div>
+        )}
+        
+        {/* Output (for run) */}
+        {compilationStats.output && compilationStats.type === 'run' && (
+          <div className="mt-3 space-y-2">
+            <div className="text-xs text-gray-600 mb-1">Output:</div>
+            <pre className="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto font-mono">
+              {compilationStats.output}
+            </pre>
+            
+            {/* Show expected output if available and mismatch */}
+            {compilationStats.expectedOutput && 
+            compilationStats.output?.trim() !== compilationStats.expectedOutput.trim() && (
+              <>
+                <div className="text-xs text-gray-600 mb-1">Expected Output:</div>
+                <pre className="bg-gray-700 text-gray-100 p-3 rounded text-xs overflow-x-auto font-mono border-l-4 border-yellow-500">
+                  {compilationStats.expectedOutput}
+                </pre>
+              </>
+            )}
+          </div>
+        )}
+        
+        {/* Test Case Results - NEW SECTION ADDED HERE */}
+        {compilationStats.testCaseOutputs && compilationStats.testCaseOutputs.length > 0 && (
+          <div className="mt-3 space-y-4">
+            <div className="text-xs text-gray-600 mb-1">Test Case Results:</div>
+            {compilationStats.testCaseOutputs.map((tc, idx) => (
+              <div key={idx} className="border border-gray-300 rounded overflow-hidden">
+                <div className="bg-gray-100 px-3 py-2 text-xs font-medium">
+                  Test Case {tc.test_case} {tc.passed ? '✓' : '✗'}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
+                  <div className="p-2 border-r border-gray-300">
+                    <div className="text-xs text-gray-600 mb-1">Input:</div>
+                    <pre className="text-xs font-mono bg-gray-800 text-gray-100 p-2 rounded overflow-x-auto">
+                      {tc.input}
+                    </pre>
+                  </div>
+                  <div className="p-2 border-r border-gray-300">
+                    <div className="text-xs text-gray-600 mb-1">Expected:</div>
+                    <pre className="text-xs font-mono bg-gray-700 text-gray-100 p-2 rounded overflow-x-auto">
+                      {tc.expected}
+                    </pre>
+                  </div>
+                  <div className="p-2">
+                    <div className="text-xs text-gray-600 mb-1">Actual:</div>
+                    <pre className={`text-xs font-mono p-2 rounded overflow-x-auto ${
+                      tc.passed ? 'bg-green-900 text-green-100' : 'bg-red-900 text-red-100'
+                    }`}>
+                      {tc.actual || tc.error || 'No output'}
+                    </pre>
                   </div>
                 </div>
-              )}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Virtual Submission ID */}
+        {compilationStats.virtualSubmissionId && (
+          <div className="mt-2 text-sm">
+            <span className="text-gray-600">Virtual Submission ID:</span>
+            <span className="font-medium ml-2">{compilationStats.virtualSubmissionId}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
             </div>
           </div>
         </div>
