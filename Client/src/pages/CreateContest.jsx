@@ -35,7 +35,9 @@ import {
   UserPlus,
   X,
   AlertCircle,
-  HelpCircle
+  HelpCircle,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -49,6 +51,7 @@ const CreateContest = () => {
   const navigate = useNavigate();
   const { contestId } = useParams();
   const [activeProblem, setActiveProblem] = useState(null);
+  const [compilationStats, setCompilationStats] = useState(null);
   // Add this with other state declarations
 const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('problems'); // 'problems', 'tutorial', or 'publish'
@@ -183,7 +186,7 @@ const [showStatementPreview, setShowStatementPreview] = useState(false);
   )
 };
 
-  // Add this useEffect to fetch contest data when in edit mode
+
 useEffect(() => {
   // If contestId exists, we're in edit mode
   if (contestId) {
@@ -786,7 +789,7 @@ const handlePublishContest = async (type) => {
     setActiveProblem(newProblem.id);
   };
 
-  const handleRunCode = async () => {
+const handleRunCode = async () => {
   if (!code.trim()) {
     alert('Please write some code before running.');
     return;
@@ -795,50 +798,93 @@ const handlePublishContest = async (type) => {
   const currentProblem = problems.find(p => p.id === activeProblem);
   if (!currentProblem) return;
 
-  try {
-    // Use sample test case or first test case
-    const testCase = currentProblem.testCases[0];
-    if (!testCase) {
-      alert('Please add at least one test case to run code.');
-      return;
-    }
+  // Check if we're in edit mode and have contestId
+  if (!contestId) {
+    alert('Please save the contest as draft first before testing code.');
+    return;
+  }
 
+  // Check if problem has an index
+  if (!currentProblem.problemIndex) {
+    alert('Please set a problem index (A, B, C, etc.) before testing code.');
+    return;
+  }
+
+  try {
     const runData = {
       language: language,
-      version_index: getVersionIndex(language),
       code: code,
-      input_data: testCase.input,
-      expected_output: testCase.output
     };
 
-    const response = await fetch('http://localhost:8000/contests/{contestId}/run/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY'
-      },
-      body: JSON.stringify(runData)
+    console.log('Running code for problem:', currentProblem.problemIndex);
+    
+    // Set loading state
+    setCompilationStats({
+      status: 'running',
+      message: 'Running against all test cases...',
+      type: 'run'
     });
+    
+    const response = await fetch(
+      `http://localhost:8000/contests/${contestId}/problems/${currentProblem.problemIndex}/run/`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY'
+        },
+        body: JSON.stringify(runData)
+      }
+    );
 
     const data = await response.json();
+    console.log('Run response:', data);
     
-    // Update problem with test results
-    handleProblemChange(currentProblem.id, 'testResults', [data]);
-    
-    // Show alert with results
-    if (data.is_execution_success || data.status === 'success') {
-      const timeMsg = data.execution_time_ms ? 
-        `\n⏱️ Time: ${data.execution_time_ms}ms` : '';
-      const memoryMsg = data.memory_kb ? 
-        `\n💾 Memory: ${data.memory_kb}KB` : '';
-      
-      alert(`✅ Execution successful!${timeMsg}${memoryMsg}\n📤 Output: ${data.output}\n🎯 Verdict: ${data.verdict}`);
+    // Update compilation stats based on actual API response
+    if (data.verdict === 'AC' || data.all_passed === true) {
+      setCompilationStats({
+        status: 'success',
+        verdict: data.verdict || 'AC',
+        time: data.execution_time || 0,
+        memory: data.memory_used || 0,
+        passed: data.passed_test_cases || data.total_test_cases || 0,
+        total: data.total_test_cases || 0,
+        testCaseOutputs: data.test_case_outputs || [],
+        output: data.output || '',
+        message: data.status || `All ${data.total_test_cases} test cases passed!`,
+        type: 'run'
+      });
     } else {
-      alert(`❌ Execution error!\n📤 Output: ${data.output}\n🔴 Status: ${data.status}`);
+      setCompilationStats({
+        status: data.verdict === 'CE' ? 'compile_error' : 'error',
+        verdict: data.verdict || 'WA',
+        time: data.execution_time || 0,
+        memory: data.memory_used || 0,
+        passed: data.passed_test_cases || 0,
+        total: data.total_test_cases || 0,
+        failedTestCase: data.failed_test_case || 0,
+        testCaseOutputs: data.test_case_outputs || [],
+        output: data.output || '',
+        message: data.error_message ||
+                 `${data.passed_test_cases || 0}/${data.total_test_cases || 0} test cases passed`,
+        type: 'run'
+      });
     }
+    
+    // Also update testResults for backward compatibility
+    setProblems(prev => prev.map(problem => 
+      problem.id === activeProblem 
+        ? { ...problem, testResults: [data] }
+        : problem
+    ));
+    
   } catch (error) {
     console.error('Run error:', error);
-    alert('Run failed');
+    setCompilationStats({
+      status: 'error',
+      message: error.response?.data?.error || 'Run failed',
+      type: 'run'
+    });
   }
 };
 
@@ -1403,57 +1449,150 @@ const addTestCase = (problemId) => {
   </div>
   
   {/* Test Results */}
-  {currentProblem.testResults && currentProblem.testResults.length > 0 && (
-    <div className="border border-gray-300 rounded-lg p-4">
-      <h4 className="font-medium text-gray-900 mb-3">Test Results</h4>
-      {currentProblem.testResults.map((result, index) => (
-        <div key={index} className={`p-3 rounded ${result.is_execution_success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-          <div className="grid grid-cols-2 gap-4 text-xs">
-            <div>
-              <span className="text-gray-600">Status:</span>
-              <span className={`ml-2 font-medium ${result.is_execution_success ? 'text-green-600' : 'text-red-600'}`}>
-                {result.is_execution_success ? '✓ Success' : '✗ Failed'}
-              </span>
-            </div>
-            {result.execution_time_ms && (
-              <div>
-                <span className="text-gray-600">Time:</span>
-                <span className="ml-2 font-medium">{result.execution_time_ms}ms</span>
-              </div>
-            )}
-            {result.memory_kb && (
-              <div>
-                <span className="text-gray-600">Memory:</span>
-                <span className="ml-2 font-medium">{result.memory_kb}KB</span>
-              </div>
-            )}
-            <div>
-              <span className="text-gray-600">Verdict:</span>
-              <span className="ml-2 font-medium">{result.verdict || result.status}</span>
+
+{compilationStats && (
+  <div className="border-t border-gray-200 mt-4">
+    <div className={`p-4 ${compilationStats.status === 'running' ? 'bg-blue-50' : compilationStats.status === 'success' ? 'bg-green-50' : compilationStats.status === 'compile_error' ? 'bg-yellow-50' : 'bg-red-50'}`}>
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center space-x-2">
+          {compilationStats.status === 'running' ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">Running...</span>
+            </>
+          ) : compilationStats.status === 'success' ? (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-medium text-green-900">Success!</span>
+            </>
+          ) : compilationStats.status === 'compile_error' ? (
+            <>
+              <AlertCircle className="w-4 h-4 text-yellow-600" />
+              <span className="text-sm font-medium text-yellow-900">Compilation Error</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <span className="text-sm font-medium text-red-900">Failed</span>
+            </>
+          )}
+          <span className="text-xs px-2 py-1 bg-white rounded border">
+            {compilationStats.type === 'run' ? 'Run' : 'Submit'}
+          </span>
+        </div>
+        <button 
+          onClick={() => setCompilationStats(null)}
+          className="text-gray-500 hover:text-gray-700 text-sm"
+        >
+          ×
+        </button>
+      </div>
+      
+      <div className="space-y-2">
+        {/* Message */}
+        <div className="text-sm">
+          {compilationStats.message}
+        </div>
+        
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+          {/* Verdict */}
+          <div className="bg-white p-2 rounded border">
+            <div className="text-xs text-gray-600">Verdict</div>
+            <div className={`font-medium text-sm ${
+              compilationStats.verdict === 'AC' ? 'text-green-600' :
+              compilationStats.verdict === 'WA' ? 'text-red-600' :
+              compilationStats.verdict === 'TLE' ? 'text-orange-600' :
+              compilationStats.verdict === 'MLE' ? 'text-purple-600' :
+              compilationStats.verdict === 'CE' ? 'text-yellow-600' :
+              compilationStats.verdict === 'RE' ? 'text-pink-600' :
+              'text-gray-700'
+            }`}>
+              {compilationStats.verdict || 'N/A'}
             </div>
           </div>
           
-          {result.output && (
-            <div className="mt-3">
-              <div className="text-gray-600 text-xs mb-1">Output:</div>
-              <pre className="bg-gray-800 text-gray-100 p-2 rounded text-xs font-mono overflow-x-auto">
-                {result.output}
-              </pre>
+          {/* Time */}
+          {compilationStats.time > 0 && (
+            <div className="bg-white p-2 rounded border">
+              <div className="text-xs text-gray-600">Time</div>
+              <div className="font-medium text-sm text-gray-900">
+                {compilationStats.time} ms
+              </div>
             </div>
           )}
           
-          {result.expected_output && (
-            <div className="mt-3">
-              <div className="text-gray-600 text-xs mb-1">Expected Output:</div>
-              <pre className="bg-gray-800 text-gray-100 p-2 rounded text-xs font-mono overflow-x-auto">
-                {result.expected_output}
-              </pre>
+          {/* Memory */}
+          {compilationStats.memory > 0 && (
+            <div className="bg-white p-2 rounded border">
+              <div className="text-xs text-gray-600">Memory</div>
+              <div className="font-medium text-sm text-gray-900">
+                {compilationStats.memory > 1024 
+                  ? `${(compilationStats.memory / 1024).toFixed(2)} MB` 
+                  : `${compilationStats.memory} KB`}
+              </div>
+            </div>
+          )}
+          
+          {/* Test Cases */}
+          {compilationStats.passed !== undefined && (
+            <div className="bg-white p-2 rounded border">
+              <div className="text-xs text-gray-600">Test Cases</div>
+              <div className="font-medium text-sm text-gray-900">
+                {compilationStats.passed}/{compilationStats.total}
+              </div>
             </div>
           )}
         </div>
-      ))}
+        
+        {/* Failed Test Case Info */}
+        {compilationStats.failedTestCase && (
+          <div className="mt-2 text-sm">
+            <span className="text-gray-600">Failed on test case:</span>
+            <span className="font-medium ml-2">#{compilationStats.failedTestCase}</span>
+          </div>
+        )}
+        
+        {/* Output section - update to show all test cases */}
+        {compilationStats.testCaseOutputs && compilationStats.testCaseOutputs.length > 0 && (
+          <div className="mt-3 space-y-4">
+            <div className="text-xs text-gray-600 mb-1">Test Case Results:</div>
+            {compilationStats.testCaseOutputs.map((tc, idx) => (
+              <div key={idx} className="border border-gray-300 rounded overflow-hidden">
+                <div className="bg-gray-100 px-3 py-2 text-xs font-medium">
+                  Test Case {tc.test_case} {tc.passed ? '✓' : '✗'}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
+                  <div className="p-2 border-r border-gray-300">
+                    <div className="text-xs text-gray-600 mb-1">Input:</div>
+                    <pre className="text-xs font-mono bg-gray-800 text-gray-100 p-2 rounded overflow-x-auto">
+                      {tc.input}
+                    </pre>
+                  </div>
+                  <div className="p-2 border-r border-gray-300">
+                    <div className="text-xs text-gray-600 mb-1">Expected:</div>
+                    <pre className="text-xs font-mono bg-gray-700 text-gray-100 p-2 rounded overflow-x-auto">
+                      {tc.expected}
+                    </pre>
+                  </div>
+                  <div className="p-2">
+                    <div className="text-xs text-gray-600 mb-1">Actual:</div>
+                    <pre className={`text-xs font-mono p-2 rounded overflow-x-auto ${
+                      tc.passed ? 'bg-green-900 text-green-100' : 'bg-red-900 text-red-100'
+                    }`}>
+                      {tc.actual || tc.error || 'No output'}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
-  )}
+  </div>
+)}
+
 </div>
 
             </div>
