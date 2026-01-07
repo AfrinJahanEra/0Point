@@ -8,6 +8,7 @@ from account.models import Account
 def dhaka_now():
     return datetime.now()
 
+
 class CodeSubmission(Document):
     user = ReferenceField(Account, required=True)
     language = StringField(max_length=50, required=True)
@@ -40,5 +41,5 @@ class CodeSubmission(Document):
 
     def __str__(self):
         return f"{self.user.email} - {self.language} - {self.status}"
-    
+
     
