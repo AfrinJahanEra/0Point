@@ -26,6 +26,7 @@ class ContestProblemSerializer(serializers.Serializer):
     points = serializers.IntegerField(default=0)  # NEW: Add points field
     test_cases = TestCaseSerializer(many=True)
 
+# contest/serializers.py - Update ContestCreateSerializer
 class ContestCreateSerializer(serializers.Serializer):
     title = serializers.CharField()
     description = serializers.CharField(required=False, allow_blank=True)
@@ -46,6 +47,10 @@ class ContestCreateSerializer(serializers.Serializer):
     allow_practice = serializers.BooleanField(required=False, default=True)
     rating_changes = serializers.BooleanField(required=False, default=True)
     editorial_published = serializers.BooleanField(required=False, default=False)
+    
+    # NEW: Add screen recording field with default True
+    require_screen_recording = serializers.BooleanField(required=False, default=True)
+    recording_max_duration = serializers.IntegerField(required=False, default=180)
     
     # Test contest fields
     testers = serializers.ListField(
@@ -70,6 +75,10 @@ class ContestCreateSerializer(serializers.Serializer):
         rating_changes = validated_data.pop("rating_changes", True)
         editorial_published = validated_data.pop("editorial_published", False)
         
+        # NEW: Extract screen recording settings
+        require_screen_recording = validated_data.pop("require_screen_recording", True)
+        recording_max_duration = validated_data.pop("recording_max_duration", 180)
+        
         contest = Contest(**validated_data)
         contest.status = status
         contest.testers = testers
@@ -83,6 +92,10 @@ class ContestCreateSerializer(serializers.Serializer):
         contest.allow_practice = allow_practice
         contest.rating_changes = rating_changes
         contest.editorial_published = editorial_published
+        
+        # NEW: Set screen recording settings
+        contest.require_screen_recording = require_screen_recording
+        contest.recording_max_duration = recording_max_duration
 
         for problem_data in problems_data:
             pdata = problem_data.copy()
@@ -96,7 +109,7 @@ class ContestCreateSerializer(serializers.Serializer):
             contest.problems.append(problem)
 
         return contest
-    
+
 class TestContestCreateSerializer(serializers.Serializer):    
     # Test contest specific fields
     test_start_time = serializers.DateTimeField(required=True)

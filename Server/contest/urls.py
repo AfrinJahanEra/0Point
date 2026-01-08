@@ -27,6 +27,11 @@ from .views import (
     ContestProblemTutorialAPIView,  # Import the new view
     ContestEditorialAPIView,  # Import the new v,
     ContestPublishTestAPIView,
+    ContestRecordingStatusAPIView,
+    StartContestRecordingAPIView,
+    StopContestRecordingAPIView,
+    UploadContestRecordingAPIView,
+    ContestRecordingSettingsAPIView,
 )
 
 from compiler.views import (
@@ -144,7 +149,7 @@ urlpatterns = [
     path('contests/<str:contest_id>/problems/<str:problem_index>/stats/', ProblemStatisticsAPIView.as_view(), name='problem-statistics'),
 
     # Keep the compiler endpoints
-    path('contests/<str:contest_id>/execute/', CodeExecuteAPIView.as_view(), name='code-execute'),
+    path('contests/<str:contest_id>/problems/<str:problem_index>/run/', CodeExecuteAPIView.as_view(), name='code-run'),
     path('contests/<str:contest_id>/problems/<str:problem_index>/execute/', ContestProblemExecuteAPIView.as_view(), name='contest-problem-execute'),
 
     # virtual URLs - FIXED VERSION
@@ -174,4 +179,11 @@ urlpatterns = [
     path('test-contests/<str:test_contest_id>/submissions/<str:submission_id>/', TestContestSubmissionDetailAPIView.as_view(), name='test-contest-submission-detail'),
 
     path('test-contests/<str:test_contest_id>/standings/', TestContestLeaderboardAPIView.as_view(), name='test-contest-standings'),
+
+
+    path('contests/<contest_id>/recording/status/', ContestRecordingStatusAPIView.as_view(), name='contest-recording-status'),
+    path('contests/<contest_id>/recording/start/', StartContestRecordingAPIView.as_view(), name='start-contest-recording'),
+    path('contests/<contest_id>/recording/<recording_id>/stop/', StopContestRecordingAPIView.as_view(), name='stop-contest-recording'),
+    path('contests/<contest_id>/recording/<recording_id>/upload/', UploadContestRecordingAPIView.as_view(), name='upload-contest-recording'),
+    path('admin/contests/<contest_id>/recording-settings/', ContestRecordingSettingsAPIView.as_view(), name='contest-recording-settings'),
 ]
