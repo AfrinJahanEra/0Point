@@ -1,5 +1,6 @@
 // ContestInside.jsx
 import React, { useState, useEffect } from 'react';
+import ScreenRecorder from '../components/ScreenRecorder';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { 
@@ -19,6 +20,9 @@ const ContestInside = () => {
   // Add this with your other state variables (around line 32)
   const [hasAnyVirtualContest, setHasAnyVirtualContest] = useState(false);
   const [virtualContestId, setVirtualContestId] = useState(null);
+
+  const [user, setUser] = useState(null);
+  const [showRecordingModal, setShowRecordingModal] = useState(false);
 
   const [newAnnouncement, setNewAnnouncement] = useState('');
 
@@ -321,12 +325,29 @@ try {
   }
 };
 
-// REMOVE THIS SECTION - It's in the wrong place!
-// console.log('🎉 All data loaded successfully!');
-// 
-// await checkVirtualContest();
-// 
-// setLoading(false);
+// useEffect(() => {
+//     if (contestData && contestData.id) {
+//       checkRecordingRequirements();
+//     }
+//   }, [contestData]);
+
+  const checkRecordingRequirements = async () => {
+    try {
+      const response = await axios.get(
+        `http://localhost:8000/contests/${contestId}/recording/status/`,
+        { headers: getHeaders() }
+      );
+      
+      const { requires_recording, recording_started } = response.data;
+      
+      // Show recording modal if required and not started yet
+      if (requires_recording && !recording_started && contestData.status === 'live') {
+        setShowRecordingModal(true);
+      }
+    } catch (err) {
+      console.error('Error checking recording requirements:', err);
+    }
+  };
 
 useEffect(() => {
   if (contestId) {
@@ -569,8 +590,67 @@ const getProblemStatusIcon = (problem) => {
     );
   }
 
+  const RecordingRequirementModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 max-w-md mx-4">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v4a1 1 0 102 0V7z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Screen Recording Required</h3>
+          <p className="text-gray-600 mb-4">
+            This contest requires screen recording for integrity purposes. 
+            Please start recording when you begin solving problems.
+          </p>
+        </div>
+        
+        <div className="space-y-3">
+          <button
+            onClick={() => {
+              setShowRecordingModal(false);
+              // Auto-start recording will happen in ScreenRecorder component
+            }}
+            className="w-full bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 transition-colors"
+          >
+            Start Recording Now
+          </button>
+          
+          <button
+            onClick={() => {
+              setShowRecordingModal(false);
+              // Optionally navigate away or show warning
+              alert('You must start recording to participate in this contest.');
+            }}
+            className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* Add ScreenRecorder component */}
+      {contestData && contestData.status === 'live' && (
+        <ScreenRecorder 
+          contestId={contestId}
+          userId={user?.id}
+          contestStatus={contestData.status} // Add this line!
+          onRecordingComplete={(data) => {
+            console.log('Recording completed:', data);
+            // You can show a notification or update UI
+          }}
+        />
+      )}
+      {/* Add Recording Requirement Modal */}
+      {showRecordingModal && <RecordingRequirementModal />}
+      
       {/* Contest Header */}
       <div className="bg-gradient-to-br from-blue-900 to-blue-700 text-white">
         <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
