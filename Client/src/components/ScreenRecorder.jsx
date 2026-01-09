@@ -164,9 +164,38 @@ const ScreenRecorder = ({ contestId, userId, contestStatus, onRecordingComplete 
         setRecordingTime(prev => prev + 1);
       }, 1000);
 
+      // FIX: Handle browser's "Stop sharing" more robustly
       stream.getVideoTracks()[0].onended = () => {
+        console.log('Browser stopped screen sharing');
+        
+        // Stop the media recorder if it's still recording
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          try {
+            mediaRecorderRef.current.stop();
+          } catch (err) {
+            console.log('Error stopping media recorder:', err);
+          }
+        }
+        
+        // Also call stopRecording to handle API cleanup
         stopRecording();
+        
+        // Force cleanup and upload if needed
+        if (recordedChunksRef.current.length > 0) {
+          setTimeout(async () => {
+            await uploadRecording();
+          }, 500);
+        } else {
+          cleanupRecording();
+        }
       };
+
+      // Also monitor audio track if it exists
+      if (stream.getAudioTracks().length > 0) {
+        stream.getAudioTracks()[0].onended = () => {
+          console.log('Audio track ended');
+        };
+      }
 
     } catch (error) {
       setStartingRecording(false);
@@ -181,33 +210,39 @@ const ScreenRecorder = ({ contestId, userId, contestStatus, onRecordingComplete 
   };
 
   const stopRecording = async () => {
-    if (mediaRecorderRef.current && recording) {
+    // Stop the media recorder first if it's still recording
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       try {
         mediaRecorderRef.current.stop();
       } catch (err) {
-        // Ignore stop errors
-      }
-      
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(track => {
-          if (track.readyState === 'live') {
-            track.stop();
-          }
-        });
-      }
-      
-      if (recordingIdRef.current) {
-        try {
-          await axios.post(
-            `http://localhost:8000/contests/${contestId}/recording/${recordingIdRef.current}/stop/`,
-            {},
-            { headers: { Authorization: `Bearer ${TOKEN}` } }
-          );
-        } catch (err) {
-          // Ignore stop API errors
-        }
+        console.log('Error stopping media recorder:', err);
       }
     }
+    
+    // Stop all tracks in the media stream if they're still active
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => {
+        if (track.readyState === 'live') {
+          track.stop();
+        }
+      });
+    }
+    
+    // Call the stop API if we have a recording ID
+    if (recordingIdRef.current) {
+      try {
+        await axios.post(
+          `http://localhost:8000/contests/${contestId}/recording/${recordingIdRef.current}/stop/`,
+          {},
+          { headers: { Authorization: `Bearer ${TOKEN}` } }
+        );
+      } catch (err) {
+        console.log('Stop API error (non-critical):', err);
+      }
+    }
+    
+    // Update UI state
+    setRecording(false);
   };
 
   const uploadRecording = async () => {
