@@ -331,23 +331,24 @@ try {
 //     }
 //   }, [contestData]);
 
-  const checkRecordingRequirements = async () => {
-    try {
-      const response = await axios.get(
-        `http://localhost:8000/contests/${contestId}/recording/status/`,
-        { headers: getHeaders() }
-      );
-      
-      const { requires_recording, recording_started } = response.data;
-      
-      // Show recording modal if required and not started yet
-      if (requires_recording && !recording_started && contestData.status === 'live') {
-        setShowRecordingModal(true);
-      }
-    } catch (err) {
-      console.error('Error checking recording requirements:', err);
+const checkRecordingRequirements = async () => {
+  try {
+    const response = await axios.get(
+      `http://localhost:8000/contests/${contestId}/recording/status/`,
+      { headers: getHeaders() }
+    );
+    
+    const { requires_recording, recording_started } = response.data;
+    
+    // Show recording modal if required and NOT started yet
+    // IMPORTANT: Check that recording_started is false
+    if (requires_recording && !recording_started && contestData.status === 'live') {
+      setShowRecordingModal(true);
     }
-  };
+  } catch (err) {
+    console.error('Error checking recording requirements:', err);
+  }
+};
 
 useEffect(() => {
   if (contestId) {
