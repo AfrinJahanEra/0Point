@@ -18,31 +18,23 @@ const Contests = () => {
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjk0NTYwMTY5MjM3MWFmMGU5OWMyYWZjIiwiZW1haWwiOiJlcmFAZ29vZ2xlLmNvbSIsInJvbGUiOiJ1c2VyIn0.zwibsApLmoW3oQ-Aq9OXw6g56gPqaWr2piZMQypVrew";
 
-  // Helper: normalize CF contest status
-  const normalizeCFStatus = (status, startTime) => {
-    const now = new Date();
-    const start = new Date(startTime);
-    if (status === 'RUNNING') return 'live';
-    if (start > now) return 'upcoming';
-    return 'past';
-  };
 
   // Normalize CF contest data
-  const normalizeCFContest = (c) => {
-    return {
-      id: `cf-${c.external_id || c.id}`,
-      title: c.title,
-      description: 'Codeforces Contest',
-      platform: 'cf',
-      start_time: c.start_time,
-      duration: (c.duration_seconds || c.duration || 0) / 3600,
-      status: normalizeCFStatus(c.status, c.start_time),
-      type: 'individual',
-      participants: c.participants || 0,
-      url: c.url,
-      external: true
-    };
-  };
+const normalizeCFContest = (c) => ({
+  id: `cf-${c.external_id}`,
+  title: c.title,
+  description: 'Codeforces Contest',
+  platform: 'cf',
+  start_time: c.start_time,
+  duration: c.duration_seconds / 3600,
+  status: c.status, // USE BACKEND VALUE
+  type: 'individual',
+  participants: 0,
+  url: c.url,
+  external: true
+});
+
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -92,6 +84,9 @@ const Contests = () => {
 
     fetchData();
   }, []);
+
+
+
 
   // WebSocket connection
   useEffect(() => {
