@@ -1,16 +1,19 @@
 from mongoengine import (
     Document, StringField, DateTimeField,
-    IntField, FloatField, URLField
+    IntField, URLField
 )
 
 class ExternalContest(Document):
     meta = {
         "collection": "external_contests",
-        "indexes": ["platform", "external_id"]
+        "indexes": [
+            ("platform", "external_id"),
+            "-start_time"
+        ]
     }
 
-    platform = StringField(required=True)   # "codeforces"
-    external_id = IntField(required=True)
+    platform = StringField(required=True)          # codeforces
+    external_id = IntField(required=True)          # CF contest id
 
     title = StringField(required=True)
     url = URLField(required=True)
@@ -18,7 +21,9 @@ class ExternalContest(Document):
     start_time = DateTimeField(required=True)
     duration_seconds = IntField(required=True)
 
-    status = StringField(choices=["UPCOMING", "RUNNING", "FINISHED"])
-    participants = IntField(default=0)
+    status = StringField(
+        choices=["upcoming", "live", "finished"],
+        required=True
+    )
 
-    last_synced = DateTimeField()
+    last_synced = DateTimeField(required=True)

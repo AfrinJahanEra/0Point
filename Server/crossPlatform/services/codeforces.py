@@ -1,26 +1,31 @@
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.utils.timezone import make_aware
 from crossPlatform.models import ExternalContest
 
 CF_API = "https://codeforces.com/api/contest.list"
 
+def map_cf_phase(phase: str) -> str:
+    if phase == "CODING":
+        return "live"
+    if phase == "BEFORE":
+        return "upcoming"
+    return "finished"
+
 def sync_codeforces_contests():
-    """
-    Fetch ALL Codeforces contests and store/update them locally
-    """
-    response = requests.get(CF_API, timeout=10)
+    response = requests.get(CF_API, timeout=15)
     response.raise_for_status()
 
     data = response.json()
     if data["status"] != "OK":
         raise RuntimeError("Codeforces API failed")
 
-    contests = data["result"]
     now = make_aware(datetime.utcnow())
 
-    for c in contests:
-        start_time = make_aware(datetime.fromtimestamp(c["startTimeSeconds"]))
+    for c in data["result"]:
+        start_time = make_aware(
+            datetime.utcfromtimestamp(c["startTimeSeconds"])
+        )
 
         ExternalContest.objects(
             platform="codeforces",
@@ -30,7 +35,7 @@ def sync_codeforces_contests():
             set__url=f"https://codeforces.com/contest/{c['id']}",
             set__start_time=start_time,
             set__duration_seconds=c["durationSeconds"],
-            set__status=c["phase"],   # BEFORE / CODING / FINISHED
+            set__status=map_cf_phase(c["phase"]),
             set__last_synced=now,
             upsert=True
         )
