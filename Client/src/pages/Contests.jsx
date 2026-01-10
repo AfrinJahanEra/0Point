@@ -20,20 +20,19 @@ const Contests = () => {
 
 
   // Normalize CF contest data
-const normalizeCFContest = (c) => ({
-  id: `cf-${c.external_id}`,
-  title: c.title,
-  description: 'Codeforces Contest',
-  platform: 'cf',
-  start_time: c.start_time,
-  duration: c.duration_seconds / 3600,
-  status: c.status, // USE BACKEND VALUE
-  type: 'individual',
-  participants: 0,
-  url: c.url,
-  external: true
-});
-
+  const normalizeCFContest = (c) => ({
+    id: `cf-${c.external_id}`,
+    title: c.title,
+    description: 'Codeforces Contest',
+    platform: 'cf',
+    start_time: c.start_time,
+    duration: c.duration_seconds / 3600,
+    status: c.status === 'finished' ? 'past' : c.status,
+    type: 'individual',
+    participants: 0,
+    url: c.url,
+    external: true
+  });
 
 
   useEffect(() => {
@@ -86,12 +85,10 @@ const normalizeCFContest = (c) => ({
   }, []);
 
 
-
-
   // WebSocket connection
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:8000/ws/contest/global/");
-    
+
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -118,7 +115,7 @@ const normalizeCFContest = (c) => ({
   // Filtering logic
   useEffect(() => {
     let filtered = [...contests];
-    
+
     // Status filter
     if (activeTab !== 'all') {
       if (activeTab === 'draft') {
@@ -127,21 +124,21 @@ const normalizeCFContest = (c) => ({
         filtered = filtered.filter(c => c.status === activeTab);
       }
     }
-    
+
     // Platform filter
     if (activePlatform !== 'all') {
       filtered = filtered.filter(c => c.platform === activePlatform);
     }
-    
+
     // Search filter
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(c => 
-        c.title.toLowerCase().includes(q) || 
+      filtered = filtered.filter(c =>
+        c.title.toLowerCase().includes(q) ||
         (c.description && c.description.toLowerCase().includes(q))
       );
     }
-    
+
     setFilteredContests(filtered);
   }, [contests, activeTab, activePlatform, searchQuery]);
 
@@ -166,12 +163,12 @@ const normalizeCFContest = (c) => ({
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
         alert("Contest published successfully!");
-        
+
         // Refresh contests list
         const contestsRes = await axios.get('http://localhost:8000/contests/', {
           headers: { Authorization: `Bearer ${TOKEN}` }
         });
-        
+
         // Get existing external contests
         const externalContests = contests.filter(c => c.external);
         const updatedContests = [...contestsRes.data.contests || [], ...externalContests];
@@ -210,16 +207,16 @@ const normalizeCFContest = (c) => ({
     try {
       const d = new Date(date);
       if (isNaN(d.getTime())) return 'Invalid date';
-      return d.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
-      }) + ' ' + 
-      d.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true 
-      });
+      return d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }) + ' ' +
+        d.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
     } catch (e) {
       return 'Invalid date';
     }
@@ -242,38 +239,38 @@ const normalizeCFContest = (c) => ({
       window.open(externalUrl, '_blank');
       return;
     }
-    
+
     if (contestStatus === 'draft') {
       navigate(`/contests/${contestId}/edit`);
       return;
     }
-    
+
     try {
       const problemsRes = await axios.get(
         `http://localhost:8000/contests/${contestId}/problems/`,
         { headers: { Authorization: `Bearer ${TOKEN}` } }
       );
-      
+
       const problems = problemsRes.data.problems || [];
-      
+
       if (problems.length === 0) {
         alert('This contest has no problems yet.');
         return;
       }
-      
+
       navigate(`/contests/${contestId}`);
-      
+
     } catch (error) {
       console.error('Error fetching contest problems:', error);
-      
+
       if (error.response?.status === 403) {
         const errorData = error.response.data;
-        
+
         if (errorData.can_register) {
           const shouldRegister = window.confirm(
             `You need to register for this ${contestStatus} contest. Register now?`
           );
-          
+
           if (shouldRegister) {
             try {
               await axios.post(
@@ -281,12 +278,12 @@ const normalizeCFContest = (c) => ({
                 {},
                 { headers: { Authorization: `Bearer ${TOKEN}` } }
               );
-              
+
               await refreshRegisteredContests();
-              
+
               alert('Successfully registered! You can now enter the contest.');
               navigate(`/contests/${contestId}`);
-              
+
             } catch (registerError) {
               console.error('Registration error:', registerError);
               navigate(`/contests/${contestId}/register`);
@@ -334,7 +331,7 @@ const normalizeCFContest = (c) => ({
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">Error Loading Contests</h3>
           <p className="text-gray-600 text-sm text-center">{error}</p>
-          <button 
+          <button
             onClick={() => window.location.reload()}
             className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors"
           >
@@ -377,11 +374,10 @@ const normalizeCFContest = (c) => ({
                   <button
                     key={tab.value}
                     onClick={() => setActiveTab(tab.value)}
-                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors duration-200 whitespace-nowrap ${
-                      activeTab === tab.value
+                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors duration-200 whitespace-nowrap ${activeTab === tab.value
                         ? 'bg-white text-gray-900 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -393,18 +389,18 @@ const normalizeCFContest = (c) => ({
             <div className="grid gap-4">
               {filteredContests.length > 0 ? (
                 filteredContests.map(contest => (
-                  <div 
-                    key={contest.id} 
+                  <div
+                    key={contest.id}
                     className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200"
-                    style={{ 
+                    style={{
                       cursor: contest.status === 'upcoming' ? 'default' : 'pointer'
                     }}
                     onClick={() => {
                       if (contest.status !== 'upcoming' && !contest.status === 'draft') {
                         handleContestEntry(
-                          contest.id, 
-                          contest.status, 
-                          contest.external, 
+                          contest.id,
+                          contest.status,
+                          contest.external,
                           contest.url
                         );
                       }
@@ -502,14 +498,14 @@ const normalizeCFContest = (c) => ({
                           )
                         ) : contest.status === 'past' ? (
                           contest.external ? (
-                            <button 
+                            <button
                               onClick={() => window.open(contest.url, '_blank')}
                               className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200"
                             >
                               View Results
                             </button>
                           ) : (
-                            <button 
+                            <button
                               onClick={() => handleContestEntry(contest.id, 'past')}
                               className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200"
                             >
@@ -526,11 +522,11 @@ const normalizeCFContest = (c) => ({
                   <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No contests found</h3>
                   <p className="text-gray-600 text-xs">
-                    {activeTab === 'draft' 
-                      ? "You don't have any draft contests." 
+                    {activeTab === 'draft'
+                      ? "You don't have any draft contests."
                       : activeTab !== 'all'
-                      ? `No ${activeTab} contests found. Try a different filter.`
-                      : "Try adjusting your filters to find more contests."}
+                        ? `No ${activeTab} contests found. Try a different filter.`
+                        : "Try adjusting your filters to find more contests."}
                   </p>
                 </div>
               )}
@@ -543,15 +539,14 @@ const normalizeCFContest = (c) => ({
               <div className="p-3 border-b border-gray-200">
                 <h2 className="text-xs font-semibold text-gray-900 mb-3">Filter by Platform</h2>
                 <div className="space-y-1">
-                  {['all','IUT','cf','codechef','atcoder','hackerrank','leetcode'].map(platform => (
+                  {['all', 'IUT', 'cf', 'codechef', 'atcoder', 'hackerrank', 'leetcode'].map(platform => (
                     <button
                       key={platform}
                       onClick={() => setActivePlatform(platform)}
-                      className={`w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors duration-200 ${
-                        activePlatform === platform
+                      className={`w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors duration-200 ${activePlatform === platform
                           ? 'bg-blue-50 text-blue-800 border border-blue-200'
                           : 'text-gray-700 hover:bg-gray-50'
-                      }`}
+                        }`}
                     >
                       <span>{platform === 'all' ? 'All Platforms' : getPlatformName(platform)}</span>
                     </button>
