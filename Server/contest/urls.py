@@ -32,6 +32,8 @@ from .views import (
     StopContestRecordingAPIView,
     UploadContestRecordingAPIView,
     ContestRecordingSettingsAPIView,
+    ContestRecordingsListAPIView,
+    ContestUserRecordingsAPIView,
 )
 
 from compiler.views import (
@@ -173,7 +175,7 @@ urlpatterns = [
 
     # Test contest submission endpoints
     path('test-contests/submit/', TestContestSubmissionCreateAPIView.as_view(), name='test-contest-submit'),
-    path('test-contests/<str:test_contest_id>/execute/', TestContestExecuteAPIView.as_view(), name='test-contest-execute'),
+    path('test-contests/<str:test_contest_id>/problems/<str:problem_index>/run/', TestContestExecuteAPIView.as_view(), name='test-contest-execute'),
     path('test-contests/<str:test_contest_id>/problems/<str:problem_index>/execute/', TestContestProblemExecuteAPIView.as_view(), name='test-contest-problem-execute'),
     path('test-contests/<str:test_contest_id>/submissions/', TestContestSubmissionsAPIView.as_view(), name='test-contest-submissions'),
     path('test-contests/<str:test_contest_id>/submissions/<str:submission_id>/', TestContestSubmissionDetailAPIView.as_view(), name='test-contest-submission-detail'),
@@ -186,4 +188,6 @@ urlpatterns = [
     path('contests/<contest_id>/recording/<recording_id>/stop/', StopContestRecordingAPIView.as_view(), name='stop-contest-recording'),
     path('contests/<contest_id>/recording/<recording_id>/upload/', UploadContestRecordingAPIView.as_view(), name='upload-contest-recording'),
     path('admin/contests/<contest_id>/recording-settings/', ContestRecordingSettingsAPIView.as_view(), name='contest-recording-settings'),
+    path('contests/<contest_id>/recordings/', ContestRecordingsListAPIView.as_view(), name='contest-recordings-list'),
+    path('contests/<contest_id>/recordings/user/<user_id>/', ContestUserRecordingsAPIView.as_view(), name='contest-user-recordings'),
 ]
