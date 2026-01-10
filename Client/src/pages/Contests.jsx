@@ -16,7 +16,7 @@ const Contests = () => {
 
   const navigate = useNavigate();
 
-  const TOKEN = "YOUR_TOKEN_HERE";
+  const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjk0NTYwMTY5MjM3MWFmMGU5OWMyYWZjIiwiZW1haWwiOiJlcmFAZ29vZ2xlLmNvbSIsInJvbGUiOiJ1c2VyIn0.zwibsApLmoW3oQ-Aq9OXw6g56gPqaWr2piZMQypVrew";
 
   // Helper: normalize CF contest status
   const normalizeCFStatus = (status, startTime) => {
