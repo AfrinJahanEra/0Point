@@ -419,28 +419,26 @@ const handleRun = async () => {
   }
 
   try {
-    // Use sample test case input for running
-    const sampleInput = problemData?.sample_test_cases?.[0]?.input || '';
-    const expectedOutput = problemData?.sample_test_cases?.[0]?.output || '';
-
     const runData = {
-      code: code,
       language: language,
-      input_data: sampleInput
-      // Remove version_index and expected_output if not needed by the backend
+      code: code,
+      // For test contest run, it should run against all test cases
+      problem_index: problemData?.problem_index || problemIndex, // ADD THIS
     };
 
-    console.log('Running code against test contest:', runData);
+    console.log('Running code for test contest with data:', runData);
     
     // Set loading state
     setCompilationStats({
       status: 'running',
-      message: 'Running against sample test case...',
-      type: 'run'
+      message: 'Running against all test cases...',
+      type: 'run',
+      is_test_contest: true
     });
     
+    // Use the same endpoint structure as regular contests
     const response = await axios.post(
-      `http://localhost:8000/test-contests/${testContestId}/execute/`,
+      `http://localhost:8000/test-contests/${testContestId}/problems/${problemData?.problem_index || problemIndex}/run/`,
       runData,
       { 
         headers: { 
@@ -452,52 +450,49 @@ const handleRun = async () => {
 
     console.log('Test contest run response:', response.data);
     
-    // Handle the response based on actual structure
+    // Update compilation stats based on actual API response
     const result = response.data;
     
-    // Check if execution was successful based on the actual response structure
-    const isSuccess = result.status === 'success' || 
-                     result.verdict === 'AC' || 
-                     result.is_execution_success ||
-                     (result.output !== undefined && result.error === undefined);
-    
-    if (isSuccess) {
-      const isCorrect = expectedOutput ? 
-        (result.output?.trim() === expectedOutput.trim()) : true;
-      
+    if (result.verdict === 'AC' || result.all_passed === true) {
       setCompilationStats({
-        status: isCorrect ? 'success' : 'error',
-        verdict: isCorrect ? 'AC' : 'WA',
-        time: result.execution_time || result.execution_time_ms || 0,
-        memory: result.memory || result.memory_kb || 0,
+        status: 'success',
+        verdict: result.verdict || 'AC',
+        time: result.execution_time || 0,
+        memory: result.memory_used || result.memory || 0,
+        passed: result.passed_test_cases || result.total_test_cases || 0,
+        total: result.total_test_cases || 0,
+        // Show all test case outputs if available
+        testCaseOutputs: result.test_case_outputs || [],
+        // For backward compatibility, keep single output
         output: result.output || '',
-        message: isCorrect ? 'Test case passed!' : 'Wrong Answer',
+        message: result.status || `All ${result.total_test_cases || 0} test cases passed!`,
         type: 'run',
-        expectedOutput: expectedOutput,
-        is_test_contest: true,
-        rawResponse: result // Store full response for debugging
+        is_test_contest: true
       });
     } else {
       setCompilationStats({
-        status: 'error',
-        verdict: result.verdict || result.status || 'RE',
-        time: result.execution_time || result.execution_time_ms || 0,
-        memory: result.memory || result.memory_kb || 0,
-        output: result.output || result.error || '',
-        message: result.status || result.error || 'Runtime Error',
+        status: result.verdict === 'CE' ? 'compile_error' : 'error',
+        verdict: result.verdict || 'WA',
+        time: result.execution_time || 0,
+        memory: result.memory_used || result.memory || 0,
+        passed: result.passed_test_cases || 0,
+        total: result.total_test_cases || 0,
+        failedTestCase: result.failed_test_case || 0,
+        // Include test cases for WA too
+        testCaseOutputs: result.test_case_outputs || [],
+        output: result.output || '',
+        message: result.error_message || 
+                `${result.passed_test_cases || 0}/${result.total_test_cases || 0} test cases passed`,
         type: 'run',
-        is_test_contest: true,
-        rawResponse: result
+        is_test_contest: true
       });
     }
     
   } catch (error) {
     console.error('Test contest run error:', error);
-    console.error('Error response:', error.response?.data);
-    
     setCompilationStats({
       status: 'error',
-      message: error.response?.data?.error || error.message || 'Run failed',
+      message: error.response?.data?.error || 'Run failed',
       type: 'run',
       is_test_contest: true
     });
@@ -535,9 +530,9 @@ const handleSubmit = async () => {
 
   try {
     const submitData = {
-      code: code,
       language: language,
-      create_submission: true  // Add this flag if your backend uses it
+      code: code,
+      // For submission, it should judge against all test cases
     };
 
     console.log('Submitting to test contest:', submitData);
@@ -545,7 +540,7 @@ const handleSubmit = async () => {
     // Set loading state
     setCompilationStats({
       status: 'running',
-      message: 'Submitting to test contest and judging against all test cases...',
+      message: 'Submitting and judging against all test cases...',
       type: 'submit',
       is_test_contest: true
     });
@@ -565,19 +560,20 @@ const handleSubmit = async () => {
     
     const result = response.data;
     
-    if (result.verdict === 'AC' || result.status === 'success') {
+    if (result.verdict === 'AC' || result.all_passed === true) {
       setCompilationStats({
         status: 'success',
-        verdict: 'AC',
+        verdict: result.verdict || 'AC',
         time: result.execution_time || 0,
         memory: result.memory_used || result.memory || 0,
-        passed: result.passed_test_cases || 0,
+        passed: result.passed_test_cases || result.total_test_cases || 0,
         total: result.total_test_cases || 0,
-        message: result.message || `All ${result.total_test_cases || 0} test cases passed!`,
-        submissionId: result.test_submission_id || result.submission_id,
+        // Include test case outputs if available
+        testCaseOutputs: result.test_case_outputs || [],
+        message: result.status || `All ${result.total_test_cases || 0} test cases passed!`,
+        submissionId: result.submission_id || result.test_submission_id,
         type: 'submit',
-        is_test_contest: true,
-        rawResponse: result
+        is_test_contest: true
       });
       
       // Refresh status
@@ -592,20 +588,20 @@ const handleSubmit = async () => {
         passed: result.passed_test_cases || 0,
         total: result.total_test_cases || 0,
         failedTestCase: result.failed_test_case || 0,
-        message: result.message || `${result.passed_test_cases || 0}/${result.total_test_cases || 0} test cases passed`,
+        // Include test case outputs
+        testCaseOutputs: result.test_case_outputs || [],
+        message: result.error_message || 
+                `${result.passed_test_cases || 0}/${result.total_test_cases || 0} test cases passed`,
         type: 'submit',
-        is_test_contest: true,
-        rawResponse: result
+        is_test_contest: true
       });
     }
     
   } catch (error) {
     console.error('Test contest submission error:', error);
-    console.error('Error response:', error.response?.data);
-    
     setCompilationStats({
       status: 'error',
-      message: error.response?.data?.error || error.message || 'Submission failed',
+      message: error.response?.data?.error || 'Submission failed',
       type: 'submit',
       is_test_contest: true
     });
@@ -901,7 +897,7 @@ const handleSubmit = async () => {
                   <span className="text-xs font-semibold text-gray-900">Discussions</span>
                 </button>
               )} */}
-              {displayContestData.status === 'live' && (
+              {/* {displayContestData.status === 'live' && (
                 <button
                   onClick={() => console.log('Navigate to test contest clarifications')}
                   className="w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
@@ -909,7 +905,7 @@ const handleSubmit = async () => {
                   <HelpCircle className="w-4 h-4" />
                   <span className="text-xs font-semibold text-gray-900">Clarifications</span>
                 </button>
-              )}
+              )} */}
               
               <button
                 onClick={() => navigate(`/test-contests/${testContestId}/standings`)}
@@ -1208,138 +1204,168 @@ const handleSubmit = async () => {
                 </div>
               </div>
 
-              {/* Compilation Stats */}
-              {compilationStats && (
-                <div className="border-t border-gray-200">
-                  <div className={`p-4 ${compilationStats.status === 'running' ? 'bg-blue-50' : compilationStats.status === 'success' ? 'bg-green-50' : compilationStats.status === 'compile_error' ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center space-x-2">
-                        {compilationStats.status === 'running' ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                            <span className="text-sm font-medium text-blue-900">Test Running...</span>
-                          </>
-                        ) : compilationStats.status === 'success' ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-900">Test Success!</span>
-                          </>
-                        ) : compilationStats.status === 'compile_error' ? (
-                          <>
-                            <AlertCircle className="w-4 h-4 text-yellow-600" />
-                            <span className="text-sm font-medium text-yellow-900">Test Compilation Error</span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle className="w-4 h-4 text-red-600" />
-                            <span className="text-sm font-medium text-red-900">Test Failed</span>
-                          </>
-                        )}
-                        <span className="text-xs px-2 py-1 bg-white rounded border">
-                          {compilationStats.type === 'run' ? 'Test Run' : 'Test Submit'}
-                        </span>
-                        <span className="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded border">
-                          TEST
-                        </span>
-                      </div>
-                      <button 
-                        onClick={() => setCompilationStats(null)}
-                        className="text-gray-500 hover:text-gray-700 text-sm"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {/* Message */}
-                      <div className="text-sm">
-                        {compilationStats.message}
-                      </div>
-                      
-                      {/* Stats Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                        {/* Verdict */}
-                        <div className="bg-white p-2 rounded border">
-                          <div className="text-xs text-gray-600">Verdict</div>
-                          <div className={`font-medium text-sm ${
-                            compilationStats.verdict === 'AC' ? 'text-green-600' :
-                            compilationStats.verdict === 'WA' ? 'text-red-600' :
-                            compilationStats.verdict === 'TLE' ? 'text-orange-600' :
-                            compilationStats.verdict === 'MLE' ? 'text-purple-600' :
-                            compilationStats.verdict === 'CE' ? 'text-yellow-600' :
-                            compilationStats.verdict === 'RE' ? 'text-pink-600' :
-                            'text-gray-700'
-                          }`}>
-                            {compilationStats.verdict || 'N/A'}
-                          </div>
-                        </div>
-                        
-                        {/* Time */}
-                        {compilationStats.time > 0 && (
-                          <div className="bg-white p-2 rounded border">
-                            <div className="text-xs text-gray-600">Time</div>
-                            <div className="font-medium text-sm text-gray-900">
-                              {compilationStats.time} ms
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Memory */}
-                        {compilationStats.memory > 0 && (
-                          <div className="bg-white p-2 rounded border">
-                            <div className="text-xs text-gray-600">Memory</div>
-                            <div className="font-medium text-sm text-gray-900">
-                              {compilationStats.memory > 1024 
-                                ? `${(compilationStats.memory / 1024).toFixed(2)} MB` 
-                                : `${compilationStats.memory} KB`}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Test Cases */}
-                        {compilationStats.passed !== undefined && (
-                          <div className="bg-white p-2 rounded border">
-                            <div className="text-xs text-gray-600">Test Cases</div>
-                            <div className="font-medium text-sm text-gray-900">
-                              {compilationStats.passed}/{compilationStats.total}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Output (for run) */}
-                      {compilationStats.output && compilationStats.type === 'run' && (
-                        <div className="mt-3 space-y-2">
-                          <div className="text-xs text-gray-600 mb-1">Test Output:</div>
-                          <pre className="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto font-mono">
-                            {compilationStats.output}
-                          </pre>
-                          
-                          {/* Show expected output if available and mismatch */}
-                          {compilationStats.expectedOutput && 
-                          compilationStats.output?.trim() !== compilationStats.expectedOutput.trim() && (
-                            <>
-                              <div className="text-xs text-gray-600 mb-1">Expected Output:</div>
-                              <pre className="bg-gray-700 text-gray-100 p-3 rounded text-xs overflow-x-auto font-mono border-l-4 border-yellow-500">
-                                {compilationStats.expectedOutput}
-                              </pre>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Test contest info */}
-                      {compilationStats.is_test_contest && (
-                        <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded text-xs text-purple-800">
-                          <div className="flex items-center gap-2">
-                            <span>This is a test contest submission. Results are for testing purposes only.</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+{compilationStats && (
+  <div className="border-t border-gray-200">
+    <div className={`p-4 ${compilationStats.status === 'running' ? 'bg-blue-50' : compilationStats.status === 'success' ? 'bg-green-50' : compilationStats.status === 'compile_error' ? 'bg-yellow-50' : 'bg-red-50'}`}>
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center space-x-2">
+          {compilationStats.status === 'running' ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">Running...</span>
+            </>
+          ) : compilationStats.status === 'success' ? (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-medium text-green-900">Success!</span>
+            </>
+          ) : compilationStats.status === 'compile_error' ? (
+            <>
+              <AlertCircle className="w-4 h-4 text-yellow-600" />
+              <span className="text-sm font-medium text-yellow-900">Compilation Error</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <span className="text-sm font-medium text-red-900">Failed</span>
+            </>
+          )}
+          <span className="text-xs px-2 py-1 bg-white rounded border">
+            {compilationStats.type === 'run' ? 'Run' : 'Submit'}
+          </span>
+          <span className="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded border">
+            TEST CONTEST
+          </span>
+        </div>
+        <button 
+          onClick={() => setCompilationStats(null)}
+          className="text-gray-500 hover:text-gray-700 text-sm"
+        >
+          ×
+        </button>
+      </div>
+      
+      <div className="space-y-2">
+        {/* Message */}
+        <div className="text-sm">
+          {compilationStats.message}
+        </div>
+        
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+          {/* Verdict */}
+          <div className="bg-white p-2 rounded border">
+            <div className="text-xs text-gray-600">Verdict</div>
+            <div className={`font-medium text-sm ${
+              compilationStats.verdict === 'AC' ? 'text-green-600' :
+              compilationStats.verdict === 'WA' ? 'text-red-600' :
+              compilationStats.verdict === 'TLE' ? 'text-orange-600' :
+              compilationStats.verdict === 'MLE' ? 'text-purple-600' :
+              compilationStats.verdict === 'CE' ? 'text-yellow-600' :
+              compilationStats.verdict === 'RE' ? 'text-pink-600' :
+              'text-gray-700'
+            }`}>
+              {compilationStats.verdict || 'N/A'}
+            </div>
+          </div>
+          
+          {/* Time */}
+          {compilationStats.time > 0 && (
+            <div className="bg-white p-2 rounded border">
+              <div className="text-xs text-gray-600">Time</div>
+              <div className="font-medium text-sm text-gray-900">
+                {compilationStats.time} ms
+              </div>
+            </div>
+          )}
+          
+          {/* Memory */}
+          {compilationStats.memory > 0 && (
+            <div className="bg-white p-2 rounded border">
+              <div className="text-xs text-gray-600">Memory</div>
+              <div className="font-medium text-sm text-gray-900">
+                {compilationStats.memory > 1024 
+                  ? `${(compilationStats.memory / 1024).toFixed(2)} MB` 
+                  : `${compilationStats.memory} KB`}
+              </div>
+            </div>
+          )}
+          
+          {/* Test Cases */}
+          {compilationStats.passed !== undefined && (
+            <div className="bg-white p-2 rounded border">
+              <div className="text-xs text-gray-600">Test Cases</div>
+              <div className="font-medium text-sm text-gray-900">
+                {compilationStats.passed}/{compilationStats.total}
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Failed Test Case Info */}
+        {compilationStats.failedTestCase && (
+          <div className="mt-2 text-sm">
+            <span className="text-gray-600">Failed on test case:</span>
+            <span className="font-medium ml-2">#{compilationStats.failedTestCase}</span>
+          </div>
+        )}
+        
+        {/* Output section - show all test cases */}
+        {compilationStats.testCaseOutputs && compilationStats.testCaseOutputs.length > 0 && (
+          <div className="mt-3 space-y-4">
+            <div className="text-xs text-gray-600 mb-1">Test Case Results:</div>
+            {compilationStats.testCaseOutputs.map((tc, idx) => (
+              <div key={idx} className="border border-gray-300 rounded overflow-hidden">
+                <div className="bg-gray-100 px-3 py-2 text-xs font-medium">
+                  Test Case {tc.test_case} {tc.passed ? '✓' : '✗'}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
+                  <div className="p-2 border-r border-gray-300">
+                    <div className="text-xs text-gray-600 mb-1">Input:</div>
+                    <pre className="text-xs font-mono bg-gray-800 text-gray-100 p-2 rounded overflow-x-auto">
+                      {tc.input}
+                    </pre>
+                  </div>
+                  <div className="p-2 border-r border-gray-300">
+                    <div className="text-xs text-gray-600 mb-1">Expected:</div>
+                    <pre className="text-xs font-mono bg-gray-700 text-gray-100 p-2 rounded overflow-x-auto">
+                      {tc.expected}
+                    </pre>
+                  </div>
+                  <div className="p-2">
+                    <div className="text-xs text-gray-600 mb-1">Actual:</div>
+                    <pre className={`text-xs font-mono p-2 rounded overflow-x-auto ${
+                      tc.passed ? 'bg-green-900 text-green-100' : 'bg-red-900 text-red-100'
+                    }`}>
+                      {tc.actual || tc.error || 'No output'}
+                    </pre>
                   </div>
                 </div>
-              )}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Submission ID */}
+        {compilationStats.submissionId && (
+          <div className="mt-2 text-sm">
+            <span className="text-gray-600">Submission ID:</span>
+            <span className="font-medium ml-2">{compilationStats.submissionId}</span>
+          </div>
+        )}
+        
+        {/* Test contest info */}
+        {compilationStats.is_test_contest && (
+          <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded text-xs text-purple-800">
+            <div className="flex items-center gap-2">
+              <span>This is a test contest submission. Results are for testing purposes only.</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
             </div>
           </div>
         </div>
