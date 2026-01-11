@@ -91,6 +91,13 @@ const [showStatementPreview, setShowStatementPreview] = useState(false);
     testStartTime: '',
     testDuration: 1,
   });
+    const [predefinedTags] = useState([
+  'Dynamic Programming', 'Graph Theory', 'Greedy', 'Binary Search',
+  'Mathematics', 'Data Structures', 'Strings', 'Sorting',
+  'Trees', 'Geometry', 'Combinatorics', 'Bitmasking',
+  'Number Theory', 'Two Pointers', 'DFS/BFS', 'Backtracking',
+  'Segment Tree', 'DSU', 'Shortest Path', 'Game Theory'
+]);
   const [testInvites, setTestInvites] = useState('');
   const [publishErrors, setPublishErrors] = useState({});
 
@@ -936,16 +943,22 @@ const addTestCase = (problemId) => {
     });
   };
 
-  const addTag = (problemId) => {
-    if (newTag.trim()) {
-      setProblems(prev => prev.map(problem => 
-        problem.id === problemId 
-          ? { ...problem, tags: [...problem.tags, newTag.trim()] }
-          : problem
-      ));
-      setNewTag('');
-    }
-  };
+const addTag = (problemId) => {
+  if (newTag.trim()) {
+    setProblems(prev => prev.map(problem => {
+      if (problem.id === problemId) {
+        // Check if tag already exists
+        if (problem.tags.includes(newTag.trim())) {
+          alert('This tag is already added!');
+          return problem;
+        }
+        return { ...problem, tags: [...problem.tags, newTag.trim()] };
+      }
+      return problem;
+    }));
+    setNewTag('');
+  }
+};
 
   const removeTag = (problemId, tagIndex) => {
     setProblems(prev => prev.map(problem => 
@@ -1321,45 +1334,59 @@ const addTestCase = (problemId) => {
 
 
 
-              {/* Tags */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <h3 className="font-semibold text-gray-900">Problem Tags</h3>
-                </div>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {currentProblem.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
-                    >
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => removeTag(currentProblem.id, index)}
-                        className="hover:text-blue-900"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    placeholder="Add a tag..."
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => addTag(currentProblem.id)}
-                    className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition-colors duration-200"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
+{/* Tags - Dropdown Version */}
+<div>
+  <div className="flex items-center gap-2 mb-3">
+    <h3 className="font-semibold text-gray-900">Problem Tags</h3>
+  </div>
+  <div className="flex flex-wrap gap-2 mb-3">
+    {currentProblem.tags.map((tag, index) => (
+      <span
+        key={index}
+        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
+      >
+        {tag}
+        <button
+          type="button"
+          onClick={() => removeTag(currentProblem.id, index)}
+          className="hover:text-blue-900"
+        >
+          ×
+        </button>
+      </span>
+    ))}
+  </div>
+  <div className="flex gap-2">
+    <select
+      value={newTag}
+      onChange={(e) => setNewTag(e.target.value)}
+      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+    >
+      <option value="">Select a tag...</option>
+      {predefinedTags
+        .filter(tag => !currentProblem.tags.includes(tag)) // Only show tags not already added
+        .map(tag => (
+          <option key={tag} value={tag}>{tag}</option>
+        ))
+      }
+    </select>
+    <button
+      type="button"
+      onClick={() => {
+        if (newTag.trim()) {
+          addTag(currentProblem.id);
+        }
+      }}
+      className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition-colors duration-200"
+      disabled={!newTag.trim()}
+    >
+      Add
+    </button>
+  </div>
+  {predefinedTags.filter(tag => !currentProblem.tags.includes(tag)).length === 0 && (
+    <p className="text-xs text-gray-500 mt-2">All available tags have been added to this problem.</p>
+  )}
+</div>
 
 {/* Code Editor Section */}
 <div>
