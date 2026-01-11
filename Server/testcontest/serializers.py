@@ -55,12 +55,6 @@ class TestContestSerializer(serializers.Serializer):
     rating_changes = serializers.BooleanField(default=True)
     editorial_published = serializers.BooleanField(default=False)
 
-# class TestContestRegistrationSerializer(serializers.Serializer):
-#     """Serializer for test contest registration"""
-#     contest_id = serializers.CharField(required=True)
-#     user_id = serializers.CharField(required=True)
-
-# testcontest/serializers.py - Add these classes
 
 class TestContestSubmissionCreateSerializer(serializers.Serializer):
     """Serializer for creating test contest submissions"""
@@ -172,3 +166,10 @@ class TestContestSubmissionSerializer(serializers.Serializer):
         # Users can view their own code
         return obj['user_id'] == str(user.id)
         
+
+# class TestContestRegistrationSerializer(serializers.Serializer):
+#     """Serializer for test contest registration"""
+#     contest_id = serializers.CharField(required=True)
+#     user_id = serializers.CharField(required=True)
+
+# testcontest/serializers.py - Add these classes

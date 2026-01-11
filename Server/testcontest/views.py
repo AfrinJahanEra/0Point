@@ -649,46 +649,159 @@ class TestContestSubmissionCreateAPIView(APIView):
                 "test_submission_id": str(test_submission.id)
             }, status=500)
         
-class TestContestExecuteAPIView(APIView):
-    """Direct code execution for test contests (without problem context)"""
+# class TestContestExecuteAPIView(APIView):
+#     """Direct code execution for test contests (without problem context)"""
     
-    def post(self, request, test_contest_id):
-        # Authenticate user
+#     def post(self, request, test_contest_id):
+#         # Authenticate user
+#         user = get_user_from_request(request)
+#         if not user:
+#             return Response({"error": "Authentication required"}, status=401)
+        
+#         # Get test contest
+#         try:
+#             test_contest = TestContest.objects.get(id=test_contest_id)
+#         except TestContest.DoesNotExist:
+#             return Response({"error": "Test contest not found"}, status=404)
+        
+#         # Check access
+#         if user.email not in test_contest.testers and str(test_contest.created_by.id) != str(user.id):
+#             return Response({"error": "Access denied to test contest"}, status=403)
+        
+#         # Check test contest status - allow execution even if not live for "Run" button
+#         # current_status = get_test_contest_status(test_contest)
+#         # if current_status != "live":
+#         #     return Response({"error": f"Test contest is not live (current status: {current_status})"}, status=400)
+        
+#         # Get code execution parameters from request
+#         code = request.data.get('code')
+#         language = request.data.get('language')
+#         input_data = request.data.get('input_data', '')
+#         expected_output = request.data.get('expected_output', '')
+        
+#         if not code or not language:
+#             return Response({"error": "Missing code or language"}, status=400)
+        
+#         # Use JDoodle API directly (copy from compiler/views.py)
+#         # JDoodle credentials
+#         JD_CLIENT_ID = "6c83bb2cd0b9e9a790f59a2484011318"
+#         JD_CLIENT_SECRET = "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4"
+#         JD_URL = "https://api.jdoodle.com/v1/execute"
+        
+#         # Map for language -> recommended versionIndex
+#         LANGUAGE_VERSION_MAP = {
+#             "python": "3",
+#             "python3": "3",
+#             "java": "4",
+#             "c": "5",
+#             "cpp": "5",
+#             "javascript": "4"
+#         }
+        
+#         language_lower = language.lower()
+#         version_index = LANGUAGE_VERSION_MAP.get(language_lower, "0")
+        
+#         # JDoodle payload
+#         payload = {
+#             "clientId": JD_CLIENT_ID,
+#             "clientSecret": JD_CLIENT_SECRET,
+#             "script": code,
+#             "stdin": input_data,
+#             "language": language_lower,
+#             "versionIndex": version_index
+#         }
+        
+#         try:
+#             res = requests.post(JD_URL, json=payload, timeout=15)
+#             res_data = res.json()
+            
+#             jdoodle_output = res_data.get("output", "").strip()
+#             cpu_time_str = res_data.get("cpuTime")
+#             cpu_time_seconds = 0.0 if cpu_time_str is None else float(cpu_time_str)
+#             cpu_time_ms = int(cpu_time_seconds * 1000)
+#             memory_kb = int(res_data.get("memory", 0))
+#             status_code = res_data.get("statusCode", 200)
+#             is_execution_success = res_data.get("isExecutionSuccess", False)
+            
+#             # Check expected output if provided
+#             verdict = "OK"
+#             if expected_output:
+#                 verdict = "AC" if jdoodle_output == expected_output.strip() else "WA"
+            
+#             # Check for compilation/runtime errors
+#             status = "success" if is_execution_success else "error"
+#             if status_code == 400:
+#                 status = "compilation_error"
+#             elif not is_execution_success:
+#                 status = "runtime_error"
+            
+#             # Return response
+#             return Response({
+#                 "submission_id": None,  # No submission ID for direct execution
+#                 "contest_id": str(test_contest.original_contest.id),
+#                 "test_contest_id": test_contest_id,
+#                 "problem_id": None,  # No problem for direct execution
+#                 "output": jdoodle_output,
+#                 "status": status,
+#                 "verdict": verdict,
+#                 "execution_time_ms": cpu_time_ms,
+#                 "execution_time_seconds": cpu_time_seconds,
+#                 "memory_kb": memory_kb,
+#                 "memory_mb": round(memory_kb / 1024, 2),
+#                 "status_code": status_code,
+#                 "is_execution_success": is_execution_success,
+#                 "is_test_contest": True,
+#                 "jdoodle_response": res_data
+#             })
+            
+#         except requests.exceptions.Timeout:
+#             return Response({
+#                 "error": "Execution timeout (15 seconds)",
+#                 "is_test_contest": True
+#             }, status=408)
+            
+#         except Exception as e:
+#             return Response({
+#                 "error": f"Execution error: {str(e)}",
+#                 "is_test_contest": True
+#             }, status=500)
+
+class TestContestExecuteAPIView(APIView):
+    """Direct code execution for test contests (runs ALL test cases like main judge)"""
+
+    def post(self, request, test_contest_id, problem_index=None):
         user = get_user_from_request(request)
         if not user:
             return Response({"error": "Authentication required"}, status=401)
-        
-        # Get test contest
+
         try:
             test_contest = TestContest.objects.get(id=test_contest_id)
         except TestContest.DoesNotExist:
             return Response({"error": "Test contest not found"}, status=404)
-        
-        # Check access
+
         if user.email not in test_contest.testers and str(test_contest.created_by.id) != str(user.id):
             return Response({"error": "Access denied to test contest"}, status=403)
-        
-        # Check test contest status - allow execution even if not live for "Run" button
-        # current_status = get_test_contest_status(test_contest)
-        # if current_status != "live":
-        #     return Response({"error": f"Test contest is not live (current status: {current_status})"}, status=400)
-        
-        # Get code execution parameters from request
-        code = request.data.get('code')
-        language = request.data.get('language')
-        input_data = request.data.get('input_data', '')
-        expected_output = request.data.get('expected_output', '')
-        
-        if not code or not language:
-            return Response({"error": "Missing code or language"}, status=400)
-        
-        # Use JDoodle API directly (copy from compiler/views.py)
-        # JDoodle credentials
-        JD_CLIENT_ID = "6c83bb2cd0b9e9a790f59a2484011318"
-        JD_CLIENT_SECRET = "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4"
-        JD_URL = "https://api.jdoodle.com/v1/execute"
-        
-        # Map for language -> recommended versionIndex
+
+        code = request.data.get("code")
+        language = request.data.get("language", "").lower()
+        problem_index = request.data.get("problem_index")
+
+        if not code or not language or not problem_index:
+            return Response({"error": "Missing code, language, or problem index"}, status=400)
+
+        problem = None
+        for p in test_contest.problems:
+            if p.index == problem_index.upper():
+                problem = p
+                break
+
+        if not problem:
+            return Response({"error": "Problem not found in test contest"}, status=404)
+
+        test_cases = problem.test_cases
+        if not test_cases:
+            return Response({"error": "No test cases found"}, status=400)
+
         LANGUAGE_VERSION_MAP = {
             "python": "3",
             "python3": "3",
@@ -697,75 +810,137 @@ class TestContestExecuteAPIView(APIView):
             "cpp": "5",
             "javascript": "4"
         }
-        
-        language_lower = language.lower()
-        version_index = LANGUAGE_VERSION_MAP.get(language_lower, "0")
-        
-        # JDoodle payload
-        payload = {
-            "clientId": JD_CLIENT_ID,
-            "clientSecret": JD_CLIENT_SECRET,
-            "script": code,
-            "stdin": input_data,
-            "language": language_lower,
-            "versionIndex": version_index
-        }
-        
-        try:
-            res = requests.post(JD_URL, json=payload, timeout=15)
-            res_data = res.json()
-            
-            jdoodle_output = res_data.get("output", "").strip()
-            cpu_time_str = res_data.get("cpuTime")
-            cpu_time_seconds = 0.0 if cpu_time_str is None else float(cpu_time_str)
-            cpu_time_ms = int(cpu_time_seconds * 1000)
-            memory_kb = int(res_data.get("memory", 0))
-            status_code = res_data.get("statusCode", 200)
-            is_execution_success = res_data.get("isExecutionSuccess", False)
-            
-            # Check expected output if provided
-            verdict = "OK"
-            if expected_output:
-                verdict = "AC" if jdoodle_output == expected_output.strip() else "WA"
-            
-            # Check for compilation/runtime errors
-            status = "success" if is_execution_success else "error"
-            if status_code == 400:
-                status = "compilation_error"
-            elif not is_execution_success:
-                status = "runtime_error"
-            
-            # Return response
-            return Response({
-                "submission_id": None,  # No submission ID for direct execution
-                "contest_id": str(test_contest.original_contest.id),
-                "test_contest_id": test_contest_id,
-                "problem_id": None,  # No problem for direct execution
-                "output": jdoodle_output,
-                "status": status,
-                "verdict": verdict,
-                "execution_time_ms": cpu_time_ms,
-                "execution_time_seconds": cpu_time_seconds,
-                "memory_kb": memory_kb,
-                "memory_mb": round(memory_kb / 1024, 2),
-                "status_code": status_code,
-                "is_execution_success": is_execution_success,
-                "is_test_contest": True,
-                "jdoodle_response": res_data
-            })
-            
-        except requests.exceptions.Timeout:
-            return Response({
-                "error": "Execution timeout (15 seconds)",
-                "is_test_contest": True
-            }, status=408)
-            
-        except Exception as e:
-            return Response({
-                "error": f"Execution error: {str(e)}",
-                "is_test_contest": True
-            }, status=500)
-        
+
+        version_index = LANGUAGE_VERSION_MAP.get(language, "0")
+
+        all_passed = True
+        passed_count = 0
+        failed_test_case = None
+        total_test_cases = len(test_cases)
+
+        final_verdict = "OK"
+        error_message = None
+        compile_output = None
+
+        max_execution_time = 0
+        max_memory_used = 0
+        test_case_outputs = []
+
+        for i, tc in enumerate(test_cases):
+            payload = {
+                "clientId": JD_CLIENT_ID,
+                "clientSecret": JD_CLIENT_SECRET,
+                "script": code,
+                "stdin": tc.input,
+                "language": language,
+                "versionIndex": version_index
+            }
+
+            try:
+                res = requests.post(JD_URL, json=payload, timeout=15)
+                res_data = res.json()
+
+                output = res_data.get("output", "").strip()
+                cpu_time_ms = int(float(res_data.get("cpuTime") or 0) * 1000)
+                memory_kb = int(res_data.get("memory", 0))
+                status_code = res_data.get("statusCode", 200)
+                success = res_data.get("isExecutionSuccess", False)
+
+                max_execution_time = max(max_execution_time, cpu_time_ms)
+                max_memory_used = max(max_memory_used, memory_kb)
+
+                expected = tc.output.strip()
+
+                if status_code == 400 or not success:
+                    all_passed = False
+                    final_verdict = "CE" if status_code == 400 else "RE"
+                    compile_output = output
+                    error_message = "Compilation Error" if status_code == 400 else "Runtime Error"
+
+                    test_case_outputs.append({
+                        "test_case": i + 1,
+                        "input": tc.input,
+                        "expected": expected,
+                        "actual": output,
+                        "passed": False,
+                        "error": error_message
+                    })
+                    break
+
+                passed = output == expected
+
+                test_case_outputs.append({
+                    "test_case": i + 1,
+                    "input": tc.input,
+                    "expected": expected,
+                    "actual": output,
+                    "passed": passed,
+                    "cpu_time_ms": cpu_time_ms,
+                    "memory_kb": memory_kb
+                })
+
+                if passed:
+                    passed_count += 1
+                else:
+                    all_passed = False
+                    if failed_test_case is None:
+                        failed_test_case = i + 1
+                    if final_verdict == "OK":
+                        final_verdict = "WA"
+
+                if cpu_time_ms > problem.time_limit_seconds * 1000 and final_verdict == "OK":
+                    all_passed = False
+                    final_verdict = "TLE"
+
+                if memory_kb > problem.memory_limit_mb * 1024 and final_verdict == "OK":
+                    all_passed = False
+                    final_verdict = "MLE"
+
+            except requests.exceptions.Timeout:
+                all_passed = False
+                final_verdict = "TLE"
+
+                test_case_outputs.append({
+                    "test_case": i + 1,
+                    "input": tc.input,
+                    "expected": tc.output.strip(),
+                    "actual": None,
+                    "passed": False,
+                    "error": "Timeout"
+                })
+                break
+
+            except Exception as e:
+                all_passed = False
+                final_verdict = "SE"
+
+                test_case_outputs.append({
+                    "test_case": i + 1,
+                    "input": tc.input,
+                    "expected": tc.output.strip(),
+                    "actual": None,
+                    "passed": False,
+                    "error": str(e)
+                })
+                break
+
+        if all_passed:
+            final_verdict = "AC"
+
+        return Response({
+            "test_contest_id": str(test_contest.id),
+            "problem_index": problem_index,
+            "verdict": final_verdict,
+            "all_passed": all_passed,
+            "passed_test_cases": passed_count,
+            "total_test_cases": total_test_cases,
+            "failed_test_case": failed_test_case,
+            "execution_time": max_execution_time,
+            "memory_used": max_memory_used,
+            "test_case_outputs": test_case_outputs,
+            "is_test_contest": True
+        })
+
 class TestContestProblemExecuteAPIView(APIView):
     """Execute code for a specific problem in test contest"""
     
