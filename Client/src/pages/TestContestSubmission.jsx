@@ -126,7 +126,7 @@ const TestContestSubmission = () => {
       case 'AC': return 'bg-green-50 text-green-700 border-green-200';
       case 'WA': return 'bg-red-50 text-red-700 border-red-200';
       case 'TLE': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-      case 'MLE': return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'MLE': return 'bg-green-50 text-green-700 border-green-200';
       case 'CE': return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'RE': return 'bg-orange-50 text-orange-700 border-orange-200';
       case 'PENDING': return 'bg-blue-50 text-blue-700 border-blue-200';
@@ -221,13 +221,13 @@ const TestContestSubmission = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-br from-purple-900 to-purple-700 text-white">
+      <div className="bg-gradient-to-br from-green-900 to-green-700 text-white">
         <div className="px-3 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Code2 className="w-4 h-4" />
               <h1 className="text-sm font-bold">Submissions</h1>
-              <span className="text-xs bg-purple-800 text-purple-100 px-1.5 py-0.5 rounded">
+              <span className="text-xs bg-green-800 text-green-100 px-1.5 py-0.5 rounded">
                 TEST
               </span>
             </div>

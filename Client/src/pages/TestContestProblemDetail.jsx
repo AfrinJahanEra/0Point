@@ -55,6 +55,7 @@ const TestContestProblemDetail = () => {
   const [problemStats, setProblemStats] = useState(null);
   const [compilationStats, setCompilationStats] = useState(null);
 
+
   const customComponents = {
     h1: ({ children }) => (
       <h1 className="text-2xl font-bold mt-6 mb-4 text-gray-900 border-b border-gray-200 pb-2">
@@ -666,7 +667,7 @@ const handleSubmit = async () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
           <div className="flex items-center justify-center gap-2 mb-2">
             <p className="text-gray-600">Loading test contest problem...</p>
           </div>
@@ -689,7 +690,7 @@ const handleSubmit = async () => {
           <div className="space-y-2">
             <button
               onClick={handleBackToTestContest}
-              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
             >
               Back to Test Contest
             </button>
@@ -710,7 +711,7 @@ const handleSubmit = async () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
           <p className="text-gray-600">Loading test problem data...</p>
         </div>
       </div>
@@ -736,7 +737,7 @@ const handleSubmit = async () => {
                     <h1 className="text-xl font-bold text-gray-900">
                       {contestData?.title || problemData?.contest_title || 'Test Contest'}
                     </h1>
-                    <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
                       TEST
                     </span>
                   </div>
@@ -753,7 +754,7 @@ const handleSubmit = async () => {
             <p className="text-gray-600 mb-4">This test contest doesn't have any problems yet.</p>
             <button
               onClick={handleBackToTestContest}
-              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
             >
               Back to Test Contest
             </button>
@@ -788,7 +789,7 @@ const handleSubmit = async () => {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-bold text-gray-900">{displayContestData.title}</h1>
-                  <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs">
+                  <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs">
                     TEST CONTEST
                   </span>
                 </div>
@@ -855,7 +856,7 @@ const handleSubmit = async () => {
                       to={`/test-contests/${testContestId}/problems/${problemId}`}
                       className={`flex items-center space-x-3 p-3 rounded-lg border transition-all duration-200 ${
                         isActive
-                          ? 'border-purple-300 bg-purple-50 text-purple-700'
+                          ? 'border-green-300 bg-green-50 text-green-700'
                           : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
                       }`}
                     >
@@ -929,7 +930,7 @@ const handleSubmit = async () => {
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-semibold text-gray-900">Stats</h3>
-                <Shield className="w-4 h-4 text-purple-600" />
+                <Shield className="w-4 h-4 text-green-600" />
               </div>
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between">
@@ -963,7 +964,7 @@ const handleSubmit = async () => {
                 <div className="text-xs text-gray-600 mb-2">Test Contest Info</div>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="text-purple-700">This is a test version</span>
+                    <span className="text-green-700">This is a test version</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-blue-700">Only visible to testers ad contest organizers</span>
@@ -987,7 +988,7 @@ const handleSubmit = async () => {
                       <h1 className="text-2xl font-bold text-gray-900">
                         {problemData?.problem_index || problemIndex} - {problemData?.title || 'Test Problem'}
                       </h1>
-                      <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full font-medium">
+                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
                         TEST
                       </span>
                     </div>
@@ -1114,7 +1115,7 @@ const handleSubmit = async () => {
                       <select 
                         value={language}
                         onChange={(e) => setLanguage(e.target.value)}
-                        className="border border-gray-300 rounded px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="border border-gray-300 rounded px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                       >
                         <option value="python">Python 3</option>
                         <option value="cpp">C++ 17</option>
@@ -1233,7 +1234,7 @@ const handleSubmit = async () => {
           <span className="text-xs px-2 py-1 bg-white rounded border">
             {compilationStats.type === 'run' ? 'Run' : 'Submit'}
           </span>
-          <span className="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded border">
+          <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded border">
             TEST CONTEST
           </span>
         </div>
@@ -1260,7 +1261,7 @@ const handleSubmit = async () => {
               compilationStats.verdict === 'AC' ? 'text-green-600' :
               compilationStats.verdict === 'WA' ? 'text-red-600' :
               compilationStats.verdict === 'TLE' ? 'text-orange-600' :
-              compilationStats.verdict === 'MLE' ? 'text-purple-600' :
+              compilationStats.verdict === 'MLE' ? 'text-green-600' :
               compilationStats.verdict === 'CE' ? 'text-yellow-600' :
               compilationStats.verdict === 'RE' ? 'text-pink-600' :
               'text-gray-700'
@@ -1356,7 +1357,7 @@ const handleSubmit = async () => {
         
         {/* Test contest info */}
         {compilationStats.is_test_contest && (
-          <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded text-xs text-purple-800">
+          <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">
             <div className="flex items-center gap-2">
               <span>This is a test contest submission. Results are for testing purposes only.</span>
             </div>
