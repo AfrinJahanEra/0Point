@@ -352,12 +352,12 @@ const TestContestInside = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Compact Header */}
-      <div className="bg-gradient-to-br from-purple-900 to-purple-700 text-white">
+      <div className="bg-gradient-to-br from-green-900 to-green-700 text-white">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-bold">{contestData.title}</h1>
-              <span className="text-xs bg-purple-800 text-purple-100 px-1.5 py-0.5 rounded">
+              <span className="text-xs bg-green-800 text-green-100 px-1.5 py-0.5 rounded">
                 TEST VERSION
               </span>
             </div>
@@ -373,7 +373,7 @@ const TestContestInside = () => {
             </div>
           </div>
           
-          <div className="flex flex-wrap gap-3 mt-2 text-xs text-purple-100">
+          <div className="flex flex-wrap gap-3 mt-2 text-xs text-green-100">
             <div className="flex items-center gap-1">
               <Calendar className="w-3 h-3" />
               <span>{formatDateTime(contestData.test_start_time || contestData.start_time)}</span>
@@ -408,7 +408,7 @@ const TestContestInside = () => {
                     onClick={() => item.id === 'problems' ? setActiveTab(item.id) : navigate(`/test-contests/${testContestId}/${item.id}`)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors mb-0.5 ${
                       activeTab === item.id
-                        ? 'bg-purple-50 text-purple-700'
+                        ? 'bg-green-50 text-green-700'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
@@ -421,7 +421,7 @@ const TestContestInside = () => {
 
             {/* Timer */}
             {contestData.status === 'live' && timeRemaining > 0 && (
-              <div className="bg-gradient-to-br from-purple-900 to-purple-700 text-white rounded-lg p-3">
+              <div className="bg-gradient-to-br from-green-900 to-green-700 text-white rounded-lg p-3">
                 <div className="text-xs mb-1">Time Remaining</div>
                 <div className="text-sm font-bold font-mono mb-1">{formatTime(timeRemaining)}</div>
                 <div className="text-xs opacity-80">Test ends in</div>
@@ -436,19 +436,19 @@ const TestContestInside = () => {
               <div className="p-2">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="text-center p-1 bg-gray-50 rounded">
-                    <div className="text-sm font-bold text-purple-700">{userStats.solved}</div>
+                    <div className="text-sm font-bold text-green-700">{userStats.solved}</div>
                     <div className="text-xs text-gray-600">Solved</div>
                   </div>
                   <div className="text-center p-1 bg-gray-50 rounded">
-                    <div className="text-sm font-bold text-purple-700">{userStats.attempted}</div>
+                    <div className="text-sm font-bold text-green-700">{userStats.attempted}</div>
                     <div className="text-xs text-gray-600">Attempted</div>
                   </div>
                   <div className="text-center p-1 bg-gray-50 rounded">
-                    <div className="text-sm font-bold text-purple-700">{userStats.total}</div>
+                    <div className="text-sm font-bold text-green-700">{userStats.total}</div>
                     <div className="text-xs text-gray-600">Total</div>
                   </div>
                   <div className="text-center p-1 bg-gray-50 rounded">
-                    <div className="text-sm font-bold text-purple-700">{userStats.accuracy}</div>
+                    <div className="text-sm font-bold text-green-700">{userStats.accuracy}</div>
                     <div className="text-xs text-gray-600">Accuracy</div>
                   </div>
                 </div>
@@ -464,7 +464,7 @@ const TestContestInside = () => {
                 {contestData.access && !contestData.access.is_registered && contestData.access.can_register && (
                   <button 
                     onClick={handleRegister}
-                    className="w-full bg-purple-800 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-purple-900 transition-colors flex items-center justify-center gap-1"
+                    className="w-full bg-green-800 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-green-900 transition-colors flex items-center justify-center gap-1"
                   >
                     Register for Test
                   </button>
@@ -525,7 +525,7 @@ const TestContestInside = () => {
                             {getStatusIcon(problem)}
                           </td>
                           <td className="p-2">
-                            <span className="font-semibold text-purple-700">
+                            <span className="font-semibold text-green-700">
                               {problem.problem_id || problem.index || problem.code || String.fromCharCode(65 + index)}
                             </span>
                           </td>
@@ -585,7 +585,7 @@ const TestContestInside = () => {
                 {contestData.is_creator && (
                   <button
                     onClick={() => setShowAnnouncementForm(!showAnnouncementForm)}
-                    className="bg-purple-800 text-white px-2 py-1 rounded text-xs font-medium hover:bg-purple-900 transition-colors flex items-center gap-1"
+                    className="bg-green-800 text-white px-2 py-1 rounded text-xs font-medium hover:bg-green-900 transition-colors flex items-center gap-1"
                   >
                     <Plus className="w-3 h-3" />
                     New
@@ -599,7 +599,7 @@ const TestContestInside = () => {
                     value={newAnnouncement}
                     onChange={(e) => setNewAnnouncement(e.target.value)}
                     placeholder="Enter test announcement text..."
-                    className="w-full p-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full p-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-transparent"
                     rows="2"
                   />
                   <div className="flex justify-end gap-1.5 mt-2">
@@ -614,7 +614,7 @@ const TestContestInside = () => {
                     </button>
                     <button
                       onClick={handlePostAnnouncement}
-                      className="px-2 py-1 bg-purple-800 text-white rounded text-xs font-medium hover:bg-purple-900 transition-colors"
+                      className="px-2 py-1 bg-green-800 text-white rounded text-xs font-medium hover:bg-green-900 transition-colors"
                     >
                       Post
                     </button>
@@ -667,9 +667,9 @@ const TestContestInside = () => {
                       <li>• {contestData.testers_count || 0} testers invited</li>
                     </ul>
                   </div>
-                  <div className="bg-purple-50 p-2 rounded">
-                    <h3 className="font-semibold text-purple-800 text-xs mb-1">Your Role</h3>
-                    <ul className="text-xs text-purple-700 space-y-0.5">
+                  <div className="bg-green-50 p-2 rounded">
+                    <h3 className="font-semibold text-green-800 text-xs mb-1">Your Role</h3>
+                    <ul className="text-xs text-green-700 space-y-0.5">
                       <li>
                         <span className="font-medium">Status: </span>
                         {contestData.access?.is_registered ? 'Registered' : 'Invited'}
