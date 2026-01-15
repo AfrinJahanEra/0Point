@@ -131,7 +131,7 @@ const TestContestLeaderboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Loader className="w-8 h-8 animate-spin text-purple-600 mb-2" />
+        <Loader className="w-8 h-8 animate-spin text-green-600 mb-2" />
         <p className="text-gray-600 text-xs">Loading leaderboard...</p>
       </div>
     );
@@ -143,14 +143,14 @@ const TestContestLeaderboard = () => {
         <div className="bg-white p-4 rounded-lg border border-gray-200 max-w-sm w-full">
           <div className="flex items-center justify-center gap-2 mb-3">
             <AlertCircle className="w-6 h-6 text-red-500" />
-            <TestTube className="w-6 h-6 text-purple-600" />
+            <TestTube className="w-6 h-6 text-green-600" />
           </div>
           <h3 className="text-sm font-bold text-gray-900 mb-1 text-center">Leaderboard Error</h3>
           <p className="text-gray-600 text-xs mb-3 text-center">{error}</p>
           <div className="space-y-1.5">
             <button
               onClick={() => navigate(`/test-contests/${testContestId}`)}
-              className="w-full bg-purple-800 text-white py-1.5 rounded text-xs font-medium hover:bg-purple-900 transition-colors"
+              className="w-full bg-green-800 text-white py-1.5 rounded text-xs font-medium hover:bg-green-900 transition-colors"
             >
               Back to Test
             </button>
@@ -169,13 +169,13 @@ const TestContestLeaderboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-br from-purple-900 to-purple-700 text-white">
+      <div className="bg-gradient-to-br from-green-900 to-green-700 text-white">
         <div className="px-3 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4" />
               <h1 className="text-sm font-bold">Test Leaderboard</h1>
-              <span className="text-xs bg-purple-800 text-purple-100 px-1.5 py-0.5 rounded">
+              <span className="text-xs bg-green-800 text-green-100 px-1.5 py-0.5 rounded">
                 TEST
               </span>
             </div>
@@ -230,7 +230,7 @@ const TestContestLeaderboard = () => {
                       </td>
                       <td className="p-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 bg-gradient-to-br from-purple-600 to-purple-800 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                          <div className="w-7 h-7 bg-gradient-to-br from-green-600 to-green-800 rounded-full flex items-center justify-center text-white text-xs font-bold">
                             {participant.username?.charAt(0).toUpperCase() || 'A'}
                           </div>
                           <div className="flex-1 min-w-0">
