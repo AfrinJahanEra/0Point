@@ -358,7 +358,7 @@ const TestContestInside = () => {
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-bold">{contestData.title}</h1>
               <span className="text-xs bg-green-800 text-green-100 px-1.5 py-0.5 rounded">
-                TEST VERSION
+                TEST
               </span>
             </div>
             <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${getStatusBadge(contestData.status)}`}>
@@ -672,15 +672,12 @@ const TestContestInside = () => {
                     <ul className="text-xs text-green-700 space-y-0.5">
                       <li>
                         <span className="font-medium">Status: </span>
-                        {contestData.access?.is_registered ? 'Registered' : 'Invited'}
+                        {contestData.is_creator? 'Creator' : 'Participant'}
                       </li>
                       <li>
                         <span className="font-medium">Access: </span>
                         {contestData.access?.can_access ? 'Full' : 'Limited'}
                       </li>
-                      {contestData.is_creator && (
-                        <li className="text-green-700 font-medium">• Test Creator</li>
-                      )}
                     </ul>
                   </div>
                 </div>
