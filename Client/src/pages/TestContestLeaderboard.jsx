@@ -174,7 +174,7 @@ const TestContestLeaderboard = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4" />
-              <h1 className="text-sm font-bold">Test Leaderboard</h1>
+              <h1 className="text-sm font-bold">Leaderboard</h1>
               <span className="text-xs bg-green-800 text-green-100 px-1.5 py-0.5 rounded">
                 TEST
               </span>
@@ -190,13 +190,13 @@ const TestContestLeaderboard = () => {
             )}
           </div>
           
-          <div className="flex items-center gap-2 text-xs mt-1">
+          {/* <div className="flex items-center gap-2 text-xs mt-1">
             <span className={`px-2 py-0.5 rounded-full ${contestStatus === 'live' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
               {contestStatus?.charAt(0).toUpperCase() + contestStatus?.slice(1)}
             </span>
             <span>•</span>
             <span>{contestProblems.length} problems • {leaderboardData.length} participants</span>
-          </div>
+          </div> */}
         </div>
       </div>
 
