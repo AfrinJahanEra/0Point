@@ -226,7 +226,6 @@ const Recordings = () => {
                 onClick={goBack}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
               </button>
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">

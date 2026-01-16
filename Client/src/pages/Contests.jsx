@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Video} from 'lucide-react';
 import { Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, AlertCircle } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useNavigate } from 'react-router-dom';
@@ -474,8 +475,9 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
     ) : contest.status === 'past' ? (
       <button 
         onClick={() => handleContestEntry(contest.id, 'past', contest)}
-        className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200"
+        className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200 flex items-center justify-center space-x-1"
       >
+        <Eye className="w-3 h-3" />
         View
       </button>
     ) : null
@@ -513,12 +515,22 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
     )
   ) : contest.status === 'past' ? (
     // Past contest buttons
+    <div className="flex flex-col space-y-2">
     <button 
       onClick={() => handleContestEntry(contest.id, 'past', contest)}
-      className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200"
+      className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200 flex items-center justify-center space-x-1"
     >
-      View
+     <Eye className="w-3 h-3" />
+     <span>View</span>
     </button>
+    <button 
+        onClick={() => navigate(`/contests/${contest.id}/recordings`)}
+        className="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-purple-700 transition-colors duration-200 flex items-center justify-center space-x-1"
+      >
+        <Video className="w-3 h-3" />
+        <span>Recordings</span>
+      </button>
+      </div>
   ) : null}
 </div>
                     </div>
