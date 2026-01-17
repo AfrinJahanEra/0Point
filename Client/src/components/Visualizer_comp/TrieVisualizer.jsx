@@ -324,7 +324,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     if (!node) return null;
     
     const nodeId = `${prefix}-${level}`;
-    const nodeSize = 30;
+    const nodeSize = 35;
     const verticalSpacing = 70;
     const horizontalSpacing = Math.max(200 / (level + 1), 80);
     
@@ -354,15 +354,20 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             
             return (
               <g key={`${nodeId}-${char}`}>
-                {/* Connection line to child with elastic stretching */}
+                {/* Connection line to child with enhanced styling */}
                 <line
                   x1={actualX}
                   y1={actualY + nodeSize/2}
                   x2={actualChildX}
                   y2={actualChildY - nodeSize/2}
-                  stroke="#9CA3AF"
-                  strokeWidth="2"
-                  className="screen-floating"
+                  stroke="url(#gradient-normal)"
+                  strokeWidth="3"
+                  className="animated-line stroke-current"
+                  strokeLinecap="round"
+                  strokeDasharray="5,5"
+                  style={{
+                    animation: 'pulse 1.5s infinite'
+                  }}
                 />
                 
                 <text
@@ -380,27 +385,37 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           })
         ) : null}
         
-        {/* Render node circle with drag support */}
+        {/* Render node circle with enhanced floating animation */}
         <g 
           onMouseDown={(e) => handleNodeMouseDown(nodeId, actualX, actualY, e)}
-          className="cursor-move screen-floating"
+          className="cursor-move floating-animation glowing delay-3"
         >
           <g transform={`translate(${actualX}, ${actualY})`}>
+            <defs>
+              <radialGradient id={`node-gradient-${nodeId}`} cx="30%" cy="30%">
+                <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
+                <stop offset="100%" stopColor={
+                  node.isEnd ? "#10B981" : "#93C5FD"
+                } />
+              </radialGradient>
+            </defs>
+            
             <circle
               r={nodeSize / 2}
-              fill={node.isEnd ? "#10B981" : "#FFFFFF"}
-              stroke="#9CA3AF"
-              strokeWidth="2"
-              className="hover:stroke-blue-500 transition-all duration-300 drop-shadow-sm"
+              fill={node.isEnd ? "url(#node-gradient-" + nodeId + ")" : "url(#node-gradient-" + nodeId + ")"}
+              stroke={node.isEnd ? "#059669" : "#4F46E5"}
+              strokeWidth="3"
+              className={`hover:stroke-indigo-700 transition-all duration-700 ease-out ${level % 4 === 0 ? 'delay-1' : level % 4 === 1 ? 'delay-2' : level % 4 === 2 ? 'delay-3' : 'delay-4'} ${node.isEnd ? 'ring-4 ring-green-300' : 'ring-4 ring-blue-300'}`}
               onMouseEnter={() => setHoveredNode(prefix || 'root')}
               onMouseLeave={() => setHoveredNode(null)}
+              filter="url(#glow-filter)"
             />
             
             <text
               x="0"
               y="5"
               textAnchor="middle"
-              className="font-bold text-black text-base drop-shadow-sm"
+              className="font-bold text-gray-800 text-base drop-shadow-sm"
             >
               {nodeLabel}
             </text>
@@ -410,7 +425,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                 x="0"
                 y="-25"
                 textAnchor="middle"
-                className="text-xs text-green-600 font-bold drop-shadow-sm"
+                className="text-xs text-white font-bold drop-shadow-sm"
               >
                 END
               </text>
@@ -479,27 +494,111 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           display: none;
         }
         
-        /* Screen floating animation for entire tree structure */
-        @keyframes screen-float {
+
+        @keyframes float {
           0% {
-            transform: translateX(0px) translateY(0px);
+            transform: translateY(0px) translateX(0px);
           }
           25% {
-            transform: translateX(5px) translateY(-3px);
+            transform: translateY(-4px) translateX(1px);
           }
           50% {
-            transform: translateX(0px) translateY(0px);
+            transform: translateY(-2px) translateX(0px);
           }
           75% {
-            transform: translateX(-5px) translateY(2px);
+            transform: translateY(-3px) translateX(0.5px);
           }
           100% {
-            transform: translateX(0px) translateY(0px);
+            transform: translateY(0px) translateX(0px);
           }
         }
         
+        /* Screen floating animation for entire tree structure */
+        @keyframes screen-float {
+          0% {
+            transform: translateX(0px);
+          }
+          25% {
+            transform: translateX(10px);
+          }
+          50% {
+            transform: translateX(0px);
+          }
+          75% {
+            transform: translateX(-10px);
+          }
+          100% {
+            transform: translateX(0px);
+          }
+        }
+        
+        @keyframes glow {
+          0% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+          50% {
+            filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.4));
+          }
+          100% {
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.2));
+          }
+        }
+        
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 0.6;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
+        
+        @keyframes particle {
+          0% {
+            transform: translate(0, 0) scale(1);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(var(--tx), var(--ty)) scale(0);
+            opacity: 0;
+          }
+        }
+        
+        .floating-animation {
+          animation: float 3s ease-in-out infinite;
+        }
+        
         .screen-floating {
-          animation: screen-float 6s ease-in-out infinite;
+          animation: screen-float 8s ease-in-out infinite;
+        }
+        
+        .glowing {
+          animation: glow 2s ease-in-out infinite;
+        }
+        
+        .animated-line {
+          animation: pulse 1.5s infinite alternate;
+        }
+        
+        .particle {
+          animation: particle 1s ease-out forwards;
+        }
+        
+        /* Staggered animations */
+        .delay-1 {
+          animation-delay: 0.1s;
+        }
+        
+        .delay-2 {
+          animation-delay: 0.2s;
+        }
+        
+        .delay-3 {
+          animation-delay: 0.3s;
+        }
+        
+        .delay-4 {
+          animation-delay: 0.4s;
         }
         `}
       </style>
@@ -564,13 +663,13 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
         </button>
         
-        <div className={`mb-6 bg-white p-3 border-2 border-gray-300 ${isFullscreen ? '!border-0 !p-0' : ''}`}>
-          <h4 className={`text-sm font-bold text-black mb-2 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
-            <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center text-xs mr-2">
+        <div className={`mb-6 bg-gradient-to-br from-slate-50 to-blue-50 p-4 border-2 border-indigo-200 rounded-lg shadow-md ${isFullscreen ? '!border-0 !p-0' : ''}`}>
+          <h4 className={`text-sm font-bold text-indigo-900 mb-3 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
+            <span className="w-6 h-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full flex items-center justify-center text-xs mr-2">
               {safeCurrentStep + 1}
             </span>
             Step {safeCurrentStep + 1} of {steps.length}
-            <span className="ml-2 px-2 py-0.5 bg-gray-200 text-black text-xs font-medium rounded">
+            <span className="ml-2 px-2.5 py-1 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 text-xs font-semibold rounded-full border border-indigo-200">
               Current
             </span>
           </h4>
@@ -586,19 +685,41 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                   viewBox="0 0 600 500"
                 >
                   <defs>
-                    <marker 
-                      id="arrowhead" 
-                      markerWidth="10" 
-                      markerHeight="7" 
-                      refX="9" 
-                      refY="3.5" 
-                      orient="auto"
-                    >
-                      <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
-                    </marker>
-                  </defs>
+                      <linearGradient id="gradient-normal" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#9CA3AF" />
+                        <stop offset="100%" stopColor="#6B717F" />
+                      </linearGradient>
+                      <linearGradient id="gradient-traversal" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#93C5FD" />
+                        <stop offset="100%" stopColor="#3B82F6" />
+                      </linearGradient>
+                      <linearGradient id="gradient-insertion" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#BFDBFE" />
+                        <stop offset="100%" stopColor="#3B82F6" />
+                      </linearGradient>
+                      <linearGradient id="gradient-comparison" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#FDE68A" />
+                        <stop offset="100%" stopColor="#F59E0B" />
+                      </linearGradient>
+                      <radialGradient id="glow-gradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                        <stop offset="0%" stopColor="rgba(59, 130, 246, 0.8)" stopOpacity="1" />
+                        <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" stopOpacity="0" />
+                      </radialGradient>
+                      <filter id="glow-filter">
+                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                        <feMerge> 
+                          <feMergeNode in="coloredBlur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                                      
+                      {/* Animated dash pattern */}
+                      <pattern id="dash-pattern" patternUnits="userSpaceOnUse" width="10" height="10">
+                        <path d="M0,5 L10,5" stroke="#9CA3AF" strokeWidth="2" strokeDasharray="3,3" />
+                      </pattern>
+                    </defs>
                   
-                  <g className="screen-floating">
+                  <g>
                     {renderTrieNode(currentStepData.tree || currentStepData.root, '', 300, 100, 0)}
                   </g>
                 </svg>
@@ -610,22 +731,25 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             )}
           </div>
 
-          <div className={`text-center p-2 bg-white border border-gray-200 ${isFullscreen ? 'hidden' : ''}`}>
-            <p className="font-semibold text-black text-sm">
+          <div className={`text-center p-4 bg-gradient-to-r from-indigo-50 to-blue-100 border border-indigo-200 rounded-lg ${isFullscreen ? 'hidden' : ''}`}>
+            <p className="font-semibold text-indigo-800 text-sm mb-1">
               {getOperationDescription(currentStepData)}
             </p>
           </div>
         </div>
       </div>
       
-      <div className="mt-6 border border-gray-200 p-4 bg-white">
-        <h4 className="text-md font-bold text-blue-800 mb-3">All Steps:</h4>
+      <div className="mt-6 border border-indigo-200 p-4 bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl shadow-sm">
+        <h4 className="text-md font-bold text-indigo-800 mb-3 flex items-center">
+          <span className="mr-2 text-indigo-600">📋</span>
+          All Steps:
+        </h4>
         <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
           {steps.map((step, index) => {
             return (
               <div 
                 key={index}
-                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}
+                className={`p-4 border rounded-xl transition-all duration-300 ${index === currentStep ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-indigo-300 shadow-md' : 'bg-white border-gray-200 hover:shadow-sm'}`}
                 id={`step-${index}`}
               >
                 <div className="flex justify-between items-start">
@@ -638,16 +762,7 @@ const TrieVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                         <div className={`w-full min-h-[200px] overflow-auto ${isFullscreen ? 'scale-150' : ''}`}>
                           <svg width="100%" height="400" className={`border border-gray-200 rounded min-w-[400px] ${isFullscreen ? '!border-0' : ''}`} viewBox="0 0 400 400">
                             <defs>
-                              <marker 
-                                id="arrowhead" 
-                                markerWidth="10" 
-                                markerHeight="7" 
-                                refX="9" 
-                                refY="3.5" 
-                                orient="auto"
-                              >
-                                <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
-                              </marker>
+
                             </defs>
                             
                             {renderTrieNode(step.tree || step.root || { children: {}, isEnd: false }, '', 200, 80)}

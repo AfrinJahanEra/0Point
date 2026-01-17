@@ -130,13 +130,13 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
             .attr("y1", pos1.y)
             .attr("x2", pos2.x)
             .attr("y2", pos2.y)
-            .attr("stroke", "#93C5FD") // Light blue default
-            .attr("stroke-width", 2);
+            .attr("stroke", "#4B5563") // Darker gray default
+            .attr("stroke-width", 3);
           
           // Apply dotted line for neighbor search
           if (isProcessingNeighbors && (stepData.operation === 'relax_edge' || stepData.operation === 'update_distance')) {
             edge.attr("stroke-dasharray", "5,5")
-                .attr("stroke", "#93C5FD"); // Light blue dotted for neighbor search
+                .attr("stroke", "#4B5563"); // Darker gray for neighbor search
           } else if (stepData.visited && 
                      ((stepData.visited.includes(fromNode) && stepData.visited.includes(toNode)))) {
             edge.attr("stroke", "#1E40AF") // Dark blue for traversed edges
@@ -198,7 +198,7 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         .attr("class", "node")
         .attr("cx", pos.x)
         .attr("cy", pos.y)
-        .attr("r", 20)
+        .attr("r", 25)
         .attr("fill", fillColor)
         .attr("stroke", strokeColor)
         .attr("stroke-width", 2)
@@ -317,10 +317,10 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         })
         .transition()
         .duration(1000)
-        .attr("r", 25)
+        .attr("r", 30)
         .transition()
         .duration(1000)
-        .attr("r", 20);
+        .attr("r", 25);
     }
     
   }, [currentStep, steps, draggedNodes, isDragging, dragNode]);

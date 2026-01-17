@@ -124,8 +124,8 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
             .attr("y1", pos1.y)
             .attr("x2", pos2.x)
             .attr("y2", pos2.y)
-            .attr("stroke", "#93C5FD") // Light blue default
-            .attr("stroke-width", 2);
+            .attr("stroke", "#4B5563") // Darker gray default
+            .attr("stroke-width", 3);
           
           // Highlight MST edges
           if (stepData.mst && stepData.mst.some(edge => 
@@ -133,7 +133,7 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
             (edge.from === fromNode && edge.to === toNode) || 
             (edge.from === toNode && edge.to === fromNode))) {
             edge.attr("stroke", "#1E40AF") // Dark blue for MST edges
-                .attr("stroke-width", 3);
+                .attr("stroke-width", 4);
           }
           
           // Highlight current edge being considered
@@ -141,8 +141,8 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
           if (currentEdge && currentEdge.from && currentEdge.to &&
             ((currentEdge.from === fromNode && currentEdge.to === toNode) ||
              (currentEdge.from === toNode && currentEdge.to === fromNode))) {
-            edge.attr("stroke", "#93C5FD") // Light blue for current edge
-                .attr("stroke-width", 2)
+            edge.attr("stroke", "#3B82F6") // Blue for current edge
+                .attr("stroke-width", 3)
                 .attr("stroke-dasharray", "5,5");
           }
           
@@ -193,7 +193,7 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         .attr("class", "node")
         .attr("cx", pos.x)
         .attr("cy", pos.y)
-        .attr("r", 20)
+        .attr("r", 25)
         .attr("fill", fillColor)
         .attr("stroke", strokeColor)
         .attr("stroke-width", 2)
@@ -287,10 +287,10 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         })
         .transition()
         .duration(1000)
-        .attr("r", 25)
+        .attr("r", 30)
         .transition()
         .duration(1000)
-        .attr("r", 20);
+        .attr("r", 25);
     }
     
   }, [currentStep, steps, draggedNodes, isDragging, dragNode]);
@@ -959,8 +959,8 @@ const renderStaticGraph = (step) => {
                 y1={pos1.y}
                 x2={pos2.x}
                 y2={pos2.y}
-                stroke={isCurrentEdge ? "#3B82F6" : "#93C5FD"} // Blue for current edge, light blue for others
-                strokeWidth={isCurrentEdge ? "3" : "2"} // Thicker for current edge
+                stroke={isCurrentEdge ? "#3B82F6" : "#4B5563"} // Blue for current edge, darker gray for others
+                strokeWidth={isCurrentEdge ? "3" : "3"} // Thicker for current edge
               />
               <text
                 x={midX}
@@ -980,10 +980,13 @@ const renderStaticGraph = (step) => {
         const pos = nodePositions[node];
         const isCurrent = step.currentNode === node;
         const isVisited = step.visited && step.visited.includes(node);
+        const isMST = step.mstNodes && step.mstNodes.includes(node);
         
         let fillColor = "#93C5FD"; // Light blue default
         if (isCurrent) {
           fillColor = "#1E40AF"; // Dark blue for current node
+        } else if (isMST) {
+          fillColor = "#1E40AF"; // Dark blue for MST nodes
         } else if (isVisited) {
           fillColor = "#3B82F6"; // Medium blue for visited
         }
@@ -993,16 +996,16 @@ const renderStaticGraph = (step) => {
             <circle
               cx={pos.x}
               cy={pos.y}
-              r="15"
+              r="20"
               fill={fillColor}
               stroke="#1E40AF"
-              strokeWidth="2"
+              strokeWidth="3"
             />
             <text
               x={pos.x}
               y={pos.y + 5}
               textAnchor="middle"
-              className="font-bold text-white text-sm"
+              className={`font-bold ${isCurrent || isVisited || isMST ? 'text-white' : 'text-black'} text-sm`}
             >
               {node}
             </text>

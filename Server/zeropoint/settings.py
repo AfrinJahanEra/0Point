@@ -41,8 +41,6 @@ INSTALLED_APPS = [
     'videoconference',
     'pdf',
     'ide',
-    'corsheaders',
-    'channels',
     # 'daphne',
     'compiler',
     'virtual',
