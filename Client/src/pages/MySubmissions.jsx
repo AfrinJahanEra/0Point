@@ -1,4 +1,3 @@
-// MySubmissions.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle2, 
@@ -10,7 +9,6 @@ import {
   Copy,
   ExternalLink,
   Lock,
-  Eye,
   AlertCircle,
   Filter,
   ChevronDown,
@@ -23,9 +21,6 @@ import {
 import { useParams, Link } from 'react-router-dom';
 
 const MySubmissions = () => {
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [contestStatus, setContestStatus] = useState('live');
-  
   const { contestId } = useParams();
   const [filter, setFilter] = useState('my');
   const [selectedVerdict, setSelectedVerdict] = useState('all');
@@ -33,97 +28,61 @@ const MySubmissions = () => {
   const [expandedSubmission, setExpandedSubmission] = useState(null);
   const [sortBy, setSortBy] = useState('time');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [contestEnded, setContestEnded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [allSubmissions, setAllSubmissions] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [problems, setProblems] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
-  const [currentUserName, setCurrentUserName] = useState('');
 
-  // Fetch submissions from backend
+  const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
+
+  // Fetch submissions
   useEffect(() => {
     const fetchSubmissions = async () => {
       try {
         setLoading(true);
         const params = new URLSearchParams();
-        
-        // Add filter parameter ('my' or 'all')
         params.append('filter', filter);
         
-        // Add problem filter if not 'all'
         if (selectedProblem !== 'all') {
           params.append('problem', selectedProblem);
         }
         
-        // Add verdict filter if not 'all'
         if (selectedVerdict !== 'all') {
           params.append('verdict', selectedVerdict);
         }
         
-        // Build the query string
         const queryString = params.toString();
-        
-        // Get API URL from environment or use default
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        
-        // IMPORTANT: Use the correct URL
         const url = `${apiUrl}/contests/${contestId}/submissions/${queryString ? `?${queryString}` : ''}`;
         
-        console.log('Fetching submissions from URL:', url);
-        
-        // Get token from localStorage
-        const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
         const headers = {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${TOKEN}`
         };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
         
         const response = await fetch(url, { headers });
         
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('API Error:', errorText);
-          throw new Error(`HTTP Error: ${response.status} - ${errorText}`);
+          throw new Error(`HTTP Error: ${response.status}`);
         }
         
         const data = await response.json();
-        
-        console.log('Backend response:', data);
-        
-        // Set the submissions data
         const submissionsData = data.submissions || [];
         setAllSubmissions(submissionsData);
         
-        // Update current user info
         if (data.current_user_id) {
           setCurrentUserId(data.current_user_id);
-          setCurrentUserName(data.current_user_name || 'You');
         }
         
-        // Update contest ended status if provided by backend
-        if (data.contest_ended !== undefined) {
-          setContestEnded(data.contest_ended);
-        }
-        
-        // Update contest status if provided by backend
-        if (data.contest_status) {
-          setContestStatus(data.contest_status);
-        }
-        
-        // Set problems for filter
-        if (data.filters && data.filters.problems) {
+        if (data.filters?.problems) {
           setProblems(data.filters.problems);
         }
         
         setError(null);
       } catch (err) {
         setError(err.message);
-        console.error('Error fetching submissions:', err);
       } finally {
         setLoading(false);
       }
@@ -137,14 +96,11 @@ const MySubmissions = () => {
   // Filter and sort submissions
   useEffect(() => {
     let filtered = [...allSubmissions];
-
-    // Apply frontend filtering if needed (backend already does most filtering)
-    // The backend handles 'my' filter, but we can double-check
+    
     if (filter === 'my' && currentUserId) {
-      filtered = filtered.filter(sub => sub.user === currentUserId);
+      filtered = filtered.filter(sub => sub.user_id === currentUserId || sub.user === currentUserId);
     }
 
-    // Sort submissions
     filtered.sort((a, b) => {
       const factor = sortOrder === 'desc' ? -1 : 1;
       if (sortBy === 'time') {
@@ -162,14 +118,6 @@ const MySubmissions = () => {
     setSubmissions(filtered);
   }, [allSubmissions, filter, sortBy, sortOrder, currentUserId]);
 
-  // Format countdown timer
-  const formatCountdown = (seconds) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
   const getVerdictColor = (verdict) => {
     switch (verdict) {
       case 'AC': return 'bg-green-50 text-green-700 border-green-200';
@@ -186,26 +134,26 @@ const MySubmissions = () => {
 
   const getVerdictIcon = (verdict) => {
     switch (verdict) {
-      case 'AC': return <CheckCircle2 className="w-4 h-4" />;
-      case 'WA': return <XCircle className="w-4 h-4" />;
-      case 'TLE': return <Clock4 className="w-4 h-4" />;
-      case 'MLE': return <AlertCircle className="w-4 h-4" />;
-      case 'CE': return <XCircle className="w-4 h-4" />;
-      case 'RE': return <AlertCircle className="w-4 h-4" />;
-      case 'PENDING': return <Clock className="w-4 h-4" />;
-      case 'RUNNING': return <Clock className="w-4 h-4 animate-spin" />;
-      default: return <AlertCircle className="w-4 h-4" />;
+      case 'AC': return <CheckCircle2 className="w-3 h-3" />;
+      case 'WA': return <XCircle className="w-3 h-3" />;
+      case 'TLE': return <Clock4 className="w-3 h-3" />;
+      case 'MLE': return <AlertCircle className="w-3 h-3" />;
+      case 'CE': return <XCircle className="w-3 h-3" />;
+      case 'RE': return <AlertCircle className="w-3 h-3" />;
+      case 'PENDING': return <Clock className="w-3 h-3" />;
+      case 'RUNNING': return <Clock className="w-3 h-3 animate-spin" />;
+      default: return <AlertCircle className="w-3 h-3" />;
     }
   };
 
   const getVerdictLabel = (verdict) => {
     switch (verdict) {
-      case 'AC': return 'Accepted';
-      case 'WA': return 'Wrong Answer';
-      case 'TLE': return 'Time Limit Exceeded';
-      case 'MLE': return 'Memory Limit Exceeded';
-      case 'CE': return 'Compilation Error';
-      case 'RE': return 'Runtime Error';
+      case 'AC': return 'AC';
+      case 'WA': return 'WA';
+      case 'TLE': return 'TLE';
+      case 'MLE': return 'MLE';
+      case 'CE': return 'CE';
+      case 'RE': return 'RE';
       case 'PENDING': return 'Pending';
       case 'RUNNING': return 'Running';
       default: return verdict;
@@ -215,7 +163,7 @@ const MySubmissions = () => {
   const formatTime = (dateString) => {
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Invalid date';
+      if (isNaN(date.getTime())) return 'Invalid';
       
       const now = new Date();
       const diffMs = now - date;
@@ -223,51 +171,15 @@ const MySubmissions = () => {
       const diffHours = Math.floor(diffMs / 3600000);
       const diffDays = Math.floor(diffMs / 86400000);
 
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays < 7) return `${diffDays}d ago`;
+      if (diffMins < 1) return 'Now';
+      if (diffMins < 60) return `${diffMins}m`;
+      if (diffHours < 24) return `${diffHours}h`;
+      if (diffDays < 7) return `${diffDays}d`;
       
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-      });
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } catch (err) {
-      return 'Invalid date';
+      return 'Invalid';
     }
-  };
-
-  const formatDateTime = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Invalid date';
-      
-      return date.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (err) {
-      return 'Invalid date';
-    }
-  };
-
-  const verdictOptions = [
-    { value: 'all', label: 'All Verdicts' },
-    { value: 'AC', label: 'Accepted' },
-    { value: 'WA', label: 'Wrong Answer' },
-    { value: 'TLE', label: 'Time Limit Exceeded' },
-    { value: 'MLE', label: 'Memory Limit Exceeded' },
-    { value: 'CE', label: 'Compilation Error' },
-    { value: 'RE', label: 'Runtime Error' },
-    { value: 'PENDING', label: 'Pending' },
-    { value: 'RUNNING', label: 'Running' }
-  ];
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
   };
 
   const handleSort = (field) => {
@@ -280,84 +192,76 @@ const MySubmissions = () => {
   };
 
   const handleViewCode = (submission) => {
-    if (submission.can_view_code || submission.is_current_user || contestEnded) {
+    if (submission.can_view_code || submission.is_current_user) {
       setExpandedSubmission(expandedSubmission === submission.id ? null : submission.id);
     } else {
-      alert('You can only view your own code during the contest. Other users\' code will be available after the contest ends.');
+      alert('You can only view your own code');
     }
   };
 
   const getUserDisplayName = (submission) => {
-    if (submission.is_current_user) {
-      return `${submission.user_name || 'You'} (You)`;
-    }
-    return submission.user_name || `User_${submission.user.substring(0, 8)}`;
+    if (submission.is_current_user) return 'You';
+    return submission.user_name?.split(' ')[0] || `User_${submission.user_id?.substring(0, 4)}`;
   };
 
-  const getUserDisplayClass = (submission) => {
-    if (submission.is_current_user) {
-      return 'font-semibold text-blue-600';
-    }
-    return 'text-gray-700';
-  };
+  const verdictOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'AC', label: 'Accepted' },
+    { value: 'WA', label: 'Wrong' },
+    { value: 'TLE', label: 'TLE' },
+    { value: 'MLE', label: 'MLE' },
+    { value: 'CE', label: 'Compile' },
+    { value: 'RE', label: 'Runtime' },
+    { value: 'PENDING', label: 'Pending' }
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Header */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-
-            
-            {/* Timer at Top Right */}
-            {contestStatus === 'live' && timeRemaining > 0 && (
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-red-600 animate-pulse" />
-                <div className="text-right">
-                  <div className="text-xs text-gray-600">Time Remaining</div>
-                  <div className="font-mono font-bold text-lg text-red-600">{formatCountdown(timeRemaining)}</div>
-                </div>
-              </div>
-            )}
-            
-
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-blue-900 to-blue-700 text-white">
+        <div className="px-3 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Code2 className="w-4 h-4" />
+              <h1 className="text-sm font-bold">Submissions</h1>
+              <span className="text-xs bg-blue-800 text-blue-100 px-1.5 py-0.5 rounded">
+                CONTEST
+              </span>
+            </div>
           </div>
+        </div>
+      </div>
 
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
+      {/* Main Content */}
+      <div className="px-3 py-3">
+        {/* Filters */}
+        <div className="bg-white rounded-lg border border-gray-200 p-2 mb-3">
+          <div className="flex flex-wrap items-center gap-2">
             {/* My/All Filter */}
-            <div className="flex space-x-1 bg-white rounded-lg p-1 border border-gray-200">
+            <div className="flex space-x-1 bg-gray-100 rounded p-0.5">
               <button
                 onClick={() => setFilter('my')}
-                className={`px-4 py-2 text-xs font-medium rounded-md transition-colors duration-200 flex items-center gap-2 ${
-                  filter === 'my'
-                    ? 'bg-blue-50 text-blue-800 border border-blue-200'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
+                className={`px-2 py-1 text-xs rounded transition-colors ${filter === 'my' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'}`}
               >
-                <User className="w-3 h-3" />
-                My Submissions
+                <User className="w-3 h-3 inline mr-1" />
+                My
               </button>
               <button
                 onClick={() => setFilter('all')}
-                className={`px-4 py-2 text-xs font-medium rounded-md transition-colors duration-200 flex items-center gap-2 ${
-                  filter === 'all'
-                    ? 'bg-blue-50 text-blue-800 border border-blue-200'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
+                className={`px-2 py-1 text-xs rounded transition-colors ${filter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'}`}
               >
-                <UserCircle className="w-3 h-3" />
-                All Submissions
+                <UserCircle className="w-3 h-3 inline mr-1" />
+                All
               </button>
             </div>
 
             {/* Verdict Filter */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-500" />
+            <div className="flex items-center gap-1">
+              <Filter className="w-3 h-3 text-gray-500" />
               <select
                 value={selectedVerdict}
                 onChange={(e) => setSelectedVerdict(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs bg-white w-40"
+                className="px-2 py-1 border border-gray-300 rounded text-xs bg-white w-28"
               >
                 {verdictOptions.map(option => (
                   <option key={option.value} value={option.value}>
@@ -368,42 +272,40 @@ const MySubmissions = () => {
             </div>
 
             {/* Problem Filter */}
-            <div className="flex items-center gap-2">
-              <Hash className="w-4 h-4 text-gray-500" />
+            <div className="flex items-center gap-1">
+              <Hash className="w-3 h-3 text-gray-500" />
               <select
                 value={selectedProblem}
                 onChange={(e) => setSelectedProblem(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs bg-white min-w-[200px]"
+                className="px-2 py-1 border border-gray-300 rounded text-xs bg-white w-32"
               >
                 <option value="all">All Problems</option>
                 {problems.map(problem => (
                   <option key={problem.code} value={problem.code}>
-                    {problem.code} - {problem.title} ({problem.submission_count || 0})
+                    {problem.code}
                   </option>
                 ))}
               </select>
             </div>
 
             {/* Sort Buttons */}
-            <div className="flex gap-2 ml-auto">
-
-              
+            <div className="flex gap-1 ml-auto">
+              <button
+                onClick={() => handleSort('time')}
+                className={`px-2 py-1 border rounded text-xs ${sortBy === 'time' ? 'bg-blue-50 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-300'}`}
+              >
+                <Calendar className="w-3 h-3 inline mr-1" />
+                Time
+                {sortBy === 'time' && (sortOrder === 'desc' ? <ChevronDown className="w-3 h-3 inline ml-1" /> : <ChevronUp className="w-3 h-3 inline ml-1" />)}
+              </button>
               {filter === 'all' && (
                 <button
                   onClick={() => handleSort('user')}
-                  className={`flex items-center gap-1 px-3 py-2 border rounded-lg transition-colors text-xs ${
-                    sortBy === 'user'
-                      ? 'bg-blue-50 text-blue-800 border-blue-200'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                  }`}
+                  className={`px-2 py-1 border rounded text-xs ${sortBy === 'user' ? 'bg-blue-50 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-300'}`}
                 >
-                  <User className="w-4 h-4" />
-                  <span>User</span>
-                  {sortBy === 'user' && (
-                    sortOrder === 'desc' ? 
-                    <ChevronDown className="w-4 h-4" /> : 
-                    <ChevronUp className="w-4 h-4" />
-                  )}
+                  <User className="w-3 h-3 inline mr-1" />
+                  User
+                  {sortBy === 'user' && (sortOrder === 'desc' ? <ChevronDown className="w-3 h-3 inline ml-1" /> : <ChevronUp className="w-3 h-3 inline ml-1" />)}
                 </button>
               )}
             </div>
@@ -412,137 +314,97 @@ const MySubmissions = () => {
 
         {/* Submissions Table */}
         {loading ? (
-          <div className="bg-white rounded-lg border border-gray-200 py-12 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading submissions...</p>
+          <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+            <p className="text-gray-600 text-xs">Loading...</p>
           </div>
         ) : error ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <p className="text-red-600 font-medium mb-2">Error loading submissions</p>
-            <p className="text-gray-600 text-sm mb-4">{error}</p>
+          <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+            <AlertCircle className="w-6 h-6 text-red-500 mx-auto mb-2" />
+            <p className="text-gray-600 text-xs">{error}</p>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              className="mt-2 px-2 py-1 bg-blue-800 text-white rounded text-xs hover:bg-blue-900"
             >
               Retry
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg border border-gray-200">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900 w-24">
-                      ID
-                    </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900">
-                      Problem
-                    </th>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="text-left p-2 font-medium text-gray-900 w-16">ID</th>
+                    <th className="text-left p-2 font-medium text-gray-900">Problem</th>
                     {filter === 'all' && (
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900 w-40">
-                        User
-                      </th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-24">User</th>
                     )}
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900 w-36">
-                      Verdict
-                    </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900 w-24">
-                      Time
-                    </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900 w-28">
-                      Memory
-                    </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900 w-32">
-                      Language
-                    </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900 w-32">
-                      Submitted
-                    </th>
+                    <th className="text-left p-2 font-medium text-gray-900 w-20">Status</th>
+                    <th className="text-left p-2 font-medium text-gray-900 w-16">Time</th>
+                    <th className="text-left p-2 font-medium text-gray-900 w-16">Memory</th>
+                    <th className="text-left p-2 font-medium text-gray-900 w-20">Language</th>
+                    <th className="text-left p-2 font-medium text-gray-900 w-16">When</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody>
                   {submissions.map((submission) => (
                     <React.Fragment key={submission.id}>
-                      <tr className="hover:bg-gray-50 transition-colors">
-                        <td className="py-3 px-4">
+                      <tr className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="p-2">
                           <button
                             onClick={() => handleViewCode(submission)}
-                            disabled={!submission.can_view_code && !submission.is_current_user && !contestEnded}
-                            className={`font-mono text-xs ${
-                              submission.can_view_code || submission.is_current_user || contestEnded
-                                ? 'text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
-                                : 'text-gray-400 cursor-not-allowed'
-                            }`}
-                            title={
-                              submission.can_view_code || submission.is_current_user || contestEnded
-                                ? "Click to view code"
-                                : "View code after contest ends"
-                            }
+                            disabled={!submission.can_view_code && !submission.is_current_user}
+                            className={`font-mono text-xs ${submission.can_view_code || submission.is_current_user ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 cursor-not-allowed'}`}
                           >
-                            #{submission.id.substring(0, 8)}
-                            {!submission.can_view_code && !submission.is_current_user && !contestEnded && (
-                              <Lock className="w-3 h-3 inline ml-1" />
+                            #{submission.id?.substring(0, 6) || 'N/A'}
+                            {!submission.can_view_code && !submission.is_current_user && (
+                              <Lock className="w-2.5 h-2.5 inline ml-0.5" />
                             )}
                           </button>
                         </td>
-                        <td className="py-3 px-4">
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              <span className="font-bold text-gray-800">{submission.problem_code}.</span> {submission.problem_title}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {submission.language}
-                            </div>
+                        <td className="p-2">
+                          <div className="font-medium">
+                            <span className="font-bold">{submission.problem_code}.</span> {submission.problem_title?.substring(0, 20)}
                           </div>
                         </td>
                         {filter === 'all' && (
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-                                <User className="w-3 h-3 text-gray-600" />
+                          <td className="p-2">
+                            <div className="flex items-center gap-1">
+                              <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center">
+                                <User className="w-2.5 h-2.5 text-gray-600" />
                               </div>
-                              <span className={`text-sm ${getUserDisplayClass(submission)}`}>
+                              <span className={`${submission.is_current_user ? 'font-bold text-blue-600' : 'text-gray-700'}`}>
                                 {getUserDisplayName(submission)}
                               </span>
                               {submission.user_rating > 0 && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 text-yellow-700 rounded text-xs">
-                                  <Trophy className="w-3 h-3" />
-                                  {submission.user_rating}
-                                </span>
+                                <Trophy className="w-3 h-3 text-yellow-500" />
                               )}
                             </div>
                           </td>
                         )}
-                        <td className="py-3 px-4">
-                          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium ${getVerdictColor(submission.verdict)}`}>
+                        <td className="p-2">
+                          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border ${getVerdictColor(submission.verdict)}`}>
                             {getVerdictIcon(submission.verdict)}
                             {getVerdictLabel(submission.verdict)}
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="text-xs text-gray-700">
-                            {submission.execution_time > 0 ? `${submission.execution_time} ms` : '-'}
-                          </div>
+                        <td className="p-2 text-gray-700">
+                          {submission.execution_time > 0 ? `${submission.execution_time}ms` : '-'}
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="text-xs text-gray-700">
-                            {submission.memory > 0 ? `${(submission.memory / 1024).toFixed(1)} MB` : '-'}
-                          </div>
+                        <td className="p-2 text-gray-700">
+                          {submission.memory > 0 ? `${(submission.memory / 1024).toFixed(0)}MB` : '-'}
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <Code2 className="w-4 h-4 text-gray-400" />
-                            <span className="text-xs text-gray-700 font-mono">
-                              {submission.language.toUpperCase()}
+                        <td className="p-2">
+                          <div className="flex items-center gap-1">
+                            <Code2 className="w-3 h-3 text-gray-400" />
+                            <span className="font-mono">
+                              {submission.language?.substring(0, 3).toUpperCase()}
                             </span>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="text-xs text-gray-500" title={formatDateTime(submission.submitted_at)}>
-                            {formatTime(submission.submitted_at)}
-                          </div>
+                        <td className="p-2 text-gray-500" title={new Date(submission.submitted_at).toLocaleString()}>
+                          {formatTime(submission.submitted_at)}
                         </td>
                       </tr>
                       
@@ -550,57 +412,49 @@ const MySubmissions = () => {
                       {expandedSubmission === submission.id && (
                         <tr>
                           <td colSpan={filter === 'all' ? 8 : 7} className="bg-gray-50 p-0">
-                            <div className="p-4 border-t border-gray-200">
-                              <div className="flex items-center justify-between mb-4">
+                            <div className="p-2 border-t border-gray-200">
+                              <div className="flex items-center justify-between mb-2">
                                 <div>
-                                  <h3 className="font-semibold text-gray-900">
-                                    Submission #{submission.id.substring(0, 8)} • {submission.language.toUpperCase()} • {getUserDisplayName(submission)}
+                                  <h3 className="text-sm font-semibold text-gray-900">
+                                    Submission #{submission.id?.substring(0, 8)}
                                   </h3>
                                   <p className="text-xs text-gray-600">
-                                    Submitted {formatDateTime(submission.submitted_at)} • Problem: {submission.problem_code} - {submission.problem_title}
+                                    {submission.problem_code} • {submission.language?.toUpperCase()} • {getUserDisplayName(submission)}
                                   </p>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
                                   <button
-                                    onClick={() => copyToClipboard(submission.code)}
-                                    className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs"
+                                    onClick={() => navigator.clipboard.writeText(submission.code || '')}
+                                    className="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center gap-1"
                                   >
-                                    <Copy className="w-4 h-4" />
-                                    Copy Code
+                                    <Copy className="w-3 h-3" />
+                                    Copy
                                   </button>
                                   <Link
                                     to={`/contest/${contestId}/problem/${submission.problem_code}`}
-                                    className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs"
+                                    className="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center gap-1"
                                   >
-                                    <ExternalLink className="w-4 h-4" />
-                                    View Problem
+                                    <ExternalLink className="w-3 h-3" />
+                                    Problem
                                   </Link>
                                 </div>
                               </div>
-                              <div className="bg-gray-900 rounded-lg overflow-hidden">
-                                <div className="px-4 py-2 bg-gray-800 text-gray-300 text-xs font-mono">
-                                  {submission.language.toUpperCase()} • {submission.verdict}
+                              <div className="bg-gray-900 rounded overflow-hidden">
+                                <div className="px-2 py-1 bg-gray-800 text-gray-300 text-xs font-mono">
+                                  {submission.language?.toUpperCase()} • {getVerdictLabel(submission.verdict)}
                                 </div>
-                                <pre className="p-4 text-xs text-gray-100 font-mono overflow-x-auto max-h-96">
-                                  <code>{submission.code}</code>
+                                <pre className="p-2 text-xs text-gray-100 font-mono overflow-x-auto max-h-48">
+                                  <code>{submission.code || 'No code available'}</code>
                                 </pre>
                               </div>
-                              <div className="mt-4 text-xs text-gray-600 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                  <span className={`px-2 py-1 rounded ${getVerdictColor(submission.verdict)}`}>
-                                    {getVerdictLabel(submission.verdict)}
-                                  </span>
-                                  <span>Time: {submission.execution_time > 0 ? `${submission.execution_time}ms` : 'N/A'}</span>
-                                  <span>Memory: {submission.memory > 0 ? `${(submission.memory / 1024).toFixed(1)}MB` : 'N/A'}</span>
+                              <div className="mt-2 text-xs text-gray-600 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span>Time: {submission.execution_time > 0 ? `${submission.execution_time}ms` : '-'}</span>
+                                  <span>Memory: {submission.memory > 0 ? `${(submission.memory / 1024).toFixed(1)}MB` : '-'}</span>
                                   {submission.passed_test_cases > 0 && (
                                     <span>Tests: {submission.passed_test_cases}/{submission.total_test_cases}</span>
                                   )}
                                 </div>
-                                {submission.verdict !== 'AC' && submission.verdict !== 'PENDING' && (
-                                  <button className="text-blue-600 hover:text-blue-800 text-xs">
-                                    View Details →
-                                  </button>
-                                )}
                               </div>
                             </div>
                           </td>
@@ -613,47 +467,20 @@ const MySubmissions = () => {
             </div>
 
             {submissions.length === 0 && (
-              <div className="py-16 text-center">
-                <div className="text-gray-400 mb-4">
-                  <Filter className="w-12 h-12 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-gray-500">No submissions found</p>
-                </div>
-                <div className="text-gray-500 text-sm mb-6">
-                  {filter === 'my' 
-                    ? "You haven't made any submissions yet."
-                    : "No submissions match your filters."
-                  }
-                </div>
-              </div>
-            )}
-
-            {/* Simple Pagination */}
-            {submissions.length > 0 && (
-              <div className="border-t border-gray-200 px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    Showing <span className="font-medium">{submissions.length}</span> of{' '}
-                    <span className="font-medium">{allSubmissions.length}</span> submissions
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button className="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm">
-                      ← Previous
-                    </button>
-                    <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm">1</span>
-                    <button className="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
-                      2
-                    </button>
-                    <button className="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
-                      Next →
-                    </button>
-                  </div>
-                </div>
+              <div className="p-4 text-center">
+                <Filter className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                <p className="text-gray-500 text-xs">No submissions found</p>
               </div>
             )}
           </div>
         )}
-        
 
+        {/* Stats Footer */}
+        {submissions.length > 0 && (
+          <div className="mt-2 text-xs text-gray-600">
+            Showing {submissions.length} submissions
+          </div>
+        )}
       </div>
     </div>
   );
