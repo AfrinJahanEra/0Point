@@ -1,4 +1,4 @@
-// ContestInside.jsx
+// ContestInside.jsx - Compact Version
 import React, { useState, useEffect } from 'react';
 import ScreenRecorder from '../components/ScreenRecorder';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -9,21 +9,24 @@ import {
   Award, Plus, AlertCircle, Loader2, CheckCircle,
   XCircle, Clock as ClockIcon,
   FileQuestionIcon,
-  BookOpen
+  BookOpen,
+  Shield,
+  ChevronRight,
+  Eye,
+  BarChart3,
+  Medal,
+  Zap,
+  TrendingUp
 } from 'lucide-react';
 
 const ContestInside = () => {
-
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [activeTab, setActiveTab] = useState('problems');
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
-  // Add this with your other state variables (around line 32)
   const [hasAnyVirtualContest, setHasAnyVirtualContest] = useState(false);
   const [virtualContestId, setVirtualContestId] = useState(null);
-
   const [user, setUser] = useState(null);
   const [showRecordingModal, setShowRecordingModal] = useState(false);
-
   const [newAnnouncement, setNewAnnouncement] = useState('');
 
   const { contestId } = useParams();
@@ -32,9 +35,7 @@ const ContestInside = () => {
   const [error, setError] = useState(null);
   const [contestData, setContestData] = useState(null);
   const [problems, setProblems] = useState([]);
-  // Add this with your other state variables
-const [solvedProblems, setSolvedProblems] = useState(new Set());
-  // Add this to your state variables
+  const [solvedProblems, setSolvedProblems] = useState(new Set());
   const [problemStatuses, setProblemStatuses] = useState({});
   const [announcements, setAnnouncements] = useState([]);
   const [userStats, setUserStats] = useState({
@@ -90,360 +91,242 @@ const [solvedProblems, setSolvedProblems] = useState(new Set());
 
   // Get difficulty color
   const getDifficultyColor = (difficulty) => {
-    if (!difficulty) return 'bg-gray-100 text-gray-800';
+    if (!difficulty) return 'bg-gray-100 text-gray-800 text-xs px-1.5 py-0.5 rounded-full';
     switch (difficulty.toLowerCase()) {
-      case 'easy': return 'bg-green-100 text-green-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'hard': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'easy': return 'bg-green-100 text-green-800 text-xs px-1.5 py-0.5 rounded-full';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 text-xs px-1.5 py-0.5 rounded-full';
+      case 'hard': return 'bg-red-100 text-red-800 text-xs px-1.5 py-0.5 rounded-full';
+      default: return 'bg-gray-100 text-gray-800 text-xs px-1.5 py-0.5 rounded-full';
     }
   };
 
   // Get status badge color
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'live': return 'bg-red-100 text-red-800 border-red-200';
-      case 'upcoming': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'past': return 'bg-green-100 text-green-800 border-green-200';
-      case 'draft': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'live': return 'bg-red-100 text-red-800 border-red-200 text-xs px-2 py-0.5 rounded-full';
+      case 'upcoming': return 'bg-blue-100 text-blue-800 border-blue-200 text-xs px-2 py-0.5 rounded-full';
+      case 'past': return 'bg-green-100 text-green-800 border-green-200 text-xs px-2 py-0.5 rounded-full';
+      case 'draft': return 'bg-yellow-100 text-yellow-800 border-yellow-200 text-xs px-2 py-0.5 rounded-full';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200 text-xs px-2 py-0.5 rounded-full';
     }
   };
 
-// SIMPLIFIED fetch function - FIXED VERSION
-const fetchContestData = async () => {
-  console.log('🚀 Starting fetchContestData for contest:', contestId);
-  setLoading(true);
-  setError(null);
-  
-  try {
-    // 1. Fetch contest details (REQUIRED)
-    console.log('📡 Fetching contest details...');
-    const contestRes = await axios.get(
-      `http://localhost:8000/contests/${contestId}/`, 
-      { headers: getHeaders() }
-    ).catch(err => {
-      console.error('❌ Contest details error:', err.response?.data || err.message);
-      throw err;
-    });
+  // Fetch contest data
+  const fetchContestData = async () => {
+    setLoading(true);
+    setError(null);
     
-    console.log('✅ Contest details:', contestRes.data);
-    
-    if (!contestRes.data) {
-      throw new Error('No contest data received');
-    }
-
-    const contest = contestRes.data;
-    setContestData(contest);
-
-    // 2. Fetch problems (REQUIRED) - SIMPLIFIED
-    console.log('📡 Fetching problems...');
-    let problemsList = [];
     try {
-      const problemsRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/problems/`, 
+      const contestRes = await axios.get(
+        `http://localhost:8000/contests/${contestId}/`, 
         { headers: getHeaders() }
-      ).catch(err => {
-        console.error('⚠️ Problems fetch error (continuing):', err.response?.data || err.message);
-        return { data: [] };
-      });
+      );
       
-      console.log('📊 Problems response:', problemsRes.data);
-      
-      if (problemsRes.data) {
-        // Handle different response structures
-        if (Array.isArray(problemsRes.data)) {
-          problemsList = problemsRes.data;
-        } else if (problemsRes.data.problems && Array.isArray(problemsRes.data.problems)) {
-          problemsList = problemsRes.data.problems;
-        } else if (problemsRes.data.data && Array.isArray(problemsRes.data.data)) {
-          problemsList = problemsRes.data.data;
-        }
+      if (!contestRes.data) {
+        throw new Error('No contest data received');
       }
-      
-      console.log('✅ Parsed problems:', problemsList.length);
-      setProblems(problemsList);
-      
-    } catch (problemsError) {
-      console.error('⚠️ Problems error caught:', problemsError);
-      setProblems([]);
-    }
 
-    // 3. Fetch announcements
-    console.log('📡 Fetching announcements...');
-    try {
-      const announcementsRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/announcements/`,
-        { headers: getHeaders() }
-      ).catch(err => {
-        console.error('⚠️ Announcements fetch error (continuing):', err.response?.data || err.message);
-        return { data: { announcements: [] } };
-      });
-      
-      console.log('📢 Announcements response:', announcementsRes.data);
-      
-      if (announcementsRes.data && announcementsRes.data.announcements) {
-        setAnnouncements(announcementsRes.data.announcements);
-      }
-    } catch (announcementsError) {
-      console.error('⚠️ Announcements error:', announcementsError);
-    }
+      const contest = contestRes.data;
+      setContestData(contest);
 
-    // 4. Fetch user problem status
-    console.log('📡 Fetching user problem status...');
-    try {
-      const statusRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/problems/status/`,
-        { headers: getHeaders() }
-      ).catch(err => {
-        console.error('⚠️ Status fetch error (continuing):', err.response?.data || err.message);
-        return { data: { problem_statuses: {} } };
-      });
-      
-      console.log('👤 Problem status response:', statusRes.data);
-      
-      if (statusRes.data && statusRes.data.problem_statuses) {
-        const statuses = statusRes.data.problem_statuses;
-        setProblemStatuses(statuses);
-        
-        // Calculate stats
-        let solved = 0;
-        let attempted = 0;
-        
-        Object.values(statuses).forEach(status => {
-          if (status.solved) solved++;
-          if (status.status === 'attempted' || status.status === 'solved') attempted++;
-        });
-        
-        const totalAttempts = solved + (attempted - solved);
-        const accuracy = totalAttempts > 0 ? Math.round((solved / totalAttempts) * 100) : 0;
-        
-        setUserStats({
-          solved,
-          attempted: totalAttempts,
-          total: problemsList.length, 
-          accuracy: `${accuracy}%`
-        });
-        
-        const solvedSet = new Set();
-        Object.entries(statuses).forEach(([problemIndex, status]) => {
-          if (status.solved) {
-            solvedSet.add(problemIndex);
-          }
-        });
-        setSolvedProblems(solvedSet);
-      }
-    } catch (statusError) {
-      console.error('⚠️ Status error:', statusError);
-    }
-
-    // 5. Calculate time remaining (OPTIONAL)
-    if (contest.status === 'live' && contest.start_time && contest.duration) {
+      let problemsList = [];
       try {
-        const startTime = new Date(contest.start_time);
-        const endTime = new Date(startTime.getTime() + (contest.duration * 60 * 60 * 1000));
-        const now = new Date();
+        const problemsRes = await axios.get(
+          `http://localhost:8000/contests/${contestId}/problems/`, 
+          { headers: getHeaders() }
+        );
         
-        if (now >= startTime && now <= endTime) {
-          const remainingSeconds = Math.floor((endTime - now) / 1000);
-          setTimeRemaining(remainingSeconds);
-          console.log('⏰ Timer started:', remainingSeconds, 'seconds remaining');
-        } else if (now > endTime) {
-          setTimeRemaining(0);
+        if (problemsRes.data) {
+          if (Array.isArray(problemsRes.data)) {
+            problemsList = problemsRes.data;
+          } else if (problemsRes.data.problems && Array.isArray(problemsRes.data.problems)) {
+            problemsList = problemsRes.data.problems;
+          } else if (problemsRes.data.data && Array.isArray(problemsRes.data.data)) {
+            problemsList = problemsRes.data.data;
+          }
         }
-      } catch (timeError) {
-        console.error('⚠️ Time calculation error:', timeError);
+        setProblems(problemsList);
+      } catch (problemsError) {
+        setProblems([]);
       }
-    }
 
-
-    // 6. Check for ANY existing virtual contests (past or active)
-console.log('🔍 Checking for ANY virtual contests for this contest...');
-try {
-  const virtualResponse = await axios.get(
-    'http://localhost:8000/my-virtual/',
-    { headers: getHeaders() }
-  ).catch(err => {
-    console.error('⚠️ Virtual contest check error (continuing):', err.response?.data || err.message);
-    return { data: { virtual_contests: [] } };
-  });
-  
-  console.log('📊 All virtual contests response:', virtualResponse.data);
-  
-  if (virtualResponse.data && virtualResponse.data.virtual_contests) {
-    const virtualContests = virtualResponse.data.virtual_contests;
-    
-    // Find ANY virtual contest for this original contest (past or active)
-    const anyVirtualContest = virtualContests.find(vc => 
-      vc.original_contest_id === contestId
-    );
-    
-    if (anyVirtualContest) {
-      console.log('✅ Found virtual contest (active or past):', anyVirtualContest);
-      setHasAnyVirtualContest(true);  // Rename this to hasAnyVirtualContest if you prefer
-      setVirtualContestId(anyVirtualContest.id);
-    } else {
-      console.log('❌ No virtual contest found for this contest');
-      setHasAnyVirtualContest(false);
-      setVirtualContestId(null);
-    }
-  } else {
-    setHasAnyVirtualContest(false);
-    setVirtualContestId(null);
-  }
-} catch (virtualError) {
-  console.error('⚠️ Virtual contest check error:', virtualError);
-  setHasAnyVirtualContest(false);
-  setVirtualContestId(null);
-}
-
-    console.log('🎉 All data loaded successfully!');
-    setLoading(false);
-    
-  } catch (err) {
-    console.error('💥 Critical error in fetchContestData:', err);
-    console.error('Error details:', {
-      message: err.message,
-      response: err.response?.data,
-      status: err.response?.status
-    });
-    
-    // User-friendly error messages
-    if (err.response?.status === 404) {
-      setError('Contest not found');
-    } else if (err.response?.status === 403) {
-      setError('Access denied. You may need to register for this contest.');
-    } else if (err.response?.status === 401) {
-      setError('Please login to access this contest');
-    } else if (err.message.includes('Network Error')) {
-      setError('Cannot connect to server. Please check your connection.');
-    } else {
-      setError(err.response?.data?.error || err.message || 'Failed to load contest');
-    }
-    
-    setLoading(false);
-  }
-};
-
-// useEffect(() => {
-//     if (contestData && contestData.id) {
-//       checkRecordingRequirements();
-//     }
-//   }, [contestData]);
-
-const checkRecordingRequirements = async () => {
-  try {
-    const response = await axios.get(
-      `http://localhost:8000/contests/${contestId}/recording/status/`,
-      { headers: getHeaders() }
-    );
-    
-    const { requires_recording, recording_started } = response.data;
-    
-    // Show recording modal if required and NOT started yet
-    // IMPORTANT: Check that recording_started is false
-    if (requires_recording && !recording_started && contestData.status === 'live') {
-      setShowRecordingModal(true);
-    }
-  } catch (err) {
-    console.error('Error checking recording requirements:', err);
-  }
-};
-
-useEffect(() => {
-  if (contestId) {
-    console.log('🔍 useEffect triggered for contest:', contestId);
-    fetchContestData();
-  } else {
-    console.error('❌ No contestId provided');
-    setError('No contest ID provided');
-    setLoading(false);
-  }
-}, [contestId]);
-
-
-useEffect(() => {
-  if (contestId) {
-    console.log('🔍 useEffect triggered for contest:', contestId);
-    fetchContestData();
-  } else {
-    console.error('❌ No contestId provided');
-    setError('No contest ID provided');
-    setLoading(false);
-  }
-}, [contestId]);
-
-// === ADD THIS COUNTDOWN TIMER EFFECT HERE ===
-useEffect(() => {
-  let intervalId;
-  
-  if (contestData?.status === 'live' && timeRemaining > 0) {
-    intervalId = setInterval(() => {
-      setTimeRemaining(prevTime => {
-        if (prevTime <= 1) {
-          clearInterval(intervalId);
-          
-          // Optionally refresh contest data when time runs out
-          setTimeout(() => {
-            fetchContestData();
-          }, 1000);
-          
-          return 0;
+      try {
+        const announcementsRes = await axios.get(
+          `http://localhost:8000/contests/${contestId}/announcements/`,
+          { headers: getHeaders() }
+        );
+        
+        if (announcementsRes.data && announcementsRes.data.announcements) {
+          setAnnouncements(announcementsRes.data.announcements);
         }
-        return prevTime - 1;
-      });
-    }, 1000);
-  }
-  
-  // Cleanup interval on component unmount or when dependencies change
-  return () => {
-    if (intervalId) {
-      clearInterval(intervalId);
+      } catch (announcementsError) {
+        console.error('Announcements error:', announcementsError);
+      }
+
+      try {
+        const statusRes = await axios.get(
+          `http://localhost:8000/contests/${contestId}/problems/status/`,
+          { headers: getHeaders() }
+        );
+        
+        if (statusRes.data && statusRes.data.problem_statuses) {
+          const statuses = statusRes.data.problem_statuses;
+          setProblemStatuses(statuses);
+          
+          let solved = 0;
+          let attempted = 0;
+          
+          Object.values(statuses).forEach(status => {
+            if (status.solved) solved++;
+            if (status.status === 'attempted' || status.status === 'solved') attempted++;
+          });
+          
+          const totalAttempts = solved + (attempted - solved);
+          const accuracy = totalAttempts > 0 ? Math.round((solved / totalAttempts) * 100) : 0;
+          
+          setUserStats({
+            solved,
+            attempted: totalAttempts,
+            total: problemsList.length, 
+            accuracy: `${accuracy}%`
+          });
+          
+          const solvedSet = new Set();
+          Object.entries(statuses).forEach(([problemIndex, status]) => {
+            if (status.solved) {
+              solvedSet.add(problemIndex);
+            }
+          });
+          setSolvedProblems(solvedSet);
+        }
+      } catch (statusError) {
+        console.error('Status error:', statusError);
+      }
+
+      if (contest.status === 'live' && contest.start_time && contest.duration) {
+        try {
+          const startTime = new Date(contest.start_time);
+          const endTime = new Date(startTime.getTime() + (contest.duration * 60 * 60 * 1000));
+          const now = new Date();
+          
+          if (now >= startTime && now <= endTime) {
+            const remainingSeconds = Math.floor((endTime - now) / 1000);
+            setTimeRemaining(remainingSeconds);
+          } else if (now > endTime) {
+            setTimeRemaining(0);
+          }
+        } catch (timeError) {
+          console.error('Time calculation error:', timeError);
+        }
+      }
+
+      try {
+        const virtualResponse = await axios.get(
+          'http://localhost:8000/my-virtual/',
+          { headers: getHeaders() }
+        );
+        
+        if (virtualResponse.data && virtualResponse.data.virtual_contests) {
+          const virtualContests = virtualResponse.data.virtual_contests;
+          const anyVirtualContest = virtualContests.find(vc => 
+            vc.original_contest_id === contestId
+          );
+          
+          if (anyVirtualContest) {
+            setHasAnyVirtualContest(true);
+            setVirtualContestId(anyVirtualContest.id);
+          } else {
+            setHasAnyVirtualContest(false);
+            setVirtualContestId(null);
+          }
+        }
+      } catch (virtualError) {
+        console.error('Virtual contest check error:', virtualError);
+        setHasAnyVirtualContest(false);
+        setVirtualContestId(null);
+      }
+
+      setLoading(false);
+      
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setError('Contest not found');
+      } else if (err.response?.status === 403) {
+        setError('Access denied. You may need to register for this contest.');
+      } else if (err.response?.status === 401) {
+        setError('Please login to access this contest');
+      } else if (err.message.includes('Network Error')) {
+        setError('Cannot connect to server. Please check your connection.');
+      } else {
+        setError(err.response?.data?.error || err.message || 'Failed to load contest');
+      }
+      
+      setLoading(false);
     }
   };
-}, [contestData?.status, timeRemaining]);
-// === END OF ADDED CODE ===
 
+  const checkRecordingRequirements = async () => {
+    try {
+      const response = await axios.get(
+        `http://localhost:8000/contests/${contestId}/recording/status/`,
+        { headers: getHeaders() }
+      );
+      
+      const { requires_recording, recording_started } = response.data;
+      
+      if (requires_recording && !recording_started && contestData.status === 'live') {
+        setShowRecordingModal(true);
+      }
+    } catch (err) {
+      console.error('Error checking recording requirements:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (contestId) {
+      fetchContestData();
+    } else {
+      setError('No contest ID provided');
+      setLoading(false);
+    }
+  }, [contestId]);
+
+  useEffect(() => {
+    let intervalId;
+    
+    if (contestData?.status === 'live' && timeRemaining > 0) {
+      intervalId = setInterval(() => {
+        setTimeRemaining(prevTime => {
+          if (prevTime <= 1) {
+            clearInterval(intervalId);
+            setTimeout(() => {
+              fetchContestData();
+            }, 1000);
+            return 0;
+          }
+          return prevTime - 1;
+        });
+      }, 1000);
+    }
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [contestData?.status, timeRemaining]);
 
   // Handle problem click
   const handleProblemClick = (problem) => {
-  const problemIndex = problem.problem_id || problem.index || problem.code;
-  if (problemIndex) {
-    console.log('🎯 Navigating to problem:', problemIndex);
-    // Change from /contests/ to /contest/ (singular)
-    navigate(`/contests/${contestId}/problems/${problemIndex}`);
-  }
-};
-
-// Add this function with your other handlers (around line 150-250 area)
-const handleStartVirtualContest = async () => {
-  try {
-    console.log('🎯 Starting virtual contest for:', contestId);
-    const response = await axios.post(
-      `http://localhost:8000/contests/${contestId}/virtual-start/`,  // Virtual contest API
-      { 
-        contest_id: contestId 
-      },
-      { headers: getHeaders() }
-    );
-    
-    console.log('✅ Virtual contest started:', response.data);
-    
-    if (response.data.virtual_contest_id) {
-      alert('Virtual contest started successfully!');
-      // Navigate to the virtual contest page
-      navigate(`/contests/${contestId}/virtual/${response.data.virtual_contest_id}`);
+    const problemIndex = problem.problem_id || problem.index || problem.code;
+    if (problemIndex) {
+      navigate(`/contests/${contestId}/problems/${problemIndex}`);
     }
-  } catch (err) {
-    console.error('❌ Virtual contest error:', err.response?.data || err.message);
-    alert(err.response?.data?.error || 'Failed to start virtual contest');
-  }
-};
+  };
 
   // Handle registration
   const handleRegister = async () => {
     try {
-      console.log('📝 Registering for contest:', contestId);
       const response = await axios.post(
         `http://localhost:8000/contests/${contestId}/register/`,
         {},
@@ -455,89 +338,88 @@ const handleStartVirtualContest = async () => {
         fetchContestData();
       }
     } catch (err) {
-      console.error('❌ Registration error:', err);
       alert(err.response?.data?.error || 'Failed to register');
     }
   };
 
-  // Handle post announcement
-// Handle post announcement
-const handlePostAnnouncement = async () => {
-  if (!newAnnouncement.trim()) {
-    alert('Please enter announcement text');
-    return;
-  }
-
-  try {
-    const response = await axios.post(
-      `http://localhost:8000/announcements/create/`,
-      { 
-        contest_id: contestId,
-        text: newAnnouncement 
-      },
-      { headers: getHeaders() }
-    );
-    
-    console.log('📝 Post announcement response:', response.data);
-    
-    if (response.data && response.data.announcement) {
-      setAnnouncements([response.data.announcement, ...announcements]);
-      setNewAnnouncement('');
-      setShowAnnouncementForm(false);
-      alert('New announcement posted: ' + response.data.announcement.text);
+  // Handle start virtual contest
+  const handleStartVirtualContest = async () => {
+    try {
+      const response = await axios.post(
+        `http://localhost:8000/contests/${contestId}/virtual-start/`,
+        { contest_id: contestId },
+        { headers: getHeaders() }
+      );
+      
+      if (response.data.virtual_contest_id) {
+        alert('Virtual contest started successfully!');
+        navigate(`/contests/${contestId}/virtual/${response.data.virtual_contest_id}`);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to start virtual contest');
     }
-  } catch (err) {
-    console.error('❌ Error posting announcement:', err);
-    console.error('Error details:', err.response?.data);
-    alert(err.response?.data?.error || 'Unknown error');
-  }
-};
+  };
 
-// Add a handler for going to existing virtual contest
-const handleGoToVirtualContest = () => {
-  if (virtualContestId) {
-    navigate(`/contests/${contestId}/virtual/${virtualContestId}`);
-  }
-};
+  // Handle post announcement
+  const handlePostAnnouncement = async () => {
+    if (!newAnnouncement.trim()) {
+      alert('Please enter announcement text');
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `http://localhost:8000/announcements/create/`,
+        { 
+          contest_id: contestId,
+          text: newAnnouncement 
+        },
+        { headers: getHeaders() }
+      );
+      
+      if (response.data && response.data.announcement) {
+        setAnnouncements([response.data.announcement, ...announcements]);
+        setNewAnnouncement('');
+        setShowAnnouncementForm(false);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Unknown error');
+    }
+  };
+
+  // Handle go to existing virtual contest
+  const handleGoToVirtualContest = () => {
+    if (virtualContestId) {
+      navigate(`/contests/${contestId}/virtual/${virtualContestId}`);
+    }
+  };
 
   // Get problem status icon
-// Update getProblemStatusIcon function
-const getProblemStatusIcon = (problem) => {
-  const problemIndex = problem.problem_id || problem.index || problem.code;
-  const status = problemStatuses[problemIndex];
-  
-  if (!status) {
-    return <div className="w-3 h-3 rounded-full bg-gray-300"></div>;
-  }
-  
-  if (status.solved) {
-    return (
-      <div className="flex items-center justify-center" title="Solved">
-        <CheckCircle className="w-4 h-4 text-green-600" />
-      </div>
-    );
-  }
-  
-  if (status.status === 'attempted') {
-    return (
-      <div className="flex items-center justify-center" title="Attempted">
-        <XCircle className="w-4 h-4 text-red-500" />
-      </div>
-    );
-  }
-  
-  return (
-    <div className="w-3 h-3 rounded-full bg-gray-300" title="Not attempted"></div>
-  );
-};
+  const getProblemStatusIcon = (problem) => {
+    const problemIndex = problem.problem_id || problem.index || problem.code;
+    const status = problemStatuses[problemIndex];
+    
+    if (!status) {
+      return <div className="w-2 h-2 rounded-full bg-gray-300"></div>;
+    }
+    
+    if (status.solved) {
+      return <CheckCircle className="w-3.5 h-3.5 text-green-600" />;
+    }
+    
+    if (status.status === 'attempted') {
+      return <XCircle className="w-3.5 h-3.5 text-red-500" />;
+    }
+    
+    return <div className="w-2 h-2 rounded-full bg-gray-300"></div>;
+  };
 
   // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-4" />
-        <p className="text-gray-600 mb-2">Loading contest data...</p>
-        <p className="text-xs text-gray-500">Contest ID: {contestId}</p>
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
+        <p className="text-gray-600 text-xs">Loading contest data...</p>
       </div>
     );
   }
@@ -546,34 +428,30 @@ const getProblemStatusIcon = (problem) => {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">Unable to Load Contest</h3>
-          <p className="text-gray-600 mb-6 text-center">{error}</p>
-          <div className="space-y-3">
+        <div className="bg-white p-4 rounded-lg border border-gray-200 max-w-sm w-full">
+          <h3 className="text-sm font-bold text-gray-900 mb-1">Contest Access Error</h3>
+          <p className="text-gray-600 text-xs mb-3">{error}</p>
+          <div className="space-y-1.5">
             <button
               onClick={() => navigate('/contests')}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              className="w-full bg-blue-800 text-white py-1.5 rounded text-xs font-medium hover:bg-blue-900 transition-colors"
             >
               Back to Contests
             </button>
             {error.includes('need to register') && contestData?.status === 'upcoming' && (
               <button
                 onClick={handleRegister}
-                className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                className="w-full bg-green-800 text-white py-1.5 rounded text-xs font-medium hover:bg-green-900 transition-colors"
               >
                 Register Now
               </button>
             )}
             <button
               onClick={() => fetchContestData()}
-              className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              className="w-full border border-gray-300 text-gray-700 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors"
             >
               Try Again
             </button>
-            <div className="text-center mt-4">
-              <p className="text-xs text-gray-500">Contest ID: {contestId}</p>
-            </div>
           </div>
         </div>
       </div>
@@ -584,8 +462,8 @@ const getProblemStatusIcon = (problem) => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No contest data available</p>
+          <AlertCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-gray-600 text-xs">No contest data available</p>
         </div>
       </div>
     );
@@ -593,27 +471,25 @@ const getProblemStatusIcon = (problem) => {
 
   const RecordingRequirementModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 max-w-md mx-4">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+      <div className="bg-white rounded-xl p-4 max-w-sm mx-4">
+        <div className="text-center mb-4">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v4a1 1 0 102 0V7z" clipRule="evenodd" />
             </svg>
           </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Screen Recording Required</h3>
-          <p className="text-gray-600 mb-4">
-            This contest requires screen recording for integrity purposes. 
-            Please start recording when you begin solving problems.
+          <h3 className="text-sm font-bold text-gray-900 mb-1">Screen Recording Required</h3>
+          <p className="text-gray-600 text-xs mb-3">
+            This contest requires screen recording for integrity purposes.
           </p>
         </div>
         
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           <button
             onClick={() => {
               setShowRecordingModal(false);
-              // Auto-start recording will happen in ScreenRecorder component
             }}
-            className="w-full bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 transition-colors"
+            className="w-full bg-red-600 text-white py-1.5 rounded text-xs font-medium hover:bg-red-700 transition-colors"
           >
             Start Recording Now
           </button>
@@ -621,10 +497,9 @@ const getProblemStatusIcon = (problem) => {
           <button
             onClick={() => {
               setShowRecordingModal(false);
-              // Optionally navigate away or show warning
               alert('You must start recording to participate in this contest.');
             }}
-            className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+            className="w-full border border-gray-300 text-gray-700 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
@@ -633,141 +508,132 @@ const getProblemStatusIcon = (problem) => {
     </div>
   );
 
-
   return (
     <div className="min-h-screen bg-gray-50">
-
       {/* Add ScreenRecorder component */}
       {contestData && contestData.status === 'live' && (
         <ScreenRecorder 
           contestId={contestId}
           userId={user?.id}
-          contestStatus={contestData.status} // Add this line!
+          contestStatus={contestData.status}
           onRecordingComplete={(data) => {
             console.log('Recording completed:', data);
-            // You can show a notification or update UI
           }}
         />
       )}
-      {/* Add Recording Requirement Modal */}
       {showRecordingModal && <RecordingRequirementModal />}
       
-      {/* Contest Header */}
+      {/* Compact Header */}
       <div className="bg-gradient-to-br from-blue-900 to-blue-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex-1 mb-6 lg:mb-0">
-              <h1 className="text-3xl font-bold mb-4">{contestData.title}</h1>
-              
-              {contestData.description && (
-                <p className="text-blue-100 mb-6 max-w-3xl">
-                  {contestData.description}
-                </p>
-              )}
-              
-              <div className="flex flex-wrap gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
-                  <span>{formatDateTime(contestData.start_time)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  <span>{formatDuration(contestData.duration)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  <span>{contestData.participants || 0} Participants</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <School className="w-5 h-5" />
-                  <span>{contestData.platform || 'Custom Platform'}</span>
-                </div>
-              </div>
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold">{contestData.title}</h1>
             </div>
-            
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold ${getStatusBadge(contestData.status)}`}>
+            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${getStatusBadge(contestData.status)}`}>
               {contestData.status === 'live' && (
-                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
               )}
-              <span>{contestData.status === 'live' ? 'Live Now' : contestData.status.charAt(0).toUpperCase() + contestData.status.slice(1)}</span>
+              <span className="text-xs">
+                {contestData.status === 'live' ? 'Live Now' : 
+                 contestData.status === 'upcoming' ? 'Starting Soon' :
+                 contestData.status.charAt(0).toUpperCase() + contestData.status.slice(1)}
+              </span>
+            </div>
+          </div>
+          
+          {contestData.description && (
+            <p className="text-blue-100 text-xs mt-1 mb-2">
+              {contestData.description.length > 100 
+                ? contestData.description.substring(0, 100) + '...' 
+                : contestData.description}
+            </p>
+          )}
+          
+          <div className="flex flex-wrap gap-3 text-xs text-blue-100">
+            <div className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              <span>{formatDateTime(contestData.start_time)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>{formatDuration(contestData.duration)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              <span>{contestData.participants || 0} participants</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <School className="w-3 h-3" />
+              <span>{contestData.platform || 'Custom Platform'}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="px-3 py-3">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
           {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
+          <div className="lg:col-span-1 space-y-3">
             {/* Navigation */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="font-semibold text-gray-900">Contest Navigation</h2>
-              </div>
-              <div className="p-2">
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-1">
                 {[
                   { 
                     id: 'problems', 
-                    icon: <Code2 className="w-5 h-5" />, 
+                    icon: <Code2 className="w-3.5 h-3.5" />, 
                     label: 'Problems',
                     onClick: () => setActiveTab('problems')
                   },
                   { 
                     id: 'submissions', 
-                    icon: <History className="w-5 h-5" />, 
-                    label: 'My Submissions',
+                    icon: <History className="w-3.5 h-3.5" />, 
+                    label: 'Submissions',
                     onClick: () => navigate(`/contests/${contestId}/submissions`)
                   },
                   { 
                     id: 'leaderboard', 
-                    icon: <Trophy className="w-5 h-5" />, 
+                    icon: <Trophy className="w-3.5 h-3.5" />, 
                     label: 'Standings',
                     onClick: () => navigate(`/contests/${contestId}/standings`)
                   },
                   { 
                     id: 'clarifications', 
-                    icon: <FileQuestionIcon className="w-5 h-5" />,
+                    icon: <FileQuestionIcon className="w-3.5 h-3.5" />,
                     label: 'Clarifications',
-                    onClick: () => navigate(`/contests/${contestId}/clarifications`)
+                    onClick: () => navigate(`/contests/${contestId}/clarifications`),
+                    show: contestData.status === 'live'
                   },
                   { 
                     id: 'discussions', 
-                    icon: <MessageSquare className="w-5 h-5" />, 
+                    icon: <MessageSquare className="w-3.5 h-3.5" />, 
                     label: 'Discussions',
-                    onClick: () => navigate(`/contests/${contestId}/discussion`)
+                    onClick: () => navigate(`/contests/${contestId}/discussion`),
+                    show: contestData.status === 'past'
                   },
-                  // In the navigation array, add this new item:
                   { 
                     id: 'editorial', 
-                    icon: <BookOpen className="w-5 h-5" />, 
+                    icon: <BookOpen className="w-3.5 h-3.5" />, 
                     label: 'Editorial',
                     onClick: () => navigate(`/contests/${contestId}/editorial`),
-                    // Conditionally show only for past contests
                     show: contestData.status === 'past'
                   }
                 ].map((item) => {
+                  if (item.show !== undefined && !item.show) return null;
                   
-                  if ((item.id === 'editorial' || item.id === 'discussions') && contestData.status !== 'past') {
-                    return null;
-                  }
-
-                  if ((item.id === 'clarifications') && contestData.status !== 'live') {
-                    return null;
-                  }
-  
-                return (
+                  return (
                     <button
                       key={item.id}
                       onClick={item.onClick}
-                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors mb-1 ${
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors mb-0.5 ${
                         activeTab === item.id
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          ? 'bg-blue-50 text-blue-700'
                           : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       {item.icon}
-                      <span className="font-medium">{item.label}</span>
+                      <span>{item.label}</span>
                     </button>
                   );
                 })}
@@ -776,91 +642,99 @@ const getProblemStatusIcon = (problem) => {
 
             {/* Timer */}
             {contestData.status === 'live' && timeRemaining > 0 && (
-              <div className="bg-gradient-to-br from-blue-900 to-blue-700 text-white rounded-xl p-6 text-center">
-                <div className="text-xs text-blue-200">Contest ends in</div>
-                <div className="text-xl font-bold font-mono mb-2">{formatTime(timeRemaining)}</div>
+              <div className="bg-gradient-to-br from-blue-900 to-blue-700 text-white rounded-lg p-3">
+                <div className="text-xs mb-1">Contest ends in</div>
+                <div className="text-sm font-bold font-mono mb-1">{formatTime(timeRemaining)}</div>
               </div>
             )}
 
             {/* Stats */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="font-semibold text-gray-900">Your Stats</h2>
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-2 border-b border-gray-200">
+                <h2 className="text-xs font-semibold text-gray-900">Your Stats</h2>
               </div>
-              <div className="p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-700">{userStats.solved}</div>
+              <div className="p-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="text-center p-1 bg-gray-50 rounded">
+                    <div className="text-sm font-bold text-blue-700">{userStats.solved}</div>
                     <div className="text-xs text-gray-600">Solved</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-700">{userStats.attempted}</div>
+                  <div className="text-center p-1 bg-gray-50 rounded">
+                    <div className="text-sm font-bold text-blue-700">{userStats.attempted}</div>
                     <div className="text-xs text-gray-600">Attempted</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-700">{userStats.total}</div>
+                  <div className="text-center p-1 bg-gray-50 rounded">
+                    <div className="text-sm font-bold text-blue-700">{userStats.total}</div>
                     <div className="text-xs text-gray-600">Total</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-700">{userStats.accuracy}</div>
+                  <div className="text-center p-1 bg-gray-50 rounded">
+                    <div className="text-sm font-bold text-blue-700">{userStats.accuracy}</div>
                     <div className="text-xs text-gray-600">Accuracy</div>
                   </div>
                 </div>
               </div>
             </div>
 
-{/* Quick Actions */}
-<div className="bg-white rounded-xl shadow-sm border border-gray-200">
-  <div className="p-4 border-b border-gray-200">
-    <h2 className="font-semibold text-gray-900">Quick Actions</h2>
-  </div>
-  <div className="p-4 space-y-3">
+            {/* Quick Actions */}
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-2 border-b border-gray-200">
+                <h2 className="text-xs font-semibold text-gray-900">Quick Actions</h2>
+              </div>
+              <div className="p-2 space-y-1.5">
+                {contestData.access && !contestData.access.is_registered && contestData.access.can_register && (
+                  <button 
+                    onClick={handleRegister}
+                    className="w-full bg-blue-800 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-blue-900 transition-colors"
+                  >
+                    Register for Contest
+                  </button>
+                )}
 
-{contestData.status === 'past' && (
-  hasAnyVirtualContest ? (
-    <button 
-      className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
-      onClick={handleGoToVirtualContest}
-    >
-      <Play className="w-5 h-5" />
-      Go to Virtual Contest
-    </button>
-  ) : (
-    <button 
-      className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-      onClick={handleStartVirtualContest}
-    >
-      <Play className="w-5 h-5" />
-      Start Virtual Contest
-    </button>
-  )
-)}
+                {contestData.status === 'past' && (
+                  hasAnyVirtualContest ? (
+                    <button 
+                      className="w-full bg-purple-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-1"
+                      onClick={handleGoToVirtualContest}
+                    >
+                      <Play className="w-3 h-3" />
+                      Go to Virtual Contest
+                    </button>
+                  ) : (
+                    <button 
+                      className="w-full bg-blue-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-1"
+                      onClick={handleStartVirtualContest}
+                    >
+                      <Play className="w-3 h-3" />
+                      Start Virtual Contest
+                    </button>
+                  )
+                )}
 
-    <button className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-      <Download className="w-5 h-5" />
-      Download Problems
-    </button>
-    <button className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-      <Flag className="w-5 h-5" />
-      Report Issue
-    </button>
-  </div>
-</div>
+                <button className="w-full border border-gray-300 text-gray-700 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1">
+                  <Download className="w-3 h-3" />
+                  Download Problems
+                </button>
+                <button className="w-full border border-gray-300 text-gray-700 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1">
+                  <Flag className="w-3 h-3" />
+                  Report Issue
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Main Content Area */}
-          <div className="lg:col-span-3 space-y-8">
+          <div className="lg:col-span-3 space-y-3">
             {/* Problems Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">Problems</h2>
-                <div className="flex items-center gap-3">
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-2 border-b border-gray-200 flex justify-between items-center">
+                <h2 className="text-sm font-bold text-gray-900">Problems</h2>
+                <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-green-600">
                     {userStats.solved}/{problems.length} Solved
                   </span>
-                  <div className="w-32 h-2 bg-gray-200 rounded-full">
+                  <div className="w-20 h-1.5 bg-gray-200 rounded-full">
                     <div 
-                      className="h-2 bg-green-600 rounded-full transition-all duration-300" 
+                      className="h-1.5 bg-green-600 rounded-full transition-all duration-300" 
                       style={{ 
                         width: problems.length > 0 ? `${(userStats.solved / problems.length) * 100}%` : '0%' 
                       }}
@@ -870,14 +744,15 @@ const getProblemStatusIcon = (problem) => {
               </div>
 
               <div className="overflow-hidden">
-                <table className="w-full">
+                <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="text-left p-4 font-medium text-gray-900 w-16">Status</th>
-                      <th className="text-left p-4 font-medium text-gray-900 w-20">#</th>
-                      <th className="text-left p-4 font-medium text-gray-900">Problem</th>
-                      <th className="text-left p-4 font-medium text-gray-900 w-32">Difficulty</th>
-                      <th className="text-left p-4 font-medium text-gray-900 w-24">Points</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-10">Status</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-12">#</th>
+                      <th className="text-left p-2 font-medium text-gray-900">Problem</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-20">Difficulty</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-16">Points</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-20">Action</th> {/* ← ADD THIS */}
                     </tr>
                   </thead>
                   <tbody>
@@ -885,48 +760,53 @@ const getProblemStatusIcon = (problem) => {
                       problems.map((problem, index) => (
                         <tr 
                           key={problem.id || index} 
-                          className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                          onClick={() => handleProblemClick(problem)}
+                          className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                         >
-                          <td className="p-4">
+                          <td className="p-2">
                             {getProblemStatusIcon(problem)}
                           </td>
-                          <td className="p-4">
+                          <td className="p-2">
                             <span className="font-semibold text-blue-700">
                               {problem.problem_id || problem.index || problem.code || String.fromCharCode(65 + index)}
                             </span>
                           </td>
-                          <td className="p-4">
+                          <td className="p-2">
                             <div className="font-medium text-gray-900">{problem.title}</div>
                             {problem.tags && problem.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {problem.tags.slice(0, 3).map((tag, i) => (
-                                  <span key={i} className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                              <div className="flex flex-wrap gap-0.5 mt-0.5">
+                                {problem.tags.slice(0, 2).map((tag, i) => (
+                                  <span key={i} className="px-1 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
                                     {tag}
                                   </span>
                                 ))}
                               </div>
                             )}
                           </td>
-                          <td className="p-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(problem.difficulty)}`}>
+                          <td className="p-2">
+                            <span className={`${getDifficultyColor(problem.difficulty)}`}>
                               {problem.difficulty?.charAt(0).toUpperCase() + problem.difficulty?.slice(1) || 'Medium'}
                             </span>
                           </td>
-                          <td className="p-4 font-medium text-gray-900">
+                          <td className="p-2 font-medium text-gray-900">
                             {problem.points || 100}
+                          </td>
+                          <td className="p-2"> {/* ← ADD THIS ACTION COLUMN */}
+                            <button
+                              onClick={() => handleProblemClick(problem)}
+                              className="text-xs bg-blue-800 text-white px-2 py-1 rounded hover:bg-blue-900 transition-colors font-medium flex items-center gap-1"
+                            >
+                              <Play className="w-2.5 h-2.5" />
+                              Solve
+                            </button>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="5" className="p-12 text-center">
+                        <td colSpan="6" className="p-4 text-center">
                           <div className="flex flex-col items-center justify-center">
-                            <Code2 className="w-16 h-16 text-gray-300 mb-4" />
-                            <h3 className="text-lg font-semibold text-gray-700 mb-2">No Problems Yet</h3>
-                            <p className="text-gray-500 max-w-md">
-                              This contest doesn't have any problems yet.
-                            </p>
+                            <Code2 className="w-8 h-8 text-gray-300 mb-2" />
+                            <p className="text-gray-500 text-xs">No problems available</p>
                           </div>
                         </td>
                       </tr>
@@ -937,47 +817,47 @@ const getProblemStatusIcon = (problem) => {
             </div>
 
             {/* Announcements Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Award className="w-6 h-6" />
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-2 border-b border-gray-200 flex justify-between items-center">
+                <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5" />
                   Announcements
                 </h2>
                 {contestData.is_creator && (
                   <button
                     onClick={() => setShowAnnouncementForm(!showAnnouncementForm)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    className="bg-blue-800 text-white px-2 py-1 rounded text-xs font-medium hover:bg-blue-900 transition-colors flex items-center gap-1"
                   >
-                    <Plus className="w-4 h-4" />
-                    New Announcement
+                    <Plus className="w-3 h-3" />
+                    New
                   </button>
                 )}
               </div>
               
               {showAnnouncementForm && contestData.is_creator && (
-                <div className="p-6 border-b border-gray-200">
+                <div className="p-2 border-b border-gray-200">
                   <textarea
                     value={newAnnouncement}
                     onChange={(e) => setNewAnnouncement(e.target.value)}
                     placeholder="Enter announcement text..."
-                    className="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    rows="3"
+                    className="w-full p-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                    rows="2"
                   />
-                  <div className="flex justify-end gap-3 mt-4">
+                  <div className="flex justify-end gap-1.5 mt-2">
                     <button
                       onClick={() => {
                         setShowAnnouncementForm(false);
                         setNewAnnouncement('');
                       }}
-                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                      className="px-2 py-1 border border-gray-300 text-gray-700 rounded text-xs font-medium hover:bg-gray-50 transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handlePostAnnouncement}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      className="px-2 py-1 bg-blue-800 text-white rounded text-xs font-medium hover:bg-blue-900 transition-colors"
                     >
-                      Post Announcement
+                      Post
                     </button>
                   </div>
                 </div>
@@ -986,9 +866,9 @@ const getProblemStatusIcon = (problem) => {
               <div className="divide-y divide-gray-100">
                 {announcements.length > 0 ? (
                   announcements.map((announcement, index) => (
-                    <div key={index} className="p-6 hover:bg-gray-50 transition-colors">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-center gap-3">
+                    <div key={index} className="p-2 hover:bg-gray-50 transition-colors">
+                      <div className="flex justify-between items-start mb-1">
+                        <div className="flex items-center gap-2">
                           <span className="text-xs font-medium text-green-600">
                             {new Date(announcement.created_at).toLocaleDateString()}
                           </span>
@@ -998,10 +878,10 @@ const getProblemStatusIcon = (problem) => {
                         </div>
                         <span className="text-xs text-gray-500">by {announcement.author || 'Admin'}</span>
                       </div>
-                      <p className="text-gray-700">{announcement.text}</p>
+                      <p className="text-gray-700 text-xs">{announcement.text}</p>
                       {announcement.problem_index && (
-                        <div className="mt-2">
-                          <span className="inline-block px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                        <div className="mt-1">
+                          <span className="inline-block px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
                             Problem {announcement.problem_index}
                           </span>
                         </div>
@@ -1009,14 +889,41 @@ const getProblemStatusIcon = (problem) => {
                     </div>
                   ))
                 ) : (
-                  <div className="p-12 text-center">
-                    <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-700 mb-2">No Announcements</h3>
-                    <p className="text-gray-500">
-                      No announcements have been posted for this contest yet.
-                    </p>
+                  <div className="p-3 text-center">
+                    <MessageSquare className="w-6 h-6 text-gray-300 mx-auto mb-1" />
+                    <p className="text-gray-500 text-xs">No announcements yet</p>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Contest Info */}
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-2 border-b border-gray-200">
+                <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  <Shield className="w-3.5 h-3.5 text-blue-600" />
+                  Contest Information
+                </h2>
+              </div>
+              <div className="p-2">
+                <div className="text-xs text-gray-700">
+                  <p className="mb-1">
+                    <span className="font-medium">Platform: </span>
+                    {contestData.platform || 'Custom Platform'}
+                  </p>
+                  <p className="mb-1">
+                    <span className="font-medium">Participants: </span>
+                    {contestData.participants || 0}
+                  </p>
+                  <p className="mb-1">
+                    <span className="font-medium">Your Role: </span>
+                    {contestData.is_creator ? 'Creator' : 'Participant'}
+                  </p>
+                  <p>
+                    <span className="font-medium">Access: </span>
+                    {contestData.access?.can_access ? 'Full Access' : 'Limited Access'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
