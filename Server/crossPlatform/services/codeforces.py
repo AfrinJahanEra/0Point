@@ -57,6 +57,7 @@ def sync_codeforces_contests():
             "status": status,
             "last_synced": now,
         }
+
+        ExternalContest.objects(platform="codeforces", external_id=str(c["id"])).update_one(upsert=True, **update_data)
+
         
-   
-     
