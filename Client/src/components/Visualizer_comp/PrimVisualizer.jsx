@@ -63,8 +63,54 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     
     if (!stepData) return;
     
-    // Clear previous animations
+    // Clear previous animations and elements
     svg.selectAll("*").interrupt();
+    svg.selectAll("*").remove();
+    
+    // Add defs for gradients (PROFESSIONAL styling)
+    const defs = svg.append("defs");
+    
+    // ELEGANT gradient for current nodes
+    defs.append("radialGradient")
+      .attr("id", "elegantCurrentGradient")
+      .attr("cx", "25%")
+      .attr("cy", "25%")
+      .attr("r", "85%")
+      .html(`
+        <stop offset="0%" stop-color="#F0F9FF" />
+        <stop offset="30%" stop-color="#E0F2FE" />
+        <stop offset="60%" stop-color="#B3E5FC" />
+        <stop offset="85%" stop-color="#81D4FA" />
+        <stop offset="100%" stop-color="#4FC3F7" />
+      `);
+    
+    // SOPHISTICATED gradient for visited nodes
+    defs.append("radialGradient")
+      .attr("id", "sophisticatedVisitedGradient")
+      .attr("cx", "50%")
+      .attr("cy", "50%")
+      .attr("r", "65%")
+      .html(`
+        <stop offset="0%" stop-color="#F8F9FA" />
+        <stop offset="40%" stop-color="#E9ECEF" />
+        <stop offset="70%" stop-color="#DEE2E6" />
+        <stop offset="100%" stop-color="#CED4DA" />
+      `);
+    
+    // SUBTLE glow effects
+    defs.append("filter")
+      .attr("id", "subtleGlow")
+      .html(`
+        <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#81D4FA" flood-opacity="0.4"/>
+        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#B3E5FC" flood-opacity="0.6"/>
+      `);
+    
+    defs.append("filter")
+      .attr("id", "refinedAura")
+      .html(`
+        <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#DEE2E6" flood-opacity="0.3"/>
+        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#E9ECEF" flood-opacity="0.5"/>
+      `);
     
     // Get SVG dimensions
     const width = 600;
@@ -97,10 +143,61 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
       }
     });
     
-    // Draw edges with D3 - UPDATED FOR NEW VISUAL STYLE
-    svg.selectAll(".edge").remove();
-    svg.selectAll(".edge-weight").remove();
+    // Draw MST PATH with enhanced visibility
+    if (stepData.mst && stepData.mst.length > 0) {
+      // Draw elegant main traversal path with refined emphasis
+      svg.append("path")
+        .attr("d", () => {
+          let path = "";
+          stepData.mst.forEach((edge, index) => {
+            if (!edge || !edge.from || !edge.to) return;
+            const pos1 = nodePositions[edge.from];
+            const pos2 = nodePositions[edge.to];
+            if (pos1 && pos2) {
+              if (index === 0) {
+                path += `M ${pos1.x} ${pos1.y}`;
+              }
+              path += ` L ${pos2.x} ${pos2.y}`;
+            }
+          });
+          return path;
+        })
+        .attr("stroke", "#495057")
+        .attr("stroke-width", 6)
+        .attr("stroke-linecap", "round")
+        .attr("stroke-linejoin", "round")
+        .attr("opacity", 0.9)
+        .attr("fill", "none")
+        .style("filter", "url(#subtleGlow)");
+      
+      // Add animated pulse effect
+      svg.append("path")
+        .attr("d", () => {
+          let path = "";
+          stepData.mst.forEach((edge, index) => {
+            if (!edge || !edge.from || !edge.to) return;
+            const pos1 = nodePositions[edge.from];
+            const pos2 = nodePositions[edge.to];
+            if (pos1 && pos2) {
+              if (index === 0) {
+                path += `M ${pos1.x} ${pos1.y}`;
+              }
+              path += ` L ${pos2.x} ${pos2.y}`;
+            }
+          });
+          return path;
+        })
+        .attr("stroke", "#81D4FA")
+        .attr("stroke-width", 2)
+        .attr("stroke-linecap", "round")
+        .attr("stroke-linejoin", "round")
+        .attr("opacity", 0.7)
+        .attr("fill", "none")
+        .style("stroke-dasharray", "5,5")
+        .style("animation", "pulse 2s ease-in-out infinite");
+    }
     
+    // Draw edges with beautiful styling
     if (stepData.graph) {
       // Draw all edges first
       nodes.forEach(fromNode => {
@@ -117,94 +214,206 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           
           if (!pos1 || !pos2) return;
           
-          // Draw edge line with appropriate style
-          const edge = svg.append("line")
-            .attr("class", "edge")
+          // Beautiful edge styling
+          let strokeColor = "#4B5563"; // Professional gray
+          let strokeWidth = 2.5;
+          
+          // Check if this edge is part of the final MST
+          const isMSTEdge = stepData.mst && stepData.mst.some(edge => 
+            edge && edge.from && edge.to &&
+            ((edge.from === fromNode && edge.to === toNode) || 
+             (edge.from === toNode && edge.to === fromNode))
+          );
+          
+          // BLUE THICK LINES FOR MST EDGES
+          if (isMSTEdge) {
+            strokeColor = "#3B82F6"; // Rich blue
+            strokeWidth = 6; // Very thick for emphasis
+          }
+          // Dark blue for visited edges
+          else if (stepData.visited && stepData.visited.some(node => 
+            (node === fromNode) || (node === toNode))) {
+            strokeColor = "#1E40AF"; // Rich dark blue
+            strokeWidth = 4.5;
+          }
+          
+          // Blue for current edge being considered
+          const currentEdge = stepData.addEdge;
+          if (currentEdge && currentEdge.from && currentEdge.to &&
+            ((currentEdge.from === fromNode && currentEdge.to === toNode) ||
+             (currentEdge.from === toNode && currentEdge.to === fromNode))) {
+            strokeColor = "#3B82F6"; // Blue for current edge
+            strokeWidth = 3.5;
+          }
+          
+          // Add subtle glow effect for important edges
+          if (strokeWidth > 3) {
+            svg.append("line")
+              .attr("x1", pos1.x)
+              .attr("y1", pos1.y)
+              .attr("x2", pos2.x)
+              .attr("y2", pos2.y)
+              .attr("stroke", strokeColor)
+              .attr("stroke-width", strokeWidth + 1)
+              .attr("stroke-linecap", "round")
+              .attr("opacity", 0.3)
+              .style("filter", "blur(1px)");
+          }
+          
+          // Main edge line
+          svg.append("line")
             .attr("x1", pos1.x)
             .attr("y1", pos1.y)
             .attr("x2", pos2.x)
             .attr("y2", pos2.y)
-            .attr("stroke", "#4B5563") // Darker gray default
-            .attr("stroke-width", 3);
+            .attr("stroke", strokeColor)
+            .attr("stroke-width", strokeWidth)
+            .attr("stroke-linecap", "round");
           
-          // Highlight MST edges
-          if (stepData.mst && stepData.mst.some(edge => 
-            (edge.from === fromNode && edge.to === toNode) || 
-            (edge.from === toNode && edge.to === fromNode))) {
-            edge.attr("stroke", "#1E40AF") // Dark blue for MST edges
-                .attr("stroke-width", 4);
-          }
-          
-          // Highlight current edge being considered
-          if (stepData.addEdge && 
-            ((stepData.addEdge.from === fromNode && stepData.addEdge.to === toNode) ||
-             (stepData.addEdge.from === toNode && stepData.addEdge.to === fromNode))) {
-            edge.attr("stroke", "#3B82F6") // Blue for current edge
-                .attr("stroke-width", 3)
-                .attr("stroke-dasharray", "5,5");
-          }
-          
-          // Draw edge weight
+          // Draw edge weight with beautiful styling
           const midX = (pos1.x + pos2.x) / 2;
           const midY = (pos1.y + pos2.y) / 2;
           
           svg.append("text")
-            .attr("class", "edge-weight")
             .attr("x", midX)
             .attr("y", midY - 5)
             .attr("text-anchor", "middle")
             .attr("font-size", "12px")
-            .attr("font-weight", "bold")
-            .attr("fill", "#9CA3AF")
+            .attr("font-weight", "600")
+            .attr("font-family", "'Inter', system-ui, sans-serif")
+            .attr("fill", isMSTEdge ? "#3B82F6" : strokeColor === "#1E40AF" ? "#1E40AF" : strokeColor === "#3B82F6" ? "#3B82F6" : "#6B7280")
             .text(weight);
         });
       });
     }
     
-    // Draw nodes with D3 - UPDATED FOR NEW COLOR SCHEME
+    // Draw nodes with beautiful styling AND drag functionality
     svg.selectAll(".node").remove();
     svg.selectAll(".node-label").remove();
     
     nodes.forEach(node => {
       const pos = nodePositions[node];
       
-      // Determine node color based on state - NEW COLOR SCHEME
-      let fillColor = "white"; // Default white
-      let strokeColor = "black"; // Default black border
-      let textColor = "black"; // Default black text
+      // Beautiful node styling
+      let fillColor = "white";
+      let strokeColor = "#6B7280";
+      let textColor = "#1F2937";
+      let strokeWidth = 2;
+      let nodeRadius = 24;
       
-      // Current node gets special treatment
+      // Current node (processing node in Prim)
       if (stepData.currentNode === node) {
-        fillColor = "#93C5FD"; // Light blue for current node
-        strokeColor = "black";
-        textColor = "black";
+        fillColor = "url(#elegantCurrentGradient)";
+        strokeColor = "#495057";
+        strokeWidth = 5;
+        nodeRadius = 32;
+        textColor = "#212529";
+        
+        // Layered professional glow effects
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 8)
+          .attr("fill", "#81D4FA")
+          .attr("opacity", 0.3)
+          .style("filter", "blur(8px)");
+        
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 5)
+          .attr("fill", "#B3E5FC")
+          .attr("opacity", 0.25)
+          .style("filter", "blur(5px)");
+        
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 3)
+          .attr("fill", "#E0F2FE")
+          .attr("opacity", 0.2)
+          .style("filter", "blur(2px)");
       } 
-      // MST nodes
-      else if (stepData.mstNodes && stepData.mstNodes.includes(node)) {
-        fillColor = "#1E40AF"; // Dark blue for MST nodes
-        strokeColor = "black";
-        textColor = "white"; // White text for dark blue background
+      // Visited nodes
+      else if (stepData.visited && stepData.visited.includes(node)) {
+        fillColor = "url(#sophisticatedVisitedGradient)";
+        strokeColor = "#6C757D";
+        strokeWidth = 4;
+        textColor = "#212529";
+        nodeRadius = 28;
+        
+        // Sophisticated neutral aura
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 4)
+          .attr("fill", "#DEE2E6")
+          .attr("opacity", 0.2)
+          .style("filter", "url(#refinedAura)");
+        
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 2)
+          .attr("fill", "#E9ECEF")
+          .attr("opacity", 0.15)
+          .style("filter", "blur(3px)");
+        
+        // Elegant inner highlight
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius - 3)
+          .attr("fill", "white")
+          .attr("opacity", 0.3);
       }
-      // In queue
-      else if (stepData.queue && stepData.queue.some(q => q.node === node)) {
-        fillColor = "#DBEAFE"; // Light blue for queued nodes
-        strokeColor = "black";
-        textColor = "black";
+      // In queue nodes
+      else if (stepData.inQueue && stepData.inQueue.includes(node)) {
+        fillColor = "#F8F9FA";
+        strokeColor = "#DEE2E6";
+        strokeWidth = 2.5;
+        textColor = "#495057";
+        nodeRadius = 22;
+        
+        // Minimal shadow for depth
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y + 2)
+          .attr("r", nodeRadius)
+          .attr("fill", "black")
+          .attr("opacity", 0.05)
+          .style("filter", "blur(2px)");
+        
+        // Subtle highlight
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y - 1)
+          .attr("r", nodeRadius - 8)
+          .attr("fill", "white")
+          .attr("opacity", 0.4);
       }
       
-      // Draw node circle with drag support
+      // Draw main node circle WITH DRAG FUNCTIONALITY
       const nodeCircle = svg.append("circle")
-        .attr("class", "node")
         .attr("cx", pos.x)
         .attr("cy", pos.y)
-        .attr("r", 25)
+        .attr("r", nodeRadius)
         .attr("fill", fillColor)
         .attr("stroke", strokeColor)
-        .attr("stroke-width", 2)
-        .attr("data-node", node)
-        .style("cursor", "pointer")
-        .on("mouseover", () => setHoveredNode(node))
-        .on("mouseout", () => setHoveredNode(null))
+        .attr("stroke-width", strokeWidth)
+        .attr("cursor", "pointer")
+        .on("mouseover", function() {
+          // Visual feedback on hover
+          d3.select(this)
+            .attr("r", nodeRadius + 2)
+            .attr("stroke-width", strokeWidth + 1);
+        })
+        .on("mouseout", function() {
+          // Return to normal state
+          d3.select(this)
+            .attr("r", nodeRadius)
+            .attr("stroke-width", strokeWidth);
+        })
         .call(d3.drag()
           .on("start", function(event) {
             setIsDragging(true);
@@ -221,41 +430,61 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
               .attr("cx", newX)
               .attr("cy", newY);
             
+            // Update the glow effects if they exist
+            svg.selectAll(`circle`).each(function() {
+              const circle = d3.select(this);
+              const cx = parseFloat(circle.attr("cx"));
+              const cy = parseFloat(circle.attr("cy"));
+              
+              // Check if this circle belongs to the dragged node
+              if (Math.abs(cx - pos.x) < 1 && Math.abs(cy - pos.y) < 1) {
+                circle.attr("cx", newX).attr("cy", newY);
+              }
+            });
+            
             // Update the node label position
-            svg.selectAll(`.node-label[data-node="${node}"]`)
-              .attr("x", newX)
-              .attr("y", newY + 5);
+            svg.selectAll("text").each(function() {
+              const text = d3.select(this);
+              const x = parseFloat(text.attr("x"));
+              const y = parseFloat(text.attr("y"));
+              
+              // Check if this text belongs to the dragged node
+              if (Math.abs(x - pos.x) < 1) {
+                text.attr("x", newX).attr("y", newY + 6);
+              }
+            });
             
             // Update connected edges
-            svg.selectAll(".edge, .edge-weight")
-              .each(function() {
-                const element = d3.select(this);
-                const x1 = parseFloat(element.attr("x1"));
-                const y1 = parseFloat(element.attr("y1"));
-                const x2 = parseFloat(element.attr("x2"));
-                const y2 = parseFloat(element.attr("y2"));
-                const textX = parseFloat(element.attr("x"));
-                const textY = parseFloat(element.attr("y"));
-                
-                // Update edge positions
-                if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-                  if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
-                    element.attr("x1", newX).attr("y1", newY);
-                  }
-                  if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
-                    element.attr("x2", newX).attr("y2", newY);
-                  }
+            svg.selectAll("line, text").each(function() {
+              const element = d3.select(this);
+              const x1 = parseFloat(element.attr("x1"));
+              const y1 = parseFloat(element.attr("y1"));
+              const x2 = parseFloat(element.attr("x2"));
+              const y2 = parseFloat(element.attr("y2"));
+              const textX = parseFloat(element.attr("x"));
+              const textY = parseFloat(element.attr("y"));
+              
+              // Update edge positions
+              if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
+                  element.attr("x1", newX).attr("y1", newY);
                 }
-                
-                // Update edge weight positions
-                if (!isNaN(textX) && !isNaN(textY)) {
-                  if (Math.abs(textX - (pos.x + (element.attr("x2") ? parseFloat(element.attr("x2")) : pos.x))/2) < 1 && 
-                      Math.abs(textY - (pos.y + (element.attr("y2") ? parseFloat(element.attr("y2")) : pos.y) - 5)/2) < 1) {
-                    element.attr("x", (newX + (element.attr("x2") ? parseFloat(element.attr("x2")) : newX))/2)
-                           .attr("y", (newY + (element.attr("y2") ? parseFloat(element.attr("y2")) : newY) - 5)/2);
-                  }
+                if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
+                  element.attr("x2", newX).attr("y2", newY);
                 }
-              });
+              }
+              
+              // Update edge weight positions
+              if (!isNaN(textX) && !isNaN(textY)) {
+                const midX = (newX + (element.attr("x2") ? parseFloat(element.attr("x2")) : newX)) / 2;
+                const midY = (newY + (element.attr("y2") ? parseFloat(element.attr("y2")) : newY)) / 2;
+                
+                if (Math.abs(textX - (pos.x + (element.attr("x2") ? parseFloat(element.attr("x2")) : pos.x))/2) < 1 && 
+                    Math.abs(textY - ((pos.y + (element.attr("y2") ? parseFloat(element.attr("y2")) : pos.y))/2 - 5)) < 1) {
+                  element.attr("x", midX).attr("y", midY - 5);
+                }
+              }
+            });
             
             // Update the position in our state
             setDraggedNodes(prev => ({
@@ -269,16 +498,16 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           })
         );
       
-      // Draw node label
+      // Draw node label with beautiful typography
       svg.append("text")
-        .attr("class", "node-label")
-        .attr("data-node", node)
         .attr("x", pos.x)
-        .attr("y", pos.y + 5)
+        .attr("y", pos.y + 6)
         .attr("text-anchor", "middle")
-        .attr("font-size", "14px")
-        .attr("font-weight", "bold")
+        .attr("font-size", "15px")
+        .attr("font-weight", "600")
+        .attr("font-family", "'Inter', system-ui, sans-serif")
         .attr("fill", textColor)
+        .attr("pointer-events", "none")
         .text(node);
     });
     
@@ -685,6 +914,22 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         .screen-floating {
           animation: screen-float 8s ease-in-out infinite;
         }
+        
+        /* Premium pulse animation for MST path */
+        @keyframes pulse {
+          0% {
+            stroke-opacity: 0.7;
+            stroke-width: 2;
+          }
+          50% {
+            stroke-opacity: 1;
+            stroke-width: 3;
+          }
+          100% {
+            stroke-opacity: 0.7;
+            stroke-width: 2;
+          }
+        }
         `}
       </style>
       
@@ -846,7 +1091,7 @@ const PrimVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
   );
 };
 
-// Helper function to render static graph for step list
+// Helper function to render static graph for step list - ENHANCED STYLING
 const renderStaticGraph = (step) => {
   if (!step.graph) return null;
   
@@ -854,7 +1099,7 @@ const renderStaticGraph = (step) => {
   if (nodes.length === 0) return null;
   
   // We'll arrange nodes in a circular pattern for visualization
-  const radius = 100;
+  const radius = 120;
   const centerX = 200;
   const centerY = 150;
   
@@ -870,40 +1115,26 @@ const renderStaticGraph = (step) => {
   
   return (
     <g>
-      {/* Draw MST edges first (in green) */}
-      {step.mst && step.mst.map((edge) => {
-        const pos1 = nodePositions[edge.from];
-        const pos2 = nodePositions[edge.to];
-        
-        if (!pos1 || !pos2) return null;
-        
-        // Calculate midpoint for weight label
-        const midX = (pos1.x + pos2.x) / 2;
-        const midY = (pos1.y + pos2.y) / 2;
-        
-        return (
-          <g key={`mst-${edge.from}-${edge.to}`}>
-            <line
-              x1={pos1.x}
-              y1={pos1.y}
-              x2={pos2.x}
-              y2={pos2.y}
-              stroke="#10B981"
-              strokeWidth="3"
-            />
-            <text
-              x={midX}
-              y={midY - 5}
-              textAnchor="middle"
-              className="font-bold text-green-600 text-xs"
-            >
-              {edge.weight}
-            </text>
-          </g>
-        );
-      })}
+      {/* Define blue theme gradients */}
+      <defs>
+        <radialGradient id="staticCurrentGradient" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#FEF3C7" />
+          <stop offset="50%" stopColor="#FDE68A" />
+          <stop offset="100%" stopColor="#FCD34D" />
+        </radialGradient>
+        <radialGradient id="staticVisitedGradient" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#3B82F6" />
+          <stop offset="100%" stopColor="#1E40AF" />
+        </radialGradient>
+        <filter id="staticBlueGlow">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#93C5FD" floodOpacity="0.3"/>
+        </filter>
+        <filter id="staticYellowGlow">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#FEF3C7" floodOpacity="0.3"/>
+        </filter>
+      </defs>
       
-      {/* Draw all edges (non-MST edges in light blue) */}
+      {/* Draw edges with high contrast styling */}
       {nodes.map((fromNode) => {
         const neighbors = step.graph[fromNode] || [];
         return neighbors.map((neighborObj) => {
@@ -913,23 +1144,36 @@ const renderStaticGraph = (step) => {
           // Avoid duplicate edges
           if (fromNode > toNode) return null;
           
-          // Check if this edge is in MST
-          const isInMST = step.mst && step.mst.some(edge => 
-            (edge.from === fromNode && edge.to === toNode) || 
-            (edge.from === toNode && edge.to === fromNode)
-          );
-          
-          // Skip if already drawn as MST edge
-          if (isInMST) return null;
-          
           const pos1 = nodePositions[fromNode];
           const pos2 = nodePositions[toNode];
-          
-          if (!pos1 || !pos2) return null;
           
           // Calculate midpoint for weight label
           const midX = (pos1.x + pos2.x) / 2;
           const midY = (pos1.y + pos2.y) / 2;
+          
+          // Determine high contrast edge style
+          let strokeColor = "black"; // Black base for visibility
+          let strokeWidth = 3; // Thick base width
+          
+          // Check if this edge is part of the final MST
+          const isMSTEdge = step.mst && step.mst.some(edge => 
+            edge && edge.from && edge.to &&
+            ((edge.from === fromNode && edge.to === toNode) || 
+             (edge.from === toNode && edge.to === fromNode))
+          );
+          
+          // DARKEST AND THICKEST FOR MST EDGES
+          if (isMSTEdge) {
+            strokeColor = "#3B82F6"; // Rich blue
+            strokeWidth = 7; // Maximum thickness
+          }
+          // Dark blue for visited edges
+          else if (step.visited && 
+              step.visited.includes(fromNode) && 
+              step.visited.includes(toNode)) {
+            strokeColor = "#1E40AF"; // Dark blue
+            strokeWidth = 5; // Very bold emphasis
+          }
           
           return (
             <g key={`${fromNode}-${toNode}`}>
@@ -938,14 +1182,18 @@ const renderStaticGraph = (step) => {
                 y1={pos1.y}
                 x2={pos2.x}
                 y2={pos2.y}
-                stroke="#4B5563"
-                strokeWidth="3"
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
               />
               <text
                 x={midX}
                 y={midY - 5}
                 textAnchor="middle"
-                className="font-bold text-gray-600 text-xs"
+                fontSize="12"
+                fontWeight="700"
+                fontFamily="'Segoe UI', system-ui, sans-serif"
+                fill={isMSTEdge ? "#3B82F6" : strokeColor === "#1E40AF" ? "#1E40AF" : "#6B7280"}
               >
                 {weight}
               </text>
@@ -954,7 +1202,7 @@ const renderStaticGraph = (step) => {
         });
       })}
       
-      {/* Draw nodes */}
+      {/* Draw nodes with enhanced styling */}
       {nodes.map((node) => {
         const pos = nodePositions[node];
         const isCurrent = step.currentNode === node;
@@ -962,32 +1210,85 @@ const renderStaticGraph = (step) => {
         const isMST = step.mstNodes && step.mstNodes.includes(node);
         const isInQueue = step.inQueue && step.inQueue.includes(node);
         
-        let fillColor = "#93C5FD"; // Light blue default
+        // Determine node style - HIGH CONTRAST DESIGN
+        let fillColor = "white";
+        let strokeColor = "black"; // Black border for maximum contrast
+        let textColor = "black"; // Black text for light backgrounds
+        let strokeWidth = 3; // Thick border for visibility
+        let nodeRadius = 20;
+        
         if (isCurrent) {
-          fillColor = "#1E40AF"; // Dark blue for current node
-        } else if (isMST) {
-          fillColor = "#1E40AF"; // Dark blue for MST nodes
-        } else if (isVisited) {
-          fillColor = "#3B82F6"; // Medium blue for visited
+          fillColor = "url(#staticCurrentGradient)";
+          strokeColor = "black"; // Black border
+          strokeWidth = 4; // Extra thick border
+          nodeRadius = 24;
+          textColor = "black"; // Black text on light yellow
+        } else if (isMST || isVisited) {
+          fillColor = "url(#staticVisitedGradient)";
+          strokeColor = "black"; // Black border
+          strokeWidth = 3; // Thick border
+          textColor = "white"; // White text on dark blue
         } else if (isInQueue) {
-          fillColor = "#60A5FA"; // Slightly darker light blue for queued
+          fillColor = "#F9FAFB"; // Very light gray
+          strokeColor = "black"; // Black border
+          strokeWidth = 3; // Thick border
+          textColor = "black"; // Black text
         }
         
         return (
           <g key={node}>
+            {/* Blue/Yellow theme glow effects */}
+            {isCurrent && (
+              <>
+                <circle
+                  cx={pos.x}
+                  cy={pos.y + 2}
+                  r={nodeRadius}
+                  fill="black"
+                  opacity="0.1"
+                  filter="url(#staticBlueGlow)"
+                />
+                <circle
+                  cx={pos.x}
+                  cy={pos.y}
+                  r={nodeRadius + 2}
+                  fill="#FEF3C7"
+                  opacity="0.2"
+                  filter="url(#staticYellowGlow)"
+                />
+              </>
+            )}
+            {isMST && (
+              <circle
+                cx={pos.x}
+                cy={pos.y}
+                r={nodeRadius - 2}
+                fill="white"
+                opacity="0.2"
+                filter="url(#staticBlueGlow)"
+              />
+            )}
+            
+            {/* Node circle */}
             <circle
               cx={pos.x}
               cy={pos.y}
-              r="20"
+              r={nodeRadius}
               fill={fillColor}
-              stroke="#1E40AF"
-              strokeWidth="3"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              style={{ animation: "none" }}
             />
+            
+            {/* Node label */}
             <text
               x={pos.x}
-              y={pos.y + 5}
+              y={pos.y + 6}
               textAnchor="middle"
-              className={`font-bold ${isCurrent || isVisited || isMST ? 'text-white' : 'text-black'} text-sm`}
+              fontSize="14"
+              fontWeight="700"
+              fontFamily="'Segoe UI', system-ui, sans-serif"
+              fill={textColor}
             >
               {node}
             </text>
