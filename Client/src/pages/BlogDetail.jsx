@@ -1,3 +1,4 @@
+// BlogDetail.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -17,11 +18,12 @@ const CommentItem = ({ comment, onReply, onDelete, replyingTo, setReplyingTo, re
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
-      year: 'numeric',
+      day: '2-digit',
       month: 'short',
-      day: 'numeric',
+      year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: true
     });
   };
 
@@ -70,15 +72,6 @@ const CommentItem = ({ comment, onReply, onDelete, replyingTo, setReplyingTo, re
             )}
             <span className="text-gray-500">•</span>
             <span className="text-gray-500 text-xs">{formatDate(comment.created_at)}</span>
-            {comment.author.badge && (
-              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                comment.author.badge === 'admin' ? 'bg-red-100 text-red-800' :
-                comment.author.badge === 'moderator' ? 'bg-blue-100 text-blue-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {comment.author.badge}
-              </span>
-            )}
           </div>
           <div className="text-gray-800 text-sm leading-relaxed mb-2">
             {comment.content}
@@ -180,11 +173,12 @@ const BlogDetail = () => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
-      year: 'numeric',
+      day: '2-digit',
       month: 'short',
-      day: 'numeric',
+      year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: true
     });
   };
 
@@ -222,12 +216,6 @@ const BlogDetail = () => {
       console.error('Error fetching comments:', error);
     }
   };
-
-  useEffect(() => {
-    fetchBlog();
-    fetchVotes();
-    fetchComments();
-  }, [id]);
 
   const handleVote = async (voteType) => {
     if (!user) {
@@ -308,13 +296,6 @@ const BlogDetail = () => {
     return 'bg-red-100';
   };
 
-  const getReadTime = (content) => {
-    const wordsPerMinute = 200;
-    const words = content.replace(/[#*`]/g, '').split(/\s+/).length;
-    const minutes = Math.ceil(words / wordsPerMinute);
-    return `${minutes} min read`;
-  };
-
   const customComponents = {
     spoiler: ({ summary, children }) => (
       <details className="my-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -330,7 +311,7 @@ const BlogDetail = () => {
     h1: ({ children }) => {
       const id = children ? String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
       return (
-        <h1 id={id} className="text-3xl font-bold mt-10 mb-6 text-blue-900 border-b-2 border-blue-300 pb-3 group">
+        <h1 id={id} className="text-2xl font-bold mt-8 mb-4 text-gray-900 border-b border-gray-300 pb-3 group">
           <a href={`#${id}`} className="opacity-0 group-hover:opacity-100 mr-3 text-blue-600">§</a>
           {children}
         </h1>
@@ -339,15 +320,14 @@ const BlogDetail = () => {
     h2: ({ children }) => {
       const id = children ? String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
       return (
-        <h2 id={id} className="text-2xl font-bold mt-8 mb-4 text-gray-800 group flex items-center">
+        <h2 id={id} className="text-xl font-bold mt-6 mb-3 text-gray-800 group flex items-center">
           <a href={`#${id}`} className="opacity-0 group-hover:opacity-100 mr-2 text-blue-600 text-lg">§</a>
           {children}
         </h2>
       );
     },
     h3: ({ children }) => (
-      <h3 className="text-xl font-semibold mt-7 mb-3 text-gray-700 flex items-center group">
-        <span className="opacity-0 group-hover:opacity-100 mr-2 text-blue-500 text-sm">›</span>
+      <h3 className="text-lg font-semibold mt-5 mb-2 text-gray-700">
         {children}
       </h3>
     ),
@@ -356,10 +336,10 @@ const BlogDetail = () => {
       return (
         <ol
           className={`
-            my-5 space-y-3
+            my-4 space-y-2
             ${isTopLevel
-              ? 'list-decimal ml-9 text-lg marker:font-bold marker:text-blue-800'
-              : 'list-decimal ml-8 text-base marker:font-medium marker:text-blue-600'
+              ? 'list-decimal ml-6 text-base marker:font-bold marker:text-blue-800'
+              : 'list-decimal ml-5 text-sm marker:font-medium marker:text-blue-600'
             }
           `}
           {...props}
@@ -373,10 +353,10 @@ const BlogDetail = () => {
       return (
         <ul
           className={`
-            my-5 space-y-3
+            my-4 space-y-2
             ${isTopLevel
-              ? 'list-disc ml-9 text-lg marker:text-blue-600'
-              : 'list-disc ml-8 text-base marker:text-blue-500'
+              ? 'list-disc ml-6 text-base marker:text-blue-600'
+              : 'list-disc ml-5 text-sm marker:text-blue-500'
             }
           `}
           {...props}
@@ -386,17 +366,17 @@ const BlogDetail = () => {
     
     li: ({ ordered, children, ...props }) => (
       <li
-        className="leading-relaxed text-gray-800 pl-2 hover:text-gray-900 transition-colors"
+        className="leading-relaxed text-gray-800 pl-1 hover:text-gray-900 transition-colors text-sm"
         {...props}
       >
-        <span className="drop-cap:inline">{children}</span>
+        <span>{children}</span>
       </li>
     ),
     
     // Blockquote component for > syntax (simple grey style)
     blockquote: ({ children }) => (
-      <blockquote className="my-6 pl-5 border-l-4 border-gray-400 bg-gray-100 py-3 pr-4 rounded-r">
-        <div className="text-gray-800">
+      <blockquote className="my-4 pl-4 border-l-3 border-gray-400 bg-gray-50 py-2 pr-3 rounded-r text-sm">
+        <div className="text-gray-700">
           {children}
         </div>
       </blockquote>
@@ -408,15 +388,15 @@ const BlogDetail = () => {
       const isBase64 = src && (src.startsWith('data:image/') || src.startsWith('base64,'));
       
       return (
-        <div className="my-6 flex flex-col items-center">
+        <div className="my-4 flex flex-col items-center">
           <img
             src={src}
             alt={alt || 'Image'}
-            className="max-w-full h-auto rounded-lg shadow-md border border-gray-300"
+            className="max-w-full h-auto rounded shadow-sm border border-gray-200"
             {...props}
           />
           {alt && (
-            <p className="mt-2 text-sm text-gray-600 text-center italic">
+            <p className="mt-1 text-xs text-gray-600 text-center italic">
               {alt}
             </p>
           )}
@@ -430,13 +410,13 @@ const BlogDetail = () => {
     },
 
     p: ({ children }) => (
-      <p className="mb-4 text-gray-700 leading-relaxed">
+      <p className="mb-3 text-gray-700 leading-relaxed text-sm">
         {children}
       </p>
     ),
 
     pre: ({ children }) => (
-      <pre className="bg-gray-100 p-4 rounded text-sm font-mono overflow-x-auto my-4">
+      <pre className="bg-gray-50 p-3 rounded text-xs font-mono overflow-x-auto my-3 border border-gray-200">
         {children}
       </pre>
     ),
@@ -456,16 +436,16 @@ const BlogDetail = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex gap-6">
-          {/* Main Content */}
-          <div className="flex-1">
-            <div className="mb-4">
+      <div className="max-w-[1920px] mx-auto px-4 py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Main Content - Span 9 columns */}
+          <div className="lg:col-span-9">
+            <div className="mb-3">
               <button
                 onClick={() => navigate('/blog')}
-                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
+                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-xs"
               >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
                 Back to Blogs
@@ -473,55 +453,57 @@ const BlogDetail = () => {
             </div>
 
             <article className="bg-white border border-gray-200 rounded p-4">
+              {/* Compact Header */}
               <header className="mb-4">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">{blog.title}</h1>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span className={`font-medium ${getRatingColor(blog.author.rating)}`}>
-                        {blog.author.name}
-                      </span>
-                      <span>•</span>
-                      <span>{formatDate(blog.published_at)}</span>
-                      {blog.updated_at !== blog.published_at && (
-                        <>
-                          <span>•</span>
-                          <span>Updated {formatDate(blog.updated_at)}</span>
-                        </>
-                      )}
+                {/* Title */}
+                <h1 className="text-xl font-bold text-gray-900 mb-3">
+                  {blog.title}
+                </h1>
+
+                {/* Author and Metadata Row */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 ${getRatingBg(blog.author.rating)} rounded-full flex items-center justify-center text-xs font-bold ${getRatingColor(blog.author.rating)}`}>
+                      {blog.author.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <span className={`text-sm font-medium ${getRatingColor(blog.author.rating)}`}>
+                          {blog.author.name}
+                        </span>
+                        {blog.author.rating && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${getRatingBg(blog.author.rating)} ${getRatingColor(blog.author.rating)} font-mono`}>
+                            {blog.author.rating}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatDate(blog.published_at)}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <button
-                      onClick={() => handleVote('upvote')}
-                      className={`p-1 rounded hover:bg-gray-100 ${votes.user_vote === 'upvote' ? 'text-green-600' : 'text-gray-400'}`}
-                      title="Upvote"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 001.414 1.414z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                    <span className="text-sm font-medium text-gray-700 min-w-[2rem] text-center">
-                      {votes.score}
-                    </span>
-                    <button
-                      onClick={() => handleVote('downvote')}
-                      className={`p-1 rounded hover:bg-gray-100 ${votes.user_vote === 'downvote' ? 'text-red-600' : 'text-gray-400'}`}
-                      title="Downvote"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 010-1.414l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                    </button>
+                </div>
+
+                {/* Tags */}
+                {blog.tags && blog.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {blog.tags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 cursor-pointer transition-colors"
+                      >
+                        {tag}
+                      </span>
+                    ))}
                   </div>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-gray-600">{blog.views} views</span>
-                  <span className="text-gray-600">{comments.length} comments</span>
-                </div>
+                )}
+
+                {/* Dark Separator Line */}
+                <div className="border-t border-gray-800 mt-3 mb-3"></div>
               </header>
 
-              <div className="prose prose-sm max-w-none border-t border-gray-100 pt-6">
+              {/* Blog Content */}
+              <div className="prose prose-sm max-w-none">
                 <ReactMarkdown
                   remarkPlugins={[remarkMath, remarkBreaks]}
                   rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
@@ -530,42 +512,100 @@ const BlogDetail = () => {
                   {blog.content}
                 </ReactMarkdown>
               </div>
+
+              {/* Compact Footer - Thumbs Up/Down & Comment */}
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  {/* Left: Interaction buttons */}
+                  <div className="flex items-center gap-3">
+                    {/* Thumbs Up */}
+                    <button
+                      onClick={() => handleVote('upvote')}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
+                        votes.user_vote === 'upvote' 
+                          ? 'bg-green-50 text-green-700 border border-green-200' 
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                      title="Like"
+                    >
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                      </svg>
+                      <span className="text-xs font-medium">{votes.upvotes}</span>
+                    </button>
+
+                    {/* Thumbs Down */}
+                    <button
+                      onClick={() => handleVote('downvote')}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
+                        votes.user_vote === 'downvote' 
+                          ? 'bg-red-50 text-red-700 border border-red-200' 
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                      title="Dislike"
+                    >
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                      </svg>
+                      <span className="text-xs font-medium">{votes.downvotes}</span>
+                    </button>
+
+                    {/* Comment Icon */}
+                    <div className="flex items-center gap-1.5 px-2 py-1 text-gray-600">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      <span className="text-xs font-medium">{comments.length}</span>
+                    </div>
+                  </div>
+
+                  {/* Right: Score */}
+                  <div className="text-sm font-bold text-gray-700">
+                    Score: {votes.score}
+                  </div>
+                </div>
+              </div>
             </article>
 
-            {/* Comments Section - Codeforces Style */}
-            <div className="mt-6">
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">{comments.length} comments</h2>
+            {/* Comments Section */}
+            <div className="mt-4">
+              {/* Comments Header - Only shows count, no comment icon */}
+              <div className="mb-3">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Comments ({comments.length})
+                </h2>
               </div>
 
               {/* New Comment Form */}
               {user ? (
-                <div className="mb-4 p-3 bg-gray-50 rounded">
+                <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
                   <textarea
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Write a comment..."
-                    className="w-full p-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-y"
+                    className="w-full p-2 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-y"
                     rows={3}
                   />
                   <div className="mt-2 flex justify-end">
                     <button
                       onClick={() => handleComment(newComment)}
                       disabled={!newComment.trim()}
-                      className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Post Comment
+                      Post
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="mb-4 p-3 bg-gray-50 rounded text-center text-sm">
-                  <p className="text-gray-600">Please <a href="/login" className="text-blue-600 hover:text-blue-800">login</a> to comment.</p>
+                <div className="mb-4 p-2 bg-gray-50 rounded text-center text-xs border border-gray-200">
+                  <p className="text-gray-600">
+                    <a href="/login" className="text-blue-600 hover:text-blue-800">Login</a> to comment
+                  </p>
                 </div>
               )}
 
               {/* Comments List */}
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {comments.map((comment) => (
                   <CommentItem
                     key={comment.id}
@@ -582,19 +622,16 @@ const BlogDetail = () => {
                   />
                 ))}
                 {comments.length === 0 && (
-                  <div className="text-center py-8 text-gray-500 text-sm">
-                    <svg className="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    <p>No comments yet.</p>
+                  <div className="text-center py-4 text-gray-500 text-xs">
+                    <p>No comments yet. Be the first!</p>
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="w-80 flex-shrink-0">
+          {/* Sidebar - Span 3 columns */}
+          <div className="lg:col-span-3">
             <Sidebar />
           </div>
         </div>
