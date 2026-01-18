@@ -126,13 +126,21 @@ const Contests = () => {
       result = result.filter(c => c.platform === activePlatform);
     }
 
-    // Search
+    // Search - Made case-insensitive
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(c =>
-        c.title?.toLowerCase().includes(q) ||
-        c.description?.toLowerCase().includes(q)
-      );
+      result = result.filter(c => {
+        // Check title (case-insensitive)
+        const titleMatch = c.title?.toLowerCase().includes(q);
+        // Check description (case-insensitive)
+        const descMatch = c.description?.toLowerCase().includes(q);
+        // Check platform name (case-insensitive)
+        const platformMatch = getPlatformName(c.platform)?.toLowerCase().includes(q);
+        // Check status (case-insensitive)
+        const statusMatch = c.status?.toLowerCase().includes(q);
+        
+        return titleMatch || descMatch || platformMatch || statusMatch;
+      });
     }
 
     setFilteredContests(result);
