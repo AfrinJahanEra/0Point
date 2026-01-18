@@ -407,20 +407,22 @@ const Contests = () => {
                         <p className="text-xs text-gray-600 mb-2">
                           {getPlatformName(contest.platform)} • {contest.type === 'individual' ? 'Individual' : 'Team'}
                         </p>
-                        <div className="flex items-center space-x-4 text-xs text-gray-500">
-                          <span className="flex items-center space-x-1">
-                            <Calendar className="w-3 h-3" />
-                            <span>{formatDateTime(contest.start_time)}</span>
-                          </span>
-                          <span className="flex items-center space-x-1">
-                            <Clock className="w-3 h-3" />
-                            <span>{formatHourDuration(contest)}</span>
-                          </span>
-                          <span className="flex items-center space-x-1">
-                            <Users className="w-3 h-3" />
-                            <span>{contest.participants || 0} participants</span>
-                          </span>
-                        </div>
+                       <div className="flex items-center space-x-4 text-xs text-gray-500">
+  <span className="flex items-center space-x-1">
+    <Calendar className="w-3 h-3" />
+    <span>{formatDateTime(contest.start_time)}</span>
+  </span>
+  <span className="flex items-center space-x-1">
+    <Clock className="w-3 h-3" />
+    <span>{formatHourDuration(contest)}</span>
+  </span>
+  {!contest.external && (
+    <span className="flex items-center space-x-1">
+      <Users className="w-3 h-3" />
+      <span>{contest.participants || 0} participants</span>
+    </span>
+  )}
+</div>
                       </div>
                       {/* Action Buttons */}
                       <div className="flex flex-col space-y-2 ml-4" onClick={(e) => e.stopPropagation()}>
