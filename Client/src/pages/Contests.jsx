@@ -355,10 +355,7 @@ const Contests = () => {
                 <div>
                   <h1 className="text-lg font-semibold text-gray-900">Contests</h1>
                   <p className="text-xs text-gray-600 mt-1">
-                    Showing {paginatedContests.length} of {filteredContests.length} contest{filteredContests.length !== 1 ? 's' : ''} found
-                    {filteredContests.length > 0 && (
-                      <span> • Page {currentPage} of {totalPages}</span>
-                    )}
+                    {filteredContests.length} contest{filteredContests.length !== 1 ? 's' : ''} found
                   </p>
                 </div>
                 <div className="flex items-center space-x-4">
