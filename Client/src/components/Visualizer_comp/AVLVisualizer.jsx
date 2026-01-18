@@ -85,7 +85,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     }
   }, [steps, currentStep, onNext, isPlaying, onStop, speed]);
 
-  // Handle rotation phases for AVL trees
+  // Handle rotation phases for AVL trees with enhanced animations
   useEffect(() => {
     const currentStepData = steps && steps[currentStep];
     if (isRotationStep(currentStepData)) {
@@ -94,25 +94,43 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
       }
       window.rotationTimeouts = [];
       
-      setRotationPhase('breaking');
+      setRotationPhase('preparing');
       
-      const rotatingTimer = setTimeout(() => {
-        setRotationPhase('rotating');
+      const preparingTimer = setTimeout(() => {
+        setRotationPhase('highlighting');
         
-        const attachingTimer = setTimeout(() => {
-          setRotationPhase('attaching');
+        const highlightingTimer = setTimeout(() => {
+          setRotationPhase('breaking');
           
-          const resetTimer = setTimeout(() => {
-            setRotationPhase(null);
-          }, 1000);
+          const rotatingTimer = setTimeout(() => {
+            setRotationPhase('rotating');
+            
+            const attachingTimer = setTimeout(() => {
+              setRotationPhase('attaching');
+              
+              const stabilizingTimer = setTimeout(() => {
+                setRotationPhase('stabilizing');
+                
+                const resetTimer = setTimeout(() => {
+                  setRotationPhase(null);
+                }, 800);
+                
+                window.rotationTimeouts.push(resetTimer);
+              }, 800);
+              
+              window.rotationTimeouts.push(stabilizingTimer);
+            }, 1200);
+            
+            window.rotationTimeouts.push(attachingTimer);
+          }, 1200);
           
-          window.rotationTimeouts.push(resetTimer);
-        }, 1000);
+          window.rotationTimeouts.push(rotatingTimer);
+        }, 800);
         
-        window.rotationTimeouts.push(attachingTimer);
-      }, 1000);
+        window.rotationTimeouts.push(highlightingTimer);
+      }, 500);
       
-      window.rotationTimeouts.push(rotatingTimer);
+      window.rotationTimeouts.push(preparingTimer);
     } else {
       if (window.rotationTimeouts) {
         window.rotationTimeouts.forEach(timeout => clearTimeout(timeout));
@@ -284,27 +302,27 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   // Function to get node styling based on state
   const getNodeStyle = (stepData, nodeValue) => {
     if (!stepData) {
-      return "w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-white text-black border-gray-400";
+      return "w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-gradient-to-br from-white to-gray-100 text-gray-800 border-indigo-300 shadow-sm";
     }
     
-    let baseStyle = "w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-500 ";
+    let baseStyle = "w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all duration-700 ease-out ";
     
     if (stepData.inserted !== undefined && stepData.inserted === nodeValue) {
-      baseStyle += "animate-pulse scale-110 ";
+      baseStyle += "animate-bounce scale-110 ";
     }
     
     if (stepData.inserted !== undefined && stepData.inserted === nodeValue) {
-      baseStyle += "bg-blue-500 text-white border-blue-600";
+      baseStyle += "bg-gradient-to-br from-blue-400 to-blue-600 text-white border-blue-700 shadow-lg shadow-blue-300";
     } else if (stepData.comparing !== undefined && stepData.comparing === nodeValue) {
-      baseStyle += "bg-gray-300 text-black border-gray-700";
+      baseStyle += "bg-gradient-to-br from-amber-300 to-orange-400 text-gray-800 border-amber-500 animate-pulse shadow-lg shadow-amber-200";
     } else if (stepData.found !== undefined && stepData.found === nodeValue) {
-      baseStyle += "bg-green-500 text-white border-green-600";
+      baseStyle += "bg-gradient-to-br from-emerald-400 to-green-600 text-white border-green-700 shadow-lg shadow-green-300";
     } else {
-      baseStyle += "bg-white text-black border-gray-400";
+      baseStyle += "bg-gradient-to-br from-white to-gray-100 text-gray-800 border-indigo-300 shadow-sm";
     }
     
     if (hoveredNode === nodeValue) {
-      baseStyle += " transform scale-110 shadow-lg ";
+      baseStyle += " transform scale-125 shadow-xl ring-4 ring-indigo-300 ";
     }
     
     return baseStyle;
@@ -380,7 +398,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   const renderTreeNode = (node, x, y, level = 0, isLeftChild = false, parentX = null, parentY = null, traversalPath = [], comparingNode = null, insertedNode = null, isRotation = false, rotationNode = null, rotationType = null) => {
     if (!node) return null;
     
-    const nodeSize = 40;
+    const nodeSize = 45;
     // ADJUSTED: Dynamic horizontal spacing based on tree height to accommodate taller trees
     const treeHeight = calculateTreeHeight(node);
     const baseHorizontalSpacing = 200;
@@ -444,16 +462,21 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           rotationType
         )}
         
-        {/* Render connection line to parent */}
+        {/* Render connection line to parent with enhanced styling */}
         {parentX !== null && parentY !== null && (
           <line
             x1={actualX}
             y1={actualY}
             x2={parentX}
             y2={parentY}
-            stroke={isInTraversalPath ? "#3B82F6" : "#9CA3AF"}
-            strokeWidth="2"
-            className="floating-animation delay-3"
+            stroke={isInTraversalPath ? "url(#gradient-traversal)" : (isInsertedNode ? "url(#gradient-insertion)" : (isComparingNode ? "url(#gradient-comparison)" : "url(#gradient-normal)"))}
+            strokeWidth="3"
+            className="animated-line stroke-current"
+            strokeLinecap="round"
+            strokeDasharray={isInTraversalPath ? "0" : "5,5"}
+            style={{
+              animation: isInTraversalPath ? 'pulse 1.5s infinite' : 'none'
+            }}
           />
         )}
         
@@ -463,15 +486,62 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           className="cursor-move floating-animation glowing delay-3"
         >
           <g transform={`translate(${actualX}, ${actualY})`}>
+            <defs>
+              <radialGradient id={`node-gradient-${node.value}`} cx="30%" cy="30%">
+                <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
+                <stop offset="100%" stopColor={
+                  isInTraversalPath ? "#3B82F6" : 
+                  (isInsertedNode ? "#3B82F6" : 
+                  (isComparingNode ? "#F59E0B" : "#93C5FD"))
+                } />
+              </radialGradient>
+            </defs>
+            
+            {/* Glow effect for special operations */}
+            {(isInsertedNode || isComparingNode || isInTraversalPath) && (
+              <circle
+                r={nodeSize / 2 + 8}
+                fill="none"
+                stroke="url(#glow-gradient)"
+                strokeWidth="2"
+                className="animate-ping"
+                opacity="0.6"
+              />
+            )}
+            
             <circle
               r={nodeSize / 2}
-              fill={isInTraversalPath ? "#BFDBFE" : (isInsertedNode ? "#3B82F6" : (isComparingNode ? "#D1D5DB" : "#FFFFFF"))}
-              stroke={isInTraversalPath ? "#3B82F6" : (isInsertedNode ? "#2563EB" : (isComparingNode ? "#374151" : "#9CA3AF"))}
-              strokeWidth="2"
-              className={`hover:stroke-blue-500 transition-all duration-500 ${level % 4 === 0 ? 'delay-1' : level % 4 === 1 ? 'delay-2' : level % 4 === 2 ? 'delay-3' : 'delay-4'}`}
+              fill={isInTraversalPath ? "url(#node-gradient-" + node.value + ")" : (isInsertedNode ? "url(#node-gradient-" + node.value + ")" : (isComparingNode ? "url(#node-gradient-" + node.value + ")" : "url(#node-gradient-" + node.value + ")"))}
+              stroke={isInTraversalPath ? "#2563EB" : (isInsertedNode ? "#1D4ED8" : (isComparingNode ? "#D97706" : "#4F46E5"))}
+              strokeWidth="3"
+              className={`hover:stroke-indigo-700 transition-all duration-700 ease-out ${level % 4 === 0 ? 'delay-1' : level % 4 === 1 ? 'delay-2' : level % 4 === 2 ? 'delay-3' : 'delay-4'} ${isInsertedNode ? 'ring-4 ring-blue-300' : ''}`}
               onMouseEnter={() => setHoveredNode(node.value)}
               onMouseLeave={() => setHoveredNode(null)}
+              filter="url(#glow-filter)"
             />
+            
+            {/* Particle effect for insertion */}
+            {isInsertedNode && (
+              <g className="particle-effect">
+                {[...Array(8)].map((_, i) => {
+                  const angle = (i * Math.PI * 2) / 8;
+                  const distance = 25;
+                  const x = Math.cos(angle) * distance;
+                  const y = Math.sin(angle) * distance;
+                  return (
+                    <circle
+                      key={i}
+                      cx={x}
+                      cy={y}
+                      r="2"
+                      fill="#3B82F6"
+                      className="particle"
+                      opacity="0.7"
+                    />
+                  );
+                })}
+              </g>
+            )}
             
             {/* Render node value - no animation */}
             <text
@@ -479,8 +549,8 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
               y="0"
               textAnchor="middle"
               dominantBaseline="middle"
-              className="font-bold text-xs select-none"
-              fill={isInTraversalPath ? "#1E40AF" : (isInsertedNode ? "#FFFFFF" : (isComparingNode ? "#1F2937" : "#4B5563"))}
+              className="font-bold text-xs select-none drop-shadow-sm"
+              fill={isInTraversalPath ? "#1E3A8A" : (isInsertedNode ? "#FFFFFF" : (isComparingNode ? "#1F2937" : "#1F2937"))}
             >
               {node.value}
             </text>
@@ -492,7 +562,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
               textAnchor="middle"
               dominantBaseline="middle"
               className="font-medium text-xs select-none"
-              fill="#6B7280"
+              fill="#4B5563"
             >
               h:{node.height}
             </text>
@@ -503,20 +573,26 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         {isRotation && isRotationNode && (
           <g transform={`translate(${actualX}, ${actualY})`}>
             <rect
-              x={-30}
+              x={-40}
               y={20}
-              width="60"
-              height="20"
-              rx="3"
-              fill={rotationPhase === 'breaking' ? "#F59E0B" : rotationPhase === 'rotating' ? "#8B5CF6" : rotationPhase === 'attaching' ? "#10B981" : "#6366F1"}
-              className="opacity-20 floating-animation"
+              width="80"
+              height="25"
+              rx="5"
+              fill={rotationPhase === 'preparing' ? "#6366F1" : 
+                    rotationPhase === 'highlighting' ? "#8B5CF6" : 
+                    rotationPhase === 'breaking' ? "#F59E0B" : 
+                    rotationPhase === 'rotating' ? "#EC4899" : 
+                    rotationPhase === 'attaching' ? "#10B981" : 
+                    rotationPhase === 'stabilizing' ? "#06B6D4" : "#6366F1"}
+              className={`opacity-80 ${rotationPhase ? 'animate-pulse' : ''}`}
+              filter="url(#glow-filter)"
             />
             <text
-              y={35}
+              y={37}
               textAnchor="middle"
-              className="text-xs font-bold fill-white floating-text"
+              className="text-xs font-bold fill-white"
             >
-              {rotationPhase ? rotationPhase.toUpperCase() : 'ROTATING'}
+              {rotationPhase ? rotationPhase.replace(/\b\w/g, l => l.toUpperCase()) : 'ROTATING'}
             </text>
           </g>
         )}
@@ -803,6 +879,26 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           }
         }
         
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 0.6;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
+        
+        @keyframes particle {
+          0% {
+            transform: translate(0, 0) scale(1);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(var(--tx), var(--ty)) scale(0);
+            opacity: 0;
+          }
+        }
+        
         .floating-animation {
           animation: float 3s ease-in-out infinite;
         }
@@ -813,6 +909,14 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         
         .glowing {
           animation: glow 2s ease-in-out infinite;
+        }
+        
+        .animated-line {
+          animation: pulse 1.5s infinite alternate;
+        }
+        
+        .particle {
+          animation: particle 1s ease-out forwards;
         }
         
         /* Staggered animations */
@@ -894,13 +998,13 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
         </button>
         
-        <div className={`mb-6 bg-white p-3 border-2 border-gray-300 ${isFullscreen ? '!border-0 !p-0' : ''}`}>
-          <h4 className={`text-sm font-bold text-black mb-2 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
-            <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center text-xs mr-2">
+        <div className={`mb-6 bg-gradient-to-br from-slate-50 to-blue-50 p-4 border-2 border-indigo-200 rounded-lg shadow-md ${isFullscreen ? '!border-0 !p-0' : ''}`}>
+          <h4 className={`text-sm font-bold text-indigo-900 mb-3 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
+            <span className="w-6 h-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full flex items-center justify-center text-xs mr-2">
               {safeCurrentStep + 1}
             </span>
             Step {safeCurrentStep + 1} of {steps.length}
-            <span className="ml-2 px-2 py-0.5 bg-gray-200 text-black text-xs font-medium rounded">
+            <span className="ml-2 px-2.5 py-1 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 text-xs font-semibold rounded-full border border-indigo-200">
               Current
             </span>
           </h4>
@@ -916,16 +1020,38 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
                   viewBox={`0 0 ${600 * calculateZoomLevel(currentStepData.tree)} 500`}
                 >
                   <defs>
-                    <marker 
-                      id="arrowhead" 
-                      markerWidth="10" 
-                      markerHeight="7" 
-                      refX="9" 
-                      refY="3.5" 
-                      orient="auto"
-                    >
-                      <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
-                    </marker>
+                    <linearGradient id="gradient-normal" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#9CA3AF" />
+                      <stop offset="100%" stopColor="#6B717F" />
+                    </linearGradient>
+                    <linearGradient id="gradient-traversal" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#93C5FD" />
+                      <stop offset="100%" stopColor="#3B82F6" />
+                    </linearGradient>
+                    <linearGradient id="gradient-insertion" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#BFDBFE" />
+                      <stop offset="100%" stopColor="#3B82F6" />
+                    </linearGradient>
+                    <linearGradient id="gradient-comparison" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#FDE68A" />
+                      <stop offset="100%" stopColor="#F59E0B" />
+                    </linearGradient>
+                    <radialGradient id="glow-gradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                      <stop offset="0%" stopColor="rgba(59, 130, 246, 0.8)" stopOpacity="1" />
+                      <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" stopOpacity="0" />
+                    </radialGradient>
+                    <filter id="glow-filter">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                      <feMerge> 
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                    
+                    {/* Animated dash pattern */}
+                    <pattern id="dash-pattern" patternUnits="userSpaceOnUse" width="10" height="10">
+                      <path d="M0,5 L10,5" stroke="#9CA3AF" strokeWidth="2" strokeDasharray="3,3" />
+                    </pattern>
                   </defs>
                   
                   {isFloating ? (
@@ -962,21 +1088,24 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             )}
           </div>
           
-          <div className={`text-center p-2 bg-white border border-gray-200 ${isFullscreen ? 'hidden' : ''}`}>
-            <p className="font-semibold text-black text-sm">
+          <div className={`text-center p-4 bg-gradient-to-r from-indigo-50 to-blue-100 border border-indigo-200 rounded-lg ${isFullscreen ? 'hidden' : ''}`}>
+            <p className="font-semibold text-indigo-800 text-sm mb-1">
               {getOperationDescription(currentStepData)}
             </p>
             {traversalPath.length > 0 && (
-              <div className="mt-1 text-xs text-blue-600">
-                Path: {traversalPath.join(' → ')}
+              <div className="mt-2 text-xs text-indigo-600 font-medium bg-white/50 inline-block px-3 py-1 rounded-full border border-indigo-200">
+                Path: {traversalPath.join(' ')}
               </div>
             )}
           </div>
         </div>
       </div>
       
-      <div className="mt-6 border border-gray-200 p-4 bg-white">
-        <h4 className="text-md font-bold text-blue-800 mb-3">All Steps:</h4>
+      <div className="mt-6 border border-indigo-200 p-4 bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl shadow-sm">
+        <h4 className="text-md font-bold text-indigo-800 mb-3 flex items-center">
+          <span className="mr-2 text-indigo-600">📋</span>
+          All Steps:
+        </h4>
         <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
           {steps.map((step, index) => {
             // Build traversal path for this step
@@ -995,7 +1124,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             return (
               <div 
                 key={index}
-                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-50 border-blue-80 shadow-sm' : 'bg-white border-gray-300'}`}
+                className={`p-4 border rounded-xl transition-all duration-300 ${index === currentStep ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-indigo-300 shadow-md' : 'bg-white border-gray-200 hover:shadow-sm'}`}
                 id={`step-${index}`}
               >
                 <div className="flex justify-between items-start">
@@ -1032,7 +1161,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
                     
                     {stepTraversalPath.length > 0 && (
                       <div className="mt-2 text-xs text-blue-600">
-                        Path: {stepTraversalPath.join(' → ')}
+                        Path: {stepTraversalPath.join(' ')}
                       </div>
                     )}
                   </div>

@@ -54,7 +54,7 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
     }
   }, [steps, currentStep, onNext, isPlaying, onStop, speed]);
 
-  // D3.js animation effect
+  // D3.js animation effect - BEAUTIFIED VERSION (matching DFS/BFS/Dijkstra styling)
   useEffect(() => {
     if (!svgRef.current || !steps || steps.length === 0) return;
     
@@ -63,8 +63,79 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
     
     if (!stepData) return;
     
-    // Clear previous animations
+    // Clear previous animations and elements
     svg.selectAll("*").interrupt();
+    svg.selectAll("*").remove();
+    
+    // Add defs for gradients (HARMONIOUS PROFESSIONAL styling)
+    const defs = svg.append("defs");
+    
+    // ELEGANT gradient for current nodes with refined palette
+    defs.append("radialGradient")
+      .attr("id", "elegantCurrentGradient")
+      .attr("cx", "25%")
+      .attr("cy", "25%")
+      .attr("r", "85%")
+      .html(`
+        <stop offset="0%" stop-color="#F0F9FF" />
+        <stop offset="30%" stop-color="#E0F2FE" />
+        <stop offset="60%" stop-color="#B3E5FC" />
+        <stop offset="85%" stop-color="#81D4FA" />
+        <stop offset="100%" stop-color="#4FC3F7" />
+      `);
+    
+    // SOPHISTICATED gradient for visited nodes with muted tones
+    defs.append("radialGradient")
+      .attr("id", "sophisticatedVisitedGradient")
+      .attr("cx", "50%")
+      .attr("cy", "50%")
+      .attr("r", "65%")
+      .html(`
+        <stop offset="0%" stop-color="#F8F9FA" />
+        <stop offset="40%" stop-color="#E9ECEF" />
+        <stop offset="70%" stop-color="#DEE2E6" />
+        <stop offset="100%" stop-color="#CED4DA" />
+      `);
+    
+    // SUBTLE glow effects for professional appearance
+    defs.append("filter")
+      .attr("id", "subtleGlow")
+      .html(`
+        <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#81D4FA" flood-opacity="0.4"/>
+        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#B3E5FC" flood-opacity="0.6"/>
+      `);
+    
+    defs.append("filter")
+      .attr("id", "refinedAura")
+      .html(`
+        <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#DEE2E6" flood-opacity="0.3"/>
+        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#E9ECEF" flood-opacity="0.5"/>
+      `);
+    
+    // CLEAN gradients for minimal aesthetic
+    defs.append("radialGradient")
+      .attr("id", "cleanCurrentGradient")
+      .attr("cx", "30%")
+      .attr("cy", "30%")
+      .attr("r", "75%")
+      .html(`
+        <stop offset="0%" stop-color="#FFFFFF" />
+        <stop offset="50%" stop-color="#F8F9FA" />
+        <stop offset="100%" stop-color="#E9ECEF" />
+      `);
+    
+    defs.append("radialGradient")
+      .attr("id", "cleanVisitedGradient")
+      .attr("cx", "50%")
+      .attr("cy", "50%")
+      .attr("r", "55%")
+      .html(`
+        <stop offset="0%" stop-color="#F1F3F4" />
+        <stop offset="100%" stop-color="#DEE2E6" />
+      `);
+    
+    // MST edges are now handled in the individual edge drawing section below
+    // This removes the duplicate path visualization that was causing static lines
     
     // Get SVG dimensions
     const width = 600;
@@ -97,10 +168,7 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
       }
     });
     
-    // Draw edges with D3 - UPDATED FOR NEW VISUAL STYLE
-    svg.selectAll(".edge").remove();
-    svg.selectAll(".edge-weight").remove();
-    
+    // Draw edges with beautiful styling (matching DFS/BFS/Dijkstra)
     if (stepData.graph) {
       // Draw all edges first
       nodes.forEach(fromNode => {
@@ -117,90 +185,206 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
           
           if (!pos1 || !pos2) return;
           
-          // Draw edge line with appropriate style
-          const edge = svg.append("line")
-            .attr("class", "edge")
-            .attr("x1", pos1.x)
-            .attr("y1", pos1.y)
-            .attr("x2", pos2.x)
-            .attr("y2", pos2.y)
-            .attr("stroke", "#93C5FD") // Light blue default
-            .attr("stroke-width", 2);
+          // Beautiful edge styling - SAME AS DIJKSTRA
+          let strokeColor = "#4B5563"; // Professional gray
+          let strokeWidth = 2.5;
           
-          // Highlight MST edges
-          if (stepData.mst && stepData.mst.some(edge => 
+          // Check if this edge is part of the final MST (blue thick lines for MST)
+          const isMSTEdge = stepData.mst && stepData.mst.some(edge => 
             edge && edge.from && edge.to &&
-            (edge.from === fromNode && edge.to === toNode) || 
-            (edge.from === toNode && edge.to === fromNode))) {
-            edge.attr("stroke", "#1E40AF") // Dark blue for MST edges
-                .attr("stroke-width", 3);
+            ((edge.from === fromNode && edge.to === toNode) || 
+             (edge.from === toNode && edge.to === fromNode))
+          );
+          
+          // BLUE THICK LINES FOR MST EDGES - PROMINENT DISPLAY
+          if (isMSTEdge) {
+            strokeColor = "#3B82F6"; // Rich blue
+            strokeWidth = 6; // Very thick for emphasis
+          }
+          // Dark blue for visited edges (same as Dijkstra)
+          else if (stepData.visited && stepData.visited.some(node => 
+            (node === fromNode) || (node === toNode))) {
+            strokeColor = "#1E40AF"; // Rich dark blue
+            strokeWidth = 4.5;
           }
           
-          // Highlight current edge being considered
+          // Blue for current edge being considered (same as Dijkstra)
           const currentEdge = stepData.currentEdge || stepData.addEdge || stepData.skipEdge;
           if (currentEdge && currentEdge.from && currentEdge.to &&
             ((currentEdge.from === fromNode && currentEdge.to === toNode) ||
              (currentEdge.from === toNode && currentEdge.to === fromNode))) {
-            edge.attr("stroke", "#93C5FD") // Light blue for current edge
-                .attr("stroke-width", 2)
-                .attr("stroke-dasharray", "5,5");
+            strokeColor = "#3B82F6"; // Blue for current edge
+            strokeWidth = 3.5;
           }
           
-          // Draw edge weight
+          // Add subtle glow effect for important edges
+          if (strokeWidth > 3) {
+            svg.append("line")
+              .attr("x1", pos1.x)
+              .attr("y1", pos1.y)
+              .attr("x2", pos2.x)
+              .attr("y2", pos2.y)
+              .attr("stroke", strokeColor)
+              .attr("stroke-width", strokeWidth + 1)
+              .attr("stroke-linecap", "round")
+              .attr("opacity", 0.3)
+              .style("filter", "blur(1px)");
+          }
+          
+          // Main edge line
+          svg.append("line")
+            .attr("x1", pos1.x)
+            .attr("y1", pos1.y)
+            .attr("x2", pos2.x)
+            .attr("y2", pos2.y)
+            .attr("stroke", strokeColor)
+            .attr("stroke-width", strokeWidth)
+            .attr("stroke-linecap", "round");
+          
+          // Draw edge weight with beautiful styling - SAME AS DIJKSTRA
           const midX = (pos1.x + pos2.x) / 2;
           const midY = (pos1.y + pos2.y) / 2;
           
           svg.append("text")
-            .attr("class", "edge-weight")
             .attr("x", midX)
             .attr("y", midY - 5)
             .attr("text-anchor", "middle")
             .attr("font-size", "12px")
-            .attr("font-weight", "bold")
-            .attr("fill", "#9CA3AF")
+            .attr("font-weight", "600")
+            .attr("font-family", "'Inter', system-ui, sans-serif")
+            .attr("fill", isMSTEdge ? "#3B82F6" : strokeColor === "#1E40AF" ? "#1E40AF" : strokeColor === "#3B82F6" ? "#3B82F6" : "#6B7280")
             .text(weight);
         });
       });
     }
     
-    // Draw nodes with D3 - UPDATED FOR NEW COLOR SCHEME
+    // Draw nodes with beautiful styling AND drag functionality (matching DFS/BFS/Dijkstra)
     svg.selectAll(".node").remove();
     svg.selectAll(".node-label").remove();
     
     nodes.forEach(node => {
       const pos = nodePositions[node];
       
-      // Determine node color based on state - NEW COLOR SCHEME
-      let fillColor = "white"; // Default white
-      let strokeColor = "black"; // Default black border
-      let textColor = "black"; // Default black text
+      // Beautiful node styling - HARMONIOUS PROFESSIONAL VERSION
+      let fillColor = "white";
+      let strokeColor = "#6B7280";
+      let textColor = "#1F2937";
+      let strokeWidth = 2;
+      let nodeRadius = 24;
       
-      // Current node gets special treatment
+      // Current node (processing node in Kruskal) - REFINED ELEGANCE
       if (stepData.currentNode === node) {
-        fillColor = "#93C5FD"; // Light blue for current node
-        strokeColor = "black";
-        textColor = "black";
+        fillColor = "url(#elegantCurrentGradient)"; // Use elegant gradient
+        strokeColor = "#495057"; // Professional dark gray border
+        strokeWidth = 5; // Premium thick border
+        nodeRadius = 32; // Largest size for emphasis
+        textColor = "#212529"; // Deep charcoal text
+        
+        // Layered professional glow effects
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 8)
+          .attr("fill", "#81D4FA")
+          .attr("opacity", 0.3)
+          .style("filter", "blur(8px)");
+        
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 5)
+          .attr("fill", "#B3E5FC")
+          .attr("opacity", 0.25)
+          .style("filter", "blur(5px)");
+        
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 3)
+          .attr("fill", "#E0F2FE")
+          .attr("opacity", 0.2)
+          .style("filter", "blur(2px)");
       } 
-      // MST nodes
-      else if (stepData.mstNodes && stepData.mstNodes.includes(node)) {
-        fillColor = "#1E40AF"; // Dark blue for MST nodes
-        strokeColor = "black";
-        textColor = "white"; // White text for dark blue background
+      // Visited nodes - SOPHISTICATED NEUTRAL GRADIENT
+      else if (stepData.visited && stepData.visited.includes(node)) {
+        fillColor = "url(#sophisticatedVisitedGradient)"; // Use sophisticated neutral gradient
+        strokeColor = "#6C757D"; // Muted gray border
+        strokeWidth = 4; // Elegant medium border
+        textColor = "#212529"; // Dark text for contrast
+        nodeRadius = 28; // Prominent size
+        
+        // Sophisticated neutral aura
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 4)
+          .attr("fill", "#DEE2E6")
+          .attr("opacity", 0.2)
+          .style("filter", "url(#refinedAura)");
+        
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 2)
+          .attr("fill", "#E9ECEF")
+          .attr("opacity", 0.15)
+          .style("filter", "blur(3px)");
+        
+        // Elegant inner highlight
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius - 3)
+          .attr("fill", "white")
+          .attr("opacity", 0.3);
+      }
+      // Unvisited nodes - CLEAN MINIMALIST
+      else if (stepData.unvisited && stepData.unvisited.includes(node)) {
+        fillColor = "#F8F9FA"; // Clean light gray
+        strokeColor = "#DEE2E6"; // Subtle border
+        strokeWidth = 2.5;
+        textColor = "#495057"; // Medium gray text
+        nodeRadius = 22; // Standard refined size
+        
+        // Minimal shadow for depth
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y + 2)
+          .attr("r", nodeRadius)
+          .attr("fill", "black")
+          .attr("opacity", 0.05)
+          .style("filter", "blur(2px)");
+        
+        // Subtle highlight
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y - 1)
+          .attr("r", nodeRadius - 8)
+          .attr("fill", "white")
+          .attr("opacity", 0.4);
       }
       
-      // Draw node circle with drag support
+      // Draw main node circle WITH DRAG FUNCTIONALITY
       const nodeCircle = svg.append("circle")
-        .attr("class", "node")
         .attr("cx", pos.x)
         .attr("cy", pos.y)
-        .attr("r", 20)
+        .attr("r", nodeRadius)
         .attr("fill", fillColor)
         .attr("stroke", strokeColor)
-        .attr("stroke-width", 2)
-        .attr("data-node", node)
-        .style("cursor", "pointer")
-        .on("mouseover", () => setHoveredNode(node))
-        .on("mouseout", () => setHoveredNode(null))
+        .attr("stroke-width", strokeWidth)
+        .attr("cursor", "pointer")
+        .on("mouseover", function() {
+          // Visual feedback on hover
+          d3.select(this)
+            .attr("r", nodeRadius + 2)
+            .attr("stroke-width", strokeWidth + 1);
+        })
+        .on("mouseout", function() {
+          // Return to normal state
+          d3.select(this)
+            .attr("r", nodeRadius)
+            .attr("stroke-width", strokeWidth);
+        })
         .call(d3.drag()
           .on("start", function(event) {
             setIsDragging(true);
@@ -217,41 +401,61 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
               .attr("cx", newX)
               .attr("cy", newY);
             
+            // Update the glow effects if they exist
+            svg.selectAll(`circle`).each(function() {
+              const circle = d3.select(this);
+              const cx = parseFloat(circle.attr("cx"));
+              const cy = parseFloat(circle.attr("cy"));
+              
+              // Check if this circle belongs to the dragged node
+              if (Math.abs(cx - pos.x) < 1 && Math.abs(cy - pos.y) < 1) {
+                circle.attr("cx", newX).attr("cy", newY);
+              }
+            });
+            
             // Update the node label position
-            svg.selectAll(`.node-label[data-node="${node}"]`)
-              .attr("x", newX)
-              .attr("y", newY + 5);
+            svg.selectAll("text").each(function() {
+              const text = d3.select(this);
+              const x = parseFloat(text.attr("x"));
+              const y = parseFloat(text.attr("y"));
+              
+              // Check if this text belongs to the dragged node
+              if (Math.abs(x - pos.x) < 1) {
+                text.attr("x", newX).attr("y", newY + 6);
+              }
+            });
             
             // Update connected edges
-            svg.selectAll(".edge, .edge-weight")
-              .each(function() {
-                const element = d3.select(this);
-                const x1 = parseFloat(element.attr("x1"));
-                const y1 = parseFloat(element.attr("y1"));
-                const x2 = parseFloat(element.attr("x2"));
-                const y2 = parseFloat(element.attr("y2"));
-                const textX = parseFloat(element.attr("x"));
-                const textY = parseFloat(element.attr("y"));
-                
-                // Update edge positions
-                if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-                  if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
-                    element.attr("x1", newX).attr("y1", newY);
-                  }
-                  if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
-                    element.attr("x2", newX).attr("y2", newY);
-                  }
+            svg.selectAll("line, text").each(function() {
+              const element = d3.select(this);
+              const x1 = parseFloat(element.attr("x1"));
+              const y1 = parseFloat(element.attr("y1"));
+              const x2 = parseFloat(element.attr("x2"));
+              const y2 = parseFloat(element.attr("y2"));
+              const textX = parseFloat(element.attr("x"));
+              const textY = parseFloat(element.attr("y"));
+              
+              // Update edge positions
+              if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
+                  element.attr("x1", newX).attr("y1", newY);
                 }
-                
-                // Update edge weight positions
-                if (!isNaN(textX) && !isNaN(textY)) {
-                  if (Math.abs(textX - (pos.x + (element.attr("x2") ? parseFloat(element.attr("x2")) : pos.x))/2) < 1 && 
-                      Math.abs(textY - (pos.y + (element.attr("y2") ? parseFloat(element.attr("y2")) : pos.y) - 5)/2) < 1) {
-                    element.attr("x", (newX + (element.attr("x2") ? parseFloat(element.attr("x2")) : newX))/2)
-                           .attr("y", (newY + (element.attr("y2") ? parseFloat(element.attr("y2")) : newY) - 5)/2);
-                  }
+                if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
+                  element.attr("x2", newX).attr("y2", newY);
                 }
-              });
+              }
+              
+              // Update edge weight positions
+              if (!isNaN(textX) && !isNaN(textY)) {
+                const midX = (newX + (element.attr("x2") ? parseFloat(element.attr("x2")) : newX)) / 2;
+                const midY = (newY + (element.attr("y2") ? parseFloat(element.attr("y2")) : newY)) / 2;
+                
+                if (Math.abs(textX - (pos.x + (element.attr("x2") ? parseFloat(element.attr("x2")) : pos.x))/2) < 1 && 
+                    Math.abs(textY - ((pos.y + (element.attr("y2") ? parseFloat(element.attr("y2")) : pos.y))/2 - 5)) < 1) {
+                  element.attr("x", midX).attr("y", midY - 5);
+                }
+              }
+            });
             
             // Update the position in our state
             setDraggedNodes(prev => ({
@@ -265,16 +469,16 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
           })
         );
       
-      // Draw node label
+      // Draw node label with beautiful typography (matching other algorithms)
       svg.append("text")
-        .attr("class", "node-label")
-        .attr("data-node", node)
         .attr("x", pos.x)
-        .attr("y", pos.y + 5)
+        .attr("y", pos.y + 6)
         .attr("text-anchor", "middle")
-        .attr("font-size", "14px")
-        .attr("font-weight", "bold")
+        .attr("font-size", "15px")
+        .attr("font-weight", "600")
+        .attr("font-family", "'Inter', system-ui, sans-serif")
         .attr("fill", textColor)
+        .attr("pointer-events", "none")
         .text(node);
     });
     
@@ -287,15 +491,15 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         })
         .transition()
         .duration(1000)
-        .attr("r", 25)
+        .attr("r", 30)
         .transition()
         .duration(1000)
-        .attr("r", 20);
+        .attr("r", 25);
     }
     
   }, [currentStep, steps, draggedNodes, isDragging, dragNode]);
 
-  // Function to download all steps as PDF with visual representations
+  // Function to download all steps as PDF with beautiful visual representations - SAME AS DIJKSTRA
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
       orientation: 'landscape',
@@ -303,11 +507,16 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
       format: 'a4'
     });
     
-    // Add title
-    doc.setFontSize(22);
+    // Add title with beautiful styling - SAME AS DIJKSTRA
+    doc.setFontSize(24);
+    doc.setTextColor(26, 86, 150); // Dark blue
     doc.text('Kruskal Visualization Steps', 148.5, 15, null, null, 'center');
     
-    // Add steps with visual representations - one step per page
+    doc.setFontSize(14);
+    doc.setTextColor(75, 85, 99); // Gray subtitle
+    doc.text('Step-by-step minimum spanning tree algorithm', 148.5, 25, null, null, 'center');
+    
+    // Add steps with beautiful visual representations - SAME AS DIJKSTRA
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index];
       
@@ -316,21 +525,23 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         doc.addPage();
       }
       
-      // Add step header
-      doc.setFontSize(16);
-      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
+      // Add step header with beautiful styling
+      doc.setFontSize(18);
+      doc.setTextColor(31, 41, 55); // Dark header
+      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 35, null, null, 'center');
       
       doc.setFontSize(12);
-      doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
+      doc.setTextColor(107, 114, 128); // Gray description
+      doc.text(getOperationDescription(step), 148.5, 45, null, null, 'center');
       
-      // Add a visual representation of the graph
+      // Add a beautiful visual representation of the graph
       if (step.graph || step.operation) {
         // Calculate bounding box for scaling
         const bbox = calculateGraphBoundingBox(step.graph);
         const pageWidth = 297; // A4 landscape width in mm
         const pageHeight = 210; // A4 landscape height in mm
         const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
-        const availableHeight = pageHeight - 60; // Leave space for header and footer
+        const availableHeight = pageHeight - 70; // Leave space for header and footer
         
         // Calculate scale to fit
         const scaleX = availableWidth / bbox.width;
@@ -341,19 +552,45 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         const graphWidth = bbox.width * scale;
         const graphHeight = bbox.height * scale;
         const x = (pageWidth - graphWidth) / 2 - bbox.minX * scale;
-        const y = (availableHeight - graphHeight) / 2 + 50 - bbox.minY * scale; // +50 for header space
+        const y = (availableHeight - graphHeight) / 2 + 60 - bbox.minY * scale; // +60 for header space
         
-        drawGraphInPDF(doc, step.graph, x, y, 0, null, null, scale, step);
+        drawBeautifulGraphInPDF(doc, step.graph, x, y, 0, null, null, scale, step);
       } else {
+        doc.setFontSize(14);
+        doc.setTextColor(156, 163, 175);
         doc.text('Empty graph', 148.5, 105, null, null, 'center');
       }
+      
+      // Add step information - SAME AS DIJKSTRA styling
+      if (step.queue && step.queue.length > 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(245, 158, 11); // Amber for queue
+        doc.text(`Queue: [${step.queue.join(', ')}]`, 20, 190);
+      }
+      
+      if (step.visited && step.visited.length > 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(30, 64, 175); // Dark blue for visited
+        doc.text(`Visited: [${step.visited.join(', ')}]`, 20, 198);
+      }
+      
+      if (step.unvisited && step.unvisited.length > 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(107, 114, 128); // Gray for unvisited
+        doc.text(`Unvisited: [${step.unvisited.join(', ')}]`, 20, 206);
+      }
+      
+      // Add page number
+      doc.setFontSize(8);
+      doc.setTextColor(156, 163, 175);
+      doc.text(`Page ${index + 1} of ${steps.length}`, 277, 200, null, null, 'right');
       
       // Add a small delay to prevent UI blocking
       await new Promise(resolve => setTimeout(resolve, 10));
     }
     
     // Save the PDF
-    doc.save('kruskal-steps.pdf');
+    doc.save('kruskal-visualization-steps.pdf');
   };
   
   // Helper function to calculate graph bounding box
@@ -465,8 +702,8 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         // Check if this edge is in MST
         const isInMST = stepData && stepData.mst && stepData.mst.some(edge => 
           edge && edge.from && edge.to &&
-          (edge.from === node && edge.to === neighbor) || 
-          (edge.from === neighbor && edge.to === node)
+          ((edge.from === node && edge.to === neighbor) || 
+           (edge.from === neighbor && edge.to === node))
         );
         
         // Check if this is the current edge being considered
@@ -475,16 +712,15 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
           ((currentEdge.from === node && currentEdge.to === neighbor) ||
            (currentEdge.from === neighbor && currentEdge.to === node));
         
-        // Draw edge
-        if (isCurrentEdge) {
+        // Draw edge - BLUE THICK LINES FOR MST
+        if (isInMST) {
+          doc.setDrawColor(59, 130, 246); // BLUE for MST edges
+          doc.setLineWidth(1.5 * optimalScale); // VERY thick for MST
+        } else if (isCurrentEdge) {
           doc.setDrawColor(59, 130, 246); // blue for current edge
           doc.setLineWidth(0.8 * optimalScale); // Slightly thicker for current edge
-        } else if (isInMST) {
-          doc.setDrawColor(16, 185, 129); // green-500
         } else {
           doc.setDrawColor(156, 163, 175); // gray-400
-        }
-        if (!isCurrentEdge) {
           doc.setLineWidth(0.5 * optimalScale);
         }
         doc.line(x1, y1, x2, y2);
@@ -493,10 +729,10 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
         const midX = (x1 + x2) / 2;
         const midY = (y1 + y2) / 2;
         doc.setFontSize(6 * optimalScale);
-        if (isCurrentEdge) {
+        if (isInMST) {
+          doc.setTextColor(59, 130, 246); // BLUE for MST edges
+        } else if (isCurrentEdge) {
           doc.setTextColor(59, 130, 246); // blue for current edge
-        } else if (isInMST) {
-          doc.setTextColor(16, 185, 129); // green-500
         } else {
           doc.setTextColor(156, 163, 175); // gray-400
         }
@@ -535,6 +771,12 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
       doc.setTextColor(0, 0, 0); // black
       doc.text(String(node), x, y + 3 * optimalScale, null, null, 'center');
     });
+  };
+
+  // Function to calculate total MST weight
+  const calculateMSTTotalWeight = (mstEdges) => {
+    if (!mstEdges || mstEdges.length === 0) return 0;
+    return mstEdges.reduce((total, edge) => total + (edge.weight || 0), 0);
   };
 
   // Function to get operation description
@@ -630,6 +872,64 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
           to {
             stroke-dashoffset: -10;
           }
+        }
+        
+        /* Premium pulse animation for MST path */
+        @keyframes pulse {
+          0% {
+            stroke-opacity: 0.7;
+            stroke-width: 2;
+          }
+          50% {
+            stroke-opacity: 1;
+            stroke-width: 3;
+          }
+          100% {
+            stroke-opacity: 0.7;
+            stroke-width: 2;
+          }
+        }
+        
+        /* Elegant floating animation */
+        @keyframes elegant-float {
+          0% {
+            transform: translateY(0px) rotate(0deg);
+          }
+          25% {
+            transform: translateY(-8px) rotate(1deg);
+          }
+          50% {
+            transform: translateY(0px) rotate(0deg);
+          }
+          75% {
+            transform: translateY(-4px) rotate(-1deg);
+          }
+          100% {
+            transform: translateY(0px) rotate(0deg);
+          }
+        }
+        
+        .elegant-floating {
+          animation: elegant-float 6s ease-in-out infinite;
+        }
+        
+        /* Sophisticated shimmer effect */
+        @keyframes shimmer {
+          0% {
+            background-position: -200% 0;
+          }
+          100% {
+            background-position: 200% 0;
+          }
+        }
+        
+        .shimmer-effect {
+          background: linear-gradient(90deg, 
+            rgba(225, 235, 245, 0.1) 0%,
+            rgba(206, 212, 218, 0.3) 50%,
+            rgba(225, 235, 245, 0.1) 100%);
+          background-size: 200% 100%;
+          animation: shimmer 3s ease-in-out infinite;
         }
         
         /* Custom scrollbar styling - transparent by default, grey on hover */
@@ -773,7 +1073,8 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
                   ref={svgRef} 
                   width="100%" 
                   height="500" 
-                  className={`border border-gray-200 rounded min-w-[600px] screen-floating ${isFullscreen ? '!border-0' : ''}`}
+                  className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`}
+                  style={{ backgroundColor: 'white' }}
                   viewBox="0 0 600 500"
                 />
               </div>
@@ -789,11 +1090,24 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
               {getOperationDescription(currentStepData)}
             </p>
             {currentStepData && (
-              <div className="mt-2 text-xs">
+              <div className="mt-2 text-xs space-y-1">
                 {currentStepData.mst && currentStepData.mst.length > 0 && (
-                  <p className="text-green-600">
-                    MST Edges: {currentStepData.mst.length}
-                  </p>
+                  <>
+                    <p className="text-blue-600 font-medium">
+                      MST Edges: {currentStepData.mst.length}
+                    </p>
+                    <p className="text-blue-800 font-semibold">
+                      Total MST Weight: {calculateMSTTotalWeight(currentStepData.mst)}
+                    </p>
+                    <div className="mt-1">
+                      <p className="text-gray-700 text-xs">MST Path:</p>
+                      <p className="text-blue-700 font-mono text-xs">
+                        {currentStepData.mst.map((edge, idx) => 
+                          `${edge.from}-${edge.to}(${edge.weight})`
+                        ).join(' → ')}
+                      </p>
+                    </div>
+                  </>
                 )}
                 {currentStepData.visited && currentStepData.visited.length > 0 && (
                   <p className="text-blue-400">
@@ -836,11 +1150,24 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
                       )}
                     </div>
                     
-                    <div className="mt-2 text-xs">
+                    <div className="mt-2 text-xs space-y-1">
                       {step.mst && step.mst.length > 0 && (
-                        <p className="text-green-600">
-                          MST Edges: {step.mst.length}
-                        </p>
+                        <>
+                          <p className="text-blue-600 font-medium">
+                            MST Edges: {step.mst.length}
+                          </p>
+                          <p className="text-blue-800 font-semibold">
+                            Total MST Weight: {calculateMSTTotalWeight(step.mst)}
+                          </p>
+                          <div className="mt-1">
+                            <p className="text-gray-700 text-xs">MST Path:</p>
+                            <p className="text-blue-700 font-mono text-xs">
+                              {step.mst.map((edge, idx) => 
+                                `${edge.from}-${edge.to}(${edge.weight})`
+                              ).join(' → ')}
+                            </p>
+                          </div>
+                        </>
                       )}
                       {step.visited && step.visited.length > 0 && (
                         <p className="text-blue-400">
@@ -859,7 +1186,7 @@ const KruskalVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, on
   );
 };
 
-// Helper function to render static graph for step list
+// Helper function to render static graph for step list - SAME AS DIJKSTRA
 const renderStaticGraph = (step) => {
   if (!step.graph) return null;
   
@@ -867,7 +1194,7 @@ const renderStaticGraph = (step) => {
   if (nodes.length === 0) return null;
   
   // We'll arrange nodes in a circular pattern for visualization
-  const radius = 100;
+  const radius = 120;
   const centerX = 200;
   const centerY = 150;
   
@@ -883,41 +1210,26 @@ const renderStaticGraph = (step) => {
   
   return (
     <g>
-      {/* Draw MST edges first (in green) */}
-      {step.mst && step.mst.map((edge, index) => {
-        if (!edge || !edge.from || !edge.to) return null;
-        const pos1 = nodePositions[edge.from];
-        const pos2 = nodePositions[edge.to];
-        
-        if (!pos1 || !pos2) return null;
-        
-        // Calculate midpoint for weight label
-        const midX = (pos1.x + pos2.x) / 2;
-        const midY = (pos1.y + pos2.y) / 2;
-        
-        return (
-          <g key={`mst-${index}`}>
-            <line
-              x1={pos1.x}
-              y1={pos1.y}
-              x2={pos2.x}
-              y2={pos2.y}
-              stroke="#10B981"
-              strokeWidth="3"
-            />
-            <text
-              x={midX}
-              y={midY - 5}
-              textAnchor="middle"
-              className="font-bold text-green-600 text-xs"
-            >
-              {edge.weight}
-            </text>
-          </g>
-        );
-      })}
+      {/* Define blue theme gradients - SAME AS DIJKSTRA */}
+      <defs>
+        <radialGradient id="staticCurrentGradient" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#FEF3C7" />
+          <stop offset="50%" stopColor="#FDE68A" />
+          <stop offset="100%" stopColor="#FCD34D" />
+        </radialGradient>
+        <radialGradient id="staticVisitedGradient" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#3B82F6" />
+          <stop offset="100%" stopColor="#1E40AF" />
+        </radialGradient>
+        <filter id="staticBlueGlow">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#93C5FD" floodOpacity="0.3"/>
+        </filter>
+        <filter id="staticYellowGlow">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#FEF3C7" floodOpacity="0.3"/>
+        </filter>
+      </defs>
       
-      {/* Draw all edges (non-MST edges in light blue) */}
+      {/* Draw edges with high contrast styling - SAME AS DIJKSTRA */}
       {nodes.map((fromNode) => {
         const neighbors = step.graph[fromNode] || [];
         return neighbors.map((neighborObj) => {
@@ -927,30 +1239,36 @@ const renderStaticGraph = (step) => {
           // Avoid duplicate edges
           if (fromNode > toNode) return null;
           
-          // Check if this edge is in MST
-          const isInMST = step.mst && step.mst.some(edge => 
+          const pos1 = nodePositions[fromNode];
+          const pos2 = nodePositions[toNode];
+          
+          // Calculate midpoint for weight label
+          const midX = (pos1.x + pos2.x) / 2;
+          const midY = (pos1.y + pos2.y) / 2;
+          
+          // Determine high contrast edge style - SAME AS DIJKSTRA
+          let strokeColor = "black"; // Black base for visibility
+          let strokeWidth = 3; // Thick base width
+          
+          // Check if this edge is part of the final MST (blue and thickest)
+          const isMSTEdge = step.mst && step.mst.some(edge => 
             edge && edge.from && edge.to &&
             ((edge.from === fromNode && edge.to === toNode) || 
              (edge.from === toNode && edge.to === fromNode))
           );
           
-          // Check if this is the current edge being considered
-          const currentEdge = step.currentEdge || step.addEdge || step.skipEdge;
-          const isCurrentEdge = currentEdge && currentEdge.from && currentEdge.to &&
-            ((currentEdge.from === fromNode && currentEdge.to === toNode) ||
-             (currentEdge.from === toNode && currentEdge.to === fromNode));
-          
-          // Skip if already drawn as MST edge
-          if (isInMST) return null;
-          
-          const pos1 = nodePositions[fromNode];
-          const pos2 = nodePositions[toNode];
-          
-          if (!pos1 || !pos2) return null;
-          
-          // Calculate midpoint for weight label
-          const midX = (pos1.x + pos2.x) / 2;
-          const midY = (pos1.y + pos2.y) / 2;
+          // BLUE AND THICKEST FOR MST EDGES
+          if (isMSTEdge) {
+            strokeColor = "#3B82F6"; // Rich blue
+            strokeWidth = 7; // Maximum thickness
+          }
+          // Dark blue for visited edges
+          else if (step.visited && 
+              step.visited.includes(fromNode) && 
+              step.visited.includes(toNode)) {
+            strokeColor = "#1E40AF"; // Dark blue
+            strokeWidth = 5; // Very bold emphasis
+          }
           
           return (
             <g key={`${fromNode}-${toNode}`}>
@@ -959,14 +1277,18 @@ const renderStaticGraph = (step) => {
                 y1={pos1.y}
                 x2={pos2.x}
                 y2={pos2.y}
-                stroke={isCurrentEdge ? "#3B82F6" : "#93C5FD"} // Blue for current edge, light blue for others
-                strokeWidth={isCurrentEdge ? "3" : "2"} // Thicker for current edge
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
               />
               <text
                 x={midX}
                 y={midY - 5}
                 textAnchor="middle"
-                className={`font-bold ${isCurrentEdge ? 'text-blue-600' : 'text-gray-600'} text-xs`}
+                fontSize="12"
+                fontWeight="700"
+                fontFamily="'Segoe UI', system-ui, sans-serif"
+                fill="#6B7280"
               >
                 {weight}
               </text>
@@ -975,34 +1297,92 @@ const renderStaticGraph = (step) => {
         });
       })}
       
-      {/* Draw nodes */}
+      {/* Draw nodes with enhanced styling - SAME AS DIJKSTRA */}
       {nodes.map((node) => {
         const pos = nodePositions[node];
         const isCurrent = step.currentNode === node;
         const isVisited = step.visited && step.visited.includes(node);
+        const isUnvisited = step.unvisited && step.unvisited.includes(node);
         
-        let fillColor = "#93C5FD"; // Light blue default
+        // Determine node style - HIGH CONTRAST DESIGN - SAME AS DIJKSTRA
+        let fillColor = "white";
+        let strokeColor = "black"; // Black border for maximum contrast
+        let textColor = "black"; // Black text for light backgrounds
+        let strokeWidth = 3; // Thick border for visibility
+        let nodeRadius = 20;
+        
         if (isCurrent) {
-          fillColor = "#1E40AF"; // Dark blue for current node
+          fillColor = "url(#staticCurrentGradient)";
+          strokeColor = "black"; // Black border
+          strokeWidth = 4; // Extra thick border
+          nodeRadius = 24;
+          textColor = "black"; // Black text on light yellow
         } else if (isVisited) {
-          fillColor = "#3B82F6"; // Medium blue for visited
+          fillColor = "url(#staticVisitedGradient)";
+          strokeColor = "black"; // Black border
+          strokeWidth = 3; // Thick border
+          textColor = "white"; // White text on dark blue
+        } else if (isUnvisited) {
+          fillColor = "#F9FAFB"; // Very light gray
+          strokeColor = "black"; // Black border
+          strokeWidth = 3; // Thick border
+          textColor = "black"; // Black text
         }
         
         return (
           <g key={node}>
+            {/* Blue/Yellow theme glow effects - SAME AS DIJKSTRA */}
+            {isCurrent && (
+              <>
+                <circle
+                  cx={pos.x}
+                  cy={pos.y + 2}
+                  r={nodeRadius}
+                  fill="black"
+                  opacity="0.1"
+                  filter="url(#staticBlueGlow)"
+                />
+                <circle
+                  cx={pos.x}
+                  cy={pos.y}
+                  r={nodeRadius + 2}
+                  fill="#FEF3C7"
+                  opacity="0.2"
+                  filter="url(#staticYellowGlow)"
+                />
+              </>
+            )}
+            {isVisited && (
+              <circle
+                cx={pos.x}
+                cy={pos.y}
+                r={nodeRadius - 2}
+                fill="white"
+                opacity="0.2"
+                filter="url(#staticBlueGlow)"
+              />
+            )}
+            
+            {/* Node circle - SAME AS DIJKSTRA */}
             <circle
               cx={pos.x}
               cy={pos.y}
-              r="15"
+              r={nodeRadius}
               fill={fillColor}
-              stroke="#1E40AF"
-              strokeWidth="2"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              style={{ animation: "none" }}
             />
+            
+            {/* Node label - SAME AS DIJKSTRA */}
             <text
               x={pos.x}
-              y={pos.y + 5}
+              y={pos.y + 6}
               textAnchor="middle"
-              className="font-bold text-white text-sm"
+              fontSize="14"
+              fontWeight="700"
+              fontFamily="'Segoe UI', system-ui, sans-serif"
+              fill={textColor}
             >
               {node}
             </text>

@@ -1,5 +1,114 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-hot-toast';
+import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { vs } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import javascript from 'react-syntax-highlighter/dist/esm/languages/hljs/javascript';
+
+// Define VS Code-like theme
+const vsCodeTheme = {
+  ...vs,
+  hljs: {
+    display: 'block',
+    overflowX: 'auto',
+    padding: '0.5em',
+    background: '#ffffff',
+    color: '#393a34',
+    fontSize: '0.875rem',
+    fontFamily: "'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace"
+  },
+  'hljs-comment': {
+    color: '#008000',
+    fontStyle: 'italic'
+  },
+  'hljs-quote': {
+    color: '#a0ada0',
+    fontStyle: 'italic'
+  },
+  'hljs-keyword': {
+    color: '#0000ff'
+  },
+  'hljs-selector-tag': {
+    color: '#0000ff'
+  },
+  'hljs-meta': {
+    color: '#0000ff'
+  },
+  'hljs-section': {
+    color: '#0000ff'
+  },
+  'hljs-name': {
+    color: '#0000ff'
+  },
+  'hljs-variable': {
+    color: '#ff0000'
+  },
+  'hljs-template-variable': {
+    color: '#ff0000'
+  },
+  'hljs-string': {
+    color: '#a31515'
+  },
+  'hljs-number': {
+    color: '#098658'
+  },
+  'hljs-regexp': {
+    color: '#811f3f'
+  },
+  'hljs-literal': {
+    color: '#098658'
+  },
+  'hljs-type': {
+    color: '#008080'
+  },
+  'hljs-params': {
+    color: '#000000'
+  },
+  'hljs-title': {
+    color: '#795da3'
+  },
+  'hljs-built_in': {
+    color: '#a71d5d'
+  },
+  'hljs-bullet': {
+    color: '#990073'
+  },
+  'hljs-code': {
+    color: '#a71d5d'
+  },
+  'hljs-emphasis': {
+    fontStyle: 'italic'
+  },
+  'hljs-strong': {
+    fontWeight: 'bold'
+  },
+  'hljs-formula': {
+    color: '#990073'
+  },
+  'hljs-link': {
+    textDecoration: 'underline',
+    color: '#0000ff'
+  },
+  'hljs-symbol': {
+    color: '#0086b3'
+  },
+  'hljs-selector-id': {
+    color: '#000080'
+  },
+  'hljs-selector-class': {
+    color: '#800080'
+  },
+  'hljs-addition': {
+    color: '#55a532',
+    backgroundColor: '#eaffea'
+  },
+  'hljs-deletion': {
+    color: '#bd2c00',
+    backgroundColor: '#ffecec'
+  }
+};
+
+SyntaxHighlighter.registerLanguage('javascript', javascript);
 import AlgorithmSelector from '../components/AlgorithmSelector';
 import InputPanel from '../components/InputPanel';
 import SequentialSortingVisualizer from '../components/Visualizer_comp/SequentialSortingVisualizer';
@@ -1020,30 +1129,36 @@ const Visualizer = () => {
   const currentLineToHighlight = getCurrentLineToHighlight();
 
   return (
-    <div className="flex flex-col h-screen bg-white">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <div className="flex-grow flex flex-col">
-        <div className="text-center py-4 bg-[#001F3F] border-b border-black">
-          <h1 className="text-3xl font-bold text-white mb-1">0Point Visualizer</h1>
-          <p className="text-white text-base">Watch algorithms come to life with interactive visualizations</p>
+        <div className="text-center py-6 bg-gradient-to-r from-[#001F3F] to-blue-900 border-b border-blue-800 shadow-lg">
+          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">0Point Visualizer</h1>
+          <p className="text-blue-100 text-lg font-medium max-w-2xl mx-auto px-4">Interactive Data Structures & Algorithms Visualization Platform</p>
           
           {/* Navbar for Visualizer Sections */}
-          <div className="flex justify-center mt-4">
-            <div className="flex space-x-1 bg-black p-1 rounded-lg">
+          <div className="flex justify-center mt-6">
+            <div className="flex space-x-2 bg-blue-900/30 backdrop-blur-sm p-1 rounded-xl border border-blue-700/50">
               <button
                 onClick={() => setActiveTab('dsa')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300 ${activeTab === 'dsa' ? 'bg-white text-[#001F3F] shadow' : 'text-gray-300 hover:text-white'}`}
+                className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 ${activeTab === 'dsa' 
+                  ? 'bg-white text-[#001F3F] shadow-lg shadow-blue-500/25 scale-105' 
+                  : 'text-blue-200 hover:text-white hover:bg-blue-800/30'}`}
               >
                 DSA Visualizer
               </button>
               <button
                 onClick={() => setActiveTab('io')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300 ${activeTab === 'io' ? 'bg-white text-[#001F3F] shadow' : 'text-gray-300 hover:text-white'}`}
+                className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 ${activeTab === 'io' 
+                  ? 'bg-white text-[#001F3F] shadow-lg shadow-blue-500/25 scale-105' 
+                  : 'text-blue-200 hover:text-white hover:bg-blue-800/30'}`}
               >
                 I/O Visualizer
               </button>
               <button
                 onClick={() => setActiveTab('code')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-300 ${activeTab === 'code' ? 'bg-white text-[#001F3F] shadow' : 'text-gray-300 hover:text-white'}`}
+                className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 ${activeTab === 'code' 
+                  ? 'bg-white text-[#001F3F] shadow-lg shadow-blue-500/25 scale-105' 
+                  : 'text-blue-200 hover:text-white hover:bg-blue-800/30'}`}
               >
                 Code Visualizer
               </button>
@@ -1051,15 +1166,23 @@ const Visualizer = () => {
           </div>
         </div>
         
-        <div className={`flex-grow ${activeTab === 'code' ? 'grid grid-cols-1' : 'grid grid-cols-1 lg:grid-cols-2'} gap-0`} style={{ height: 'calc(100vh - 160px)' }}>
+        <div className={`flex-grow ${activeTab === 'code' ? 'grid grid-cols-1' : 'grid grid-cols-1 lg:grid-cols-2'} gap-0`} style={{ height: 'calc(100vh - 180px)' }}>
           {/* Left Column - Input and Code for DSA and IO tabs only */}
           {(activeTab === 'dsa' || activeTab === 'io') && (
-            <div className="bg-white border-r border-black flex flex-col h-full">
+            <div className="bg-white border-r border-blue-200 flex flex-col h-full shadow-sm">
               {activeTab === 'dsa' && (
                 <div className="p-6 overflow-y-auto flex-grow h-full">
-                  <h2 className="text-xl text-[#001F3F] mb-3">Algorithm & Input</h2>
-                  
                   <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-[#001F3F] mb-2">
+                      Algorithm Selection
+                    </h2>
+                    <p className="text-gray-600 text-sm">Choose and configure your algorithm for visualization</p>
+                  </div>
+                  
+                  <div className="mb-6 bg-gradient-to-br from-white to-blue-50 rounded-xl border border-blue-100 p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <h3 className="font-semibold text-gray-800">Select Algorithm</h3>
+                    </div>
                     <AlgorithmSelector
                       selectedAlgorithm={selectedAlgorithm}
                       onAlgorithmChange={handleAlgorithmChange}
@@ -1067,7 +1190,10 @@ const Visualizer = () => {
                   </div>
                   
                   {selectedAlgorithm && (
-                    <div className="mb-6">
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+
+                      </div>
                       <InputPanel
                         algorithm={algorithms.find(alg => alg.id === selectedAlgorithm)}
                         inputValues={inputValues}
@@ -1080,20 +1206,53 @@ const Visualizer = () => {
                     </div>
                   )}
                   
-                  {/* Code Display */}
+                  {/* Code Display with Syntax Highlighting */}
                   {selectedAlgorithm && (
-                    <div className="mt-6 flex-grow flex flex-col">
-                      <h3 className="text-lg text-[#001F3F] mb-2">Algorithm Code</h3>
-                      <div className="bg-black text-white p-4 rounded-lg overflow-x-auto font-mono text-sm flex-grow">
-                        {algorithmCodes[selectedAlgorithm]?.split('\n').map((line, index) => (
-                          <div 
-                            key={index} 
-                            className={index === currentLineToHighlight ? 'bg-[#001F3F] p-1 rounded code-line-highlight animate-uniqueCodeHighlight' : ''}
-                          >
-                            <span className="text-gray-500 mr-4 select-none">{index + 1}</span>
-                            {line}
-                          </div>
-                        ))}
+                    <div className="mt-6 flex-grow flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                      <div className="bg-gradient-to-r from-blue-800 to-blue-900 px-4 py-3 flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-white">
+                          Algorithm Implementation
+                        </h3>
+                        <div className="flex items-center gap-2 text-blue-200 text-sm">
+                          <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                          <span>Live Code Preview</span>
+                        </div>
+                      </div>
+                      <div className="bg-white p-4 overflow-x-auto flex-grow">
+                        <SyntaxHighlighter
+                          language="javascript"
+                          style={vsCodeTheme}
+                          customStyle={{
+                            backgroundColor: '#ffffff',
+                            margin: 0,
+                            padding: 0,
+                            fontSize: '0.875rem',
+                            lineHeight: '1.6',
+                            fontFamily: "'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace"
+                          }}
+                          lineNumberStyle={{
+                            color: '#2b91af',
+                            minWidth: '2rem',
+                            paddingRight: '1rem',
+                            textAlign: 'right',
+                            userSelect: 'none',
+                            backgroundColor: '#f6f8fa',
+                            borderRight: '1px solid #eaecef'
+                          }}
+                          showLineNumbers={true}
+                          startingLineNumber={1}
+                          wrapLines={true}
+                          lineProps={(lineNumber) => {
+                            let style = { paddingLeft: '1rem' };
+                            if (lineNumber === currentLineToHighlight + 1) {
+                              style.backgroundColor = '#e5f3ff';
+                              style.borderLeft = '3px solid #007acc';
+                            }
+                            return { style };
+                          }}
+                        >
+                          {algorithmCodes[selectedAlgorithm] || '// No code available'}
+                        </SyntaxHighlighter>
                       </div>
                     </div>
                   )}
@@ -1246,42 +1405,92 @@ const Visualizer = () => {
           )}
           
           {/* Right Column - Visualization or Full-width for Code Visualizer */}
-          <div className="bg-white flex flex-col h-full">
+          <div className="bg-gradient-to-br from-white to-blue-50 flex flex-col h-full shadow-sm">
             <div className="p-6 overflow-y-auto flex-grow h-full">
               {activeTab === 'dsa' && (
                 <>
-                  <h2 className="text-xl text-[#001F3F] mb-3">Visualization</h2>
-                  {renderVisualization()}
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-[#001F3F] mb-2 flex items-center gap-2">
+                      
+                      Live Visualization
+                    </h2>
+                    <p className="text-gray-600 text-sm">Interactive step-by-step algorithm visualization</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-blue-200 shadow-sm p-4 mb-6">
+                    {renderVisualization()}
+                  </div>
                   
                   {!selectedAlgorithm && (
-                    <div className="border border-black p-6 mt-6 bg-white">
+                    <div className="border border-blue-200 p-8 mt-6 bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-lg">
                       <div className="flex flex-col md:flex-row items-center">
-                        <div className="mb-4 md:mb-0 md:mr-6">
-                          <div className="w-16 h-20 bg-white border border-black flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="mb-6 md:mb-0 md:mr-8">
+                          <div className="w-20 h-24 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform duration-300">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                           </div>
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-lg text-black mb-2">How to Use This Visualizer</h3>
-                          <div className="grid grid-cols-1 gap-4 text-black">
-                            <p><span>1. Select an algorithm</span> from the dropdown menu</p>
-                            <p><span>2. Enter the required inputs</span> as comma-separated values</p>
-                            <p><span>3. Click "Start Visualization"</span> to see the algorithm in action</p>
-                            <p><span>4. Observe</span> how the algorithm works step by step</p>
+                          <h3 className="text-xl font-bold text-[#001F3F] mb-4 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Getting Started Guide
+                          </h3>
+                          <div className="grid grid-cols-1 gap-4 text-gray-700">
+                            <div className="flex items-start gap-3">
+                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-white text-xs font-bold">1</span>
+                              </div>
+                              <p><span className="font-semibold">Select an algorithm</span> from the dropdown menu to begin your visualization journey</p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-white text-xs font-bold">2</span>
+                              </div>
+                              <p><span className="font-semibold">Enter required inputs</span> using comma-separated values or use our examples</p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-white text-xs font-bold">3</span>
+                              </div>
+                              <p><span className="font-semibold">Click "Start Visualization"</span> to see the algorithm come to life with interactive animations</p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-white text-xs font-bold">4</span>
+                              </div>
+                              <p><span className="font-semibold">Observe and learn</span> as each step unfolds with detailed explanations</p>
+                            </div>
                           </div>
                         </div>
                       </div>
                       
                       {/* Tips for new users */}
-                      <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg">
-                        <h3 className="text-black mb-1">Quick Tips</h3>
-                        <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
-                          <li>Try the "Example" buttons to quickly load sample data</li>
-                          <li>Sorting algorithms work best with 5-10 numbers</li>
-                          <li>Pause animations anytime to examine steps closely</li>
-                          <li>Use the navigation buttons to move between steps</li>
+                      <div className="mt-8 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                        <h3 className="text-[#001F3F] font-semibold mb-3 flex items-center gap-2">
+                          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                          </svg>
+                          Pro Tips for Better Experience
+                        </h3>
+                        <ul className="text-sm text-gray-700 space-y-2">
+                          <li className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>Try the <span className="font-semibold">"Example"</span> buttons to quickly load sample data and see algorithms in action</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>Sorting algorithms work best with <span className="font-semibold">5-10 numbers</span> for optimal visualization</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span><span className="font-semibold">Pause animations anytime</span> to examine steps closely and understand the process</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>Use the <span className="font-semibold">navigation buttons</span> to move between steps at your own pace</span>
+                          </li>
                         </ul>
                       </div>
                     </div>

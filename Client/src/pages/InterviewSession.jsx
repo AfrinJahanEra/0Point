@@ -281,8 +281,20 @@ const InterviewSession = () => {
         setLocalAudioActive(true);
         setLocalVideoActive(true);
 
+        // Ensure video element gets the stream with proper handling
         if (localVideoRef.current) {
-          localVideoRef.current.srcObject = s;
+          // Use a temporary variable to avoid race conditions
+          const videoElement = localVideoRef.current;
+          videoElement.srcObject = s;
+          
+          // Handle play promise to avoid uncaught exceptions
+          if (videoElement.paused) {
+            videoElement.play().catch(e => {
+              console.warn('Auto-play prevented:', e);
+              // On mobile devices, video might not autoplay until user interaction
+              // This is expected behavior
+            });
+          }
         }
 
         const peerConnection = new RTCPeerConnection({
@@ -393,7 +405,17 @@ const InterviewSession = () => {
 
         peerConnection.ontrack = (e) => {
           if (remoteVideoRef.current && e.streams && e.streams[0]) {
-            remoteVideoRef.current.srcObject = e.streams[0];
+            const remoteStream = e.streams[0];
+            remoteVideoRef.current.srcObject = remoteStream;
+            
+            // Handle play promise to avoid uncaught exceptions
+            if (remoteVideoRef.current.paused) {
+              remoteVideoRef.current.play().catch(e => {
+                console.warn('Auto-play prevented for remote video:', e);
+                // On mobile devices, video might not autoplay until user interaction
+                // This is expected behavior
+              });
+            }
           }
         };
 
@@ -429,8 +451,13 @@ const InterviewSession = () => {
         streamRef.current = null;
       }
 
-      if (localVideoRef.current) localVideoRef.current.srcObject = null;
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+      // Properly clean up video elements
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = null;
+      }
     };
   }, [sessionId, role, email, checkPermissions, fetchLatestPDF, initCodeSync]);
 
@@ -444,20 +471,10 @@ const InterviewSession = () => {
 
     const track = videoTracks[0];
 
-    if (track.readyState === 'live') {
+    if (track.enabled) {
       // 👉 Turn OFF
-      track.stop();
+      track.enabled = false;  // Disable the track instead of stopping it
       setLocalVideoActive(false);
-
-      // ✅ Clear video element
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = null;
-      }
-
-      if (pc.current) {
-        const sender = pc.current.getSenders().find(s => s.track === track);
-        if (sender) sender.replaceTrack(null);
-      }
 
       // ✅ Send update
       if (ws.current?.readyState === WebSocket.OPEN) {
@@ -469,41 +486,38 @@ const InterviewSession = () => {
       }
     } else {
       // 👉 Turn ON
-      try {
-        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const newTrack = newStream.getVideoTracks()[0];
+      track.enabled = true;  // Enable the track instead of creating a new stream
+      setLocalVideoActive(true);
 
-        // ✅ Assign to video element
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = newStream;
+      // Ensure the video element has the correct stream
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = s;
+        
+        // Handle play promise to avoid uncaught exceptions
+        if (localVideoRef.current.paused) {
+          localVideoRef.current.play().catch(e => {
+            console.warn('Auto-play prevented for local video after toggle:', e);
+          });
         }
+      }
 
-        // ✅ Add to WebRTC
-        if (pc.current) {
-          const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
-          if (sender) {
-            sender.replaceTrack(newTrack);
-          } else {
-            pc.current.addTrack(newTrack, newStream);
-          }
+      // ✅ Add to WebRTC if not already added
+      if (pc.current) {
+        const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(track);
+        } else {
+          pc.current.addTrack(track, s);
         }
+      }
 
-        // ✅ Update state
-        setLocalVideoActive(true);
-        streamRef.current = newStream;
-
-        // ✅ Send update
-        if (ws.current?.readyState === WebSocket.OPEN) {
-          ws.current.send(JSON.stringify({
-            type: 'media_update',
-            media_type: 'video',
-            enabled: true
-          }));
-        }
-
-      } catch (err) {
-        console.error('Failed to re-enable camera:', err);
-        alert('Could not re-enable camera. Check permissions.');
+      // ✅ Send update
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({
+          type: 'media_update',
+          media_type: 'video',
+          enabled: true
+        }));
       }
     }
   };
@@ -519,9 +533,19 @@ const InterviewSession = () => {
     const track = audioTracks[0];
     const newState = !track.enabled;
 
+    // Toggle the track enabled state
     track.enabled = newState;
     setLocalAudioActive(newState);
 
+    // Update WebRTC audio sender
+    if (pc.current) {
+      const sender = pc.current.getSenders().find(s => s.track?.kind === 'audio');
+      if (sender) {
+        sender.track.enabled = newState;
+      }
+    }
+
+    // Send update to remote peer
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({
         type: 'media_update',
@@ -567,6 +591,54 @@ const InterviewSession = () => {
       }
     }
   };
+
+  // Effect to ensure local video stream is always assigned to the video element
+  useEffect(() => {
+    if (localVideoRef.current && streamRef.current) {
+      const videoElement = localVideoRef.current;
+      videoElement.srcObject = streamRef.current;
+      
+      // Handle play promise to avoid uncaught exceptions
+      if (videoElement.srcObject && videoElement.paused) {
+        videoElement.play().catch(e => {
+          console.warn('Auto-play prevented for local video:', e);
+        });
+      }
+    }
+  }, [localVideoActive, streamRef.current]);
+
+  // Effect to handle remote video when stream changes
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteVideoEnabled) {
+      // The actual remote stream will be assigned in the ontrack event
+      // This effect is mainly for handling play state
+      const videoElement = remoteVideoRef.current;
+      if (videoElement.paused && videoElement.srcObject) {
+        videoElement.play().catch(e => {
+          console.warn('Auto-play prevented for remote video:', e);
+        });
+      }
+    }
+  }, [remoteVideoEnabled]);
+
+  // Effect to ensure audio track is properly handled
+  useEffect(() => {
+    if (streamRef.current) {
+      const audioTracks = streamRef.current.getAudioTracks();
+      if (audioTracks.length > 0) {
+        const audioTrack = audioTracks[0];
+        audioTrack.enabled = localAudioActive;
+        
+        // Update WebRTC audio sender if it exists
+        if (pc.current) {
+          const sender = pc.current.getSenders().find(s => s.track?.kind === 'audio');
+          if (sender && sender.track) {
+            sender.track.enabled = localAudioActive;
+          }
+        }
+      }
+    }
+  }, [localAudioActive]);
 
   // 📄 Render PDF viewer
   const renderPDFViewer = () => {
@@ -882,7 +954,7 @@ const InterviewSession = () => {
               {getMediaIcon(localVideoActive, 'video')}
               {myRoleLabel} (You)
             </div>
-            {localVideoActive ? (
+            <div style={{ position: 'relative', width: '100%', height: '220px' }}>
               <video
                 ref={localVideoRef}
                 autoPlay
@@ -894,27 +966,32 @@ const InterviewSession = () => {
                     height: '220px',
                     objectFit: 'cover',
                     background: '#0f172a',
-                    display: 'block'
+                    display: localVideoActive ? 'block' : 'none',
+                    opacity: localVideoActive ? 1 : 0
                   }
                 }
               />
-            ) : (
-              <div style={{
-                width: '100%',
-                height: '220px',
-                background: '#0f172a',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '1.2em',
-                fontWeight: '600'
-              }}>
-                <div style={{ fontSize: '2em', marginBottom: '10px' }}><FaVideoSlash /></div>
-                <div>Camera Off</div>
-              </div>
-            )}
+              {!localVideoActive && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '220px',
+                  background: '#0f172a',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '1.2em',
+                  fontWeight: '600'
+                }}>
+                  <div style={{ fontSize: '2em', marginBottom: '10px' }}><FaVideoSlash /></div>
+                  <div>Camera Off</div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Remote Video */}
@@ -940,39 +1017,44 @@ const InterviewSession = () => {
               {getMediaIcon(remoteVideoEnabled, 'video')}
               {remoteRoleLabel}
             </div>
-            {remoteVideoEnabled ? (
+            <div style={{ position: 'relative', width: '100%', height: '220px' }}>
               <video
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
                 muted
-                style={{
+                style={
+                  {
+                    width: '100%',
+                    height: '220px',
+                    objectFit: 'cover',
+                    background: '#0f172a',
+                    display: remoteVideoEnabled ? 'block' : 'none',
+                    opacity: remoteVideoEnabled ? 1 : 0
+                  }
+                }
+              />
+              {!remoteVideoEnabled && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
                   width: '100%',
                   height: '220px',
-                  objectFit: 'cover',
                   background: '#0f172a',
-                  display: 'block',
-                  opacity: remoteVideoEnabled ? 1 : 0.5,
-                  filter: remoteVideoEnabled ? 'none' : 'grayscale(100%)'
-                }}
-              />
-            ) : (
-              <div style={{
-                width: '100%',
-                height: '220px',
-                background: '#0f172a',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '1.2em',
-                fontWeight: '600'
-              }}>
-                <div style={{ fontSize: '2em', marginBottom: '10px' }}><FaVideoSlash /></div>
-                <div>Remote Camera Off</div>
-              </div>
-            )}
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '1.2em',
+                  fontWeight: '600'
+                }}>
+                  <div style={{ fontSize: '2em', marginBottom: '10px' }}><FaVideoSlash /></div>
+                  <div>Remote Camera Off</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

@@ -4,14 +4,14 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
   // Use external props if provided, otherwise use internal state
   const [internalInputType, setInternalInputType] = useState('array');
   const [internalInputValue, setInternalInputValue] = useState('');
-  const [visualizationMode, setVisualizationMode] = useState('default');
+
   const [animationSpeed, setAnimationSpeed] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
   const [nodeDetails, setNodeDetails] = useState(null);
   const [stackData, setStackData] = useState([]);
   const [queueData, setQueueData] = useState([]);
-  const [isFullScreen, setIsFullScreen] = useState(false);
+
   
   // Ref to track programmatic input updates
   const isProgrammaticUpdate = useRef(false);
@@ -440,17 +440,115 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
       // JSON format
       if (str.startsWith('{') && str.endsWith('}')) {
         try {
-          return JSON.parse(str);
+          const parsed = JSON.parse(str);
+          // Ensure we have the required structure
+          return {
+            nodes: parsed.nodes || [],
+            edges: parsed.edges || [],
+            weights: parsed.weights || {},
+            adjacency: parsed.adjacency || {}
+          };
         } catch (e) {
           // Not valid JSON, continue
         }
       }
       
-      return parseTree(str); // Reuse tree parser for now
+      // Parse different graph formats
+      const nodes = new Map();
+      const edges = [];
+      const weights = {};
+      let nodeId = 0;
+      
+      // Split by commas to get individual graph elements
+      const elements = str.split(',').map(e => e.trim()).filter(e => e);
+      
+      elements.forEach(element => {
+        // Check for directed edge format: A->B[:weight]
+        if (element.includes('->')) {
+          const [from, rest] = element.split('->');
+          let to = rest;
+          let weight = 1;
+          
+          if (rest.includes(':')) {
+            const [toPart, weightPart] = rest.split(':');
+            to = toPart;
+            weight = parseFloat(weightPart) || 1;
+          }
+          
+          const fromNode = from.trim();
+          const toNode = to.trim();
+          
+          if (!nodes.has(fromNode)) {
+            nodes.set(fromNode, { id: nodeId++, label: fromNode });
+          }
+          if (!nodes.has(toNode)) {
+            nodes.set(toNode, { id: nodeId++, label: toNode });
+          }
+          
+          edges.push({ from: fromNode, to: toNode, directed: true });
+          weights[`${fromNode}-${toNode}`] = weight;
+        } 
+        // Check for undirected edge format: A-B[:weight]
+        else if (element.includes('-') && !element.includes('->')) {
+          const [node1, rest] = element.split('-');
+          let node2 = rest;
+          let weight = 1;
+          
+          if (rest.includes(':')) {
+            const [node2Part, weightPart] = rest.split(':');
+            node2 = node2Part;
+            weight = parseFloat(weightPart) || 1;
+          }
+          
+          const node1Trim = node1.trim();
+          const node2Trim = node2.trim();
+          
+          if (!nodes.has(node1Trim)) {
+            nodes.set(node1Trim, { id: nodeId++, label: node1Trim });
+          }
+          if (!nodes.has(node2Trim)) {
+            nodes.set(node2Trim, { id: nodeId++, label: node2Trim });
+          }
+          
+          edges.push({ from: node1Trim, to: node2Trim, directed: false });
+          weights[`${node1Trim}-${node2Trim}`] = weight;
+        } 
+        // Single node
+        else {
+          const node = element.trim();
+          if (!nodes.has(node)) {
+            nodes.set(node, { id: nodeId++, label: node });
+          }
+        }
+      });
+      
+      return {
+        nodes: Array.from(nodes.values()),
+        edges,
+        weights,
+        adjacency: buildAdjacencyList(Array.from(nodes.values()), edges)
+      };
       
     } catch (err) {
       throw new Error(`Graph parsing error: ${err.message}`);
     }
+  };
+  
+  // Helper function to build adjacency list
+  const buildAdjacencyList = (nodes, edges) => {
+    const adj = {};
+    nodes.forEach(node => {
+      adj[node.label] = [];
+    });
+    
+    edges.forEach(edge => {
+      adj[edge.from].push(edge.to);
+      if (!edge.directed) {
+        adj[edge.to].push(edge.from);
+      }
+    });
+    
+    return adj;
   };
 
   // Calculate metadata for visualization
@@ -489,7 +587,6 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         break;
         
       case 'tree':
-      case 'graph':
         meta.nodeCount = data.nodes.length;
         meta.edgeCount = data.edges.length;
         meta.directedEdges = data.edges.filter(e => e.directed).length;
@@ -500,19 +597,54 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         meta.root = data.root;
         
         // Calculate degree for each node
-        const degrees = {};
+        const treeDegrees = {};
         data.nodes.forEach(node => {
-          degrees[node.label] = 0;
+          treeDegrees[node.label] = 0;
         });
         
         data.edges.forEach(edge => {
-          degrees[edge.from]++;
-          degrees[edge.to]++;
+          treeDegrees[edge.from]++;
+          treeDegrees[edge.to]++;
         });
         
-        meta.maxDegree = Math.max(...Object.values(degrees));
-        meta.minDegree = Math.min(...Object.values(degrees));
+        meta.maxDegree = Math.max(...Object.values(treeDegrees));
+        meta.minDegree = Math.min(...Object.values(treeDegrees));
         meta.summary = `${type.charAt(0).toUpperCase() + type.slice(1)} with ${meta.nodeCount} nodes and ${meta.edgeCount} edges`;
+        break;
+        
+      case 'graph':
+        meta.nodeCount = data.nodes.length;
+        meta.edgeCount = data.edges.length;
+        meta.directedEdges = data.edges.filter(e => e.directed).length;
+        meta.undirectedEdges = data.edges.filter(e => e.directed === false).length;
+        meta.selfLoops = data.edges.filter(e => e.from === e.to).length;
+        
+        // Calculate degree for each node in graph
+        const graphDegrees = {};
+        data.nodes.forEach(node => {
+          graphDegrees[node.label] = 0;
+        });
+        
+        data.edges.forEach(edge => {
+          // For undirected edges, increment both nodes
+          if (edge.directed === false) {
+            graphDegrees[edge.from]++;
+            graphDegrees[edge.to]++;
+          } else {
+            // For directed edges, count as outgoing for 'from' and incoming for 'to'
+            graphDegrees[edge.from]++;
+            if (edge.from !== edge.to) { // Avoid double counting for self-loops
+              graphDegrees[edge.to]++;
+            }
+          }
+        });
+        
+        meta.maxDegree = Math.max(...Object.values(graphDegrees));
+        meta.minDegree = Math.min(...Object.values(graphDegrees));
+        meta.avgDegree = meta.nodeCount > 0 ? (2 * meta.edgeCount) / meta.nodeCount : 0; // For undirected graphs
+        meta.density = meta.nodeCount > 1 ? (2 * meta.edgeCount) / (meta.nodeCount * (meta.nodeCount - 1)) : 0;
+        
+        meta.summary = `${type.charAt(0).toUpperCase() + type.slice(1)} with ${meta.nodeCount} nodes, ${meta.edgeCount} edges${meta.selfLoops > 0 ? `, ${meta.selfLoops} self-loops` : ''}`;
         break;
     }
     
@@ -1052,19 +1184,36 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
             
             const length = Math.sqrt(Math.pow(toNode.x - fromNode.x, 2) + Math.pow(toNode.y - fromNode.y, 2));
             
+            // Calculate midpoint for weight label
+            const midX = (fromNode.x + toNode.x) / 2;
+            const midY = (fromNode.y + toNode.y) / 2;
+            
             return (
-              <line
-                key={index}
-                x1={fromNode.x}
-                y1={fromNode.y}
-                x2={toNode.x}
-                y2={toNode.y}
-                stroke="#001F3F"
-                strokeWidth="2"
-                markerEnd={edge.directed ? "url(#arrowhead)" : undefined}
-                className={`transition-all duration-300 ${isAnimating ? 'animate-uniqueEdgeDraw' : ''}`}
-                style={{ strokeDasharray: length, strokeDashoffset: isAnimating ? length : 0 }}
-              />
+              <g key={index}>
+                <line
+                  x1={fromNode.x}
+                  y1={fromNode.y}
+                  x2={toNode.x}
+                  y2={toNode.y}
+                  stroke="#001F3F"
+                  strokeWidth="2"
+                  markerEnd={edge.directed ? "url(#arrowhead)" : undefined}
+                  className={`transition-all duration-300 ${isAnimating ? 'animate-uniqueEdgeDraw' : ''}`}
+                  style={{ strokeDasharray: length, strokeDashoffset: isAnimating ? length : 0 }}
+                />
+                {/* Render weight label */}
+                {parsedData.weights && (
+                  <text
+                    x={midX}
+                    y={midY - 10}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="font-bold text-sm fill-[#001F3F] select-none pointer-events-none"
+                  >
+                    {parsedData.weights[`${edge.from}-${edge.to}`] !== undefined ? parsedData.weights[`${edge.from}-${edge.to}`] : 1}
+                  </text>
+                )}
+              </g>
             );
           })}
           
@@ -1172,21 +1321,84 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
             
             if (!fromNode || !toNode) return null;
             
-            const length = Math.sqrt(Math.pow(toNode.x - fromNode.x, 2) + Math.pow(toNode.y - fromNode.y, 2));
+            // Handle self-loops differently
+            if (fromNode.label === toNode.label) {
+              // Create a curved self-loop
+              const centerX = fromNode.x;
+              const centerY = fromNode.y - 40; // Position loop above the node
+              const rx = 25; // Horizontal radius
+              const ry = 25; // Vertical radius
+              
+              return (
+                <g key={index}>
+                  <path
+                    d={`M ${fromNode.x - 28},${fromNode.y} A ${rx} ${ry} 0 1,1 ${fromNode.x + 28},${fromNode.y}`}
+                    fill="none"
+                    stroke="#001F3F"
+                    strokeWidth="2"
+                    markerEnd={edge.directed ? "url(#arrowhead)" : undefined}
+                    className={`transition-all duration-300 ${isAnimating ? 'animate-uniqueEdgeDraw' : ''}`}
+                  />
+                  {/* Render weight for self-loop */}
+                  {parsedData.weights && (
+                    <text
+                      x={centerX}
+                      y={centerY - 35}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      className="font-bold text-sm fill-[#001F3F] select-none pointer-events-none"
+                    >
+                      {parsedData.weights[`${edge.from}-${edge.to}`] !== undefined ? parsedData.weights[`${edge.from}-${edge.to}`] : 1}
+                    </text>
+                  )}
+                </g>
+              );
+            }
+            
+            const dx = toNode.x - fromNode.x;
+            const dy = toNode.y - fromNode.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            
+            // Normalize direction vector
+            const nx = dx / length;
+            const ny = dy / length;
+            
+            // Calculate start and end points at node boundaries (accounting for radius)
+            const startX = fromNode.x + nx * 28;
+            const startY = fromNode.y + ny * 28;
+            const endX = toNode.x - nx * 28;
+            const endY = toNode.y - ny * 28;
+            
+            // Calculate midpoint for weight label
+            const midX = (startX + endX) / 2;
+            const midY = (startY + endY) / 2;
             
             return (
-              <line
-                key={index}
-                x1={fromNode.x}
-                y1={fromNode.y}
-                x2={toNode.x}
-                y2={toNode.y}
-                stroke="#001F3F"
-                strokeWidth="2"
-                markerEnd={edge.directed ? "url(#arrowhead)" : undefined}
-                className={`transition-all duration-300 ${isAnimating ? 'animate-uniqueEdgeDraw' : ''}`}
-                style={{ strokeDasharray: length, strokeDashoffset: isAnimating ? length : 0 }}
-              />
+              <g key={index}>
+                <line
+                  x1={startX}
+                  y1={startY}
+                  x2={endX}
+                  y2={endY}
+                  stroke="#001F3F"
+                  strokeWidth="2"
+                  markerEnd={edge.directed ? "url(#arrowhead)" : undefined}
+                  className={`transition-all duration-300 ${isAnimating ? 'animate-uniqueEdgeDraw' : ''}`}
+                  style={{ strokeDasharray: length, strokeDashoffset: isAnimating ? Math.max(length, 0) : 0 }}
+                />
+                {/* Render weight label */}
+                {parsedData.weights && (
+                  <text
+                    x={midX}
+                    y={midY - 10}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="font-bold text-sm fill-[#001F3F] select-none pointer-events-none"
+                  >
+                    {parsedData.weights[`${edge.from}-${edge.to}`] !== undefined ? parsedData.weights[`${edge.from}-${edge.to}`] : 1}
+                  </text>
+                )}
+              </g>
             );
           })}
           
@@ -1272,35 +1484,11 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
 
     return (
       <div className="w-full">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-black">
-            {inputType.charAt(0).toUpperCase() + inputType.slice(1)} Visualization
-          </h3>
-          <div className="flex items-center space-x-2">
-            <select
-              value={visualizationMode}
-              onChange={(e) => setVisualizationMode(e.target.value)}
-              className="text-sm p-2 border border-black rounded-md bg-white text-black"
-            >
-              <option value="default">Default View</option>
-              <option value="compact">Compact</option>
-              <option value="detailed">Detailed</option>
-            </select>
-            <button
-              onClick={() => setIsAnimating(!isAnimating)}
-              className={`px-3 py-1 text-sm rounded-md ${isAnimating ? 'bg-[#001F3F] text-white' : 'bg-gray-200 text-black'}`}
-            >
-              {isAnimating ? 'Stop' : 'Animate'}
-            </button>
-            <button 
-              title="Full Screen"
-              onClick={() => setIsFullScreen(true)}
-              className="p-1 rounded-md bg-gray-200 text-black hover:bg-gray-300"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-              </svg>
-            </button>
+        <div className="mb-4">
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-black">
+              {inputType.charAt(0).toUpperCase() + inputType.slice(1)} Visualization
+            </h3>
           </div>
         </div>
         
@@ -1467,9 +1655,14 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
             </div>
             
             {/* Examples Section */}
-            <div className="bg-gray-50 p-5 rounded-xl border border-black">
-              <h3 className="text-lg font-semibold text-black mb-4">Quick Examples</h3>
-              <div className="grid grid-cols-1 gap-3">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-[#001F3F] shadow-lg">
+              <h3 className="text-xl font-bold text-[#001F3F] mb-5 flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Quick Examples
+              </h3>
+              <div className="grid grid-cols-1 gap-4">
                 <ExampleButton
                   title="Array Example"
                   description="Mixed data types array"
@@ -1523,7 +1716,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 <ExampleButton
                   title="Graph Example"
                   description="Directed weighted graph"
-                  data="A->B:5, B->C:3, C->A:2, D->E:1"
+                  data="A->B:5, B->C:3, C-A:2, D->E:1, F-F:4"
                   type="graph"
                   setInputType={setInputType}
                   setInputValue={setInputValue}
@@ -1559,21 +1752,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
           </div>
         </div>
       </div>
-      {isFullScreen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-lg w-11/12 h-5/6 overflow-auto">
-            <div className="flex justify-end mb-2">
-              <button 
-                onClick={() => setIsFullScreen(false)}
-                className="px-3 py-1 bg-[#001F3F] text-white rounded hover:bg-[#001F3F]/80"
-              >
-                Close
-              </button>
-            </div>
-            {renderVisualization()}
-          </div>
-        </div>
-      )}
+
       <style>{`
         @keyframes uniquePulse {
           0% { transform: scale(1); opacity: 1; }
@@ -1646,11 +1825,30 @@ const ExampleButton = ({ title, description, data, type, setInputType, setInputV
         setInputValue(data);
       }
     }}
-    className={`p-4 text-left rounded-lg border transition-all ${currentType === type ? 'border-[#001F3F] bg-gray-50' : 'border-black hover:border-[#001F3F] hover:bg-gray-50'}`}
+    className={`p-5 rounded-xl border-2 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col ${currentType === type 
+      ? 'border-[#001F3F] bg-gradient-to-r from-blue-100 to-indigo-100 ring-2 ring-blue-300' 
+      : 'border-gray-300 hover:border-[#001F3F] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50'}`}
   >
-    <div className="font-medium text-black">{title}</div>
-    <div className="text-sm text-gray-600 mt-1">{description}</div>
-    <div className="text-xs font-mono bg-gray-100 p-2 mt-2 rounded truncate text-black">{data}</div>
+    <div className="flex items-start">
+      <div className={`w-3 h-3 rounded-full mt-1.5 mr-3 ${currentType === type ? 'bg-[#001F3F]' : 'bg-gray-400'}`} />
+      <div className="flex-1">
+        <div className="font-bold text-[#001F3F] flex items-center">
+          {title}
+          <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${currentType === type 
+            ? 'bg-[#001F3F] text-white' 
+            : 'bg-gray-200 text-gray-700'}`}>
+            {type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')}
+          </span>
+        </div>
+        <div className="text-sm text-gray-600 mt-1.5">{description}</div>
+        <div className="mt-3">
+          <div className="text-xs font-semibold text-gray-500 mb-1">Example Input:</div>
+          <div className="text-sm font-mono bg-white p-3 rounded-lg border border-gray-200 break-all text-gray-800 shadow-sm">
+            {data}
+          </div>
+        </div>
+      </div>
+    </div>
   </button>
 );
 
@@ -1668,7 +1866,7 @@ const getPlaceholder = (type) => {
     case 'tree':
       return 'Nested format: A(B(C,D),E) or edge format: A->B, B->C, C-D';
     case 'graph':
-      return 'Edge format: A->B:5, B->C:3, C-D:2 (-> for directed, - for undirected)';
+      return 'Edge format: A->B:5, B->C:3, C-D:2 (-> for directed, - for undirected, : for weight)';
     default:
       return 'Enter data...';
   }

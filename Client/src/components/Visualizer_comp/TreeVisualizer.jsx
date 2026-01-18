@@ -433,45 +433,90 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
     // Node styling based on state
     let nodeStyle = {};
     if (isInTraversalPath) {
-      nodeStyle = { backgroundColor: '#BFDBFE', borderColor: '#3B82F6' };
+      nodeStyle = { 
+        backgroundColor: 'transparent',
+        backgroundImage: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), #3B82F6)',
+        borderColor: '#2563EB',
+        color: '#1E3A8A'
+      };
     } else if (isInsertedNode) {
-      nodeStyle = { backgroundColor: '#3B82F6', borderColor: '#2563EB', color: 'white' };
+      nodeStyle = { 
+        backgroundColor: 'transparent',
+        backgroundImage: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), #3B82F6)',
+        borderColor: '#1D4ED8',
+        color: 'white'
+      };
     } else if (isComparingNode) {
-      nodeStyle = { backgroundColor: '#D1D5DB', borderColor: '#374151' };
+      nodeStyle = { 
+        backgroundColor: 'transparent',
+        backgroundImage: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), #F59E0B)',
+        borderColor: '#D97706',
+        color: '#1F2937'
+      };
     } else if (isRotation && isRotationNode) {
       if (rotationPhase === 'breaking') {
-        nodeStyle = { backgroundColor: '#F59E0B', borderColor: '#D97706', color: 'white' };
+        nodeStyle = { 
+          backgroundColor: 'transparent',
+          backgroundImage: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), #F59E0B)',
+          borderColor: '#D97706',
+          color: 'white' 
+        };
       } else if (rotationPhase === 'rotating') {
-        nodeStyle = { backgroundColor: '#8B5CF6', borderColor: '#7C3AED', color: 'white' };
+        nodeStyle = { 
+          backgroundColor: 'transparent',
+          backgroundImage: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), #8B5CF6)',
+          borderColor: '#7C3AED',
+          color: 'white' 
+        };
       } else if (rotationPhase === 'attaching') {
-        nodeStyle = { backgroundColor: '#10B981', borderColor: '#059669', color: 'white' };
+        nodeStyle = { 
+          backgroundColor: 'transparent',
+          backgroundImage: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), #10B981)',
+          borderColor: '#059669',
+          color: 'white' 
+        };
       } else {
-        nodeStyle = { backgroundColor: '#6366F1', borderColor: '#4F46E5', color: 'white' };
+        nodeStyle = { 
+          backgroundColor: 'transparent',
+          backgroundImage: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), #6366F1)',
+          borderColor: '#4F46E5',
+          color: 'white' 
+        };
       }
     } else {
-      nodeStyle = { backgroundColor: 'white', borderColor: '#9CA3AF', color: 'black' };
+      nodeStyle = { 
+        backgroundColor: 'transparent',
+        backgroundImage: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), #E5E7EB)',
+        borderColor: '#4B5563',
+        color: '#4B5563' 
+      };
     }
 
     return (
       <React.Fragment key={nodeId}>
-        {/* Render connection line to parent */}
+        {/* Render connection line to parent with enhanced styling */}
         {parentX !== null && parentY !== null && (
           <line
             x1={actualX}
             y1={actualY}
             x2={parentX}
             y2={parentY}
-            stroke={isInTraversalPath ? "#3B82F6" : "#9CA3AF"}
-            strokeWidth="2"
-            className="floating-animation delay-3"
+            stroke={isInTraversalPath ? "url(#gradient-traversal)" : "url(#gradient-normal)"}
+            strokeWidth="3"
+            className="animated-line stroke-current"
+            strokeLinecap="round"
+            strokeDasharray={isInTraversalPath ? "0" : "5,5"}
+            style={{
+              animation: isInTraversalPath ? 'pulse 1.5s infinite' : 'none'
+            }}
           />
         )}
 
         {/* Render node as motion div with enhanced floating animation */}
         <motion.div
-          className={`node absolute w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm cursor-move select-none transition-all duration-200 ${
-            isBeingDragged ? 'shadow-2xl scale-110' : 'hover:scale-105 hover:shadow-lg'
-          } ${isRotationNode ? 'animate-pulse' : 'floating-animation glowing delay-1'}`}
+          className={`node absolute w-12 h-12 rounded-full flex items-center justify-center border-2 font-bold text-sm cursor-move select-none transition-all duration-700 ease-out floating-animation glowing delay-1 ${
+            isDragging ? 'shadow-xl scale-110 ring-4 ring-indigo-300' : 'hover:scale-125 hover:shadow-xl'
+          } ${isRotationNode ? 'animate-pulse' : ''}`}
           style={{
             left: actualX - 24,
             top: actualY - 24,
@@ -487,8 +532,10 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
               ...prev,
               [nodeId]: {
                 ...prev[nodeId],
-                startX: info.point.x - prev[nodeId].offsetX,
-                startY: info.point.y - prev[nodeId].offsetY
+                offsetX: info.point.x - (prev[nodeId]?.startX || actualX),
+                offsetY: info.point.y - (prev[nodeId]?.startY || actualY),
+                startX: info.point.x - (prev[nodeId]?.offsetX || 0),
+                startY: info.point.y - (prev[nodeId]?.offsetY || 0)
               }
             }));
           }}
@@ -497,7 +544,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             setCurrentlyDraggingNode(null);
           }}
         >
-          <span>{nodeData.value}</span>
+          <span className="drop-shadow-sm">{node.value}</span>
         </motion.div>
 
         {/* Render children */}
@@ -688,6 +735,26 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           }
         }
         
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 0.6;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
+        
+        @keyframes particle {
+          0% {
+            transform: translate(0, 0) scale(1);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(var(--tx), var(--ty)) scale(0);
+            opacity: 0;
+          }
+        }
+        
         .floating-animation {
           animation: float 3s ease-in-out infinite;
         }
@@ -698,6 +765,14 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
         
         .glowing {
           animation: glow 2s ease-in-out infinite;
+        }
+        
+        .animated-line {
+          animation: pulse 1.5s infinite alternate;
+        }
+        
+        .particle {
+          animation: particle 1s ease-out forwards;
         }
         
         /* Staggered animations */
@@ -778,13 +853,13 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
           {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
         </button>
         
-        <div className={`mb-6 bg-white p-3 border-2 border-gray-300 ${isFullscreen ? '!border-0 !p-0' : ''}`}>
-          <h4 className={`text-sm font-bold text-black mb-2 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
-            <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center text-xs mr-2">
+        <div className={`mb-6 bg-gradient-to-br from-slate-50 to-blue-50 p-4 border-2 border-indigo-200 rounded-lg shadow-md ${isFullscreen ? '!border-0 !p-0' : ''}`}>
+          <h4 className={`text-sm font-bold text-indigo-900 mb-3 flex items-center ${isFullscreen ? 'hidden' : ''}`}>
+            <span className="w-6 h-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full flex items-center justify-center text-xs mr-2">
               {safeCurrentStep + 1}
             </span>
             Step {safeCurrentStep + 1} of {steps.length}
-            <span className="ml-2 px-2 py-0.5 bg-gray-200 text-black text-xs font-medium rounded">
+            <span className="ml-2 px-2.5 py-1 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 text-xs font-semibold rounded-full border border-indigo-200">
               Current
             </span>
           </h4>
@@ -799,16 +874,42 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                   viewBox={`0 0 ${600 * calculateZoomLevel(currentStepData.tree)} 500`}
                 >
                   <defs>
-                    <marker 
-                      id="arrowhead" 
-                      markerWidth="10" 
-                      markerHeight="7" 
-                      refX="9" 
-                      refY="3.5" 
-                      orient="auto"
-                    >
-                      <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
-                    </marker>
+                    <linearGradient id="gradient-normal" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#9CA3AF" />
+                      <stop offset="100%" stopColor="#6B717F" />
+                    </linearGradient>
+                    <linearGradient id="gradient-traversal" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#93C5FD" />
+                      <stop offset="100%" stopColor="#3B82F6" />
+                    </linearGradient>
+                    <linearGradient id="gradient-insertion" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#BFDBFE" />
+                      <stop offset="100%" stopColor="#3B82F6" />
+                    </linearGradient>
+                    <linearGradient id="gradient-comparison" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#FDE68A" />
+                      <stop offset="100%" stopColor="#F59E0B" />
+                    </linearGradient>
+                    <radialGradient id="node-gradient-static" cx="30%" cy="30%">
+                      <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
+                      <stop offset="100%" stopColor="#E5E7EB" />
+                    </radialGradient>
+                    <radialGradient id="glow-gradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                      <stop offset="0%" stopColor="rgba(59, 130, 246, 0.8)" stopOpacity="1" />
+                      <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" stopOpacity="0" />
+                    </radialGradient>
+                    <filter id="glow-filter">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                      <feMerge> 
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                    
+                    {/* Animated dash pattern */}
+                    <pattern id="dash-pattern" patternUnits="userSpaceOnUse" width="10" height="10">
+                      <path d="M0,5 L10,5" stroke="#9CA3AF" strokeWidth="2" strokeDasharray="3,3" />
+                    </pattern>
                   </defs>
                   
                   {isFloating ? (
@@ -845,22 +946,24 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             )}
           </div>
           
-          <div className={`text-center p-2 bg-white border border-gray-200 ${isFullscreen ? 'hidden' : ''}`}>
-            <p className="font-semibold text-black text-sm">
+          <div className={`text-center p-4 bg-gradient-to-r from-indigo-50 to-blue-100 border border-indigo-200 rounded-lg ${isFullscreen ? 'hidden' : ''}`}>
+            <p className="font-semibold text-indigo-800 text-sm mb-1">
               {getOperationDescription(currentStepData)}
             </p>
             {traversalPath.length > 0 && (
-              <p className="text-xs text-blue-600 mt-1">
-                Traversal Path: {traversalPath.join(' → ')}
-              </p>
+              <div className="mt-2 text-xs text-indigo-600 font-medium bg-white/50 inline-block px-3 py-1 rounded-full border border-indigo-200">
+                Path: {traversalPath.join(' ')}
+              </div>
             )}
           </div>
         </div>
       </div>
       
-      {/* Steps list remains the same */}
-      <div className="mt-6 border border-gray-200 p-4 bg-white">
-        <h4 className="text-md font-bold text-blue-800 mb-3">All Steps:</h4>
+      <div className="mt-6 border border-indigo-200 p-4 bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl shadow-sm">
+        <h4 className="text-md font-bold text-indigo-800 mb-3 flex items-center">
+          <span className="mr-2 text-indigo-600">📋</span>
+          All Steps:
+        </h4>
         <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
           {steps.map((step, index) => {
             const stepTraversalPath = [];
@@ -878,7 +981,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
             return (
               <div 
                 key={index}
-                className={`p-3 border rounded transition-all ${index === currentStep ? 'bg-blue-5 border-blue-800 shadow-sm' : 'bg-white border-gray-300'}`}
+                className={`p-4 border rounded-xl transition-all duration-300 ${index === currentStep ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-indigo-300 shadow-md' : 'bg-white border-gray-200 hover:shadow-sm'}`}
                 id={`step-${index}`}
               >
                 <div className="flex justify-between items-start">
@@ -915,7 +1018,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
                     
                     {stepTraversalPath.length > 0 && (
                       <div className="mt-2 text-xs text-blue-600">
-                        Path: {stepTraversalPath.join(' → ')}
+                        Path: {stepTraversalPath.join(' ')}
                       </div>
                     )}
                   </div>
@@ -932,7 +1035,7 @@ const TreeVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onSto
 // Helper function for static tree rendering in step list
 const renderStaticTreeNode = (node, x, y, level = 0, parentX = null, parentY = null) => {
   if (!node) return null;
-  
+
   const nodeSize = 20;
   const horizontalSpacing = Math.max(80 / (level + 1), 30);
   const verticalSpacing = 50;
@@ -948,7 +1051,7 @@ const renderStaticTreeNode = (node, x, y, level = 0, parentX = null, parentY = n
           y1={y}
           x2={parentX}
           y2={parentY}
-          stroke="#9CA3AF"
+          stroke="url(#gradient-normal)"
           strokeWidth="2"
         />
       )}
@@ -957,8 +1060,8 @@ const renderStaticTreeNode = (node, x, y, level = 0, parentX = null, parentY = n
         cx={x}
         cy={y}
         r={nodeSize / 2}
-        fill="#FFFFFF"
-        stroke="#9CA3AF"
+        fill="url(#node-gradient-static)"
+        stroke="#4B5563"
         strokeWidth="2"
       />
       
@@ -966,7 +1069,7 @@ const renderStaticTreeNode = (node, x, y, level = 0, parentX = null, parentY = n
         x={x}
         y={y + 4}
         textAnchor="middle"
-        className="font-bold text-black text-sm"
+        className="font-bold text-gray-800 text-sm"
       >
         {node.value}
       </text>

@@ -161,19 +161,7 @@ function App() {
               </Layout>
             } />
 
-            <Route path="/test-contests/:testContestId/standings" 
-            element={
-              <Layout>
-                <TestContestLeaderboard />
-              </Layout>
-            } />
 
-            <Route path="/test-contests/:testContestId/submissions" 
-            element={
-              <Layout>
-                <TestContestSubmission />
-              </Layout>
-            } />
 
             <Route path="/test-contests/:testContestId/problems" element={
               <TestContestInside />

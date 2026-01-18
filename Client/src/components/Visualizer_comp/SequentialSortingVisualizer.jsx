@@ -72,14 +72,14 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
   const getElementStyle = (stepData, index) => {
     // Add null check for stepData
     if (!stepData) {
-      return "w-12 h-12 flex flex-col items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-white text-black border-gray-400";
+      return "w-14 h-14 flex flex-col items-center justify-center border-2 font-bold text-sm transition-all duration-500 bg-white text-[#001F3F] border-blue-300 rounded-xl shadow-sm node-enhanced";
     }
     
-    let baseStyle = "w-12 h-12 flex flex-col items-center justify-center border-2 font-bold text-sm transition-all duration-500 ";
+    let baseStyle = "w-14 h-14 flex flex-col items-center justify-center border-2 font-bold text-sm transition-all duration-500 rounded-xl shadow-sm node-enhanced ";
     
     // Add animation classes based on state
     if (stepData.comparing && stepData.comparing.includes(index)) {
-      baseStyle += "animate-pulse scale-110 ";
+      baseStyle += "animate-pulse scale-110 "; // Use built-in pulse animation
     } else if (stepData.swapping && stepData.swapping.includes(index)) {
       // Determine which swap animation to use based on value comparison
       if (stepData.swapping.length === 2) {
@@ -99,49 +99,49 @@ const SequentialSortingVisualizer = ({ data, steps, currentStep, totalSteps, isP
       }
     } else if (stepData.operation === 'place' || stepData.operation === 'place_remaining' || stepData.operation === 'place_element') {
       if (stepData.swapping && stepData.swapping.includes(index)) {
-        baseStyle += "animate-ping ";
+        baseStyle += "animate-ping scale-105 "; // Enhanced ping animation
       }
     }
     
-    // Handle different algorithm states based on operation
+    // Handle different algorithm states based on operation with enhanced colors
     if (stepData.pivot !== undefined && index === stepData.pivot) {
-      baseStyle += "bg-black text-white border-black";
+      baseStyle += "bg-gradient-to-br from-red-500 to-red-600 text-white border-red-700 shadow-lg shadow-red-500/30";
     } else if (stepData.heapRoot !== undefined && index === stepData.heapRoot) {
-      baseStyle += "bg-blue-800 text-white border-blue-900"; // Highlight heap root
+      baseStyle += "bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-800 shadow-lg shadow-blue-500/30"; // Enhanced heap root
     } else if (stepData.comparing && stepData.comparing.includes(index)) {
-      baseStyle += "bg-gray-300 text-black border-gray-700";
+      baseStyle += "bg-gradient-to-br from-yellow-400 to-yellow-500 text-[#001F3F] border-yellow-600 shadow-md shadow-yellow-400/30";
     } else if (stepData.swapping && stepData.swapping.includes(index)) {
-      baseStyle += "bg-gray-400 text-white border-black";
+      baseStyle += "bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-800 shadow-lg shadow-blue-500/30 animate-float";
     } else if (stepData.operation === 'divide' && stepData.range) {
       // Check if index is in the current range being divided
       if (index >= stepData.range[0] && index <= stepData.range[1]) {
-        baseStyle += "bg-gray-500 text-white border-black";
+        baseStyle += "bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-500/30";
       } else if (stepData.sorted && stepData.sorted.includes(index)) {
-        baseStyle += "bg-gray-200 text-black border-gray-700";
+        baseStyle += "bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-800 border-emerald-300";
       } else {
-        baseStyle += "bg-white text-black border-gray-400";
+        baseStyle += "bg-white text-[#001F3F] border-blue-300 hover:border-blue-400";
       }
     } else if (stepData.operation === 'merge_start' || stepData.operation === 'compare' || stepData.operation === 'compare_merge' || stepData.operation === 'place' || stepData.operation === 'place_remaining' || stepData.operation === 'place_element') {
       // Check if index is in the current range being merged
       if (stepData.range && index >= stepData.range[0] && index <= stepData.range[1]) {
-        baseStyle += "bg-gray-500 text-white border-black";
+        baseStyle += "bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-500/30";
       } else if (stepData.sorted && stepData.sorted.includes(index)) {
-        baseStyle += "bg-gray-200 text-black border-gray-700";
+        baseStyle += "bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-800 border-emerald-300";
       } else {
-        baseStyle += "bg-white text-black border-gray-400";
+        baseStyle += "bg-white text-[#001F3F] border-blue-300 hover:border-blue-400";
       }
     } else if (stepData.operation && stepData.operation.includes('heap') && stepData.range && stepData.range.includes(index)) {
       // Highlight nodes involved in heap operations
-      baseStyle += "bg-blue-400 text-white border-blue-600";
+      baseStyle += "bg-gradient-to-br from-cyan-400 to-cyan-500 text-white border-cyan-600 shadow-md shadow-cyan-400/30";
     } else if (stepData.sorted && stepData.sorted.includes(index)) {
-      baseStyle += "bg-gray-200 text-black border-gray-700";
+      baseStyle += "bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-800 border-emerald-300";
     } else {
-      baseStyle += "bg-white text-black border-gray-400";
+      baseStyle += "bg-white text-[#001F3F] border-blue-300 hover:border-blue-400";
     }
     
     // Add hover effect
     if (hoveredIndex === index) {
-      baseStyle += " transform scale-105 shadow-lg animate-gentle-pulse ";
+      baseStyle += " transform scale-110 shadow-xl animate-gentle-pulse ring-2 ring-blue-400 ring-opacity-50 ";
     }
     
     return baseStyle;

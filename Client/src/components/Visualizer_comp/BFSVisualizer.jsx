@@ -34,7 +34,7 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     }
   }, [steps, currentStep, onNext, isPlaying, onStop, speed]);
 
-  // D3.js animation effect
+  // D3.js animation effect - BEAUTIFIED VERSION (matching DFS styling)
   useEffect(() => {
     if (!svgRef.current || !steps || steps.length === 0) return;
     
@@ -43,8 +43,35 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     
     if (!stepData) return;
     
-    // Clear previous animations
+    // Clear previous animations and elements
     svg.selectAll("*").interrupt();
+    svg.selectAll("*").remove();
+    
+    // Add defs for gradients (matching DFS beautiful styling)
+    const defs = svg.append("defs");
+    
+    // Beautiful gradient for current nodes (queue nodes in BFS)
+    defs.append("radialGradient")
+      .attr("id", "beautifulQueueGradient")
+      .attr("cx", "30%")
+      .attr("cy", "30%")
+      .attr("r", "70%")
+      .html(`
+        <stop offset="0%" stop-color="#FEF3C7" />
+        <stop offset="50%" stop-color="#FDE68A" />
+        <stop offset="100%" stop-color="#FCD34D" />
+      `);
+    
+    // Beautiful gradient for visited nodes  
+    defs.append("radialGradient")
+      .attr("id", "beautifulVisitedGradient")
+      .attr("cx", "50%")
+      .attr("cy", "50%")
+      .attr("r", "50%")
+      .html(`
+        <stop offset="0%" stop-color="#3B82F6" />
+        <stop offset="100%" stop-color="#1E40AF" />
+      `);
     
     // Get SVG dimensions
     const width = 600;
@@ -62,10 +89,9 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     const nodes = Array.from(allNodes);
     if (nodes.length === 0) return;
     
-    // Position nodes in a circle with support for dragged positions
+    // Position nodes
     const nodePositions = {};
     nodes.forEach((node, index) => {
-      // Check if node has been dragged
       if (draggedNodes[node]) {
         nodePositions[node] = draggedNodes[node];
       } else {
@@ -77,15 +103,11 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
       }
     });
     
-    // Draw edges with D3 - UPDATED FOR NEW VISUAL STYLE
-    svg.selectAll(".edge").remove();
-    svg.selectAll(".edge-weight").remove();
-    
+    // Draw edges with beautiful styling (matching DFS)
     if (stepData.graph) {
       nodes.forEach(fromNode => {
         const neighbors = stepData.graph[fromNode] || [];
         neighbors.forEach(toNode => {
-          // Avoid duplicate edges
           if (fromNode > toNode) return;
           
           const pos1 = nodePositions[fromNode];
@@ -93,81 +115,117 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           
           if (!pos1 || !pos2) return;
           
-          // Check if this edge connects to the current node
-          const isCurrentNodeEdge = stepData.currentNode && 
-            (fromNode === stepData.currentNode || toNode === stepData.currentNode);
+          // Beautiful edge styling - matching DFS
+          let strokeColor = "#4B5563"; // Professional gray
+          let strokeWidth = 2.5;
           
-          // Check if we're processing neighbors of current node
-          const isProcessingNeighbors = stepData.currentNode === fromNode || stepData.currentNode === toNode;
+          // Dark blue for visited edges with emphasis
+          if (stepData.visited && 
+              stepData.visited.includes(fromNode) && 
+              stepData.visited.includes(toNode)) {
+            strokeColor = "#1E40AF"; // Rich dark blue
+            strokeWidth = 4.5;
+          }
           
-          // Draw edge line with appropriate style
-          const edge = svg.append("line")
-            .attr("class", "edge")
+          // Add subtle glow effect for important edges
+          if (strokeWidth > 3) {
+            svg.append("line")
+              .attr("x1", pos1.x)
+              .attr("y1", pos1.y)
+              .attr("x2", pos2.x)
+              .attr("y2", pos2.y)
+              .attr("stroke", strokeColor)
+              .attr("stroke-width", strokeWidth + 1)
+              .attr("stroke-linecap", "round")
+              .attr("opacity", 0.3)
+              .style("filter", "blur(1px)");
+          }
+          
+          // Main edge line
+          svg.append("line")
             .attr("x1", pos1.x)
             .attr("y1", pos1.y)
             .attr("x2", pos2.x)
             .attr("y2", pos2.y)
-            .attr("stroke", "#93C5FD") // Light blue default
-            .attr("stroke-width", 2);
-          
-          // Apply dotted line for neighbor search
-          if (isProcessingNeighbors && (stepData.operation === 'process')) {
-            edge.attr("stroke-dasharray", "5,5")
-                .attr("stroke", "#93C5FD"); // Light blue dotted for neighbor search
-          } else if (stepData.visited && 
-                     ((stepData.visited.includes(fromNode) && stepData.visited.includes(toNode)))) {
-            edge.attr("stroke", "#1E40AF") // Dark blue for traversed edges
-                .attr("stroke-width", 3)
-                .attr("stroke-dasharray", "none");
-          }
+            .attr("stroke", strokeColor)
+            .attr("stroke-width", strokeWidth)
+            .attr("stroke-linecap", "round");
         });
       });
     }
     
-    // Draw nodes with D3 - UPDATED FOR NEW COLOR SCHEME
-    svg.selectAll(".node").remove();
-    svg.selectAll(".node-label").remove();
-    
+    // Draw nodes with beautiful styling AND drag functionality (matching DFS)
     nodes.forEach(node => {
       const pos = nodePositions[node];
       
-      // Determine node color based on state - NEW COLOR SCHEME
-      let fillColor = "white"; // Default white
-      let strokeColor = "black"; // Default black border
-      let textColor = "black"; // Default black text
+      // Beautiful node styling - matching DFS exactly
+      let fillColor = "white";
+      let strokeColor = "#6B7280";
+      let textColor = "#1F2937";
+      let strokeWidth = 2;
+      let nodeRadius = 24;
       
-      // Current node gets special treatment
+      // Current node (processing node in BFS) - Beautiful gradient with effects
       if (stepData.currentNode === node) {
-        fillColor = "#93C5FD"; // Light blue for current node
-        strokeColor = "black";
-        textColor = "black";
+        fillColor = "url(#beautifulQueueGradient)"; // Using queue gradient for current
+        strokeColor = "#F59E0B"; // Warm amber border
+        strokeWidth = 3;
+        nodeRadius = 28;
+        textColor = "#92400E"; // Dark amber text
+        
+        // Add glow effect
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 3)
+          .attr("fill", "#FCD34D")
+          .attr("opacity", 0.3)
+          .style("filter", "blur(3px)");
       } 
-      // Visited nodes
+      // Visited nodes - Beautiful blue gradient
       else if (stepData.visited && stepData.visited.includes(node)) {
-        fillColor = "#1E40AF"; // Dark blue for visited
-        strokeColor = "black";
-        textColor = "white"; // White text for dark blue background
+        fillColor = "url(#beautifulVisitedGradient)";
+        strokeColor = "#1E40AF"; // Deep blue border
+        strokeWidth = 2.5;
+        textColor = "white";
+        
+        // Add subtle inner glow
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius - 2)
+          .attr("fill", "white")
+          .attr("opacity", 0.2);
       }
-      // Queued nodes
+      // Queued nodes - Subtle beauty (different from DFS stacked nodes)
       else if (stepData.queue && stepData.queue.includes(node)) {
-        fillColor = "#DBEAFE"; // Very light blue for queued
-        strokeColor = "black";
-        textColor = "black";
+        fillColor = "#FEF3C7"; // Light yellow for queued
+        strokeColor = "#F59E0B"; // Amber border
+        strokeWidth = 2;
+        textColor = "#92400E"; // Dark amber text
       }
       
-      // Draw node circle with drag support
+      // Draw main node circle WITH DRAG FUNCTIONALITY
       const nodeCircle = svg.append("circle")
-        .attr("class", "node")
         .attr("cx", pos.x)
         .attr("cy", pos.y)
-        .attr("r", 20)
+        .attr("r", nodeRadius)
         .attr("fill", fillColor)
         .attr("stroke", strokeColor)
-        .attr("stroke-width", 2)
-        .attr("data-node", node)
-        .style("cursor", "pointer")
-        .on("mouseover", () => setHoveredNode(node))
-        .on("mouseout", () => setHoveredNode(null))
+        .attr("stroke-width", strokeWidth)
+        .attr("cursor", "pointer")
+        .on("mouseover", function() {
+          // Visual feedback on hover
+          d3.select(this)
+            .attr("r", nodeRadius + 2)
+            .attr("stroke-width", strokeWidth + 1);
+        })
+        .on("mouseout", function() {
+          // Return to normal state
+          d3.select(this)
+            .attr("r", nodeRadius)
+            .attr("stroke-width", strokeWidth);
+        })
         .call(d3.drag()
           .on("start", function(event) {
             setIsDragging(true);
@@ -184,27 +242,45 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
               .attr("cx", newX)
               .attr("cy", newY);
             
+            // Update the glow effects if they exist
+            svg.selectAll(`circle`).each(function() {
+              const circle = d3.select(this);
+              const cx = parseFloat(circle.attr("cx"));
+              const cy = parseFloat(circle.attr("cy"));
+              
+              // Check if this circle belongs to the dragged node
+              if (Math.abs(cx - pos.x) < 1 && Math.abs(cy - pos.y) < 1) {
+                circle.attr("cx", newX).attr("cy", newY);
+              }
+            });
+            
             // Update the node label position
-            svg.selectAll(`.node-label[data-node="${node}"]`)
-              .attr("x", newX)
-              .attr("y", newY + 5);
+            svg.selectAll("text").each(function() {
+              const text = d3.select(this);
+              const x = parseFloat(text.attr("x"));
+              const y = parseFloat(text.attr("y"));
+              
+              // Check if this text belongs to the dragged node
+              if (Math.abs(x - pos.x) < 1) {
+                text.attr("x", newX).attr("y", newY + 6);
+              }
+            });
             
             // Update connected edges
-            svg.selectAll(".edge")
-              .each(function() {
-                const edge = d3.select(this);
-                const x1 = parseFloat(edge.attr("x1"));
-                const y1 = parseFloat(edge.attr("y1"));
-                const x2 = parseFloat(edge.attr("x2"));
-                const y2 = parseFloat(edge.attr("y2"));
-                
-                if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
-                  edge.attr("x1", newX).attr("y1", newY);
-                }
-                if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
-                  edge.attr("x2", newX).attr("y2", newY);
-                }
-              });
+            svg.selectAll("line").each(function() {
+              const line = d3.select(this);
+              const x1 = parseFloat(line.attr("x1"));
+              const y1 = parseFloat(line.attr("y1"));
+              const x2 = parseFloat(line.attr("x2"));
+              const y2 = parseFloat(line.attr("y2"));
+              
+              if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
+                line.attr("x1", newX).attr("y1", newY);
+              }
+              if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
+                line.attr("x2", newX).attr("y2", newY);
+              }
+            });
             
             // Update the position in our state
             setDraggedNodes(prev => ({
@@ -218,33 +294,18 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
           })
         );
       
-      // Draw node label
+      // Draw node label with beautiful typography (matching DFS)
       svg.append("text")
-        .attr("class", "node-label")
-        .attr("data-node", node)
         .attr("x", pos.x)
-        .attr("y", pos.y + 5)
+        .attr("y", pos.y + 6)
         .attr("text-anchor", "middle")
-        .attr("font-size", "14px")
-        .attr("font-weight", "bold")
+        .attr("font-size", "15px")
+        .attr("font-weight", "600")
+        .attr("font-family", "'Inter', system-ui, sans-serif")
         .attr("fill", textColor)
+        .attr("pointer-events", "none")
         .text(node);
     });
-    
-    // Add animation for node transitions
-    if (stepData.currentNode) {
-      svg.selectAll(".node")
-        .filter((d, i, nodes) => {
-          const nodeText = d3.select(nodes[i]).text();
-          return nodeText === stepData.currentNode;
-        })
-        .transition()
-        .duration(1000)
-        .attr("r", 25)
-        .transition()
-        .duration(1000)
-        .attr("r", 20);
-    }
     
   }, [currentStep, steps, draggedNodes, isDragging, dragNode]);
 
@@ -268,7 +329,7 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     };
   }, []);
 
-  // Function to download all steps as PDF with visual representations
+  // Function to download all steps as PDF with beautiful visual representations (matching DFS)
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
       orientation: 'landscape',
@@ -276,11 +337,16 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
       format: 'a4'
     });
     
-    // Add title
-    doc.setFontSize(22);
+    // Add title with beautiful styling (matching DFS)
+    doc.setFontSize(24);
+    doc.setTextColor(26, 86, 150); // Dark blue
     doc.text('BFS Visualization Steps', 148.5, 15, null, null, 'center');
     
-    // Add steps with visual representations - one step per page
+    doc.setFontSize(14);
+    doc.setTextColor(75, 85, 99); // Gray subtitle
+    doc.text('Step-by-step algorithm traversal', 148.5, 25, null, null, 'center');
+    
+    // Add steps with beautiful visual representations (matching DFS)
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index];
       
@@ -289,21 +355,23 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         doc.addPage();
       }
       
-      // Add step header
-      doc.setFontSize(16);
-      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
+      // Add step header with beautiful styling
+      doc.setFontSize(18);
+      doc.setTextColor(31, 41, 55); // Dark header
+      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 35, null, null, 'center');
       
       doc.setFontSize(12);
-      doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
+      doc.setTextColor(107, 114, 128); // Gray description
+      doc.text(getOperationDescription(step), 148.5, 45, null, null, 'center');
       
-      // Add a visual representation of the graph
+      // Add a beautiful visual representation of the graph
       if (step.graph || step.operation) {
         // Calculate bounding box for scaling
         const bbox = calculateGraphBoundingBox(step.graph);
         const pageWidth = 297; // A4 landscape width in mm
         const pageHeight = 210; // A4 landscape height in mm
         const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
-        const availableHeight = pageHeight - 60; // Leave space for header and footer
+        const availableHeight = pageHeight - 70; // Leave space for header and footer
         
         // Calculate scale to fit
         const scaleX = availableWidth / bbox.width;
@@ -314,19 +382,39 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         const graphWidth = bbox.width * scale;
         const graphHeight = bbox.height * scale;
         const x = (pageWidth - graphWidth) / 2 - bbox.minX * scale;
-        const y = (availableHeight - graphHeight) / 2 + 50 - bbox.minY * scale; // +50 for header space
+        const y = (availableHeight - graphHeight) / 2 + 60 - bbox.minY * scale; // +60 for header space
         
-        drawGraphInPDF(doc, step.graph, x, y, 0, null, null, scale, step);
+        drawBeautifulGraphInPDF(doc, step.graph, x, y, 0, null, null, scale, step);
       } else {
+        doc.setFontSize(14);
+        doc.setTextColor(156, 163, 175);
         doc.text('Empty graph', 148.5, 105, null, null, 'center');
       }
+      
+      // Add step information (matching DFS styling)
+      if (step.queue && step.queue.length > 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(245, 158, 11); // Amber for queue
+        doc.text(`Queue: [${step.queue.join(', ')}]`, 20, 190);
+      }
+      
+      if (step.visited && step.visited.length > 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(30, 64, 175); // Dark blue for visited
+        doc.text(`Visited: [${step.visited.join(', ')}]`, 20, 198);
+      }
+      
+      // Add page number
+      doc.setFontSize(8);
+      doc.setTextColor(156, 163, 175);
+      doc.text(`Page ${index + 1} of ${steps.length}`, 277, 200, null, null, 'right');
       
       // Add a small delay to prevent UI blocking
       await new Promise(resolve => setTimeout(resolve, 10));
     }
     
     // Save the PDF
-    doc.save('bfs-steps.pdf');
+    doc.save('bfs-visualization-steps.pdf');
   };
   
   // Helper function to calculate graph bounding box
@@ -360,25 +448,25 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     return bbox;
   };
   
-  // Helper function to draw graph in PDF - ZOOM-OUT IMPLEMENTATION
-  const drawGraphInPDF = (doc, graph, offsetX, offsetY, level = 0, parentX = null, parentY = null, scale = 1, stepData = null) => {
+  // Helper function to draw beautiful graph in PDF - MATCHING DFS STYLING
+  const drawBeautifulGraphInPDF = (doc, graph, offsetX, offsetY, level = 0, parentX = null, parentY = null, scale = 1, stepData = null) => {
     if (!graph) return;
     
     const nodes = Object.keys(graph);
     if (nodes.length === 0) return;
     
-    // AUTO ZOOM-OUT: Calculate optimal scale to fit entire graph in PDF
-    const pageWidth = 297; // A4 landscape width in mm
-    const pageHeight = 210; // A4 landscape height in mm
-    const margin = 20; // 20mm margin on all sides
+    // Calculate optimal layout
+    const pageWidth = 297;
+    const pageHeight = 210;
+    const margin = 20;
     
     // Calculate bounding box of all nodes
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     
     nodes.forEach((node, index) => {
       const angle = (index / nodes.length) * 2 * Math.PI;
-      const x = 150 * Math.cos(angle); // Base radius of 150
-      const y = 100 * Math.sin(angle); // Base radius of 100
+      const x = 150 * Math.cos(angle);
+      const y = 100 * Math.sin(angle);
       
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
@@ -387,12 +475,12 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     });
     
     // Add padding for node size
-    minX -= 20;
-    maxX += 20;
-    minY -= 20;
-    maxY += 20;
+    minX -= 25;
+    maxX += 25;
+    minY -= 25;
+    maxY += 25;
     
-    // Calculate optimal scale to fit graph within page margins
+    // Calculate optimal scale
     const graphWidth = maxX - minX;
     const graphHeight = maxY - minY;
     const availableWidth = pageWidth - 2 * margin;
@@ -401,17 +489,17 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
     const optimalScale = Math.min(
       availableWidth / graphWidth,
       availableHeight / graphHeight,
-      1 // Don't upscale
+      1
     );
     
-    // Center the graph on the page
+    // Center the graph
     const centerX = (pageWidth - graphWidth * optimalScale) / 2 - minX * optimalScale;
     const centerY = (pageHeight - graphHeight * optimalScale) / 2 - minY * optimalScale;
     
     const radius = 80 * optimalScale;
-    const nodeRadius = 8 * optimalScale;
+    const nodeRadius = 10 * optimalScale; // Larger for better text fit
     
-    // Draw edges first
+    // Draw edges first with beautiful styling
     const drawnEdges = new Set();
     nodes.forEach((node, index) => {
       const angle = (index / nodes.length) * 2 * Math.PI;
@@ -420,7 +508,6 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
       
       const neighbors = graph[node] || [];
       neighbors.forEach(neighbor => {
-        // Create a unique edge identifier to avoid drawing twice
         const edgeId = [node, neighbor].sort().join('-');
         if (drawnEdges.has(edgeId)) return;
         drawnEdges.add(edgeId);
@@ -432,46 +519,75 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         const x2 = centerX + 150 * optimalScale * Math.cos(neighborAngle);
         const y2 = centerY + 100 * optimalScale * Math.sin(neighborAngle);
         
+        // Determine edge style - MATCH DFS VISUALIZATION
+        let strokeColor = [107, 114, 128]; // Gray
+        let lineWidth = 0.8 * optimalScale;
+        
+        // Dark blue for traversed edges
+        if (stepData && stepData.visited && 
+            stepData.visited.includes(node) && 
+            stepData.visited.includes(neighbor)) {
+          strokeColor = [30, 64, 175]; // Dark blue
+          lineWidth = 1.5 * optimalScale;
+        }
+        
         // Draw edge
-        doc.setDrawColor(156, 163, 175); // gray-400
-        doc.setLineWidth(0.5 * optimalScale);
+        doc.setDrawColor(...strokeColor);
+        doc.setLineWidth(lineWidth);
         doc.line(x1, y1, x2, y2);
       });
     });
     
-    // Draw nodes
+    // Draw nodes with beautiful styling - MATCH DFS EXACTLY
     nodes.forEach((node, index) => {
       const angle = (index / nodes.length) * 2 * Math.PI;
       const x = centerX + 150 * optimalScale * Math.cos(angle);
       const y = centerY + 100 * optimalScale * Math.sin(angle);
       
-      // Determine node style based on step data
-      let fillColor = [255, 255, 255]; // white
-      let strokeColor = [156, 163, 175]; // gray-400
+      // Determine node style based on step data - MATCH EXACTLY
+      let fillColor = [255, 255, 255]; // White
+      let strokeColor = [107, 114, 128]; // Gray border
+      let textColor = [31, 41, 55]; // Dark text
+      let lineWidth = 0.6 * optimalScale;
       
       if (stepData) {
+        // Current node (processing node) - Yellow gradient effect
         if (stepData.currentNode === node) {
-          fillColor = [59, 130, 246]; // blue-500
-          strokeColor = [37, 99, 235]; // blue-600
-        } else if (stepData.visited && stepData.visited.includes(node)) {
-          fillColor = [16, 185, 129]; // green-500
-          strokeColor = [5, 150, 105]; // green-600
-        } else if (stepData.queue && stepData.queue.includes(node)) {
-          fillColor = [245, 158, 11]; // amber-500
-          strokeColor = [217, 119, 6]; // amber-600
+          fillColor = [254, 243, 199]; // Light yellow
+          strokeColor = [245, 158, 11]; // Amber border
+          lineWidth = 0.9 * optimalScale; // Thicker border
+          textColor = [146, 64, 14]; // Dark amber text
+        } 
+        // Visited nodes - Blue gradient effect
+        else if (stepData.visited && stepData.visited.includes(node)) {
+          fillColor = [30, 64, 175]; // Dark blue
+          strokeColor = [30, 64, 175]; // Dark blue border
+          lineWidth = 0.7 * optimalScale; // Medium border
+          textColor = [255, 255, 255]; // White text
+        }
+        // Queued nodes - Light yellow (different from DFS stacked)
+        else if (stepData.queue && stepData.queue.includes(node)) {
+          fillColor = [254, 243, 199]; // Light yellow
+          strokeColor = [245, 158, 11]; // Amber border
+          lineWidth = 0.6 * optimalScale; // Standard border
+          textColor = [146, 64, 14]; // Dark amber text
         }
       }
       
-      // Draw node circle
+      // Draw node circle with larger size for better text visibility
       doc.setFillColor(...fillColor);
       doc.setDrawColor(...strokeColor);
-      doc.setLineWidth(0.5 * optimalScale);
-      doc.circle(x, y, nodeRadius, 'FD');
+      doc.setLineWidth(lineWidth);
+      doc.circle(x, y, nodeRadius, 'FD'); // Larger radius
       
-      // Draw node value
-      doc.setFontSize(8 * optimalScale);
-      doc.setTextColor(0, 0, 0); // black
-      doc.text(String(node), x, y + 3 * optimalScale, null, null, 'center');
+      // Draw node value with MUCH LARGER text (matching DFS)
+      doc.setFontSize(12 * optimalScale); // Significantly larger font size
+      doc.setFont(undefined, 'bold'); // Bold text for emphasis
+      doc.setTextColor(...textColor);
+      
+      // Center text properly in larger node
+      const textOffset = 3 * optimalScale; // Adjust vertical positioning
+      doc.text(String(node), x, y + textOffset, null, null, 'center');
     });
   };
 
@@ -795,7 +911,7 @@ const BFSVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
   );
 };
 
-// Helper function to render static graph for step list
+// Helper function to render static graph for step list - ENHANCED STYLING (matching DFS)
 const renderStaticGraph = (step) => {
   if (!step.graph) return null;
   
@@ -803,7 +919,7 @@ const renderStaticGraph = (step) => {
   if (nodes.length === 0) return null;
   
   // We'll arrange nodes in a circular pattern for visualization
-  const radius = 100;
+  const radius = 120;
   const centerX = 200;
   const centerY = 150;
   
@@ -819,7 +935,26 @@ const renderStaticGraph = (step) => {
   
   return (
     <g>
-      {/* Draw edges */}
+      {/* Define blue theme gradients (matching DFS) */}
+      <defs>
+        <radialGradient id="staticQueueGradient" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#FEF3C7" />
+          <stop offset="50%" stopColor="#FDE68A" />
+          <stop offset="100%" stopColor="#FCD34D" />
+        </radialGradient>
+        <radialGradient id="staticVisitedGradient" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#3B82F6" />
+          <stop offset="100%" stopColor="#1E40AF" />
+        </radialGradient>
+        <filter id="staticBlueGlow">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#93C5FD" floodOpacity="0.3"/>
+        </filter>
+        <filter id="staticYellowGlow">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#FEF3C7" floodOpacity="0.3"/>
+        </filter>
+      </defs>
+      
+      {/* Draw edges with high contrast styling (matching DFS) */}
       {nodes.map((fromNode) => {
         const neighbors = step.graph[fromNode] || [];
         return neighbors.map((toNode) => {
@@ -829,6 +964,18 @@ const renderStaticGraph = (step) => {
           const pos1 = nodePositions[fromNode];
           const pos2 = nodePositions[toNode];
           
+          // Determine high contrast edge style
+          let strokeColor = "black"; // Black base for visibility
+          let strokeWidth = 3; // Thick base width
+          
+          // Traversed edges - Dark blue
+          if (step.visited && 
+              step.visited.includes(fromNode) && 
+              step.visited.includes(toNode)) {
+            strokeColor = "#1E40AF"; // Dark blue
+            strokeWidth = 5; // Very bold emphasis
+          }
+          
           return (
             <line
               key={`${fromNode}-${toNode}`}
@@ -836,44 +983,100 @@ const renderStaticGraph = (step) => {
               y1={pos1.y}
               x2={pos2.x}
               y2={pos2.y}
-              stroke="#93C5FD"
-              strokeWidth="2"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
             />
           );
         });
       })}
       
-      {/* Draw nodes */}
+      {/* Draw nodes with enhanced styling (matching DFS) */}
       {nodes.map((node) => {
         const pos = nodePositions[node];
         const isCurrent = step.currentNode === node;
         const isVisited = step.visited && step.visited.includes(node);
         const isQueued = step.queue && step.queue.includes(node);
         
-        let fillColor = "#93C5FD"; // Light blue default
+        // Determine node style - HIGH CONTRAST DESIGN
+        let fillColor = "white";
+        let strokeColor = "black"; // Black border for maximum contrast
+        let textColor = "black"; // Black text for light backgrounds
+        let strokeWidth = 3; // Thick border for visibility
+        let nodeRadius = 20;
+        
         if (isCurrent) {
-          fillColor = "#1E40AF"; // Dark blue for current node
+          fillColor = "url(#staticQueueGradient)";
+          strokeColor = "black"; // Black border
+          strokeWidth = 4; // Extra thick border
+          nodeRadius = 24;
+          textColor = "black"; // Black text on light yellow
         } else if (isVisited) {
-          fillColor = "#3B82F6"; // Medium blue for visited
+          fillColor = "url(#staticVisitedGradient)";
+          strokeColor = "black"; // Black border
+          strokeWidth = 3; // Thick border
+          textColor = "white"; // White text on dark blue
         } else if (isQueued) {
-          fillColor = "#60A5FA"; // Slightly darker light blue for queued
+          fillColor = "#FEF3C7"; // Light yellow fill
+          strokeColor = "black"; // Black border
+          strokeWidth = 3; // Thick border
+          textColor = "black"; // Black text
         }
         
         return (
           <g key={node}>
+            {/* Blue/Yellow theme glow effects */}
+            {isCurrent && (
+              <>
+                <circle
+                  cx={pos.x}
+                  cy={pos.y + 2}
+                  r={nodeRadius}
+                  fill="black"
+                  opacity="0.1"
+                  filter="url(#staticBlueGlow)"
+                />
+                <circle
+                  cx={pos.x}
+                  cy={pos.y}
+                  r={nodeRadius + 2}
+                  fill="#FEF3C7"
+                  opacity="0.2"
+                  filter="url(#staticYellowGlow)"
+                />
+              </>
+            )}
+            {isVisited && (
+              <circle
+                cx={pos.x}
+                cy={pos.y}
+                r={nodeRadius - 2}
+                fill="white"
+                opacity="0.2"
+                filter="url(#staticBlueGlow)"
+              />
+            )}
+            
+            {/* Node circle */}
             <circle
               cx={pos.x}
               cy={pos.y}
-              r="15"
+              r={nodeRadius}
               fill={fillColor}
-              stroke="#1E40AF"
-              strokeWidth="2"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              style={{ animation: "none" }}
             />
+            
+            {/* Node label */}
             <text
               x={pos.x}
-              y={pos.y + 5}
+              y={pos.y + 6}
               textAnchor="middle"
-              className="font-bold text-white text-sm"
+              fontSize="14"
+              fontWeight="700"
+              fontFamily="'Segoe UI', system-ui, sans-serif"
+              fill={textColor}
             >
               {node}
             </text>

@@ -1,14 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 
-const LoopVisualizer = ({ 
-  uploadedCode,
-  fileName,
-  onCodeChange,
-  onFileNameChange,
-  onExecutionMetricsChange, 
-  onCodePatternsChange, 
-  onPerformanceDataChange 
-}) => {
+const LoopVisualizer = () => {
+  const [uploadedCode, setUploadedCode] = useState('');
+  const [fileName, setFileName] = useState('');
   const [iterations, setIterations] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -16,31 +10,8 @@ const LoopVisualizer = ({
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [finalOutput, setFinalOutput] = useState('');
   const [executingLine, setExecutingLine] = useState(-1);
-  
-  // Analysis state
-  const [executionMetrics, setExecutionMetrics] = useState({
-    totalSteps: 0,
-    variablesTracked: 0,
-    memoryUsage: 0,
-    executionTime: 0
-  });
-  
-  const [codePatterns, setCodePatterns] = useState({
-    loops: 0,
-    conditionals: 0,
-    functionCalls: 0,
-    recursionDepth: 0
-  });
-  
-  const [performanceData, setPerformanceData] = useState({
-    cpuUsage: 0,
-    memoryConsumption: 0,
-    executionSpeed: 0
-  });
-  
   const fileInputRef = useRef(null);
   const intervalRef = useRef(null);
-  const startTimeRef = useRef(null);
 
   // Supported file extensions
   const supportedExtensions = ['.cpp', '.c', '.java', '.js', '.py'];
@@ -56,12 +27,12 @@ const LoopVisualizer = ({
       return;
     }
 
-    onFileNameChange(file.name);
+    setFileName(file.name);
     const reader = new FileReader();
     
     reader.onload = (e) => {
       const content = e.target.result;
-      onCodeChange(content);
+      setUploadedCode(content);
       // Reset previous results
       setIterations([]);
       setFinalOutput('');
@@ -86,55 +57,6 @@ const LoopVisualizer = ({
     return langMap[ext] || 'python';
   };
 
-  // Analyze code patterns
-  const analyzeCodePatterns = (code) => {
-    const patterns = {
-      loops: 0,
-      conditionals: 0,
-      functionCalls: 0,
-      recursionDepth: 0
-    };
-    
-    // Split code into lines for analysis
-    const lines = code.split('\n');
-    
-    lines.forEach(line => {
-      const trimmed = line.trim();
-      
-      // Count loops
-      if (/\b(for|while)\b/.test(trimmed)) {
-        patterns.loops++;
-      }
-      
-      // Count conditionals
-      if (/\b(if|else|elif|switch)\b/.test(trimmed)) {
-        patterns.conditionals++;
-      }
-      
-      // Count function calls (simple pattern)
-      if (/\w+\s*\([^)]*\)/.test(trimmed) && !/^(if|for|while|function|def|class)/.test(trimmed)) {
-        patterns.functionCalls++;
-      }
-    });
-    
-    return patterns;
-  };
-
-  // Estimate memory usage based on variables
-  const estimateMemoryUsage = (steps) => {
-    let totalVariables = 0;
-    const uniqueVars = new Set();
-    
-    steps.forEach(step => {
-      Object.keys(step.variables || {}).forEach(varName => {
-        uniqueVars.add(varName);
-      });
-    });
-    
-    // Rough estimation: 8 bytes per variable (simplified)
-    return uniqueVars.size * 8;
-  };
-
   // Simulate code compilation and line-by-line execution
   const simulateCompilation = async () => {
     if (!uploadedCode) {
@@ -143,7 +65,6 @@ const LoopVisualizer = ({
     }
 
     setIsProcessing(true);
-    startTimeRef.current = Date.now(); // Record start time
 
     try {
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
@@ -185,47 +106,6 @@ const LoopVisualizer = ({
           output: step.output || ''
         };
       });
-
-      // Calculate execution time
-      const endTime = Date.now();
-      const executionTime = endTime - startTimeRef.current;
-      
-      // Analyze code patterns
-      const patterns = analyzeCodePatterns(uploadedCode);
-      
-      // Estimate memory usage
-      const memoryUsage = estimateMemoryUsage(data.steps);
-      
-      // Calculate performance metrics
-      const totalSteps = mappedIterations.length;
-      const variablesTracked = new Set(
-        mappedIterations.flatMap(step => 
-          Object.keys(step.variables || {})
-        )
-      ).size;
-      
-      // Update all metrics and notify parent
-      const newExecutionMetrics = {
-        totalSteps,
-        variablesTracked,
-        memoryUsage,
-        executionTime
-      };
-      
-      const newPerformanceData = {
-        cpuUsage: Math.min(95, Math.round((totalSteps / 10) * 15)),
-        memoryConsumption: memoryUsage,
-        executionSpeed: totalSteps > 0 ? Math.round(totalSteps / (executionTime / 1000)) : 0
-      };
-      
-      setExecutionMetrics(newExecutionMetrics);
-      setCodePatterns(patterns);
-      setPerformanceData(newPerformanceData);
-      
-      // Notify parent component
-      if (onExecutionMetricsChange) onExecutionMetricsChange(newExecutionMetrics);
-      if (onCodePatternsChange) onCodePatternsChange(patterns);
-      if (onPerformanceDataChange) onPerformanceDataChange(newPerformanceData);
 
       setIterations(mappedIterations);
       setFinalOutput(data.final_output || data.steps[data.steps.length - 1]?.output || '');
@@ -321,8 +201,8 @@ const LoopVisualizer = ({
 
   // Reset everything
   const resetAll = () => {
-    onCodeChange('');
-    onFileNameChange('');
+    setUploadedCode('');
+    setFileName('');
     setIterations([]);
     setFinalOutput('');
     setCurrentStep(0);

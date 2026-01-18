@@ -54,7 +54,7 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     }
   }, [steps, currentStep, onNext, isPlaying, onStop, speed]);
 
-  // D3.js animation effect
+  // D3.js animation effect - BEAUTIFIED VERSION (matching DFS/BFS styling)
   useEffect(() => {
     if (!svgRef.current || !steps || steps.length === 0) return;
     
@@ -63,8 +63,35 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     
     if (!stepData) return;
     
-    // Clear previous animations
+    // Clear previous animations and elements
     svg.selectAll("*").interrupt();
+    svg.selectAll("*").remove();
+    
+    // Add defs for gradients (matching DFS/BFS beautiful styling)
+    const defs = svg.append("defs");
+    
+    // Beautiful gradient for current nodes (processing node in Dijkstra)
+    defs.append("radialGradient")
+      .attr("id", "beautifulCurrentGradient")
+      .attr("cx", "30%")
+      .attr("cy", "30%")
+      .attr("r", "70%")
+      .html(`
+        <stop offset="0%" stop-color="#FEF3C7" />
+        <stop offset="50%" stop-color="#FDE68A" />
+        <stop offset="100%" stop-color="#FCD34D" />
+      `);
+    
+    // Beautiful gradient for visited nodes  
+    defs.append("radialGradient")
+      .attr("id", "beautifulVisitedGradient")
+      .attr("cx", "50%")
+      .attr("cy", "50%")
+      .attr("r", "50%")
+      .html(`
+        <stop offset="0%" stop-color="#3B82F6" />
+        <stop offset="100%" stop-color="#1E40AF" />
+      `);
     
     // Get SVG dimensions
     const width = 600;
@@ -97,10 +124,7 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       }
     });
     
-    // Draw edges with D3 - UPDATED FOR NEW VISUAL STYLE
-    svg.selectAll(".edge").remove();
-    svg.selectAll(".edge-weight").remove();
-    
+    // Draw edges with beautiful styling (matching DFS/BFS)
     if (stepData.graph) {
       nodes.forEach(fromNode => {
         const neighbors = stepData.graph[fromNode] || [];
@@ -108,7 +132,6 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
           const toNode = neighborObj.node;
           const weight = neighborObj.weight;
           
-          // Avoid duplicate edges
           if (fromNode > toNode) return;
           
           const pos1 = nodePositions[fromNode];
@@ -116,52 +139,60 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
           
           if (!pos1 || !pos2) return;
           
-          // Check if this edge connects to the current node
-          const isCurrentNodeEdge = stepData.currentNode && 
-            (fromNode === stepData.currentNode || toNode === stepData.currentNode);
+          // Beautiful edge styling - matching DFS/BFS
+          let strokeColor = "#4B5563"; // Professional gray
+          let strokeWidth = 2.5;
           
-          // Check if we're processing neighbors of current node
-          const isProcessingNeighbors = stepData.currentNode === fromNode || stepData.currentNode === toNode;
+          // Dark blue for visited edges with emphasis
+          if (stepData.visited && 
+              stepData.visited.includes(fromNode) && 
+              stepData.visited.includes(toNode)) {
+            strokeColor = "#1E40AF"; // Rich dark blue
+            strokeWidth = 4.5;
+          }
           
-          // Draw edge line with appropriate style
-          const edge = svg.append("line")
-            .attr("class", "edge")
+          // Add subtle glow effect for important edges
+          if (strokeWidth > 3) {
+            svg.append("line")
+              .attr("x1", pos1.x)
+              .attr("y1", pos1.y)
+              .attr("x2", pos2.x)
+              .attr("y2", pos2.y)
+              .attr("stroke", strokeColor)
+              .attr("stroke-width", strokeWidth + 1)
+              .attr("stroke-linecap", "round")
+              .attr("opacity", 0.3)
+              .style("filter", "blur(1px)");
+          }
+          
+          // Main edge line
+          svg.append("line")
             .attr("x1", pos1.x)
             .attr("y1", pos1.y)
             .attr("x2", pos2.x)
             .attr("y2", pos2.y)
-            .attr("stroke", "#93C5FD") // Light blue default
-            .attr("stroke-width", 2);
+            .attr("stroke", strokeColor)
+            .attr("stroke-width", strokeWidth)
+            .attr("stroke-linecap", "round");
           
-          // Apply dotted line for neighbor search
-          if (isProcessingNeighbors && (stepData.operation === 'relax_edge' || stepData.operation === 'update_distance')) {
-            edge.attr("stroke-dasharray", "5,5")
-                .attr("stroke", "#93C5FD"); // Light blue dotted for neighbor search
-          } else if (stepData.visited && 
-                     ((stepData.visited.includes(fromNode) && stepData.visited.includes(toNode)))) {
-            edge.attr("stroke", "#1E40AF") // Dark blue for traversed edges
-                .attr("stroke-width", 3)
-                .attr("stroke-dasharray", "none");
-          }
-          
-          // Draw edge weight
+          // Draw edge weight with beautiful styling
           const midX = (pos1.x + pos2.x) / 2;
           const midY = (pos1.y + pos2.y) / 2;
           
           svg.append("text")
-            .attr("class", "edge-weight")
             .attr("x", midX)
             .attr("y", midY - 5)
             .attr("text-anchor", "middle")
             .attr("font-size", "12px")
-            .attr("font-weight", "bold")
-            .attr("fill", "#9CA3AF")
+            .attr("font-weight", "600")
+            .attr("font-family", "'Inter', system-ui, sans-serif")
+            .attr("fill", "#6B7280")
             .text(weight);
         });
       });
     }
     
-    // Draw nodes with D3 - UPDATED FOR NEW COLOR SCHEME
+    // Draw nodes with beautiful styling AND drag functionality (matching DFS/BFS)
     svg.selectAll(".node").remove();
     svg.selectAll(".node-label").remove();
     svg.selectAll(".node-distance").remove();
@@ -169,43 +200,74 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
     nodes.forEach(node => {
       const pos = nodePositions[node];
       
-      // Determine node color based on state - NEW COLOR SCHEME
-      let fillColor = "white"; // Default white
-      let strokeColor = "black"; // Default black border
-      let textColor = "black"; // Default black text
+      // Beautiful node styling - matching DFS/BFS exactly
+      let fillColor = "white";
+      let strokeColor = "#6B7280";
+      let textColor = "#1F2937";
+      let strokeWidth = 2;
+      let nodeRadius = 24;
       
-      // Current node gets special treatment
+      // Current node (processing node in Dijkstra) - Beautiful gradient with effects
       if (stepData.currentNode === node) {
-        fillColor = "#93C5FD"; // Light blue for current node
-        strokeColor = "black";
-        textColor = "black";
+        fillColor = "url(#beautifulCurrentGradient)";
+        strokeColor = "#F59E0B"; // Warm amber border
+        strokeWidth = 3;
+        nodeRadius = 28;
+        textColor = "#92400E"; // Dark amber text
+        
+        // Add glow effect
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius + 3)
+          .attr("fill", "#FCD34D")
+          .attr("opacity", 0.3)
+          .style("filter", "blur(3px)");
       } 
-      // Visited nodes
+      // Visited nodes - Beautiful blue gradient
       else if (stepData.visited && stepData.visited.includes(node)) {
-        fillColor = "#1E40AF"; // Dark blue for visited
-        strokeColor = "black";
-        textColor = "white"; // White text for dark blue background
+        fillColor = "url(#beautifulVisitedGradient)";
+        strokeColor = "#1E40AF"; // Deep blue border
+        strokeWidth = 2.5;
+        textColor = "white";
+        
+        // Add subtle inner glow
+        svg.append("circle")
+          .attr("cx", pos.x)
+          .attr("cy", pos.y)
+          .attr("r", nodeRadius - 2)
+          .attr("fill", "white")
+          .attr("opacity", 0.2);
       }
-      // Unvisited nodes
+      // Unvisited nodes - Light styling
       else if (stepData.unvisited && stepData.unvisited.includes(node)) {
-        fillColor = "#F3F4F6"; // Very light gray for unvisited
-        strokeColor = "black";
-        textColor = "black";
+        fillColor = "#F9FAFB"; // Very light gray
+        strokeColor = "#D1D5DB"; // Light gray border
+        strokeWidth = 2;
+        textColor = "#374151"; // Dark gray text
       }
       
-      // Draw node circle with drag support
+      // Draw main node circle WITH DRAG FUNCTIONALITY
       const nodeCircle = svg.append("circle")
-        .attr("class", "node")
         .attr("cx", pos.x)
         .attr("cy", pos.y)
-        .attr("r", 20)
+        .attr("r", nodeRadius)
         .attr("fill", fillColor)
         .attr("stroke", strokeColor)
-        .attr("stroke-width", 2)
-        .attr("data-node", node)
-        .style("cursor", "pointer")
-        .on("mouseover", () => setHoveredNode(node))
-        .on("mouseout", () => setHoveredNode(null))
+        .attr("stroke-width", strokeWidth)
+        .attr("cursor", "pointer")
+        .on("mouseover", function() {
+          // Visual feedback on hover
+          d3.select(this)
+            .attr("r", nodeRadius + 2)
+            .attr("stroke-width", strokeWidth + 1);
+        })
+        .on("mouseout", function() {
+          // Return to normal state
+          d3.select(this)
+            .attr("r", nodeRadius)
+            .attr("stroke-width", strokeWidth);
+        })
         .call(d3.drag()
           .on("start", function(event) {
             setIsDragging(true);
@@ -222,51 +284,67 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
               .attr("cx", newX)
               .attr("cy", newY);
             
-            // Update the node label position
-            svg.selectAll(`.node-label[data-node="${node}"]`)
-              .attr("x", newX)
-              .attr("y", newY);
+            // Update the glow effects if they exist
+            svg.selectAll(`circle`).each(function() {
+              const circle = d3.select(this);
+              const cx = parseFloat(circle.attr("cx"));
+              const cy = parseFloat(circle.attr("cy"));
+              
+              // Check if this circle belongs to the dragged node
+              if (Math.abs(cx - pos.x) < 1 && Math.abs(cy - pos.y) < 1) {
+                circle.attr("cx", newX).attr("cy", newY);
+              }
+            });
             
-            // Update the node distance position
-            svg.selectAll(`.node-distance[data-node="${node}"]`)
-              .attr("x", newX)
-              .attr("y", newY + 15);
+            // Update the node labels and distances
+            svg.selectAll("text").each(function() {
+              const text = d3.select(this);
+              const x = parseFloat(text.attr("x"));
+              const y = parseFloat(text.attr("y"));
+              
+              // Check if this text belongs to the dragged node
+              if (Math.abs(x - pos.x) < 1) {
+                if (Math.abs(y - pos.y) < 1) {
+                  // Node label
+                  text.attr("x", newX).attr("y", newY + 6);
+                } else if (Math.abs(y - (pos.y + 15)) < 1) {
+                  // Distance label
+                  text.attr("x", newX).attr("y", newY + 21);
+                }
+              }
+            });
             
-            // Update connected edges
-            svg.selectAll(".edge, .edge-weight")
-              .each(function() {
-                const element = d3.select(this);
-                const x1 = parseFloat(element.attr("x1"));
-                const y1 = parseFloat(element.attr("y1"));
-                const x2 = parseFloat(element.attr("x2"));
-                const y2 = parseFloat(element.attr("y2"));
-                const textX = parseFloat(element.attr("x"));
-                const textY = parseFloat(element.attr("y"));
-                
-                // Update edge positions
-                if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-                  if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
-                    element.attr("x1", newX).attr("y1", newY);
-                  }
-                  if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
-                    element.attr("x2", newX).attr("y2", newY);
-                  }
+            // Update connected edges and weights
+            svg.selectAll("line, text").each(function() {
+              const element = d3.select(this);
+              const x1 = parseFloat(element.attr("x1"));
+              const y1 = parseFloat(element.attr("y1"));
+              const x2 = parseFloat(element.attr("x2"));
+              const y2 = parseFloat(element.attr("y2"));
+              const textX = parseFloat(element.attr("x"));
+              const textY = parseFloat(element.attr("y"));
+              
+              // Update edge positions
+              if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                if (Math.abs(x1 - pos.x) < 1 && Math.abs(y1 - pos.y) < 1) {
+                  element.attr("x1", newX).attr("y1", newY);
                 }
-                
-                // Update edge weight positions
-                if (!isNaN(textX) && !isNaN(textY)) {
-                  const midX = (pos.x + (element.attr("x1") ? parseFloat(element.attr("x1")) : pos.x) + 
-                               (element.attr("x2") ? parseFloat(element.attr("x2")) : pos.x)) / 2;
-                  const midY = (pos.y + (element.attr("y1") ? parseFloat(element.attr("y1")) : pos.y) + 
-                               (element.attr("y2") ? parseFloat(element.attr("y2")) : pos.y)) / 2;
-                  
-                  if (Math.abs(textX - (pos.x + (element.attr("x2") ? parseFloat(element.attr("x2")) : pos.x))/2) < 1 && 
-                      Math.abs(textY - (pos.y + (element.attr("y2") ? parseFloat(element.attr("y2")) : pos.y) - 5)/2) < 1) {
-                    element.attr("x", (newX + (element.attr("x2") ? parseFloat(element.attr("x2")) : newX))/2)
-                           .attr("y", (newY + (element.attr("y2") ? parseFloat(element.attr("y2")) : newY) - 5)/2);
-                  }
+                if (Math.abs(x2 - pos.x) < 1 && Math.abs(y2 - pos.y) < 1) {
+                  element.attr("x2", newX).attr("y2", newY);
                 }
-              });
+              }
+              
+              // Update edge weight positions
+              if (!isNaN(textX) && !isNaN(textY)) {
+                const midX = (newX + (element.attr("x2") ? parseFloat(element.attr("x2")) : newX)) / 2;
+                const midY = (newY + (element.attr("y2") ? parseFloat(element.attr("y2")) : newY)) / 2;
+                
+                if (Math.abs(textX - (pos.x + (element.attr("x2") ? parseFloat(element.attr("x2")) : pos.x))/2) < 1 && 
+                    Math.abs(textY - ((pos.y + (element.attr("y2") ? parseFloat(element.attr("y2")) : pos.y))/2 - 5)) < 1) {
+                  element.attr("x", midX).attr("y", midY - 5);
+                }
+              }
+            });
             
             // Update the position in our state
             setDraggedNodes(prev => ({
@@ -280,30 +358,30 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
           })
         );
       
-      // Draw node label
+      // Draw node label with beautiful typography (matching DFS/BFS)
       svg.append("text")
-        .attr("class", "node-label")
-        .attr("data-node", node)
         .attr("x", pos.x)
-        .attr("y", pos.y)
+        .attr("y", pos.y + 6)
         .attr("text-anchor", "middle")
-        .attr("font-size", "14px")
-        .attr("font-weight", "bold")
+        .attr("font-size", "15px")
+        .attr("font-weight", "600")
+        .attr("font-family", "'Inter', system-ui, sans-serif")
         .attr("fill", textColor)
+        .attr("pointer-events", "none")
         .text(node);
       
-      // Draw node distance
+      // Draw node distance with beautiful styling
       const distance = stepData.distances && stepData.distances[node];
       if (distance !== undefined) {
         svg.append("text")
-          .attr("class", "node-distance")
-          .attr("data-node", node)
           .attr("x", pos.x)
-          .attr("y", pos.y + 15)
+          .attr("y", pos.y + 21)
           .attr("text-anchor", "middle")
-          .attr("font-size", "10px")
-          .attr("font-weight", "bold")
+          .attr("font-size", "12px")
+          .attr("font-weight", "600")
+          .attr("font-family", "'Inter', system-ui, sans-serif")
           .attr("fill", textColor)
+          .attr("pointer-events", "none")
           .text(distance === Infinity ? "∞" : distance);
       }
     });
@@ -317,15 +395,15 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         })
         .transition()
         .duration(1000)
-        .attr("r", 25)
+        .attr("r", 30)
         .transition()
         .duration(1000)
-        .attr("r", 20);
+        .attr("r", 25);
     }
     
   }, [currentStep, steps, draggedNodes, isDragging, dragNode]);
 
-  // Function to download all steps as PDF with visual representations
+  // Function to download all steps as PDF with beautiful visual representations (matching DFS/BFS)
   const downloadStepsAsPDF = async () => {
     const doc = new jsPDF({
       orientation: 'landscape',
@@ -333,11 +411,16 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
       format: 'a4'
     });
     
-    // Add title
-    doc.setFontSize(22);
+    // Add title with beautiful styling (matching DFS/BFS)
+    doc.setFontSize(24);
+    doc.setTextColor(26, 86, 150); // Dark blue
     doc.text('Dijkstra Visualization Steps', 148.5, 15, null, null, 'center');
     
-    // Add steps with visual representations - one step per page
+    doc.setFontSize(14);
+    doc.setTextColor(75, 85, 99); // Gray subtitle
+    doc.text('Step-by-step shortest path algorithm', 148.5, 25, null, null, 'center');
+    
+    // Add steps with beautiful visual representations (matching DFS/BFS)
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index];
       
@@ -346,21 +429,23 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         doc.addPage();
       }
       
-      // Add step header
-      doc.setFontSize(16);
-      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 25, null, null, 'center');
+      // Add step header with beautiful styling
+      doc.setFontSize(18);
+      doc.setTextColor(31, 41, 55); // Dark header
+      doc.text(`Step ${index + 1} of ${steps.length}`, 148.5, 35, null, null, 'center');
       
       doc.setFontSize(12);
-      doc.text(getOperationDescription(step), 148.5, 35, null, null, 'center');
+      doc.setTextColor(107, 114, 128); // Gray description
+      doc.text(getOperationDescription(step), 148.5, 45, null, null, 'center');
       
-      // Add a visual representation of the graph
+      // Add a beautiful visual representation of the graph
       if (step.graph || step.operation) {
         // Calculate bounding box for scaling
         const bbox = calculateGraphBoundingBox(step.graph);
         const pageWidth = 297; // A4 landscape width in mm
         const pageHeight = 210; // A4 landscape height in mm
         const availableWidth = pageWidth - 40; // Leave 20mm margin on each side
-        const availableHeight = pageHeight - 60; // Leave space for header and footer
+        const availableHeight = pageHeight - 70; // Leave space for header and footer
         
         // Calculate scale to fit
         const scaleX = availableWidth / bbox.width;
@@ -371,19 +456,45 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
         const graphWidth = bbox.width * scale;
         const graphHeight = bbox.height * scale;
         const x = (pageWidth - graphWidth) / 2 - bbox.minX * scale;
-        const y = (availableHeight - graphHeight) / 2 + 50 - bbox.minY * scale; // +50 for header space
+        const y = (availableHeight - graphHeight) / 2 + 60 - bbox.minY * scale; // +60 for header space
         
-        drawGraphInPDF(doc, step.graph, x, y, 0, null, null, scale, step);
+        drawBeautifulGraphInPDF(doc, step.graph, x, y, 0, null, null, scale, step);
       } else {
+        doc.setFontSize(14);
+        doc.setTextColor(156, 163, 175);
         doc.text('Empty graph', 148.5, 105, null, null, 'center');
       }
+      
+      // Add step information (matching DFS/BFS styling)
+      if (step.queue && step.queue.length > 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(245, 158, 11); // Amber for queue
+        doc.text(`Queue: [${step.queue.join(', ')}]`, 20, 190);
+      }
+      
+      if (step.visited && step.visited.length > 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(30, 64, 175); // Dark blue for visited
+        doc.text(`Visited: [${step.visited.join(', ')}]`, 20, 198);
+      }
+      
+      if (step.unvisited && step.unvisited.length > 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(107, 114, 128); // Gray for unvisited
+        doc.text(`Unvisited: [${step.unvisited.join(', ')}]`, 20, 206);
+      }
+      
+      // Add page number
+      doc.setFontSize(8);
+      doc.setTextColor(156, 163, 175);
+      doc.text(`Page ${index + 1} of ${steps.length}`, 277, 200, null, null, 'right');
       
       // Add a small delay to prevent UI blocking
       await new Promise(resolve => setTimeout(resolve, 10));
     }
     
     // Save the PDF
-    doc.save('dijkstra-steps.pdf');
+    doc.save('dijkstra-visualization-steps.pdf');
   };
   
   // Helper function to calculate graph bounding box
@@ -884,7 +995,7 @@ const DijkstraVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, o
   );
 };
 
-// Helper function to render static graph for step list
+// Helper function to render static graph for step list - ENHANCED STYLING (matching DFS/BFS)
 const renderStaticGraph = (step) => {
   if (!step.graph) return null;
   
@@ -892,7 +1003,7 @@ const renderStaticGraph = (step) => {
   if (nodes.length === 0) return null;
   
   // We'll arrange nodes in a circular pattern for visualization
-  const radius = 100;
+  const radius = 120;
   const centerX = 200;
   const centerY = 150;
   
@@ -908,7 +1019,26 @@ const renderStaticGraph = (step) => {
   
   return (
     <g>
-      {/* Draw edges */}
+      {/* Define blue theme gradients (matching DFS/BFS) */}
+      <defs>
+        <radialGradient id="staticCurrentGradient" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#FEF3C7" />
+          <stop offset="50%" stopColor="#FDE68A" />
+          <stop offset="100%" stopColor="#FCD34D" />
+        </radialGradient>
+        <radialGradient id="staticVisitedGradient" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#3B82F6" />
+          <stop offset="100%" stopColor="#1E40AF" />
+        </radialGradient>
+        <filter id="staticBlueGlow">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#93C5FD" floodOpacity="0.3"/>
+        </filter>
+        <filter id="staticYellowGlow">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#FEF3C7" floodOpacity="0.3"/>
+        </filter>
+      </defs>
+      
+      {/* Draw edges with high contrast styling (matching DFS/BFS) */}
       {nodes.map((fromNode) => {
         const neighbors = step.graph[fromNode] || [];
         return neighbors.map((neighborObj) => {
@@ -925,6 +1055,18 @@ const renderStaticGraph = (step) => {
           const midX = (pos1.x + pos2.x) / 2;
           const midY = (pos1.y + pos2.y) / 2;
           
+          // Determine high contrast edge style
+          let strokeColor = "black"; // Black base for visibility
+          let strokeWidth = 3; // Thick base width
+          
+          // Traversed edges - Dark blue
+          if (step.visited && 
+              step.visited.includes(fromNode) && 
+              step.visited.includes(toNode)) {
+            strokeColor = "#1E40AF"; // Dark blue
+            strokeWidth = 5; // Very bold emphasis
+          }
+          
           return (
             <g key={`${fromNode}-${toNode}`}>
               <line
@@ -932,14 +1074,18 @@ const renderStaticGraph = (step) => {
                 y1={pos1.y}
                 x2={pos2.x}
                 y2={pos2.y}
-                stroke="#93C5FD"
-                strokeWidth="2"
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
               />
               <text
                 x={midX}
                 y={midY - 5}
                 textAnchor="middle"
-                className="font-bold text-gray-600 text-xs"
+                fontSize="12"
+                fontWeight="700"
+                fontFamily="'Segoe UI', system-ui, sans-serif"
+                fill="#6B7280"
               >
                 {weight}
               </text>
@@ -948,20 +1094,36 @@ const renderStaticGraph = (step) => {
         });
       })}
       
-      {/* Draw nodes */}
+      {/* Draw nodes with enhanced styling (matching DFS/BFS) */}
       {nodes.map((node) => {
         const pos = nodePositions[node];
         const isCurrent = step.currentNode === node;
         const isVisited = step.visited && step.visited.includes(node);
         const isUnvisited = step.unvisited && step.unvisited.includes(node);
         
-        let fillColor = "#93C5FD"; // Light blue default
+        // Determine node style - HIGH CONTRAST DESIGN
+        let fillColor = "white";
+        let strokeColor = "black"; // Black border for maximum contrast
+        let textColor = "black"; // Black text for light backgrounds
+        let strokeWidth = 3; // Thick border for visibility
+        let nodeRadius = 20;
+        
         if (isCurrent) {
-          fillColor = "#1E40AF"; // Dark blue for current node
+          fillColor = "url(#staticCurrentGradient)";
+          strokeColor = "black"; // Black border
+          strokeWidth = 4; // Extra thick border
+          nodeRadius = 24;
+          textColor = "black"; // Black text on light yellow
         } else if (isVisited) {
-          fillColor = "#3B82F6"; // Medium blue for visited
+          fillColor = "url(#staticVisitedGradient)";
+          strokeColor = "black"; // Black border
+          strokeWidth = 3; // Thick border
+          textColor = "white"; // White text on dark blue
         } else if (isUnvisited) {
-          fillColor = "#60A5FA"; // Slightly darker light blue for unvisited
+          fillColor = "#F9FAFB"; // Very light gray
+          strokeColor = "black"; // Black border
+          strokeWidth = 3; // Thick border
+          textColor = "black"; // Black text
         }
         
         // Get distance for this node
@@ -969,28 +1131,72 @@ const renderStaticGraph = (step) => {
         
         return (
           <g key={node}>
+            {/* Blue/Yellow theme glow effects */}
+            {isCurrent && (
+              <>
+                <circle
+                  cx={pos.x}
+                  cy={pos.y + 2}
+                  r={nodeRadius}
+                  fill="black"
+                  opacity="0.1"
+                  filter="url(#staticBlueGlow)"
+                />
+                <circle
+                  cx={pos.x}
+                  cy={pos.y}
+                  r={nodeRadius + 2}
+                  fill="#FEF3C7"
+                  opacity="0.2"
+                  filter="url(#staticYellowGlow)"
+                />
+              </>
+            )}
+            {isVisited && (
+              <circle
+                cx={pos.x}
+                cy={pos.y}
+                r={nodeRadius - 2}
+                fill="white"
+                opacity="0.2"
+                filter="url(#staticBlueGlow)"
+              />
+            )}
+            
+            {/* Node circle */}
             <circle
               cx={pos.x}
               cy={pos.y}
-              r="15"
+              r={nodeRadius}
               fill={fillColor}
-              stroke="#1E40AF"
-              strokeWidth="2"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              style={{ animation: "none" }}
             />
+            
+            {/* Node label */}
             <text
               x={pos.x}
-              y={pos.y}
+              y={pos.y + 6}
               textAnchor="middle"
-              className="font-bold text-white text-sm"
+              fontSize="14"
+              fontWeight="700"
+              fontFamily="'Segoe UI', system-ui, sans-serif"
+              fill={textColor}
             >
               {node}
             </text>
+            
+            {/* Node distance */}
             {distance !== undefined && (
               <text
                 x={pos.x}
-                y={pos.y + 15}
+                y={pos.y + 20}
                 textAnchor="middle"
-                className="font-bold text-white text-xs"
+                fontSize="12"
+                fontWeight="700"
+                fontFamily="'Segoe UI', system-ui, sans-serif"
+                fill={textColor}
               >
                 {distance === Infinity ? "∞" : distance}
               </text>
