@@ -21,6 +21,13 @@ import {
   Lock,
   AlertCircle
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import rehypeHighlight from 'rehype-highlight';
+import rehypeRaw from 'rehype-raw';
+import 'katex/dist/katex.min.css';
+import 'highlight.js/styles/github.css';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -42,8 +49,122 @@ const ContestDiscussion = () => {
   const [expandedPost, setExpandedPost] = useState(null);
   const [commentInputs, setCommentInputs] = useState({});
   const [replyingTo, setReplyingTo] = useState({});
+  const [showPreview, setShowPreview] = useState(false);
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
+
+  // Custom Markdown components for discussion rendering
+  const customComponents = {
+    // Spoiler component for hidden content (Codeforces style)
+    spoiler: ({ summary, children }) => (
+      <details className="my-3 bg-gray-50 rounded-lg p-3 border border-gray-200">
+        <summary className="cursor-pointer font-medium text-blue-700 hover:text-blue-900 list-none">
+          <span className="inline-block mr-2">▶</span>
+          {summary || 'Spoiler'}
+        </summary>
+        <div className="mt-2 pl-6 border-l-3 border-blue-400">{children}</div>
+      </details>
+    ),
+
+    // Headings with better styling
+    h1: ({ children }) => (
+      <h1 className="text-xl font-bold mt-4 mb-3 text-gray-900 border-b border-gray-300 pb-2">
+        {children}
+      </h1>
+    ),
+    h2: ({ children }) => (
+      <h2 className="text-lg font-bold mt-3 mb-2 text-gray-800">
+        {children}
+      </h2>
+    ),
+    h3: ({ children }) => (
+      <h3 className="text-base font-semibold mt-2 mb-1 text-gray-700">
+        {children}
+      </h3>
+    ),
+
+    // Lists
+    ul: ({ children }) => (
+      <ul className="my-2 ml-4 list-disc space-y-1">
+        {children}
+      </ul>
+    ),
+    ol: ({ children }) => (
+      <ol className="my-2 ml-4 list-decimal space-y-1">
+        {children}
+      </ol>
+    ),
+
+    // Code blocks
+    code: ({ className, children }) => {
+      const match = /language-(\w+)/.exec(className || '');
+      const isInline = !match && !className?.includes('language-');
+      
+      if (isInline) {
+        return (
+          <code className="px-1.5 py-0.5 bg-gray-100 rounded text-sm font-mono text-gray-800">
+            {children}
+          </code>
+        );
+      }
+      
+      return (
+        <code className={className}>
+          {children}
+        </code>
+      );
+    },
+
+    // Blockquotes
+    blockquote: ({ children }) => (
+      <blockquote className="border-l-4 border-gray-300 pl-3 my-3 text-gray-600 italic">
+        {children}
+      </blockquote>
+    ),
+
+    // Links
+    a: ({ href, children }) => (
+      <a 
+        href={href} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:text-blue-800 underline"
+      >
+        {children}
+      </a>
+    ),
+
+    // Tables
+    table: ({ children }) => (
+      <div className="overflow-x-auto my-3">
+        <table className="min-w-full border-collapse border border-gray-300">
+          {children}
+        </table>
+      </div>
+    ),
+    th: ({ children }) => (
+      <th className="border border-gray-300 px-3 py-2 bg-gray-100 font-medium">
+        {children}
+      </th>
+    ),
+    td: ({ children }) => (
+      <td className="border border-gray-300 px-3 py-2">
+        {children}
+      </td>
+    ),
+
+    // Paragraphs
+    p: ({ children }) => (
+      <p className="my-2 leading-relaxed">
+        {children}
+      </p>
+    ),
+
+    // Horizontal rule
+    hr: () => (
+      <hr className="my-4 border-gray-300" />
+    ),
+  };
 
   // Fetch discussions
   const fetchDiscussions = async () => {
@@ -271,6 +392,7 @@ const ContestDiscussion = () => {
         setDiscussions(prev => [data.discussion, ...prev]);
         setNewPost({ title: '', content: '', problem: '' });
         setShowNewPostForm(false);
+        setShowPreview(false);
       }
     } catch (error) {
       console.error('Error creating post:', error);
@@ -420,6 +542,8 @@ const ContestDiscussion = () => {
     fetchDiscussions();
   };
 
+  const togglePreview = () => setShowPreview(!showPreview);
+
   if (loading && !discussions.length) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -514,7 +638,10 @@ const ContestDiscussion = () => {
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-medium text-gray-900 text-xs">New Post</h3>
               <button
-                onClick={() => setShowNewPostForm(false)}
+                onClick={() => {
+                  setShowNewPostForm(false);
+                  setShowPreview(false);
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X className="w-3 h-3" />
@@ -528,13 +655,42 @@ const ContestDiscussion = () => {
                 onChange={(e) => setNewPost({...newPost, title: e.target.value})}
                 className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               />
-              <textarea
-                placeholder="Content"
-                value={newPost.content}
-                onChange={(e) => setNewPost({...newPost, content: e.target.value})}
-                rows={3}
-                className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              />
+              
+              {/* Content Input with Preview Toggle */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-600">Content (Markdown supported)</span>
+                  <button
+                    type="button"
+                    onClick={togglePreview}
+                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                  >
+                    <Eye className="w-3 h-3" />
+                    {showPreview ? 'Edit' : 'Preview'}
+                  </button>
+                </div>
+                
+                {!showPreview ? (
+                  <textarea
+                    placeholder={`Write your post content using Markdown...\n\nExamples:\n**bold text**\n[link](https://example.com)\n\`\`\`cpp\n// code block\n\`\`\`\n$a + b = c$ for inline math\n$$E = mc^2$$ for display math\n<spoiler summary="Spoiler Title">Hidden content</spoiler>`}
+                    value={newPost.content}
+                    onChange={(e) => setNewPost({...newPost, content: e.target.value})}
+                    rows={4}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                  />
+                ) : (
+                  <div className="w-full p-2 border border-gray-300 rounded text-xs bg-gray-50 min-h-[100px] overflow-y-auto">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath]}
+                      rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                      components={customComponents}
+                    >
+                      {newPost.content || '*Nothing to preview*'}
+                    </ReactMarkdown>
+                  </div>
+                )}
+              </div>
+              
               <div className="flex items-center gap-2">
                 <select
                   value={newPost.problem}
@@ -585,12 +741,17 @@ const ContestDiscussion = () => {
                   </div>
                 </div>
 
-                {/* Post Content Preview */}
+                {/* Post Content with Markdown Rendering */}
                 <div className="p-2">
-                  <p className="text-gray-600 text-xs line-clamp-2">
-                    {post.content.substring(0, 100)}
-                    {post.content.length > 100 && '...'}
-                  </p>
+                  <div className="text-gray-800 text-xs prose prose-sm max-w-none">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath]}
+                      rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                      components={customComponents}
+                    >
+                      {post.content}
+                    </ReactMarkdown>
+                  </div>
                 </div>
 
                 {/* Post Actions */}
@@ -696,17 +857,28 @@ const ContestDiscussion = () => {
                                     {comment.author?.name?.split(' ')[0] || 'User'}
                                   </span>
                                 </div>
+                                <span className="text-[10px] text-gray-500">
+                                  {formatDate(comment.createdAt)}
+                                </span>
+                              </div>
+                              <div className="text-gray-600 text-xs mt-1">
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkMath]}
+                                  rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                                  components={customComponents}
+                                >
+                                  {comment.content}
+                                </ReactMarkdown>
+                              </div>
+                              <div className="flex justify-end mt-1">
                                 <button
                                   onClick={() => handleReply(post.id, comment.id)}
-                                  className="text-gray-400 hover:text-blue-600"
-                                  title="Reply"
+                                  className="text-[10px] text-blue-600 hover:text-blue-800 flex items-center gap-0.5"
                                 >
                                   <Reply className="w-2.5 h-2.5" />
+                                  Reply
                                 </button>
                               </div>
-                              <p className="text-gray-600 text-xs">
-                                {comment.content}
-                              </p>
                             </div>
                           ))}
                           {post.comments.length > 5 && (
