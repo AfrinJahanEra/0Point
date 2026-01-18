@@ -404,9 +404,9 @@ const BlogDetail = () => {
       );
     },
 
-    // Updated code block with same background as blockquote
+    // Updated code block with tag background color, no border
     pre: ({ children }) => (
-      <pre className="my-4 bg-gray-100 p-3 rounded border-l-4 border-gray-400 text-xs font-mono overflow-x-auto">
+      <pre className="my-4 bg-gray-100 p-3 rounded text-xs font-mono overflow-x-auto">
         {children}
       </pre>
     ),
@@ -488,13 +488,13 @@ const BlogDetail = () => {
                   </div>
                 </div>
 
-                {/* Tags - Updated with same bg as blockquote, black text, and rounded */}
+                {/* Tags - Updated with same bg as code block, black text, and rounded */}
                 {blog.tags && blog.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {blog.tags.map((tag, index) => (
                       <span
                         key={index}
-                        className="px-2 py-0.5 text-xs bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 cursor-pointer transition-colors border border-gray-300"
+                        className="px-2 py-0.5 text-xs bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 cursor-pointer transition-colors"
                       >
                         {tag}
                       </span>
@@ -525,7 +525,7 @@ const BlogDetail = () => {
                     onClick={() => handleVote('upvote')}
                     className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
                       votes.user_vote === 'upvote' 
-                        ? 'bg-green-50 text-green-700 border border-green-200' 
+                        ? 'bg-green-50 text-green-700' 
                         : 'text-gray-600 hover:bg-gray-100'
                     }`}
                     title="Like"
@@ -541,7 +541,7 @@ const BlogDetail = () => {
                     onClick={() => handleVote('downvote')}
                     className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
                       votes.user_vote === 'downvote' 
-                        ? 'bg-red-50 text-red-700 border border-red-200' 
+                        ? 'bg-red-50 text-red-700' 
                         : 'text-gray-600 hover:bg-gray-100'
                     }`}
                     title="Dislike"
