@@ -13,11 +13,8 @@ const Contests = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredContests, setFilteredContests] = useState([]);
   const [registeredContests, setRegisteredContests] = useState([]);
-
   const navigate = useNavigate();
-
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjk0NTYwMTY5MjM3MWFmMGU5OWMyYWZjIiwiZW1haWwiOiJlcmFAZ29vZ2xlLmNvbSIsInJvbGUiOiJ1c2VyIn0.zwibsApLmoW3oQ-Aq9OXw6g56gPqaWr2piZMQypVrew";
-
 
   // Normalize CF contest data
   const normalizeCFContest = (c) => ({
@@ -26,40 +23,36 @@ const Contests = () => {
     description: 'Codeforces Contest',
     platform: 'cf',
     start_time: c.start_time,
-    duration: c.duration_seconds / 3600,
+    duration_seconds: c.duration_seconds,
+    duration_formatted: c.duration_formatted,  // Use formatted duration from backend
     status: c.status === 'finished' ? 'past' : c.status,
     type: 'individual',
-    participants: 0,
+    participants: c.participants || 0,  // Use exact participant count from API
     url: c.url,
     external: true
   });
-
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         console.log('📡 Fetching contests...');
-
         // 1️⃣ Fetch manual contests
         const manualRes = await axios.get('http://localhost:8000/contests/', {
           headers: { Authorization: `Bearer ${TOKEN}` }
         });
         const manualContests = manualRes.data.contests || [];
         console.log('✅ Manual contests:', manualContests.length);
-
         // 2️⃣ Fetch CF contests (using correct parameter name)
         const cfRes = await axios.get('http://localhost:8000/external/contests/?platform=codeforces', {
           headers: { Authorization: `Bearer ${TOKEN}` }
         });
         const cfContests = (cfRes.data || []).map(normalizeCFContest);
         console.log('✅ CF contests:', cfContests.length);
-
         // Merge all contests
         const allContests = [...manualContests, ...cfContests];
         console.log('✅ Total contests:', allContests.length);
         setContests(allContests);
-
         // Fetch registrations for manual contests only
         try {
           const regRes = await axios.get('http://localhost:8000/contests/registrations/', {
@@ -71,7 +64,6 @@ const Contests = () => {
           console.warn('⚠️ Registrations fetch failed:', regErr);
           setRegisteredContests([]);
         }
-
         setError(null);
       } catch (err) {
         console.error('❌ Contests fetch failed:', err);
@@ -80,15 +72,12 @@ const Contests = () => {
         setLoading(false);
       }
     };
-
     fetchData();
   }, []);
-
 
   // WebSocket connection
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:8000/ws/contest/global/");
-
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -104,18 +93,15 @@ const Contests = () => {
         console.error('WebSocket message error:', error);
       }
     };
-
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
     };
-
     return () => ws.close();
   }, []);
 
   // Filtering logic
   useEffect(() => {
     let filtered = [...contests];
-
     // Status filter
     if (activeTab !== 'all') {
       if (activeTab === 'draft') {
@@ -124,12 +110,10 @@ const Contests = () => {
         filtered = filtered.filter(c => c.status === activeTab);
       }
     }
-
     // Platform filter
     if (activePlatform !== 'all') {
       filtered = filtered.filter(c => c.platform === activePlatform);
     }
-
     // Search filter
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -138,7 +122,6 @@ const Contests = () => {
         (c.description && c.description.toLowerCase().includes(q))
       );
     }
-
     setFilteredContests(filtered);
   }, [contests, activeTab, activePlatform, searchQuery]);
 
@@ -149,7 +132,7 @@ const Contests = () => {
       case 'codechef': return 'CodeChef';
       case 'atcoder': return 'AtCoder';
       case 'hackerrank': return 'HackerRank';
-      case 'leetcode': return 'LeetCode';
+      case 'leetcode': return 'LeCode';
       default: return platform || 'Unknown';
     }
   };
@@ -163,12 +146,10 @@ const Contests = () => {
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
         alert("Contest published successfully!");
-
         // Refresh contests list
         const contestsRes = await axios.get('http://localhost:8000/contests/', {
           headers: { Authorization: `Bearer ${TOKEN}` }
         });
-
         // Get existing external contests
         const externalContests = contests.filter(c => c.external);
         const updatedContests = [...contestsRes.data.contests || [], ...externalContests];
@@ -192,13 +173,35 @@ const Contests = () => {
     }
   };
 
-  const formatHourDuration = (hours) => {
-    if (!hours && hours !== 0) return 'Not set';
-    const h = Math.floor(hours);
-    const m = Math.round((hours - h) * 60);
-    if (h > 0 && m > 0) return `${h}h ${m}m`;
-    if (h > 0) return `${h}h`;
-    if (m > 0) return `${m}m`;
+  const formatHourDuration = (contest) => {
+    // For manual contests, use the old logic
+    if (!contest.external && contest.duration) {
+      const hours = contest.duration;
+      if (!hours && hours !== 0) return 'Not set';
+      const h = Math.floor(hours);
+      const m = Math.round((hours - h) * 60);
+      if (h > 0 && m > 0) return `${h}h ${m}m`;
+      if (h > 0) return `${h}h`;
+      if (m > 0) return `${m}m`;
+      return 'Not set';
+    }
+    
+    // For CF contests, use the formatted duration from backend
+    if (contest.external && contest.duration_formatted) {
+      return contest.duration_formatted;
+    }
+    
+    // Fallback
+    if (contest.duration_seconds) {
+      const hours = contest.duration_seconds / 3600;
+      const h = Math.floor(hours);
+      const m = Math.round((hours - h) * 60);
+      if (h > 0 && m > 0) return `${h}h ${m}m`;
+      if (h > 0) return `${h}h`;
+      if (m > 0) return `${m}m`;
+      return 'Not set';
+    }
+    
     return 'Not set';
   };
 
@@ -239,38 +242,29 @@ const Contests = () => {
       window.open(externalUrl, '_blank');
       return;
     }
-
     if (contestStatus === 'draft') {
       navigate(`/contests/${contestId}/edit`);
       return;
     }
-
     try {
       const problemsRes = await axios.get(
         `http://localhost:8000/contests/${contestId}/problems/`,
         { headers: { Authorization: `Bearer ${TOKEN}` } }
       );
-
       const problems = problemsRes.data.problems || [];
-
       if (problems.length === 0) {
         alert('This contest has no problems yet.');
         return;
       }
-
       navigate(`/contests/${contestId}`);
-
     } catch (error) {
       console.error('Error fetching contest problems:', error);
-
       if (error.response?.status === 403) {
         const errorData = error.response.data;
-
         if (errorData.can_register) {
           const shouldRegister = window.confirm(
             `You need to register for this ${contestStatus} contest. Register now?`
           );
-
           if (shouldRegister) {
             try {
               await axios.post(
@@ -278,12 +272,9 @@ const Contests = () => {
                 {},
                 { headers: { Authorization: `Bearer ${TOKEN}` } }
               );
-
               await refreshRegisteredContests();
-
               alert('Successfully registered! You can now enter the contest.');
               navigate(`/contests/${contestId}`);
-
             } catch (registerError) {
               console.error('Registration error:', registerError);
               navigate(`/contests/${contestId}/register`);
@@ -367,7 +358,6 @@ const Contests = () => {
                   />
                 </div>
               </div>
-
               {/* Status Tabs */}
               <div className="flex space-x-1 mt-4 bg-gray-100 rounded-lg p-1">
                 {statusTabs.map(tab => (
@@ -384,7 +374,6 @@ const Contests = () => {
                 ))}
               </div>
             </div>
-
             {/* Contest Cards Grid */}
             <div className="grid gap-4">
               {filteredContests.length > 0 ? (
@@ -396,7 +385,7 @@ const Contests = () => {
                       cursor: contest.status === 'upcoming' ? 'default' : 'pointer'
                     }}
                     onClick={() => {
-                      if (contest.status !== 'upcoming' && !contest.status === 'draft') {
+                      if (contest.status !== 'upcoming' && contest.status !== 'draft') {
                         handleContestEntry(
                           contest.id,
                           contest.status,
@@ -413,11 +402,7 @@ const Contests = () => {
                           <span className={getStatusBadge(contest.status)}>
                             {contest.status.toUpperCase()}
                           </span>
-                          {contest.external && (
-                            <span className="px-2 py-1 rounded-full text-xs font-semibold border bg-purple-50 text-purple-800 border-purple-200">
-                              EXTERNAL
-                            </span>
-                          )}
+                          {/* REMOVED: External tag for CF contests */}
                         </div>
                         <p className="text-xs text-gray-600 mb-2">
                           {getPlatformName(contest.platform)} • {contest.type === 'individual' ? 'Individual' : 'Team'}
@@ -429,7 +414,7 @@ const Contests = () => {
                           </span>
                           <span className="flex items-center space-x-1">
                             <Clock className="w-3 h-3" />
-                            <span>{formatHourDuration(contest.duration)}</span>
+                            <span>{formatHourDuration(contest)}</span>
                           </span>
                           <span className="flex items-center space-x-1">
                             <Users className="w-3 h-3" />
@@ -437,7 +422,6 @@ const Contests = () => {
                           </span>
                         </div>
                       </div>
-
                       {/* Action Buttons */}
                       <div className="flex flex-col space-y-2 ml-4" onClick={(e) => e.stopPropagation()}>
                         {contest.status === 'draft' ? (
@@ -532,7 +516,6 @@ const Contests = () => {
               )}
             </div>
           </div>
-
           {/* Sidebar */}
           <div className="lg:col-span-3 space-y-4">
             <div className="bg-white rounded-lg border border-gray-200">
