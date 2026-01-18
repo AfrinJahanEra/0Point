@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/pdf/', include('pdf.urls')),
     path('api/ide/', include('ide.urls')),
     path("", include("crossPlatform.urls")),
+    path("blog/", include("blog.urls")),
 ]
 
 # Serve media files during development
@@ -32,3 +33,4 @@ if settings.DEBUG:
         }),
 
     ]
+
