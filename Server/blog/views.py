@@ -2,8 +2,8 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import Blog, BlogVote, BlogComment
-from .serializers import BlogSerializer, BlogVoteSerializer, BlogCommentSerializer
+from .models import Blog, BlogCommentVote, BlogVote, BlogComment
+from .serializers import BlogCommentVoteSerializer, BlogSerializer, BlogVoteSerializer, BlogCommentSerializer
 from account.models import Account
 import jwt
 from django.conf import settings
@@ -253,11 +253,20 @@ def get_blog_comments(request, blog_id):
         # Get top-level comments (no parent)
         comments = BlogComment.objects(blog=blog, parent_comment=None, is_deleted=False).order_by('created_at')
         
+        user = get_user_from_request(request)
+        
         comment_data = []
         for comment in comments:
             comment_dict = comment.to_dict()
-            # Recursively get replies
-            comment_dict['replies'] = get_nested_replies(comment)
+            # Add user vote information if user is authenticated
+            if user:
+                vote = BlogCommentVote.objects(comment=comment, user=user).first()
+                comment_dict['user_vote'] = vote.vote_type if vote else None
+            else:
+                comment_dict['user_vote'] = None
+            
+            # Recursively get replies with vote info
+            comment_dict['replies'] = get_nested_replies_with_votes(comment, user)
             comment_data.append(comment_dict)
         
         return Response(comment_data, status=status.HTTP_200_OK)
@@ -266,15 +275,89 @@ def get_blog_comments(request, blog_id):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-def get_nested_replies(comment):
-    """Helper function to get nested replies recursively"""
+def get_nested_replies_with_votes(comment, user):
+    """Helper function to get nested replies recursively with vote information"""
     replies = []
     for reply in comment.replies:
         if not reply.is_deleted:
             reply_dict = reply.to_dict()
-            reply_dict['replies'] = get_nested_replies(reply)
+            
+            # Add user vote information if user is authenticated
+            if user:
+                vote = BlogCommentVote.objects(comment=reply, user=user).first()
+                reply_dict['user_vote'] = vote.vote_type if vote else None
+            else:
+                reply_dict['user_vote'] = None
+            
+            # Recursively get nested replies
+            reply_dict['replies'] = get_nested_replies_with_votes(reply, user)
             replies.append(reply_dict)
     return replies
+
+
+@api_view(['GET'])
+def get_comment_votes(request, comment_id):
+    """Get vote counts for a comment"""
+    try:
+        comment = BlogComment.objects.get(id=comment_id, is_deleted=False)
+        upvotes = BlogCommentVote.objects(comment=comment, vote_type='upvote').count()
+        downvotes = BlogCommentVote.objects(comment=comment, vote_type='downvote').count()
+        
+        # Check user's vote if authenticated
+        user_vote = None
+        user = get_user_from_request(request)
+        if user:
+            vote = BlogCommentVote.objects(comment=comment, user=user).first()
+            user_vote = vote.vote_type if vote else None
+        
+        return Response({
+            'upvotes': upvotes,
+            'downvotes': downvotes,
+            'score': upvotes - downvotes,
+            'user_vote': user_vote
+        }, status=status.HTTP_200_OK)
+    except BlogComment.DoesNotExist:
+        return Response({'error': 'Comment not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def vote_comment(request, comment_id):
+    """Vote on a comment (upvote/downvote)"""
+    user = get_user_from_request(request)
+    if not user:
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        comment = BlogComment.objects.get(id=comment_id, is_deleted=False)
+    except BlogComment.DoesNotExist:
+        return Response({'error': 'Comment not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = BlogCommentVoteSerializer(data={'comment_id': comment_id, 'vote_type': request.data.get('vote_type')}, context={'request': request, 'user': user})
+    if serializer.is_valid():
+        result = serializer.save()
+        if isinstance(result, dict) and result.get('message') == 'Vote removed':
+            return Response({'message': 'Vote removed', 'vote_type': None}, status=status.HTTP_200_OK)
+        
+        # Get updated vote counts
+        upvotes = BlogCommentVote.objects(comment=comment, vote_type='upvote').count()
+        downvotes = BlogCommentVote.objects(comment=comment, vote_type='downvote').count()
+        score = upvotes - downvotes
+        
+        # Get user's current vote
+        current_vote = BlogCommentVote.objects(comment=comment, user=user).first()
+        user_vote = current_vote.vote_type if current_vote else None
+        
+        return Response({
+            'message': 'Vote recorded',
+            'upvotes': upvotes,
+            'downvotes': downvotes,
+            'score': score,
+            'user_vote': user_vote
+        }, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['DELETE'])
 def delete_comment(request, comment_id):

@@ -87,6 +87,26 @@ class BlogVote(Document):
         self.updated_at = datetime.utcnow()
         return super(BlogVote, self).save(*args, **kwargs)
 
+class BlogCommentVote(Document):
+    meta = {'collection': 'blog_comment_votes'}
+    
+    comment = ReferenceField('BlogComment', required=True)
+    user = ReferenceField(Account, required=True)
+    vote_type = StringField(required=True, choices=['upvote', 'downvote'])
+    
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+    
+    meta = {
+        'indexes': [
+            {'fields': ['comment', 'user'], 'unique': True}  # One vote per user per comment
+        ]
+    }
+    
+    def save(self, *args, **kwargs):
+        self.updated_at = datetime.utcnow()
+        return super(BlogCommentVote, self).save(*args, **kwargs)
+
 class BlogComment(Document):
     meta = {'collection': 'blog_comments'}
     
@@ -105,6 +125,10 @@ class BlogComment(Document):
         return super(BlogComment, self).save(*args, **kwargs)
     
     def to_dict(self):
+        # Calculate vote counts for this comment
+        upvotes = BlogCommentVote.objects(comment=self, vote_type='upvote').count()
+        downvotes = BlogCommentVote.objects(comment=self, vote_type='downvote').count()
+        
         return {
             "id": str(self.id),
             "blog_id": str(self.blog.id),
@@ -124,4 +148,9 @@ class BlogComment(Document):
             "is_deleted": self.is_deleted,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "upvotes": upvotes,
+            "downvotes": downvotes,
+            "score": upvotes - downvotes,
         }
+
+

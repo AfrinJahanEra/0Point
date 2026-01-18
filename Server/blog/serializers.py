@@ -1,6 +1,6 @@
 # blog/serializers.py
 from rest_framework import serializers
-from .models import Blog, BlogVote, BlogComment
+from .models import Blog, BlogCommentVote, BlogVote, BlogComment
 from account.models import Account
 
 class BlogSerializer(serializers.Serializer):
@@ -170,3 +170,46 @@ class BlogCommentSerializer(serializers.Serializer):
             parent_comment.save()
 
         return comment
+    
+class BlogCommentVoteSerializer(serializers.Serializer):
+    id = serializers.CharField(read_only=True)
+    comment_id = serializers.CharField(required=True)
+    vote_type = serializers.ChoiceField(choices=['upvote', 'downvote'], required=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
+
+    def create(self, validated_data):
+        user = self.context.get('user')
+        if not user:
+            raise serializers.ValidationError("User authentication required")
+
+        comment_id = validated_data['comment_id']
+        vote_type = validated_data['vote_type']
+
+        try:
+            comment = BlogComment.objects.get(id=comment_id)
+        except BlogComment.DoesNotExist:
+            raise serializers.ValidationError("Comment not found")
+
+        # Check if user already voted on this comment
+        existing_vote = BlogCommentVote.objects(comment=comment, user=user).first()
+        
+        if existing_vote:
+            if existing_vote.vote_type == vote_type:
+                # User is trying to vote the same way again - remove the vote
+                existing_vote.delete()
+                return {'message': 'Vote removed', 'vote_type': None}
+            else:
+                # User is changing their vote
+                existing_vote.vote_type = vote_type
+                existing_vote.save()
+                return existing_vote
+        else:
+            # Create new vote
+            vote = BlogCommentVote(
+                comment=comment,
+                user=user,
+                vote_type=vote_type
+            )
+            vote.save()
+            return vote
