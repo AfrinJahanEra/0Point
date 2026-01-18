@@ -630,15 +630,16 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
     
     return (
       <div className="flex flex-col items-center w-full">
-        <div className="flex flex-wrap gap-2 justify-center mb-6">
+        <div className="flex flex-wrap gap-3 justify-center mb-6">
           {parsedData.map((item, index) => (
             <div 
               key={index}
               className={`
-                w-16 h-16 flex flex-col items-center justify-center 
-                border-2 border-black rounded transition-all duration-300
-                ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-110' : ''}
-                bg-white hover:bg-gray-100
+                w-20 h-20 flex flex-col items-center justify-center 
+                border-2 rounded-xl transition-all duration-300
+                ${selectedNode === index ? 'ring-4 ring-blue-500 scale-110 shadow-lg' : 'shadow-md'}
+                bg-gradient-to-br from-white to-gray-50 hover:from-blue-50 hover:to-blue-100
+                border-gray-300 hover:border-blue-400
                 ${isAnimating ? 'animate-puddingWave' : ''}
               `}
               style={{
@@ -656,41 +657,41 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 });
               }}
             >
-              <span className="font-bold text-lg text-black">
+              <span className="font-bold text-lg text-gray-800">
                 {item === null ? 'null' : String(item)}
               </span>
-              <span className="text-xs text-gray-600 mt-1">[{index}]</span>
+              <span className="text-xs text-gray-500 mt-1 font-medium">[{index}]</span>
             </div>
           ))}
         </div>
         
         {/* Array stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
-          <div className="border border-black p-3 rounded bg-white">
-            <div className="text-sm text-gray-600">Length</div>
-            <div className="text-lg font-bold text-black">{parsedData.length}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-2xl">
+          <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-sm text-gray-600 font-medium">Length</div>
+            <div className="text-xl font-bold text-blue-800">{parsedData.length}</div>
           </div>
           
           {metadata.hasNumbers && (
             <>
-              <div className="border border-black p-3 rounded bg-white">
-                <div className="text-sm text-gray-600">Sum</div>
-                <div className="text-lg font-bold text-black">{metadata.sum}</div>
+              <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="text-sm text-gray-600 font-medium">Sum</div>
+                <div className="text-xl font-bold text-blue-800">{metadata.sum}</div>
               </div>
-              <div className="border border-black p-3 rounded bg-white">
-                <div className="text-sm text-gray-600">Avg</div>
-                <div className="text-lg font-bold text-black">{metadata.average.toFixed(2)}</div>
+              <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="text-sm text-gray-600 font-medium">Avg</div>
+                <div className="text-xl font-bold text-blue-800">{metadata.average.toFixed(2)}</div>
               </div>
             </>
           )}
           
-          <div className="border border-black p-3 rounded bg-white">
-            <div className="text-sm text-gray-600">Types</div>
-            <div className="text-xs text-black">
-              {metadata.hasNumbers && 'N '}
-              {metadata.hasStrings && 'S '}
-              {metadata.hasBooleans && 'B '}
-              {metadata.hasNulls && 'Null'}
+          <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-sm text-gray-600 font-medium">Types</div>
+            <div className="text-xs text-gray-700 font-medium">
+              {metadata.hasNumbers && <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs mr-1">N</span>}
+              {metadata.hasStrings && <span className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs mr-1">S</span>}
+              {metadata.hasBooleans && <span className="inline-block bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs mr-1">B</span>}
+              {metadata.hasNulls && <span className="inline-block bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs">Null</span>}
             </div>
           </div>
         </div>
@@ -712,10 +713,11 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
             <div 
               key={index}
               className={`
-                w-full h-16 flex items-center justify-between px-4
-                border-2 border-black rounded transition-all duration-300 mb-2
-                ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-105' : ''}
-                bg-white hover:bg-gray-100
+                w-full h-18 flex items-center justify-between px-5
+                border-2 rounded-xl transition-all duration-300 mb-3
+                ${selectedNode === index ? 'ring-4 ring-blue-500 scale-105 shadow-lg' : 'shadow-md'}
+                bg-gradient-to-br from-white to-gray-50 hover:from-blue-50 hover:to-blue-100
+                border-gray-300 hover:border-blue-400
                 ${isAnimating ? 'animate-puddingWave' : ''}
               `}
               style={{
@@ -734,12 +736,12 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               }}
             >
               <div className="flex items-center">
-                <span className="font-bold text-lg text-black">
+                <span className="font-bold text-lg text-gray-800">
                   {item === null ? 'null' : String(item)}
                 </span>
-                <span className="text-xs text-gray-600 ml-2">[{index}]</span>
+                <span className="text-xs text-gray-500 ml-3 font-medium">[{index}]</span>
               </div>
-              <div className="text-xs text-gray-600">
+              <div className="text-xs text-blue-600 font-bold">
                 Pos: {index + 1}
               </div>
             </div>
@@ -747,29 +749,29 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         </div>
         
         {/* Stack stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
-          <div className="border border-black p-3 rounded bg-white">
-            <div className="text-sm text-gray-600">Size</div>
-            <div className="text-lg font-bold text-black">{stackData.length}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-2xl">
+          <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-sm text-gray-600 font-medium">Size</div>
+            <div className="text-xl font-bold text-blue-800">{stackData.length}</div>
           </div>
           
           {stackData.length > 0 && (
-            <div className="border border-black p-3 rounded bg-white">
-              <div className="text-sm text-gray-600">Top Element</div>
-              <div className="text-lg font-bold text-black">
+            <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="text-sm text-gray-600 font-medium">Top Element</div>
+              <div className="text-xl font-bold text-blue-800">
                 {stackData[0] === null ? 'null' : String(stackData[0])}
               </div>
             </div>
           )}
           
-          <div className="border border-black p-3 rounded bg-white">
-            <div className="text-sm text-gray-600">Bottom Index</div>
-            <div className="text-lg font-bold text-black">{stackData.length > 0 ? stackData.length - 1 : 'N/A'}</div>
+          <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-sm text-gray-600 font-medium">Bottom Index</div>
+            <div className="text-xl font-bold text-blue-800">{stackData.length > 0 ? stackData.length - 1 : 'N/A'}</div>
           </div>
           
-          <div className="border border-black p-3 rounded bg-white">
-            <div className="text-sm text-gray-600">Top Index</div>
-            <div className="text-lg font-bold text-black">0</div>
+          <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-sm text-gray-600 font-medium">Top Index</div>
+            <div className="text-xl font-bold text-blue-800">0</div>
           </div>
         </div>
       </div>
@@ -790,10 +792,11 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
             <div 
               key={index}
               className={`
-                w-full h-16 flex items-center justify-between px-4
-                border-2 border-black rounded transition-all duration-300 mb-2
-                ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-105' : ''}
-                bg-white hover:bg-gray-100
+                w-full h-18 flex items-center justify-between px-5
+                border-2 rounded-xl transition-all duration-300 mb-3
+                ${selectedNode === index ? 'ring-4 ring-blue-500 scale-105 shadow-lg' : 'shadow-md'}
+                bg-gradient-to-br from-white to-gray-50 hover:from-blue-50 hover:to-blue-100
+                border-gray-300 hover:border-blue-400
                 ${isAnimating ? 'animate-puddingWave' : ''}
               `}
               style={{
@@ -812,12 +815,12 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               }}
             >
               <div className="flex items-center">
-                <span className="font-bold text-lg text-black">
+                <span className="font-bold text-lg text-gray-800">
                   {item === null ? 'null' : String(item)}
                 </span>
-                <span className="text-xs text-gray-600 ml-2">[{index}]</span>
+                <span className="text-xs text-gray-500 ml-3 font-medium">[{index}]</span>
               </div>
-              <div className="text-xs text-gray-600">
+              <div className="text-xs text-blue-600 font-bold">
                 Pos: {index + 1}
               </div>
             </div>
@@ -825,32 +828,32 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         </div>
         
         {/* Queue stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
-          <div className="border border-black p-3 rounded bg-white">
-            <div className="text-sm text-gray-600">Size</div>
-            <div className="text-lg font-bold text-black">{queueData.length}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-2xl">
+          <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-sm text-gray-600 font-medium">Size</div>
+            <div className="text-xl font-bold text-blue-800">{queueData.length}</div>
           </div>
           
           {queueData.length > 0 && (
             <>
-              <div className="border border-black p-3 rounded bg-white">
-                <div className="text-sm text-gray-600">Front Element</div>
-                <div className="text-lg font-bold text-black">
+              <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="text-sm text-gray-600 font-medium">Front Element</div>
+                <div className="text-xl font-bold text-blue-800">
                   {queueData[0] === null ? 'null' : String(queueData[0])}
                 </div>
               </div>
-              <div className="border border-black p-3 rounded bg-white">
-                <div className="text-sm text-gray-600">Rear Element</div>
-                <div className="text-lg font-bold text-black">
+              <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="text-sm text-gray-600 font-medium">Rear Element</div>
+                <div className="text-xl font-bold text-blue-800">
                   {queueData[queueData.length - 1] === null ? 'null' : String(queueData[queueData.length - 1])}
                 </div>
               </div>
             </>
           )}
           
-          <div className="border border-black p-3 rounded bg-white">
-            <div className="text-sm text-gray-600">Front Index</div>
-            <div className="text-lg font-bold text-black">0</div>
+          <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-sm text-gray-600 font-medium">Front Index</div>
+            <div className="text-xl font-bold text-blue-800">0</div>
           </div>
         </div>
       </div>
@@ -869,10 +872,11 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               <React.Fragment key={index}>
                 <div 
                   className={`
-                    w-20 h-16 flex flex-col items-center justify-center
-                    border-2 border-black rounded transition-all duration-300
-                    ${selectedNode === index ? 'ring-2 ring-[#001F3F] scale-105' : ''}
-                    bg-white hover:bg-gray-100
+                    w-24 h-20 flex flex-col items-center justify-center
+                    border-2 rounded-xl transition-all duration-300
+                    ${selectedNode === index ? 'ring-4 ring-blue-500 scale-105 shadow-lg' : 'shadow-md'}
+                    bg-gradient-to-br from-white to-gray-50 hover:from-blue-50 hover:to-blue-100
+                    border-gray-300 hover:border-blue-400
                     ${isAnimating ? 'animate-puddingWave' : ''}
                   `}
                   style={{
@@ -890,13 +894,13 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                     });
                   }}
                 >
-                  <span className="font-bold text-sm text-black">
+                  <span className="font-bold text-base text-gray-800">
                     {item === null ? 'null' : String(item)}
                   </span>
-                  <span className="text-xs text-gray-600 mt-1">[{index}]</span>
+                  <span className="text-xs text-gray-500 mt-1 font-medium">[{index}]</span>
                 </div>
                 {index < parsedData.length - 1 && (
-                  <div className="mx-2 text-xl font-bold text-black">→</div>
+                  <div className="mx-3 text-2xl font-bold text-blue-600">→</div>
                 )}
               </React.Fragment>
             ))}
@@ -904,32 +908,32 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         </div>
         
         {/* Linked list stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
-          <div className="border border-black p-3 rounded bg-white">
-            <div className="text-sm text-gray-600">Length</div>
-            <div className="text-lg font-bold text-black">{parsedData.length}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-2xl">
+          <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-sm text-gray-600 font-medium">Length</div>
+            <div className="text-xl font-bold text-blue-800">{parsedData.length}</div>
           </div>
           
           {parsedData.length > 0 && (
             <>
-              <div className="border border-black p-3 rounded bg-white">
-                <div className="text-sm text-gray-600">Head</div>
-                <div className="text-lg font-bold text-black">
+              <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="text-sm text-gray-600 font-medium">Head</div>
+                <div className="text-xl font-bold text-blue-800">
                   {parsedData[0] === null ? 'null' : String(parsedData[0])}
                 </div>
               </div>
-              <div className="border border-black p-3 rounded bg-white">
-                <div className="text-sm text-gray-600">Tail</div>
-                <div className="text-lg font-bold text-black">
+              <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="text-sm text-gray-600 font-medium">Tail</div>
+                <div className="text-xl font-bold text-blue-800">
                   {parsedData[parsedData.length - 1] === null ? 'null' : String(parsedData[parsedData.length - 1])}
                 </div>
               </div>
             </>
           )}
           
-          <div className="border border-black p-3 rounded bg-white">
-            <div className="text-sm text-gray-600">Operations</div>
-            <div className="text-xs text-black">Insert, Delete, Traverse</div>
+          <div className="border border-gray-200 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-sm text-gray-600 font-medium">Operations</div>
+            <div className="text-xs text-gray-700 font-medium">Insert, Delete, Traverse</div>
           </div>
         </div>
       </div>
@@ -1041,7 +1045,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
           width="100%"
           height="100%"
           viewBox={`0 0 ${layout.width} ${layout.height}`}
-          className="border border-black rounded-lg bg-white min-h-[400px]"
+          className="border-2 border-gray-200 rounded-xl bg-gradient-to-br from-blue-50 to-white min-h-[400px] shadow-inner"
         >
           {/* Render edges with draw animation */}
           {layout.edges.map((edge, index) => {
@@ -1163,7 +1167,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
           width="100%"
           height="100%"
           viewBox={`0 0 ${layout.width} ${layout.height}`}
-          className="border border-black rounded-lg bg-white min-h-[400px]"
+          className="border-2 border-gray-200 rounded-xl bg-gradient-to-br from-blue-50 to-white min-h-[400px] shadow-inner"
         >
           {/* Render edges with draw animation */}
           {layout.edges.map((edge, index) => {
@@ -1272,15 +1276,15 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
 
     return (
       <div className="w-full">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-black">
+        <div className="flex justify-between items-center mb-6 pb-3 border-b border-gray-200">
+          <h3 className="text-xl font-bold text-gray-800">
             {inputType.charAt(0).toUpperCase() + inputType.slice(1)} Visualization
           </h3>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
             <select
               value={visualizationMode}
               onChange={(e) => setVisualizationMode(e.target.value)}
-              className="text-sm p-2 border border-black rounded-md bg-white text-black"
+              className="text-sm p-2.5 border-2 border-gray-200 rounded-xl bg-white text-gray-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="default">Default View</option>
               <option value="compact">Compact</option>
@@ -1288,14 +1292,16 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
             </select>
             <button
               onClick={() => setIsAnimating(!isAnimating)}
-              className={`px-3 py-1 text-sm rounded-md ${isAnimating ? 'bg-[#001F3F] text-white' : 'bg-gray-200 text-black'}`}
+              className={`px-4 py-2 text-sm font-medium rounded-xl transition-all duration-300 ${isAnimating 
+                ? 'bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-lg' 
+                : 'bg-gradient-to-br from-gray-200 to-gray-300 text-gray-700 shadow-sm hover:shadow-md'}`}
             >
               {isAnimating ? 'Stop' : 'Animate'}
             </button>
             <button 
               title="Full Screen"
               onClick={() => setIsFullScreen(true)}
-              className="p-1 rounded-md bg-gray-200 text-black hover:bg-gray-300"
+              className="p-2 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 hover:from-gray-200 hover:to-gray-300 shadow-sm hover:shadow-md transition-all duration-300"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -1315,13 +1321,13 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         
         {/* Node Details Panel */}
         {nodeDetails && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-black">
-            <h4 className="font-medium text-black mb-2">Node Details</h4>
-            <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="mt-6 p-5 bg-gradient-to-br from-blue-50 to-white rounded-2xl border border-gray-200 shadow-md hover:shadow-lg transition-all duration-300">
+            <h4 className="font-bold text-gray-800 text-lg mb-4 pb-2 border-b border-gray-200">Node Details</h4>
+            <div className="grid grid-cols-2 gap-3 text-base">
               {Object.entries(nodeDetails).map(([key, value]) => (
-                <div key={key} className="flex justify-between">
-                  <span className="text-gray-600 capitalize">{key}:</span>
-                  <span className="font-medium text-black">{String(value)}</span>
+                <div key={key} className="flex justify-between p-2 rounded-lg bg-white border border-gray-100 hover:bg-blue-50 transition-colors duration-200">
+                  <span className="text-gray-600 font-medium capitalize">{key}:</span>
+                  <span className="font-bold text-blue-800">{String(value)}</span>
                 </div>
               ))}
             </div>
@@ -1329,12 +1335,12 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
         )}
         
         {/* Metadata Summary */}
-        <div className="mt-4 p-3 bg-white rounded-lg border border-[#001F3F]">
+        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 shadow-sm">
           <div className="flex items-center">
-            <svg className="w-5 h-5 text-[#001F3F] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-blue-700 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-[#001F3F] font-medium">{metadata.summary}</span>
+            <span className="text-blue-800 font-bold text-lg">{metadata.summary}</span>
           </div>
         </div>
       </div>
@@ -1362,15 +1368,15 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
   
   // Standalone mode with full controls
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg border border-black shadow-sm">
-      <div className="p-6">
+    <div className="flex flex-col h-full bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+      <div className="p-6 bg-white/80 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-black">I/O Visualizer</h2>
-            <p className="text-gray-600 mt-1">Interactive visualization for data structures and algorithms</p>
+            <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-indigo-800">I/O Visualizer</h2>
+            <p className="text-gray-600 mt-2 text-lg">Interactive visualization for data structures and algorithms</p>
           </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-500">Speed:</span>
+          <div className="flex items-center space-x-2 bg-gray-100 p-3 rounded-xl border border-gray-300">
+            <span className="text-sm text-gray-700 font-medium">Speed:</span>
             <input
               type="range"
               min="0.5"
@@ -1378,31 +1384,33 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
               step="0.5"
               value={animationSpeed}
               onChange={(e) => setAnimationSpeed(parseFloat(e.target.value))}
-              className="w-24"
+              className="w-32 accent-blue-700"
             />
-            <span className="text-sm font-medium text-black">{animationSpeed}x</span>
+            <span className="text-sm font-bold text-blue-800 min-w-[30px]">{animationSpeed}x</span>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Input Section */}
-          <div className="space-y-6">
-            <div className="bg-gray-50 p-5 rounded-xl border border-black">
-              <h3 className="text-lg font-semibold text-black mb-4">Input Configuration</h3>
+          <div className="space-y-8">
+            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <h3 className="text-xl font-bold text-gray-800 mb-6 pb-3 border-b border-gray-200">Input Configuration</h3>
               
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Data Type
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                     {['array', 'stack', 'queue', 'linked-list', 'tree', 'graph'].map((type) => (
                       <button
                         key={type}
                         onClick={() => setInputType(type)}
-                        className={`p-3 rounded-lg text-center transition-all ${inputType === type ? 'bg-[#001F3F] text-white' : 'bg-white border border-black hover:bg-gray-100'}`}
+                        className={`p-4 rounded-xl transition-all duration-300 transform hover:scale-105 ${inputType === type 
+                          ? 'bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-lg shadow-blue-500/30' 
+                          : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 shadow-sm hover:shadow-md'}`}
                       >
-                        <div className="font-medium">{type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')}</div>
+                        <div className="font-bold text-sm">{type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')}</div>
                       </button>
                     ))}
                   </div>
@@ -1410,11 +1418,11 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 
                 {/* Add element input for stack and queue */}
                 {(inputType === 'stack' || inputType === 'queue') && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <input
                       type="text"
                       placeholder="Enter element to add"
-                      className="flex-1 p-2 border border-black rounded-lg focus:ring-2 focus:ring-[#001F3F] focus:border-[#001F3F] bg-white text-black"
+                      className="flex-1 p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800 shadow-sm transition-all duration-300"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           handleAddElement(e.target.value);
@@ -1428,14 +1436,14 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                         handleAddElement(input.value);
                         input.value = '';
                       }}
-                      className="px-3 py-2 bg-[#001F3F] text-white rounded-lg hover:bg-[#001F3F]/80 transition-colors"
+                      className="px-4 py-3 bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-xl hover:from-blue-700 hover:to-blue-900 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
                       Add
                     </button>
                     {inputType === 'stack' && stackData.length > 0 && (
                       <button 
                         onClick={handlePopElement}
-                        className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                        className="px-4 py-3 bg-gradient-to-br from-red-500 to-red-700 text-white rounded-xl hover:from-red-600 hover:to-red-800 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                       >
                         Pop
                       </button>
@@ -1443,7 +1451,7 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                     {inputType === 'queue' && queueData.length > 0 && (
                       <button 
                         onClick={handleDequeueElement}
-                        className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                        className="px-4 py-3 bg-gradient-to-br from-red-500 to-red-700 text-white rounded-xl hover:from-red-600 hover:to-red-800 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                       >
                         Dequeue
                       </button>
@@ -1452,14 +1460,14 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
                 )}
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
                     Input Data
                   </label>
                   <textarea
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder={getPlaceholder(inputType)}
-                    className="w-full p-4 border border-black rounded-lg focus:ring-2 focus:ring-[#001F3F] focus:border-[#001F3F] h-32 bg-white text-black"
+                    className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-32 bg-white text-gray-800 shadow-sm transition-all duration-300 resize-none"
                     rows="4"
                   />
                 </div>
@@ -1467,9 +1475,9 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
             </div>
             
             {/* Examples Section */}
-            <div className="bg-gray-50 p-5 rounded-xl border border-black">
-              <h3 className="text-lg font-semibold text-black mb-4">Quick Examples</h3>
-              <div className="grid grid-cols-1 gap-3">
+            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <h3 className="text-xl font-bold text-gray-800 mb-6 pb-3 border-b border-gray-200">Quick Examples</h3>
+              <div className="grid grid-cols-1 gap-4">
                 <ExampleButton
                   title="Array Example"
                   description="Mixed data types array"
@@ -1535,26 +1543,28 @@ const IOVisualizer = ({ inputType: externalInputType, inputValue: externalInputV
           </div>
           
           {/* Visualization Section */}
-          <div className="bg-white border border-black rounded-xl shadow-inner p-5 overflow-hidden min-h-[600px]">
-            <div className="h-full overflow-auto">
+          <div className="bg-gradient-to-br from-white to-blue-50 border-2 border-gray-200 rounded-2xl shadow-xl p-6 overflow-hidden min-h-[600px]">
+            <div className="h-full overflow-auto bg-white/70 rounded-xl p-4 border border-gray-100">
               {renderVisualization()}
             </div>
           </div>
         </div>
         
         {/* Footer with info */}
-        <div className="mt-6 pt-6 border-t border-black">
-          <div className="flex items-center justify-between text-sm text-gray-500">
+        <div className="mt-8 pt-6 border-t border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl">
+          <div className="flex items-center justify-between text-gray-600">
             <div className="flex items-center">
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>Click on elements for detailed information</span>
+              <span className="font-medium">Click on elements for detailed information</span>
             </div>
-            <div>
-              <span className="text-[#001F3F] font-medium">{metadata.type}</span>
-              <span className="mx-2">•</span>
-              <span>{new Date(metadata.timestamp).toLocaleTimeString()}</span>
+            <div className="flex items-center space-x-4">
+              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                {metadata.type}
+              </span>
+              <span className="text-gray-500 font-medium">•</span>
+              <span className="text-gray-700 font-medium">{new Date(metadata.timestamp).toLocaleTimeString()}</span>
             </div>
           </div>
         </div>
@@ -1646,11 +1656,11 @@ const ExampleButton = ({ title, description, data, type, setInputType, setInputV
         setInputValue(data);
       }
     }}
-    className={`p-4 text-left rounded-lg border transition-all ${currentType === type ? 'border-[#001F3F] bg-gray-50' : 'border-black hover:border-[#001F3F] hover:bg-gray-50'}`}
+    className={`p-5 text-left rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] shadow-sm hover:shadow-md ${currentType === type ? 'border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 ring-2 ring-blue-300' : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'}`}
   >
-    <div className="font-medium text-black">{title}</div>
-    <div className="text-sm text-gray-600 mt-1">{description}</div>
-    <div className="text-xs font-mono bg-gray-100 p-2 mt-2 rounded truncate text-black">{data}</div>
+    <div className="font-bold text-gray-800">{title}</div>
+    <div className="text-sm text-gray-600 mt-2">{description}</div>
+    <div className="text-xs font-mono bg-gradient-to-br from-gray-100 to-gray-50 p-3 mt-3 rounded-lg truncate text-gray-700 border border-gray-200">{data}</div>
   </button>
 );
 
