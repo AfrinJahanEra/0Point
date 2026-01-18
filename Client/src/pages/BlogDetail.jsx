@@ -14,7 +14,8 @@ import 'highlight.js/styles/github.css';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
-const CommentItem = ({ comment, onReply, onDelete, replyingTo, setReplyingTo, replyText, setReplyText, user, blogAuthor, depth = 0 }) => {
+// In BlogDetail.jsx, update the CommentItem component
+const CommentItem = ({ comment, onReply, onDelete, onVote, replyingTo, setReplyingTo, replyText, setReplyText, user, blogAuthor, depth = 0 }) => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -52,6 +53,12 @@ const CommentItem = ({ comment, onReply, onDelete, replyingTo, setReplyingTo, re
     return 'bg-red-100';
   };
 
+  const handleVote = async (voteType) => {
+    if (onVote) {
+      await onVote(comment.id, voteType);
+    }
+  };
+
   return (
     <div className={`${depth > 0 ? 'ml-6 border-l border-gray-200 pl-4' : ''}`}>
       <div className="flex gap-3 py-2">
@@ -65,29 +72,70 @@ const CommentItem = ({ comment, onReply, onDelete, replyingTo, setReplyingTo, re
             <span className={`font-semibold ${getRatingColor(comment.author.rating)} hover:underline cursor-pointer`}>
               {comment.author.name}
             </span>
+            {comment.author.rating && (
+              <span className={`text-xs px-1 py-0.5 rounded ${getRatingBg(comment.author.rating)} ${getRatingColor(comment.author.rating)} font-mono`}>
+                {comment.author.rating}
+              </span>
+            )}
             <span className="text-gray-500">•</span>
             <span className="text-gray-500 text-xs">{formatDate(comment.created_at)}</span>
           </div>
           <div className="text-gray-800 text-sm leading-relaxed mb-2">
             {comment.content}
           </div>
-          <div className="flex items-center gap-4 text-xs">
-            {user && (
+          
+          {/* Comment Vote Actions */}
+          <div className="flex items-center gap-4 mb-2">
+            <div className="flex items-center gap-1">
               <button
-                onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
-                className="text-blue-600 hover:text-blue-800 font-medium"
+                onClick={() => handleVote('upvote')}
+                className={`flex items-center gap-1 px-1 py-0.5 rounded transition-colors ${
+                  comment.user_vote === 'upvote' 
+                    ? 'text-green-600 bg-green-50' 
+                    : 'text-gray-500 hover:text-green-600 hover:bg-gray-100'
+                }`}
+                title="Upvote comment"
               >
-                Reply
+                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                </svg>
+                <span className="text-xs font-medium">{comment.upvotes || 0}</span>
               </button>
-            )}
-            {canDelete && (
+              
               <button
-                onClick={() => onDelete(comment.id)}
-                className="text-red-600 hover:text-red-800 font-medium"
+                onClick={() => handleVote('downvote')}
+                className={`flex items-center gap-1 px-1 py-0.5 rounded transition-colors ${
+                  comment.user_vote === 'downvote' 
+                    ? 'text-red-600 bg-red-50' 
+                    : 'text-gray-500 hover:text-red-600 hover:bg-gray-100'
+                }`}
+                title="Downvote comment"
               >
-                Delete
+                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                </svg>
+                <span className="text-xs font-medium">{comment.downvotes || 0}</span>
               </button>
-            )}
+            </div>
+            
+            <div className="flex items-center gap-4 text-xs">
+              {user && (
+                <button
+                  onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                  className="text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Reply
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={() => onDelete(comment.id)}
+                  className="text-red-600 hover:text-red-800 font-medium"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Reply Form */}
@@ -130,6 +178,7 @@ const CommentItem = ({ comment, onReply, onDelete, replyingTo, setReplyingTo, re
                   comment={reply}
                   onReply={onReply}
                   onDelete={onDelete}
+                  onVote={onVote}
                   replyingTo={replyingTo}
                   setReplyingTo={setReplyingTo}
                   replyText={replyText}
@@ -256,6 +305,80 @@ const BlogDetail = () => {
       toast.error('Failed to post comment');
     }
   };
+
+// Add to BlogDetail component
+const handleCommentVote = async (commentId, voteType) => {
+  if (!user) {
+    toast.error('Please login to vote');
+    return;
+  }
+
+  try {
+    const response = await api.post(`/blog/comments/${commentId}/vote/`, { vote_type: voteType });
+    
+    // Update the comments state with the new vote
+    setComments(prevComments => {
+      const updateCommentVotes = (commentsList) => {
+        return commentsList.map(comment => {
+          if (comment.id === commentId) {
+            if (response.data.message === 'Vote removed') {
+              // Remove vote
+              return {
+                ...comment,
+                user_vote: null,
+                upvotes: comment.user_vote === 'upvote' ? comment.upvotes - 1 : comment.upvotes,
+                downvotes: comment.user_vote === 'downvote' ? comment.downvotes - 1 : comment.downvotes,
+                score: (comment.user_vote === 'upvote' ? comment.upvotes - 1 : comment.upvotes) - 
+                       (comment.user_vote === 'downvote' ? comment.downvotes - 1 : comment.downvotes)
+              };
+            } else {
+              // Update vote
+              const oldVote = comment.user_vote;
+              const newVote = voteType;
+              
+              let upvotes = comment.upvotes;
+              let downvotes = comment.downvotes;
+              
+              if (oldVote === 'upvote') upvotes -= 1;
+              if (oldVote === 'downvote') downvotes -= 1;
+              if (newVote === 'upvote') upvotes += 1;
+              if (newVote === 'downvote') downvotes += 1;
+              
+              return {
+                ...comment,
+                user_vote: newVote,
+                upvotes,
+                downvotes,
+                score: upvotes - downvotes
+              };
+            }
+          }
+          
+          // Recursively check replies
+          if (comment.replies && comment.replies.length > 0) {
+            return {
+              ...comment,
+              replies: updateCommentVotes(comment.replies)
+            };
+          }
+          
+          return comment;
+        });
+      };
+      
+      return updateCommentVotes(prevComments);
+    });
+    
+    if (response.data.message === 'Vote removed') {
+      toast.success('Vote removed!');
+    } else {
+      toast.success('Vote recorded!');
+    }
+  } catch (error) {
+    console.error('Error voting on comment:', error);
+    toast.error('Failed to vote');
+  }
+};
 
   const handleDeleteComment = async (commentId) => {
     try {
@@ -610,19 +733,20 @@ const BlogDetail = () => {
               {/* Comments List */}
               <div className="space-y-3">
                 {comments.map((comment) => (
-                  <CommentItem
-                    key={comment.id}
-                    comment={comment}
-                    onReply={handleComment}
-                    onDelete={handleDeleteComment}
-                    replyingTo={replyingTo}
-                    setReplyingTo={setReplyingTo}
-                    replyText={replyText}
-                    setReplyText={setReplyText}
-                    user={user}
-                    blogAuthor={blog.author}
-                    depth={0}
-                  />
+                 <CommentItem
+  key={comment.id}
+  comment={comment}
+  onReply={handleComment}
+  onDelete={handleDeleteComment}
+  onVote={handleCommentVote}
+  replyingTo={replyingTo}
+  setReplyingTo={setReplyingTo}
+  replyText={replyText}
+  setReplyText={setReplyText}
+  user={user}
+  blogAuthor={blog.author}
+  depth={0}
+/>
                 ))}
                 {comments.length === 0 && (
                   <div className="text-center py-4 text-gray-500 text-xs">
