@@ -1824,7 +1824,7 @@ const ExampleButton = ({ title, description, data, type, setInputType, setInputV
         setInputType(type);
         setInputValue(data);
       }
-    }}
+    }} 
     className={`p-5 rounded-xl border-2 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col ${currentType === type 
       ? 'border-[#001F3F] bg-gradient-to-r from-blue-100 to-indigo-100 ring-2 ring-blue-300' 
       : 'border-gray-300 hover:border-[#001F3F] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50'}`}
