@@ -162,7 +162,7 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'Asia/Dhaka'   # ✅ CHANGE THIS
-USE_TZ = False             # ✅ CHANGE THIS
+USE_TZ = True             # ✅ CHANGE THIS
 
 USE_I18N = True
 
@@ -176,5 +176,6 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
 
 FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 
 
