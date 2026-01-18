@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,6 +14,12 @@ const Contests = () => {
   const [filteredContests, setFilteredContests] = useState([]);
   const [registeredContests, setRegisteredContests] = useState([]);
   const navigate = useNavigate();
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [paginatedContests, setPaginatedContests] = useState([]);
 
   const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjk0NTYwMTY5MjM3MWFmMGU5OWMyYWZjIiwiZW1haWwiOiJlcmFAZ29vZ2xlLmNvbSIsInJvbGUiOiJ1c2VyIn0.zwibsApLmoW3oQ-Aq9OXw6g56gPqaWr2piZMQypVrew";
 
@@ -130,7 +136,27 @@ const Contests = () => {
     }
 
     setFilteredContests(result);
+    // Reset to first page when filters change
+    setCurrentPage(1);
   }, [contests, activeTab, activePlatform, searchQuery]);
+
+  // Pagination effect
+  useEffect(() => {
+    // Calculate total pages
+    const total = Math.ceil(filteredContests.length / itemsPerPage);
+    setTotalPages(total || 1);
+    
+    // Adjust current page if it's beyond total pages
+    if (currentPage > total && total > 0) {
+      setCurrentPage(1);
+    }
+    
+    // Calculate paginated contests
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginated = filteredContests.slice(startIndex, endIndex);
+    setPaginatedContests(paginated);
+  }, [filteredContests, currentPage, itemsPerPage]);
 
   const getPlatformName = (p) => {
     const map = {
@@ -242,6 +268,49 @@ const Contests = () => {
     navigate(`/contests/${contestId}/edit`);
   };
 
+  // Pagination handlers
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const goToFirstPage = () => goToPage(1);
+  const goToLastPage = () => goToPage(totalPages);
+  const goToPrevPage = () => goToPage(currentPage - 1);
+  const goToNextPage = () => goToPage(currentPage + 1);
+
+  const handleItemsPerPageChange = (e) => {
+    const value = parseInt(e.target.value);
+    setItemsPerPage(value);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pageNumbers = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(i);
+      }
+    } else {
+      let start = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+      let end = Math.min(totalPages, start + maxVisiblePages - 1);
+      
+      if (end - start + 1 < maxVisiblePages) {
+        start = end - maxVisiblePages + 1;
+      }
+      
+      for (let i = start; i <= end; i++) {
+        pageNumbers.push(i);
+      }
+    }
+    
+    return pageNumbers;
+  };
+
   const statusTabs = [
     { value: 'all',     label: 'All Contests' },
     { value: 'live',    label: 'Live Now' },
@@ -286,17 +355,40 @@ const Contests = () => {
                 <div>
                   <h1 className="text-lg font-semibold text-gray-900">Contests</h1>
                   <p className="text-xs text-gray-600 mt-1">
-                    {filteredContests.length} contest{filteredContests.length !== 1 ? 's' : ''} found
+                    Showing {paginatedContests.length} of {filteredContests.length} contest{filteredContests.length !== 1 ? 's' : ''} found
+                    {filteredContests.length > 0 && (
+                      <span> • Page {currentPage} of {totalPages}</span>
+                    )}
                   </p>
                 </div>
-                <div className="relative w-full lg:w-64">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    placeholder="Search contests..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
-                  />
+                <div className="flex items-center space-x-4">
+                  {/* Items per page selector */}
+                  <div className="flex items-center space-x-2">
+                    <label htmlFor="itemsPerPage" className="text-xs text-gray-600">
+                      Show:
+                    </label>
+                    <select
+                      id="itemsPerPage"
+                      value={itemsPerPage}
+                      onChange={handleItemsPerPageChange}
+                      className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="5">5</option>
+                      <option value="10">10</option>
+                      <option value="20">20</option>
+                      <option value="50">50</option>
+                    </select>
+                  </div>
+                  
+                  <div className="relative w-full lg:w-64">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input
+                      placeholder="Search contests..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -320,7 +412,7 @@ const Contests = () => {
 
             {/* Contest list */}
             <div className="grid gap-4">
-              {filteredContests.length === 0 ? (
+              {paginatedContests.length === 0 ? (
                 <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
                   <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No contests found</h3>
@@ -333,7 +425,7 @@ const Contests = () => {
                   </p>
                 </div>
               ) : (
-                filteredContests.map(c => (
+                paginatedContests.map(c => (
                   <div
                     key={c.id}
                     className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200"
@@ -445,6 +537,93 @@ const Contests = () => {
                 ))
               )}
             </div>
+
+            {/* Pagination Controls - Only show if we have more than 1 page */}
+            {totalPages > 1 && filteredContests.length > 0 && (
+              <div className="bg-white rounded-lg border border-gray-200 mt-4 p-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-xs text-gray-600">
+                    Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredContests.length)} to {Math.min(currentPage * itemsPerPage, filteredContests.length)} of {filteredContests.length} contests
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    {/* First Page */}
+                    <button
+                      onClick={goToFirstPage}
+                      disabled={currentPage === 1}
+                      className={`p-1.5 rounded border ${
+                        currentPage === 1
+                          ? 'text-gray-400 border-gray-300 cursor-not-allowed'
+                          : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <ChevronsLeft className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Previous Page */}
+                    <button
+                      onClick={goToPrevPage}
+                      disabled={currentPage === 1}
+                      className={`p-1.5 rounded border ${
+                        currentPage === 1
+                          ? 'text-gray-400 border-gray-300 cursor-not-allowed'
+                          : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Page Numbers */}
+                    <div className="flex items-center space-x-1">
+                      {getPageNumbers().map(pageNum => (
+                        <button
+                          key={pageNum}
+                          onClick={() => goToPage(pageNum)}
+                          className={`w-8 h-8 flex items-center justify-center text-xs rounded border ${
+                            currentPage === pageNum
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    {/* Next Page */}
+                    <button
+                      onClick={goToNextPage}
+                      disabled={currentPage === totalPages}
+                      className={`p-1.5 rounded border ${
+                        currentPage === totalPages
+                          ? 'text-gray-400 border-gray-300 cursor-not-allowed'
+                          : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Last Page */}
+                    <button
+                      onClick={goToLastPage}
+                      disabled={currentPage === totalPages}
+                      className={`p-1.5 rounded border ${
+                        currentPage === totalPages
+                          ? 'text-gray-400 border-gray-300 cursor-not-allowed'
+                          : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <ChevronsRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  {/* Page info */}
+                  <div className="text-xs text-gray-600">
+                    Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
