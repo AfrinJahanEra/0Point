@@ -4,15 +4,26 @@ import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkBreaks from 'remark-breaks';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
-import 'highlight.js/styles/github.css'; // ← Fixed!
+import 'highlight.js/styles/github.css';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
 
 const CreateBlog = () => {
   const { user } = useApp();
   const navigate = useNavigate();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
+
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
@@ -60,14 +71,31 @@ const CreateBlog = () => {
     setSelectedCoAuthors(prev => prev.filter(u => u !== username));
   };
 
-  const handleSubmit = (e, isDraft = false) => {
+  const handleSubmit = async (e, isDraft = false) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setTimeout(() => {
+
+    try {
+      const blogData = {
+        title,
+        content,
+        tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag),
+        co_authors: selectedCoAuthors,
+        publish: !isDraft
+      };
+
+      const response = await api.post('/blog/create/', blogData);
+
+      if (response.status === 201) {
+        toast.success(isDraft ? 'Blog saved as draft!' : 'Blog published successfully!');
+        navigate('/blog');
+      }
+    } catch (error) {
+      console.error('Error saving blog:', error);
+      toast.error('Failed to save blog. Please try again.');
+    } finally {
       setIsSubmitting(false);
-      alert(isDraft ? 'Saved as draft!' : 'Blog published successfully!');
-      navigate('/blog');
-    }, 1500);
+    }
   };
 
   const togglePreview = () => setShowPreview(!showPreview);
@@ -243,7 +271,7 @@ const customComponents = {
                 ) : (
                   <div className="w-full p-4 border border-gray-300 rounded-md bg-white min-h-[300px] prose prose-sm max-w-none">
                     <ReactMarkdown
-                      remarkPlugins={[remarkMath]}
+                      remarkPlugins={[remarkMath, remarkBreaks]}
                       rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
                       components={customComponents}
                     >
