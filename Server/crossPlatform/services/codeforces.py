@@ -1,6 +1,7 @@
 import requests
 from datetime import datetime, timedelta
 from django.utils.timezone import make_aware
+from crossPlatform.services.base import cleanup_old_contests
 from crossPlatform.models import ExternalContest
 from dateutil.relativedelta import relativedelta
 
@@ -60,4 +61,6 @@ def sync_codeforces_contests():
 
         ExternalContest.objects(platform="codeforces", external_id=str(c["id"])).update_one(upsert=True, **update_data)
 
-        
+
+        # Clean up very old contests (older than ~70 days)
+        cleanup_old_contests("codeforces", keep_days=70)
