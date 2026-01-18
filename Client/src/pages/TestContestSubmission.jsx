@@ -1,3 +1,4 @@
+// TestContestSubmission.jsx - COMPACT VERSION
 import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle2, 
@@ -16,12 +17,14 @@ import {
   Calendar,
   Hash,
   UserCircle,
-  Trophy
+  Trophy,
+  Eye,
+  Play
 } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
 
-const MySubmissions = () => {
-  const { contestId } = useParams();
+const TestContestSubmission = () => {
+  const { testContestId } = useParams();
   const [filter, setFilter] = useState('my');
   const [selectedVerdict, setSelectedVerdict] = useState('all');
   const [selectedProblem, setSelectedProblem] = useState('all');
@@ -55,7 +58,7 @@ const MySubmissions = () => {
         
         const queryString = params.toString();
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const url = `${apiUrl}/contests/${contestId}/submissions/${queryString ? `?${queryString}` : ''}`;
+        const url = `${apiUrl}/test-contests/${testContestId}/submissions/${queryString ? `?${queryString}` : ''}`;
         
         const headers = {
           'Content-Type': 'application/json',
@@ -88,17 +91,17 @@ const MySubmissions = () => {
       }
     };
 
-    if (contestId) {
+    if (testContestId) {
       fetchSubmissions();
     }
-  }, [contestId, selectedProblem, selectedVerdict, filter]);
+  }, [testContestId, selectedProblem, selectedVerdict, filter]);
 
   // Filter and sort submissions
   useEffect(() => {
     let filtered = [...allSubmissions];
     
     if (filter === 'my' && currentUserId) {
-      filtered = filtered.filter(sub => sub.user_id === currentUserId || sub.user === currentUserId);
+      filtered = filtered.filter(sub => sub.user_id === currentUserId);
     }
 
     filtered.sort((a, b) => {
@@ -122,8 +125,8 @@ const MySubmissions = () => {
     switch (verdict) {
       case 'AC': return 'bg-green-50 text-green-700 border-green-200';
       case 'WA': return 'bg-red-50 text-red-700 border-red-200';
-      case 'TLE': return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'MLE': return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'TLE': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'MLE': return 'bg-green-50 text-green-700 border-green-200';
       case 'CE': return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'RE': return 'bg-orange-50 text-orange-700 border-orange-200';
       case 'PENDING': return 'bg-blue-50 text-blue-700 border-blue-200';
@@ -218,14 +221,14 @@ const MySubmissions = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-br from-blue-900 to-blue-700 text-white">
+      <div className="bg-gradient-to-br from-green-900 to-green-700 text-white">
         <div className="px-3 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Code2 className="w-4 h-4" />
               <h1 className="text-sm font-bold">Submissions</h1>
-              <span className="text-xs bg-blue-800 text-blue-100 px-1.5 py-0.5 rounded">
-                CONTEST
+              <span className="text-xs bg-green-800 text-green-100 px-1.5 py-0.5 rounded">
+                TEST
               </span>
             </div>
           </div>
@@ -342,7 +345,6 @@ const MySubmissions = () => {
                     )}
                     <th className="text-left p-2 font-medium text-gray-900 w-20">Status</th>
                     <th className="text-left p-2 font-medium text-gray-900 w-16">Time</th>
-                    <th className="text-left p-2 font-medium text-gray-900 w-16">Memory</th>
                     <th className="text-left p-2 font-medium text-gray-900 w-20">Language</th>
                     <th className="text-left p-2 font-medium text-gray-900 w-16">When</th>
                   </tr>
@@ -377,9 +379,6 @@ const MySubmissions = () => {
                               <span className={`${submission.is_current_user ? 'font-bold text-blue-600' : 'text-gray-700'}`}>
                                 {getUserDisplayName(submission)}
                               </span>
-                              {submission.user_rating > 0 && (
-                                <Trophy className="w-3 h-3 text-yellow-500" />
-                              )}
                             </div>
                           </td>
                         )}
@@ -391,9 +390,6 @@ const MySubmissions = () => {
                         </td>
                         <td className="p-2 text-gray-700">
                           {submission.execution_time > 0 ? `${submission.execution_time}ms` : '-'}
-                        </td>
-                        <td className="p-2 text-gray-700">
-                          {submission.memory > 0 ? `${(submission.memory / 1024).toFixed(0)}MB` : '-'}
                         </td>
                         <td className="p-2">
                           <div className="flex items-center gap-1">
@@ -411,7 +407,7 @@ const MySubmissions = () => {
                       {/* Expanded Code View */}
                       {expandedSubmission === submission.id && (
                         <tr>
-                          <td colSpan={filter === 'all' ? 8 : 7} className="bg-gray-50 p-0">
+                          <td colSpan={filter === 'all' ? 7 : 6} className="bg-gray-50 p-0">
                             <div className="p-2 border-t border-gray-200">
                               <div className="flex items-center justify-between mb-2">
                                 <div>
@@ -419,7 +415,7 @@ const MySubmissions = () => {
                                     Submission #{submission.id?.substring(0, 8)}
                                   </h3>
                                   <p className="text-xs text-gray-600">
-                                    {submission.problem_code} • {submission.language?.toUpperCase()} • {getUserDisplayName(submission)}
+                                    {submission.problem_code} • {submission.language?.toUpperCase()}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -430,31 +426,15 @@ const MySubmissions = () => {
                                     <Copy className="w-3 h-3" />
                                     Copy
                                   </button>
-                                  <Link
-                                    to={`/contest/${contestId}/problem/${submission.problem_code}`}
-                                    className="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center gap-1"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                    Problem
-                                  </Link>
                                 </div>
                               </div>
                               <div className="bg-gray-900 rounded overflow-hidden">
                                 <div className="px-2 py-1 bg-gray-800 text-gray-300 text-xs font-mono">
-                                  {submission.language?.toUpperCase()} • {getVerdictLabel(submission.verdict)}
+                                  {submission.language?.toUpperCase()}
                                 </div>
                                 <pre className="p-2 text-xs text-gray-100 font-mono overflow-x-auto max-h-48">
                                   <code>{submission.code || 'No code available'}</code>
                                 </pre>
-                              </div>
-                              <div className="mt-2 text-xs text-gray-600 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span>Time: {submission.execution_time > 0 ? `${submission.execution_time}ms` : '-'}</span>
-                                  <span>Memory: {submission.memory > 0 ? `${(submission.memory / 1024).toFixed(1)}MB` : '-'}</span>
-                                  {submission.passed_test_cases > 0 && (
-                                    <span>Tests: {submission.passed_test_cases}/{submission.total_test_cases}</span>
-                                  )}
-                                </div>
                               </div>
                             </div>
                           </td>
@@ -486,4 +466,4 @@ const MySubmissions = () => {
   );
 };
 
-export default MySubmissions;
+export default TestContestSubmission;

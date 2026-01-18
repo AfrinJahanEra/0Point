@@ -1,23 +1,17 @@
-// VirtualContestInside.jsx
+// VirtualContestInside.jsx - Compact Version
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { 
   Calendar, Clock, Users, School, Play, Code2, 
   History, Trophy, MessageSquare, Download, Flag,
-  Award, Plus, AlertCircle, Loader2, CheckCircle,
-  XCircle, Clock as ClockIcon,
-  FileQuestionIcon,
-  BookOpen,
-  RotateCcw, // Icon for restart virtual contest
-  BarChart3, // Icon for statistics
-  Trophy as TrophyIcon,
-  Timer
+  AlertCircle, Loader2, CheckCircle,
+  XCircle, BookOpen, RotateCcw
 } from 'lucide-react';
 
 const VirtualContestInside = () => {
   const navigate = useNavigate();
-  const { contestId, virtualContestId } = useParams(); // Get BOTH IDs
+  const { contestId, virtualContestId } = useParams();
   
   // State variables
   const [loading, setLoading] = useState(true);
@@ -26,7 +20,6 @@ const VirtualContestInside = () => {
   const [originalContestData, setOriginalContestData] = useState(null);
   const [problems, setProblems] = useState([]);
   const [problemStatuses, setProblemStatuses] = useState({});
-  const [solvedProblems, setSolvedProblems] = useState(new Set());
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [activeTab, setActiveTab] = useState('problems');
   
@@ -84,38 +77,31 @@ const VirtualContestInside = () => {
 
   // Get difficulty color
   const getDifficultyColor = (difficulty) => {
-    if (!difficulty) return 'bg-gray-100 text-gray-800';
+    if (!difficulty) return 'bg-gray-100 text-gray-800 text-xs px-1.5 py-0.5 rounded-full';
     switch (difficulty.toLowerCase()) {
-      case 'easy': return 'bg-green-100 text-green-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'hard': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'easy': return 'bg-green-100 text-green-800 text-xs px-1.5 py-0.5 rounded-full';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 text-xs px-1.5 py-0.5 rounded-full';
+      case 'hard': return 'bg-red-100 text-red-800 text-xs px-1.5 py-0.5 rounded-full';
+      default: return 'bg-gray-100 text-gray-800 text-xs px-1.5 py-0.5 rounded-full';
     }
   };
 
   // Get status badge color
-  const getStatusBadge = (status) => {
-    return 'bg-purple-100 text-purple-800 border-purple-200'; // Purple for virtual contests
+  const getStatusBadge = () => {
+    return 'bg-purple-100 text-purple-800 border-purple-200 text-xs px-2 py-0.5 rounded-full';
   };
 
   // Main fetch function for virtual contest
   const fetchVirtualContestData = async () => {
-    console.log('🚀 Starting fetchVirtualContestData for virtual contest:', virtualContestId);
     setLoading(true);
     setError(null);
     
     try {
       // 1. Fetch virtual contest details
-      console.log('📡 Fetching virtual contest details...');
       const virtualContestRes = await axios.get(
         `http://localhost:8000/contests/${contestId}/virtual/${virtualContestId}/`, 
         { headers: getHeaders() }
-      ).catch(err => {
-        console.error('❌ Virtual contest details error:', err.response?.data || err.message);
-        throw err;
-      });
-      
-      console.log('✅ Virtual contest details:', virtualContestRes.data);
+      );
       
       if (!virtualContestRes.data) {
         throw new Error('No virtual contest data received');
@@ -128,24 +114,17 @@ const VirtualContestInside = () => {
       const originalContestId = virtualContest.original_contest_id;
 
       // 2. Fetch problems for the virtual contest
-      console.log('📡 Fetching virtual contest problems...');
       try {
         const problemsRes = await axios.get(
           `http://localhost:8000/contests/${contestId}/virtual/${virtualContestId}/problems/`, 
           { headers: getHeaders() }
-        ).catch(err => {
-          console.error('⚠️ Problems fetch error (continuing):', err.response?.data || err.message);
-          return { data: { problems: [] } };
-        });
-        
-        console.log('📊 Virtual problems response:', problemsRes.data);
+        );
         
         let problemsList = [];
         if (problemsRes.data && problemsRes.data.problems) {
           problemsList = problemsRes.data.problems;
         }
         
-        console.log('✅ Parsed virtual problems:', problemsList.length);
         setProblems(problemsList);
         
         // Calculate stats from problems
@@ -177,36 +156,23 @@ const VirtualContestInside = () => {
         });
         setProblemStatuses(statuses);
         
-        // Set solved problems
-        const solvedSet = new Set();
-        problemsList.forEach(problem => {
-          if (problem.solved) {
-            solvedSet.add(problem.index);
-          }
-        });
-        setSolvedProblems(solvedSet);
-        
       } catch (problemsError) {
-        console.error('⚠️ Problems error caught:', problemsError);
+        console.error('Problems error:', problemsError);
         setProblems([]);
       }
 
-      // 3. Fetch original contest details (for reference)
-      console.log('📡 Fetching original contest details...');
+      // 3. Fetch original contest details
       try {
         const originalContestRes = await axios.get(
           `http://localhost:8000/contests/${originalContestId}/`, 
           { headers: getHeaders() }
-        ).catch(err => {
-          console.error('⚠️ Original contest fetch error (continuing):', err.response?.data || err.message);
-          return { data: {} };
-        });
+        );
         
         if (originalContestRes.data) {
           setOriginalContestData(originalContestRes.data);
         }
       } catch (originalError) {
-        console.error('⚠️ Original contest error:', originalError);
+        console.error('Original contest error:', originalError);
       }
 
       // 4. Calculate time remaining if contest is active
@@ -218,27 +184,17 @@ const VirtualContestInside = () => {
           if (now < endTime) {
             const remainingSeconds = Math.floor((endTime - now) / 1000);
             setTimeRemaining(remainingSeconds);
-            console.log('⏰ Virtual contest timer started:', remainingSeconds, 'seconds remaining');
           } else {
             setTimeRemaining(0);
           }
         } catch (timeError) {
-          console.error('⚠️ Time calculation error:', timeError);
+          console.error('Time calculation error:', timeError);
         }
       }
 
-      console.log('🎉 Virtual contest data loaded successfully!');
       setLoading(false);
       
     } catch (err) {
-      console.error('💥 Critical error in fetchVirtualContestData:', err);
-      console.error('Error details:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status
-      });
-      
-      // User-friendly error messages
       if (err.response?.status === 404) {
         setError('Virtual contest not found');
       } else if (err.response?.status === 403) {
@@ -257,10 +213,8 @@ const VirtualContestInside = () => {
 
   useEffect(() => {
     if (virtualContestId) {
-      console.log('🔍 useEffect triggered for virtual contest:', virtualContestId);
       fetchVirtualContestData();
     } else {
-      console.error('❌ No virtualContestId provided');
       setError('No virtual contest ID provided');
       setLoading(false);
     }
@@ -275,12 +229,9 @@ const VirtualContestInside = () => {
         setTimeRemaining(prevTime => {
           if (prevTime <= 1) {
             clearInterval(intervalId);
-            
-            // Refresh data when time runs out
             setTimeout(() => {
               fetchVirtualContestData();
             }, 1000);
-            
             return 0;
           }
           return prevTime - 1;
@@ -299,8 +250,6 @@ const VirtualContestInside = () => {
   const handleProblemClick = (problem) => {
     const problemIndex = problem.index || problem.code;
     if (problemIndex) {
-      console.log('🎯 Navigating to virtual problem:', problemIndex);
-      // Navigate to virtual contest problem page
       navigate(`/contests/${contestId}/virtual/${virtualContestId}/problems/${problemIndex}`);
     }
   };
@@ -311,7 +260,6 @@ const VirtualContestInside = () => {
     
     if (window.confirm('Are you sure you want to restart this virtual contest? Your current progress will be lost.')) {
       try {
-        console.log('🔄 Restarting virtual contest for:', virtualContestData.original_contest_id);
         const response = await axios.post(
           `http://localhost:8000/contests/${contestId}/virtual-start/`,
           { 
@@ -320,14 +268,11 @@ const VirtualContestInside = () => {
           { headers: getHeaders() }
         );
         
-        console.log('✅ New virtual contest started:', response.data);
-        
         if (response.data.virtual_contest_id) {
           alert('New virtual contest started!');
           navigate(`/contests/${contestId}/virtual/${response.data.virtual_contest_id}`);
         }
       } catch (err) {
-        console.error('❌ Restart virtual contest error:', err.response?.data || err.message);
         alert(err.response?.data?.error || 'Failed to restart virtual contest');
       }
     }
@@ -340,62 +285,32 @@ const VirtualContestInside = () => {
     }
   };
 
-  // Handle view leaderboard
-  const handleViewLeaderboard = () => {
-    navigate(`/contests/${contestId}/standings`);
-  };
-
-  const handleViewSubmissions = () => {
-    navigate(`/contests/${contestId}/submissions`);
-  };
-
-  const handleViewEditorial = () => {
-    navigate(`/contests/${contestId}/editorial`);
-  };
-
-  const handleViewClarifications = () => {
-    navigate(`/contests/${contestId}/clarifications`);
-  };
-
-  
-
   // Get problem status icon
   const getProblemStatusIcon = (problem) => {
     const problemIndex = problem.index || problem.code;
     const status = problemStatuses[problemIndex];
     
     if (!status) {
-      return <div className="w-3 h-3 rounded-full bg-gray-300"></div>;
+      return <div className="w-2 h-2 rounded-full bg-gray-300"></div>;
     }
     
     if (status.solved) {
-      return (
-        <div className="flex items-center justify-center" title="Solved">
-          <CheckCircle className="w-4 h-4 text-green-600" />
-        </div>
-      );
+      return <CheckCircle className="w-3.5 h-3.5 text-green-600" />;
     }
     
     if (status.status === 'attempted') {
-      return (
-        <div className="flex items-center justify-center" title="Attempted">
-          <XCircle className="w-4 h-4 text-red-500" />
-        </div>
-      );
+      return <XCircle className="w-3.5 h-3.5 text-red-500" />;
     }
     
-    return (
-      <div className="w-3 h-3 rounded-full bg-gray-300" title="Not attempted"></div>
-    );
+    return <div className="w-2 h-2 rounded-full bg-gray-300"></div>;
   };
 
   // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <Loader2 className="w-12 h-12 animate-spin text-purple-600 mb-4" />
-        <p className="text-gray-600 mb-2">Loading virtual contest...</p>
-        <p className="text-xs text-gray-500">Virtual Contest ID: {virtualContestId}</p>
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600 mb-2" />
+        <p className="text-gray-600 text-xs">Loading virtual contest...</p>
       </div>
     );
   }
@@ -404,26 +319,22 @@ const VirtualContestInside = () => {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">Unable to Load Virtual Contest</h3>
-          <p className="text-gray-600 mb-6 text-center">{error}</p>
-          <div className="space-y-3">
+        <div className="bg-white p-4 rounded-lg border border-gray-200 max-w-sm w-full">
+          <h3 className="text-sm font-bold text-gray-900 mb-1">Virtual Contest Error</h3>
+          <p className="text-gray-600 text-xs mb-3">{error}</p>
+          <div className="space-y-1.5">
             <button
               onClick={() => navigate('/contests')}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              className="w-full bg-blue-800 text-white py-1.5 rounded text-xs font-medium hover:bg-blue-900 transition-colors"
             >
               Back to Contests
             </button>
             <button
               onClick={() => fetchVirtualContestData()}
-              className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              className="w-full border border-gray-300 text-gray-700 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors"
             >
               Try Again
             </button>
-            <div className="text-center mt-4">
-              <p className="text-xs text-gray-500">Virtual Contest ID: {virtualContestId}</p>
-            </div>
           </div>
         </div>
       </div>
@@ -434,8 +345,8 @@ const VirtualContestInside = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No virtual contest data available</p>
+          <AlertCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-gray-600 text-xs">No virtual contest data available</p>
         </div>
       </div>
     );
@@ -443,196 +354,139 @@ const VirtualContestInside = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Virtual Contest Header */}
+      {/* Compact Header */}
       <div className="bg-gradient-to-br from-purple-900 to-purple-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex-1 mb-6 lg:mb-0">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="px-3 py-1 bg-purple-800 text-purple-100 rounded-full text-sm font-medium">
-                  Virtual Contest
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold">{originalContestData?.title || virtualContestData.original_contest_title || 'Virtual Contest'}</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${getStatusBadge()}`}>
+                <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></div>
+                <span className="text-xs">
+                  Virtual {virtualContestData.is_active ? 'Active' : 'Completed'}
                 </span>
-                {virtualContestData.is_active && (
-                  <span className="px-3 py-1 bg-green-800 text-green-100 rounded-full text-sm font-medium flex items-center gap-1">
-                    <Timer className="w-3 h-3" />
-                    Active
-                  </span>
-                )}
               </div>
-              
-              <h1 className="text-3xl font-bold mb-2">
-                {originalContestData?.title || virtualContestData.original_contest_title || 'Virtual Contest'}
-              </h1>
-              
-              {originalContestData?.description && (
-                <p className="text-purple-100 mb-4 max-w-3xl">
-                  {originalContestData.description}
-                </p>
-              )}
-              
-              <div className="flex flex-wrap gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
-                  <span>Started: {formatDateTime(virtualContestData.virtual_start_time)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  <span>Duration: {formatDuration(
-                  virtualContestData.original_contest_duration ||  // Try flat first
-                  virtualContestData.original_contest?.duration_hours  // Then try nested
-                )}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  <span>Original Participants: {originalContestData?.participants || 0}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <School className="w-5 h-5" />
-                  <span>{originalContestData?.platform || 'Custom Platform'}</span>
-                </div>
-              </div>
-              
-              {/* Progress info */}
-              <div className="mt-4">
-                <div className="flex items-center gap-4">
-                  <span className="text-purple-200">
-                    Your Progress: {userStats.solved}/{problems.length} problems solved
-                  </span>
-                  <div className="w-48 h-2 bg-purple-800 rounded-full">
-                    <div 
-                      className="h-2 bg-green-400 rounded-full transition-all duration-300" 
-                      style={{ 
-                        width: problems.length > 0 ? `${(userStats.solved / problems.length) * 100}%` : '0%' 
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
+            </div>
+          </div>
+          
+          {originalContestData?.description && (
+            <p className="text-purple-100 text-xs mt-1 mb-2">
+              {originalContestData.description.length > 100 
+                ? originalContestData.description.substring(0, 100) + '...' 
+                : originalContestData.description}
+            </p>
+          )}
+          
+          <div className="flex flex-wrap gap-3 text-xs text-purple-100">
+            <div className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              <span>Started: {formatDateTime(virtualContestData.virtual_start_time)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>Duration: {formatDuration(
+                virtualContestData.original_contest_duration ||
+                virtualContestData.original_contest?.duration_hours
+              )}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              <span>Original: {originalContestData?.participants || 0} participants</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <School className="w-3 h-3" />
+              <span>{originalContestData?.platform || 'Custom Platform'}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="px-3 py-3">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
           {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
+          <div className="lg:col-span-1 space-y-3">
             {/* Navigation */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="font-semibold text-gray-900">Virtual Contest Navigation</h2>
-              </div>
-              <div className="p-2">
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-1">
                 {[
                   { 
                     id: 'problems', 
-                    icon: <Code2 className="w-5 h-5" />, 
+                    icon: <Code2 className="w-3.5 h-3.5" />, 
                     label: 'Problems',
                     onClick: () => setActiveTab('problems')
                   },
                   { 
                     id: 'submissions', 
-                    icon: <History className="w-5 h-5" />, 
-                    label: 'My Submissions',
-                    onClick: handleViewSubmissions
+                    icon: <History className="w-3.5 h-3.5" />, 
+                    label: 'Submissions',
+                    onClick: () => navigate(`/contests/${contestId}/submissions`)
                   },
                   { 
                     id: 'leaderboard', 
-                    icon: <Trophy className="w-5 h-5" />, 
+                    icon: <Trophy className="w-3.5 h-3.5" />, 
                     label: 'Standings',
-                    onClick: handleViewLeaderboard
-                  },
-                  { 
-                    id: 'discussions', 
-                    icon: <MessageSquare className="w-5 h-5" />, 
-                    label: 'Discussions',
-                    onClick: () => navigate(`/contests/${contestId}/discussion`)
+                    onClick: () => navigate(`/contests/${contestId}/standings`)
                   },
                   { 
                     id: 'editorial', 
-                    icon: <BarChart3 className="w-5 h-5" />, 
+                    icon: <BookOpen className="w-3.5 h-3.5" />, 
                     label: 'Editorial',
-                    onClick: handleViewEditorial
-                  },
-                  { 
-                    id: 'clarifications', 
-                    icon: <BarChart3 className="w-5 h-5" />, 
-                    label: 'Clarifications',
-                    onClick: handleViewClarifications
+                    onClick: () => navigate(`/contests/${contestId}/editorial`),
+                    show: !virtualContestData.is_active
                   }
                 ].map((item) => {
-                  if ((item.id === 'editorial' || item.id === 'discussions') && virtualContestData.status !== 'past') {
-                    return null;
-                  }
-                  if ((item.id === 'clarifications') && virtualContestData.status !== 'live') {
-                    return null;
-                  }
-
+                  if (item.show !== undefined && !item.show) return null;
                   
                   return (
                     <button
                       key={item.id}
                       onClick={item.onClick}
-                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors mb-1 ${
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors mb-0.5 ${
                         activeTab === item.id
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          ? 'bg-purple-50 text-purple-700'
                           : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       {item.icon}
-                      <span className="font-medium">{item.label}</span>
+                      <span>{item.label}</span>
                     </button>
                   );
-                }
-                //   (
-                //   <button
-                //     key={item.id}
-                //     onClick={item.onClick}
-                //     className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors mb-1 ${
-                //       activeTab === item.id
-                //         ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                //         : 'text-gray-700 hover:bg-gray-50'
-                //     }`}
-                //   >
-                //     {item.icon}
-                //     <span className="font-medium">{item.label}</span>
-                //   </button>
-                // )
-              )}
+                })}
               </div>
             </div>
 
-            {/* Timer (only for active virtual contests) */}
+            {/* Timer */}
             {virtualContestData.is_active && timeRemaining > 0 && (
-              <div className="bg-gradient-to-br from-purple-900 to-purple-700 text-white rounded-xl p-6 text-center">
-                <div className="text-xs text-purple-100 mb-2">Time Remaining</div>
-                <div className="text-xl font-bold font-mono mb-2">{formatTime(timeRemaining)}</div>
-                <div className="text-xs text-purple-200">Virtual contest ends in</div>
+              <div className="bg-gradient-to-br from-purple-900 to-purple-700 text-white rounded-lg p-3">
+                <div className="text-xs mb-1">Time remaining</div>
+                <div className="text-sm font-bold font-mono mb-1">{formatTime(timeRemaining)}</div>
               </div>
             )}
 
             {/* Stats */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="font-semibold text-gray-900">Your Virtual Stats</h2>
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-2 border-b border-gray-200">
+                <h2 className="text-xs font-semibold text-gray-900">Your Virtual Stats</h2>
               </div>
-              <div className="p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-700">{userStats.solved}</div>
+              <div className="p-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="text-center p-1 bg-gray-50 rounded">
+                    <div className="text-sm font-bold text-purple-700">{userStats.solved}</div>
                     <div className="text-xs text-gray-600">Solved</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-700">{userStats.attempted}</div>
+                  <div className="text-center p-1 bg-gray-50 rounded">
+                    <div className="text-sm font-bold text-purple-700">{userStats.attempted}</div>
                     <div className="text-xs text-gray-600">Attempted</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-700">{userStats.total}</div>
+                  <div className="text-center p-1 bg-gray-50 rounded">
+                    <div className="text-sm font-bold text-purple-700">{userStats.total}</div>
                     <div className="text-xs text-gray-600">Total</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-700">{userStats.accuracy}</div>
+                  <div className="text-center p-1 bg-gray-50 rounded">
+                    <div className="text-sm font-bold text-purple-700">{userStats.accuracy}</div>
                     <div className="text-xs text-gray-600">Accuracy</div>
                   </div>
                 </div>
@@ -640,26 +494,44 @@ const VirtualContestInside = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="font-semibold text-gray-900">Quick Actions</h2>
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-2 border-b border-gray-200">
+                <h2 className="text-xs font-semibold text-gray-900">Quick Actions</h2>
               </div>
-              <div className="p-4 space-y-3">                
-                <button
+              <div className="p-2 space-y-1.5">
+                {virtualContestData.is_active ? (
+                  <button 
+                    onClick={handleRestartVirtualContest}
+                    className="w-full bg-yellow-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-yellow-700 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Restart Virtual
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleRestartVirtualContest}
+                    className="w-full bg-purple-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Play className="w-3 h-3" />
+                    Start New Virtual
+                  </button>
+                )}
+                
+                <button 
                   onClick={handleViewOriginalContest}
-                  className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                  className="w-full border border-gray-300 text-gray-700 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
                 >
-                  <BookOpen className="w-5 h-5" />
+                  <BookOpen className="w-3 h-3" />
                   Original Contest
                 </button>
                 
-                <button className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-                  <Download className="w-5 h-5" />
+                <button className="w-full border border-gray-300 text-gray-700 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1">
+                  <Download className="w-3 h-3" />
                   Download Problems
                 </button>
                 
-                <button className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-                  <Flag className="w-5 h-5" />
+                <button className="w-full border border-gray-300 text-gray-700 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1">
+                  <Flag className="w-3 h-3" />
                   Report Issue
                 </button>
               </div>
@@ -667,18 +539,18 @@ const VirtualContestInside = () => {
           </div>
 
           {/* Main Content Area */}
-          <div className="lg:col-span-3 space-y-8">
+          <div className="lg:col-span-3 space-y-3">
             {/* Problems Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">Problems</h2>
-                <div className="flex items-center gap-3">
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-2 border-b border-gray-200 flex justify-between items-center">
+                <h2 className="text-sm font-bold text-gray-900">Virtual Contest Problems</h2>
+                <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-green-600">
                     {userStats.solved}/{problems.length} Solved
                   </span>
-                  <div className="w-32 h-2 bg-gray-200 rounded-full">
+                  <div className="w-20 h-1.5 bg-gray-200 rounded-full">
                     <div 
-                      className="h-2 bg-green-600 rounded-full transition-all duration-300" 
+                      className="h-1.5 bg-green-600 rounded-full transition-all duration-300" 
                       style={{ 
                         width: problems.length > 0 ? `${(userStats.solved / problems.length) * 100}%` : '0%' 
                       }}
@@ -688,15 +560,16 @@ const VirtualContestInside = () => {
               </div>
 
               <div className="overflow-hidden">
-                <table className="w-full">
+                <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="text-left p-4 font-medium text-gray-900 w-16">Status</th>
-                      <th className="text-left p-4 font-medium text-gray-900 w-20">#</th>
-                      <th className="text-left p-4 font-medium text-gray-900">Problem</th>
-                      <th className="text-left p-4 font-medium text-gray-900 w-32">Difficulty</th>
-                      <th className="text-left p-4 font-medium text-gray-900 w-24">Points</th>
-                      <th className="text-left p-4 font-medium text-gray-900 w-32">Your Attempts</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-10">Status</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-12">#</th>
+                      <th className="text-left p-2 font-medium text-gray-900">Problem</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-20">Difficulty</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-16">Points</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-20">Attempts</th>
+                      <th className="text-left p-2 font-medium text-gray-900 w-20">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -704,55 +577,60 @@ const VirtualContestInside = () => {
                       problems.map((problem, index) => (
                         <tr 
                           key={problem.index || index} 
-                          className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                          onClick={() => handleProblemClick(problem)}
+                          className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                         >
-                          <td className="p-4">
+                          <td className="p-2">
                             {getProblemStatusIcon(problem)}
                           </td>
-                          <td className="p-4">
+                          <td className="p-2">
                             <span className="font-semibold text-purple-700">
                               {problem.index || problem.code || String.fromCharCode(65 + index)}
                             </span>
                           </td>
-                          <td className="p-4">
+                          <td className="p-2">
                             <div className="font-medium text-gray-900">{problem.title}</div>
                             {problem.tags && problem.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {problem.tags.slice(0, 3).map((tag, i) => (
-                                  <span key={i} className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                              <div className="flex flex-wrap gap-0.5 mt-0.5">
+                                {problem.tags.slice(0, 2).map((tag, i) => (
+                                  <span key={i} className="px-1 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
                                     {tag}
                                   </span>
                                 ))}
                               </div>
                             )}
                           </td>
-                          <td className="p-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(problem.difficulty)}`}>
+                          <td className="p-2">
+                            <span className={`${getDifficultyColor(problem.difficulty)}`}>
                               {problem.difficulty?.charAt(0).toUpperCase() + problem.difficulty?.slice(1) || 'Medium'}
                             </span>
                           </td>
-                          <td className="p-4 font-medium text-gray-900">
+                          <td className="p-2 font-medium text-gray-900">
                             {problem.points || 100}
                           </td>
-                          <td className="p-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          <td className="p-2">
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
                               problem.attempts > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
                             }`}>
-                              {problem.attempts || 0} attempt{problem.attempts !== 1 ? 's' : ''}
+                              {problem.attempts || 0}
                             </span>
+                          </td>
+                          <td className="p-2">
+                            <button
+                              onClick={() => handleProblemClick(problem)}
+                              className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 transition-colors font-medium flex items-center gap-1"
+                            >
+                              <Play className="w-2.5 h-2.5" />
+                              Solve
+                            </button>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="6" className="p-12 text-center">
+                        <td colSpan="7" className="p-4 text-center">
                           <div className="flex flex-col items-center justify-center">
-                            <Code2 className="w-16 h-16 text-gray-300 mb-4" />
-                            <h3 className="text-lg font-semibold text-gray-700 mb-2">No Problems Yet</h3>
-                            <p className="text-gray-500 max-w-md">
-                              Loading problems for this virtual contest...
-                            </p>
+                            <Code2 className="w-8 h-8 text-gray-300 mb-2" />
+                            <p className="text-gray-500 text-xs">No problems available</p>
                           </div>
                         </td>
                       </tr>
@@ -762,69 +640,62 @@ const VirtualContestInside = () => {
               </div>
             </div>
 
-            {/* Virtual Contest Info Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <TrophyIcon className="w-6 h-6" />
+            {/* Virtual Contest Info */}
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="p-2 border-b border-gray-200">
+                <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  <BookOpen className="w-3.5 h-3.5 text-purple-600" />
                   Virtual Contest Information
                 </h2>
               </div>
-              
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-1">Status</h3>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {virtualContestData.is_active ? (
-                          <span className="text-green-600">Active</span>
-                        ) : (
-                          <span className="text-gray-600">Completed</span>
-                        )}
-                      </p>
+              <div className="p-2">
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <div className="mb-1">
+                      <span className="font-medium">Status: </span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-xs ${
+                        virtualContestData.is_active 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {virtualContestData.is_active ? 'Active' : 'Completed'}
+                      </span>
                     </div>
-                    
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-1">Start Time</h3>
-                      <p className="text-gray-900">{formatDateTime(virtualContestData.virtual_start_time)}</p>
+                    <div className="mb-1">
+                      <span className="font-medium">Started: </span>
+                      {formatDateTime(virtualContestData.virtual_start_time)}
                     </div>
-                    
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-1">Duration</h3>
-                      <p className="text-gray-900">{formatDuration(
-  virtualContestData.original_contest_duration ||  // Try flat first
-  virtualContestData.original_contest?.duration_hours  // Then try nested
-)}</p>
-                      
+                      <span className="font-medium">Duration: </span>
+                      {formatDuration(
+                        virtualContestData.original_contest_duration ||
+                        virtualContestData.original_contest?.duration_hours
+                      )}
                     </div>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-1">Original Contest</h3>
-                      <p className="text-gray-900">{virtualContestData.original_contest_title}</p>
+                  <div>
+                    <div className="mb-1">
+                      <span className="font-medium">Original Contest: </span>
+                      {virtualContestData.original_contest_title}
                     </div>
-                    
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-1">Your Best Score</h3>
-                      <p className="text-2xl font-bold text-purple-700">
-                        {problems.reduce((total, problem) => total + (problem.solved ? (problem.points || 100) : 0), 0)} points
-                      </p>
+                    <div className="mb-1">
+                      <span className="font-medium">Your Score: </span>
+                      <span className="font-bold text-purple-700">
+                        {problems.reduce((total, problem) => total + (problem.solved ? (problem.points || 100) : 0), 0)} pts
+                      </span>
                     </div>
-                    
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-1">Progress</h3>
-                      <div className="flex items-center gap-3">
-                        <div className="w-full h-2 bg-gray-200 rounded-full">
+                      <span className="font-medium">Progress: </span>
+                      <div className="inline-flex items-center gap-1">
+                        <div className="w-16 h-1.5 bg-gray-200 rounded-full">
                           <div 
-                            className="h-2 bg-purple-600 rounded-full transition-all duration-300" 
+                            className="h-1.5 bg-purple-600 rounded-full transition-all duration-300" 
                             style={{ 
                               width: problems.length > 0 ? `${(userStats.solved / problems.length) * 100}%` : '0%' 
                             }}
                           ></div>
                         </div>
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className="text-xs">
                           {Math.round((userStats.solved / problems.length) * 100)}%
                         </span>
                       </div>
@@ -833,12 +704,12 @@ const VirtualContestInside = () => {
                 </div>
                 
                 {/* Note about virtual contests */}
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-blue-600 mt-0.5 flex-shrink-0" />
                     <div>
-                      <h4 className="font-medium text-blue-900 mb-1">About Virtual Contests</h4>
-                      <p className="text-sm text-blue-700">
+                      <h4 className="font-medium text-blue-900 text-xs mb-0.5">About Virtual Contests</h4>
+                      <p className="text-blue-700 text-xs">
                         This is a virtual contest. Your submissions will not affect your rating. 
                         You can practice at your own pace and restart the contest anytime.
                       </p>
@@ -847,8 +718,6 @@ const VirtualContestInside = () => {
                 </div>
               </div>
             </div>
-
-
           </div>
         </div>
       </div>

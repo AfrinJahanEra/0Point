@@ -1,5 +1,5 @@
 # contest/models.py
-import datetime
+from datetime import datetime
 from mongoengine import Document, EmbeddedDocument, DictField
 from mongoengine import (
     StringField, DateTimeField, FloatField, IntField,
@@ -49,6 +49,11 @@ class Contest(Document):
 
     # NEW: Status field with appropriate choices
     status = StringField(choices=["draft", "upcoming", "live", "past", "test"], default="draft")
+
+    require_screen_recording = BooleanField(default=True)  # Whether contest requires recording
+    recording_max_duration = IntField(default=180)  # Max recording duration in minutes
+
+    recordings_started = ListField(StringField(), default=list)
     
     # NEW: Contest visibility and settings
     visibility = StringField(choices=["public", "invite"], default="public")
@@ -104,3 +109,37 @@ class TestContest(Document):
     allow_practice = BooleanField(default=True)
     rating_changes = BooleanField(default=True)
     editorial_published = BooleanField(default=False)
+
+
+# contest/models.py - Add this new model
+class ContestScreenRecording(Document):
+    """Model to store screen recordings for contests"""
+    meta = {'collection': 'contest_screen_recordings'}
+    
+    contest = ReferenceField(Contest, required=True)
+    user = ReferenceField(Account, required=True)
+    recording_file = StringField()  # Path to the recording file
+    start_time = DateTimeField(required=True)
+    end_time = DateTimeField()
+    duration = FloatField()  # Duration in seconds
+    recording_status = StringField(choices=["recording", "stopped", "error", "completed"], default="recording")
+    file_size = IntField()  # File size in bytes
+    
+    # Metadata
+    video_format = StringField(default="webm")
+    video_resolution = StringField()
+    fps = IntField(default=30)
+    
+    # Security
+    checksum = StringField()  # For file integrity
+    encrypted = BooleanField(default=False)
+    
+    # Timestamps
+    created_at = DateTimeField(default=datetime.now)
+    updated_at = DateTimeField(default=datetime.now)
+    
+    def save(self, *args, **kwargs):
+        self.updated_at = datetime.now()
+        return super().save(*args, **kwargs)
+    
+    

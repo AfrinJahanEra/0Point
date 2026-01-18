@@ -55,12 +55,6 @@ class TestContestSerializer(serializers.Serializer):
     rating_changes = serializers.BooleanField(default=True)
     editorial_published = serializers.BooleanField(default=False)
 
-# class TestContestRegistrationSerializer(serializers.Serializer):
-#     """Serializer for test contest registration"""
-#     contest_id = serializers.CharField(required=True)
-#     user_id = serializers.CharField(required=True)
-
-# testcontest/serializers.py - Add these classes
 
 class TestContestSubmissionCreateSerializer(serializers.Serializer):
     """Serializer for creating test contest submissions"""
@@ -100,14 +94,7 @@ class TestContestSubmissionCreateSerializer(serializers.Serializer):
         
         if current_status not in ["live"]:
             raise serializers.ValidationError(f"Test contest is not live (current status: {current_status})")
-        
-        # Check if user is registered
-        # registration = TestContestRegistration.objects.filter(
-        #     user=user, contest=test_contest
-        # ).first()
-        # if not registration:
-        #     raise serializers.ValidationError("You are not registered for this test contest")
-        
+
         # Check if problem exists
         problem_exists = False
         for problem in test_contest.problems:
@@ -138,7 +125,6 @@ class TestContestSubmissionCreateSerializer(serializers.Serializer):
         data['test_contest'] = test_contest
         
         return data
-
 
 class TestContestSubmissionSerializer(serializers.Serializer):
     """Serializer for test contest submission responses"""
@@ -180,3 +166,10 @@ class TestContestSubmissionSerializer(serializers.Serializer):
         # Users can view their own code
         return obj['user_id'] == str(user.id)
         
+
+# class TestContestRegistrationSerializer(serializers.Serializer):
+#     """Serializer for test contest registration"""
+#     contest_id = serializers.CharField(required=True)
+#     user_id = serializers.CharField(required=True)
+
+# testcontest/serializers.py - Add these classes
