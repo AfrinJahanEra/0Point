@@ -1,23 +1,28 @@
+# Server/auto_sync.py   (very minimal version)
 import schedule
 import time
 import os
 import django
 
-# Setup Django
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "zeropoint.settings")  # ← CHANGE THIS!
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "zeropoint.settings")
 django.setup()
 
 from django.core.management import call_command
 
-def sync_job():
-    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Running sync_cf...")
-    call_command("sync_cf")
-    print("Done!\n")
+def job():
+    ts = time.strftime('%Y-%m-%d %H:%M:%S')
+    print(f"[{ts}] Syncing all contests...")
+    call_command("sync_all_contests")
+    print(f"[{ts}] Done ✓\n")
 
-# Run every 60 seconds
-schedule.every(60).seconds.do(sync_job)
+# Choose one:
+schedule.every(30).minutes.do(job)
+# schedule.every(1).hour.do(job)
+# schedule.every(4).hours.do(job)
 
-print("Started automatic Codeforces sync (every 60 seconds)")
+print("Auto-sync (all platforms) started")
+print(f"Interval: every {schedule.jobs[0].interval} {schedule.jobs[0].unit}")
+print("="*65)
 
 while True:
     schedule.run_pending()
