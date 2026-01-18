@@ -34,21 +34,6 @@ def format_duration_like_cf(seconds: int) -> str:
     return " ".join(parts)
 
 
-
-def fetch_participants_count(contest_id: int) -> int:
-    try:
-        url = f"https://codeforces.com/api/contest.standings?contestId={contest_id}"
-        resp = requests.get(url, timeout=10)
-        data = resp.json()
-        
-        if data.get("status") == "OK":
-            rows = data["result"].get("rows", [])
-            return len(rows)
-        return 0
-    except Exception as e:
-        print(f"Failed to fetch standings for {contest_id}: {e}")
-        return 0
-
 def sync_codeforces_contests():
     response = requests.get(CF_API, timeout=15)
     response.raise_for_status()
@@ -73,9 +58,5 @@ def sync_codeforces_contests():
             "last_synced": now,
         }
         
-        # Only save participant count for FINISHED contests
-        if status == "finished":
-            participants = fetch_participants_count(c["id"])
-            update_data["participants"] = participants
-        
+   
      
