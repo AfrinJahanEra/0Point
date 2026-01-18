@@ -65,11 +65,6 @@ const CommentItem = ({ comment, onReply, onDelete, replyingTo, setReplyingTo, re
             <span className={`font-semibold ${getRatingColor(comment.author.rating)} hover:underline cursor-pointer`}>
               {comment.author.name}
             </span>
-            {comment.author.rating && (
-              <span className={`text-xs px-1 py-0.5 rounded ${getRatingBg(comment.author.rating)} ${getRatingColor(comment.author.rating)} font-mono`}>
-                {comment.author.rating}
-              </span>
-            )}
             <span className="text-gray-500">•</span>
             <span className="text-gray-500 text-xs">{formatDate(comment.created_at)}</span>
           </div>
@@ -375,8 +370,8 @@ const BlogDetail = () => {
     
     // Blockquote component for > syntax (simple grey style)
     blockquote: ({ children }) => (
-      <blockquote className="my-4 pl-4 border-l-3 border-gray-400 bg-gray-50 py-2 pr-3 rounded-r text-sm">
-        <div className="text-gray-700">
+      <blockquote className="my-4 pl-4 border-l-4 border-gray-400 bg-gray-100 py-2 pr-4 rounded-r">
+        <div className="text-gray-800">
           {children}
         </div>
       </blockquote>
@@ -409,16 +404,30 @@ const BlogDetail = () => {
       );
     },
 
+    // Updated code block with same background as blockquote
+    pre: ({ children }) => (
+      <pre className="my-4 bg-gray-100 p-3 rounded border-l-4 border-gray-400 text-xs font-mono overflow-x-auto">
+        {children}
+      </pre>
+    ),
+
+    // Updated link component to open in new tab
+    a: ({ href, children, ...props }) => (
+      <a 
+        href={href} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:text-blue-800 hover:underline"
+        {...props}
+      >
+        {children}
+      </a>
+    ),
+
     p: ({ children }) => (
       <p className="mb-3 text-gray-700 leading-relaxed text-sm">
         {children}
       </p>
-    ),
-
-    pre: ({ children }) => (
-      <pre className="bg-gray-50 p-3 rounded text-xs font-mono overflow-x-auto my-3 border border-gray-200">
-        {children}
-      </pre>
     ),
   };
 
@@ -471,11 +480,6 @@ const BlogDetail = () => {
                         <span className={`text-sm font-medium ${getRatingColor(blog.author.rating)}`}>
                           {blog.author.name}
                         </span>
-                        {blog.author.rating && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${getRatingBg(blog.author.rating)} ${getRatingColor(blog.author.rating)} font-mono`}>
-                            {blog.author.rating}
-                          </span>
-                        )}
                       </div>
                       <div className="text-xs text-gray-500">
                         {formatDate(blog.published_at)}
@@ -484,13 +488,13 @@ const BlogDetail = () => {
                   </div>
                 </div>
 
-                {/* Tags */}
+                {/* Tags - Updated with same bg as blockquote, black text, and rounded */}
                 {blog.tags && blog.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {blog.tags.map((tag, index) => (
                       <span
                         key={index}
-                        className="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 cursor-pointer transition-colors"
+                        className="px-2 py-0.5 text-xs bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 cursor-pointer transition-colors border border-gray-300"
                       >
                         {tag}
                       </span>
@@ -513,55 +517,47 @@ const BlogDetail = () => {
                 </ReactMarkdown>
               </div>
 
-              {/* Compact Footer - Thumbs Up/Down & Comment */}
+              {/* Compact Footer - Only Thumbs Up/Down & Comment */}
               <div className="mt-4 pt-3 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  {/* Left: Interaction buttons */}
-                  <div className="flex items-center gap-3">
-                    {/* Thumbs Up */}
-                    <button
-                      onClick={() => handleVote('upvote')}
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
-                        votes.user_vote === 'upvote' 
-                          ? 'bg-green-50 text-green-700 border border-green-200' 
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                      title="Like"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                      </svg>
-                      <span className="text-xs font-medium">{votes.upvotes}</span>
-                    </button>
+                <div className="flex items-center gap-3">
+                  {/* Thumbs Up */}
+                  <button
+                    onClick={() => handleVote('upvote')}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
+                      votes.user_vote === 'upvote' 
+                        ? 'bg-green-50 text-green-700 border border-green-200' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    title="Like"
+                  >
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                    </svg>
+                    <span className="text-xs font-medium">{votes.upvotes}</span>
+                  </button>
 
-                    {/* Thumbs Down */}
-                    <button
-                      onClick={() => handleVote('downvote')}
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
-                        votes.user_vote === 'downvote' 
-                          ? 'bg-red-50 text-red-700 border border-red-200' 
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                      title="Dislike"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                      </svg>
-                      <span className="text-xs font-medium">{votes.downvotes}</span>
-                    </button>
+                  {/* Thumbs Down */}
+                  <button
+                    onClick={() => handleVote('downvote')}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
+                      votes.user_vote === 'downvote' 
+                        ? 'bg-red-50 text-red-700 border border-red-200' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    title="Dislike"
+                  >
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                    </svg>
+                    <span className="text-xs font-medium">{votes.downvotes}</span>
+                  </button>
 
-                    {/* Comment Icon */}
-                    <div className="flex items-center gap-1.5 px-2 py-1 text-gray-600">
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                      <span className="text-xs font-medium">{comments.length}</span>
-                    </div>
-                  </div>
-
-                  {/* Right: Score */}
-                  <div className="text-sm font-bold text-gray-700">
-                    Score: {votes.score}
+                  {/* Comment Icon */}
+                  <div className="flex items-center gap-1.5 px-2 py-1 text-gray-600">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <span className="text-xs font-medium">{comments.length}</span>
                   </div>
                 </div>
               </div>
@@ -569,7 +565,7 @@ const BlogDetail = () => {
 
             {/* Comments Section */}
             <div className="mt-4">
-              {/* Comments Header - Only shows count, no comment icon */}
+              {/* Comments Header */}
               <div className="mb-3">
                 <h2 className="text-lg font-semibold text-gray-900">
                   Comments ({comments.length})
@@ -599,7 +595,14 @@ const BlogDetail = () => {
               ) : (
                 <div className="mb-4 p-2 bg-gray-50 rounded text-center text-xs border border-gray-200">
                   <p className="text-gray-600">
-                    <a href="/login" className="text-blue-600 hover:text-blue-800">Login</a> to comment
+                    <a 
+                      href="/login" 
+                      className="text-blue-600 hover:text-blue-800"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Login
+                    </a> to comment
                   </p>
                 </div>
               )}
