@@ -11,4 +11,24 @@ urlpatterns = [
     path("", include("leaderboard.urls")),
     path("", include("announcement.urls")),
     path("", include("tutorial.urls")),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path('admin/', admin.site.urls),
+    path('api/executor/', include('executor.urls')),
+    path('mock-interview/', include('mock_interview.urls')),
+    path('videoconference/', include('videoconference.urls')),
+    path('api/pdf/', include('pdf.urls')),
+    path('api/ide/', include('ide.urls')),
+    path("", include("crossPlatform.urls")),
+    path("blog/", include("blog.urls")),
+]
+
+# Serve media files during development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Additional pattern to serve media files directly via Django's built-in serve view
+    urlpatterns += [
+        re_path(r'^media/(?P<path>.*)$', serve, {
+            'document_root': settings.MEDIA_ROOT,
+        }),
+
+    ]
+

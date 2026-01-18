@@ -35,7 +35,7 @@ import TestContestInside from './pages/TestContestInside';
 import TestContestProblemDetail from './pages/TestContestProblemDetail';
 import TestContestLeaderboard  from './pages/TestContestLeaderboard';
 import TestContestSubmission from './pages/TestContestSubmission';
-
+import BlogDetail from './pages/BlogDetail';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -222,7 +222,13 @@ function App() {
                 <Blog />
               </NavLayout>
             } />
-           
+
+            <Route path="/blog/:id" element={
+              <NavLayout>
+                <BlogDetail />
+              </NavLayout>
+            } />
+            
             <Route path="/dashboard" element={
               <NavLayout>
                 <Dashboard />

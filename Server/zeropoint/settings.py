@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'discussion',
     'clarification',
     'testcontest',
+    'crossPlatform',
+    'blog',
 ]
 
 MIDDLEWARE = [
@@ -161,7 +163,7 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'Asia/Dhaka'   # ✅ CHANGE THIS
-USE_TZ = False             # ✅ CHANGE THIS
+USE_TZ = True             # ✅ CHANGE THIS
 
 USE_I18N = True
 
@@ -169,4 +171,7 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+
 
