@@ -49,15 +49,6 @@ class TestContest(Document):
     rating_changes = BooleanField(default=True)
     editorial_published = BooleanField(default=False)
 
-# class TestContestRegistration(Document):
-#     """Registration for test contests"""
-#     meta = {'collection': 'test_contest_registration'}
-#     contest = ReferenceField(TestContest)
-#     user = ReferenceField(Account)
-#     registered_at = DateTimeField()
-
-# testcontest/models.py - Add these classes at the end of the file
-
 class TestContestSubmission(Document):
     """Model for storing test contest submissions"""
     
@@ -133,3 +124,11 @@ class TestContestSubmission(Document):
             'is_test_contest': self.is_test_contest
         }
     
+# class TestContestRegistration(Document):
+#     """Registration for test contests"""
+#     meta = {'collection': 'test_contest_registration'}
+#     contest = ReferenceField(TestContest)
+#     user = ReferenceField(Account)
+#     registered_at = DateTimeField()
+
+# testcontest/models.py - Add these classes at the end of the file

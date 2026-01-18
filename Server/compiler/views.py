@@ -13,13 +13,13 @@ from submission.models import Submission
 from contest.models import Contest, ContestProblem
 
 # JDoodle credentials
-# JD_CLIENT_ID = "fd5008b0be3517adb097999e752bdc36"
-JD_CLIENT_ID = "6c83bb2cd0b9e9a790f59a2484011318"
-# JD_CLIENT_SECRET = "99df47ceee2ae9af0137b30d0d7eebcdc3aac2fc400b16ef5298bff3576ad5e2"
-JD_CLIENT_SECRET = "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4"
+JD_CLIENT_ID = "fd5008b0be3517adb097999e752bdc36"
+# JD_CLIENT_ID = "6c83bb2cd0b9e9a790f59a2484011318"
+JD_CLIENT_SECRET = "99df47ceee2ae9af0137b30d0d7eebcdc3aac2fc400b16ef5298bff3576ad5e2"
+# JD_CLIENT_SECRET = "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4"
 JD_URL = "https://api.jdoodle.com/v1/execute"
 
-# Map for language -> recommended versionIndex
+
 LANGUAGE_VERSION_MAP = {
     "python": "3",
     "python3": "3",
@@ -29,130 +29,215 @@ LANGUAGE_VERSION_MAP = {
     "javascript": "4"
 }
 
-
+   
 class CodeExecuteAPIView(APIView):
-    """Execute code via JDoodle API for testing (Run button)"""
+    """Execute code via JDoodle API for testing (Run button) - Now runs all test cases"""
     
-    def post(self, request, contest_id=None, problem_id=None):
-        # Authenticate user
+    def post(self, request, contest_id=None, problem_index=None):
         user = get_user_from_request(request)
         if not user:
             return Response({"error": "Authentication required"}, status=401)
-        
-        # Validate input
+
         serializer = CodeSubmissionSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
-        
+
         data = serializer.validated_data
         language = data["language"].lower()
         version_index = data.get("version_index") or LANGUAGE_VERSION_MAP.get(language, "0")
-        
-        # JDoodle payload
-        payload = {
-            "clientId": JD_CLIENT_ID,
-            "clientSecret": JD_CLIENT_SECRET,
-            "script": data["code"],
-            "stdin": data.get("input_data", ""),
-            "language": language,
-            "versionIndex": version_index
-        }
-        
-        try:
-            res = requests.post(JD_URL, json=payload, timeout=15)
-            res_data = res.json()
 
-            print("=" * 50)
-            print("DEBUG - CodeExecuteAPIView JDoodle Response:")
-            print(f"Full JDoodle response: {res_data}")
-            print(f"cpuTime: {res_data.get('cpuTime')}, type: {type(res_data.get('cpuTime'))}")
-            print(f"memory: {res_data.get('memory')}, type: {type(res_data.get('memory'))}")
-            print(f"isExecutionSuccess: {res_data.get('isExecutionSuccess')}")
-            print(f"statusCode: {res_data.get('statusCode')}")
-            print("=" * 50)
-            
-            jdoodle_output = res_data.get("output", "").strip()
-            cpu_time_str = res_data.get("cpuTime")
-            cpu_time_seconds = 0.0 if cpu_time_str is None else float(cpu_time_str)
-            cpu_time_ms = int(cpu_time_seconds * 1000)
-            memory_kb = int(res_data.get("memory", 0))
-            status_code = res_data.get("statusCode", 200)
-            is_execution_success = res_data.get("isExecutionSuccess", False)
-            
-            # Check expected output if provided
-            verdict = "OK"
+        contest = None
+        problem = None
+        test_cases = []
+
+        if contest_id and problem_index:
+            try:
+                contest = Contest.objects.get(id=contest_id)
+                for p in contest.problems:
+                    if p.index == problem_index.upper():
+                        problem = p
+                        test_cases = p.test_cases
+                        break
+                if not problem:
+                    return Response({"error": "Problem not found"}, status=404)
+            except Contest.DoesNotExist:
+                return Response({"error": "Contest not found"}, status=404)
+
+        if not test_cases:
+            input_data = data.get("input_data", "").strip()
             expected_output = data.get("expected_output", "").strip()
-            if expected_output:
-                verdict = "AC" if jdoodle_output == expected_output else "WA"
-            
-            # Check for compilation/runtime errors
-            status = "success" if is_execution_success else "error"
-            if status_code == 400:
-                status = "compilation_error"
-            elif not is_execution_success:
-                status = "runtime_error"
-            
-            # Save to CodeSubmission for debugging
-            code_submission = CodeSubmission(
-                user=user,
-                language=language,
-                version_index=version_index,
-                code=data["code"],
-                input_data=data.get("input_data", ""),
-                output=jdoodle_output,
-                status=status
-            )
-            code_submission.save()
-            
-            return Response({
-                "submission_id": str(code_submission.id),
-                "contest_id": contest_id,
-                "problem_id": problem_id,
-                "output": jdoodle_output,
-                "status": status,
-                "verdict": verdict,
-                "execution_time_ms": cpu_time_ms,
-                "execution_time_seconds": cpu_time_seconds,
-                "memory_kb": memory_kb,
-                "memory_mb": round(memory_kb / 1024, 2),
-                "status_code": status_code,
-                "is_execution_success": is_execution_success,
-                "jdoodle_response": res_data
-            })
-            
-        except requests.exceptions.Timeout:
-            error_msg = "Execution timeout (15 seconds)"
-            code_submission = CodeSubmission(
-                user=user,
-                language=language,
-                version_index=version_index,
-                code=data["code"],
-                input_data=data.get("input_data", ""),
-                output=error_msg,
-                status="timeout_error"
-            )
-            code_submission.save()
-            return Response({"error": error_msg}, status=408)
-            
-        except Exception as e:
-            error_msg = str(e)
-            code_submission = CodeSubmission(
-                user=user,
-                language=language,
-                version_index=version_index,
-                code=data["code"],
-                input_data=data.get("input_data", ""),
-                output=error_msg,
-                status="system_error",
-                execution_time_ms=cpu_time_ms,
-                execution_time_seconds=cpu_time_seconds,
-                memory_kb=memory_kb,
-                memory_mb=round(memory_kb / 1024, 2),
-                status_code=status_code,
-                is_execution_success=is_execution_success
-            )
-            code_submission.save()
-            return Response({"error": error_msg}, status=500)
+            if not input_data:
+                return Response({"error": "No test cases provided"}, status=400)
+            test_cases = [{
+                "input": input_data,
+                "output": expected_output,
+                "sample": True
+            }]
+
+        all_passed = True
+        passed_count = 0
+        failed_test_case = None
+        total_test_cases = len(test_cases)
+
+        final_verdict = "OK"
+        error_message = None
+        compile_output = None
+
+        max_execution_time = 0
+        max_memory_used = 0
+
+        test_case_outputs = []
+
+        for i, test_case in enumerate(test_cases):
+            payload = {
+                "clientId": JD_CLIENT_ID,
+                "clientSecret": JD_CLIENT_SECRET,
+                "script": data["code"],
+                "stdin": test_case.input if hasattr(test_case, "input") else test_case.get("input", ""),
+                "language": language,
+                "versionIndex": version_index
+            }
+
+            try:
+                res = requests.post(JD_URL, json=payload, timeout=15)
+                res_data = res.json()
+
+                output = res_data.get("output", "").strip()
+                cpu_time_ms = int(float(res_data.get("cpuTime") or 0) * 1000)
+                memory_kb = int(res_data.get("memory", 0))
+                status_code = res_data.get("statusCode", 200)
+                success = res_data.get("isExecutionSuccess", False)
+
+                max_execution_time = max(max_execution_time, cpu_time_ms)
+                max_memory_used = max(max_memory_used, memory_kb)
+
+                expected = (
+                    test_case.output.strip()
+                    if hasattr(test_case, "output")
+                    else test_case.get("output", "").strip()
+                )
+
+                if status_code == 400 or not success:
+                    all_passed = False
+                    final_verdict = "CE"
+                    compile_output = output
+                    error_message = "Compilation Error" if status_code == 400 else "Runtime Error"
+
+                    test_case_outputs.append({
+                        "test_case": i + 1,
+                        "input": payload["stdin"],
+                        "expected": expected,
+                        "actual": output,
+                        "passed": False,
+                        "error": error_message
+                    })
+                    break
+
+                passed = output == expected
+
+                test_case_outputs.append({
+                    "test_case": i + 1,
+                    "input": payload["stdin"],
+                    "expected": expected,
+                    "actual": output,
+                    "passed": passed,
+                    "cpu_time_ms": cpu_time_ms,
+                    "memory_kb": memory_kb
+                })
+
+                if passed:
+                    passed_count += 1
+                else:
+                    all_passed = False
+                    if failed_test_case is None:
+                        failed_test_case = i + 1
+                    if final_verdict == "OK":
+                        final_verdict = "WA"
+
+                if problem:
+                    if cpu_time_ms > problem.time_limit_seconds * 1000 and final_verdict == "OK":
+                        all_passed = False
+                        final_verdict = "TLE"
+
+                    if memory_kb > problem.memory_limit_mb * 1024 and final_verdict == "OK":
+                        all_passed = False
+                        final_verdict = "MLE"
+
+            except requests.exceptions.Timeout:
+                all_passed = False
+                if final_verdict == "OK":
+                    final_verdict = "TLE"
+
+                test_case_outputs.append({
+                    "test_case": i + 1,
+                    "input": payload["stdin"],
+                    "expected": expected,
+                    "actual": None,
+                    "passed": False,
+                    "error": "Timeout"
+                })
+
+            except Exception as e:
+                all_passed = False
+                final_verdict = "SE"
+
+                test_case_outputs.append({
+                    "test_case": i + 1,
+                    "input": payload["stdin"],
+                    "expected": expected,
+                    "actual": None,
+                    "passed": False,
+                    "error": str(e)
+                })
+                break
+
+        if all_passed:
+            final_verdict = "AC"
+            status_msg = "Accepted"
+        else:
+            status_msg = final_verdict
+
+        first_output = test_case_outputs[0]["actual"] if test_case_outputs else ""
+
+        code_submission = CodeSubmission(
+            user=user,
+            language=language,
+            version_index=version_index,
+            code=data["code"],
+            input_data=data.get("input_data", ""),
+            output=first_output or error_message or compile_output or "",
+            status="success" if all_passed else "error",
+            verdict=final_verdict,
+            execution_time_ms=max_execution_time,
+            execution_time_seconds=max_execution_time / 1000 if max_execution_time else 0,
+            memory_kb=max_memory_used,
+            memory_mb=round(max_memory_used / 1024, 2) if max_memory_used else 0,
+            status_code=200 if all_passed else 400,
+            is_execution_success=all_passed
+        )
+        code_submission.save()
+
+        return Response({
+            "submission_id": str(code_submission.id),
+            "contest_id": contest_id,
+            "problem_index": problem_index,
+            "verdict": final_verdict,
+            "status": status_msg,
+            "output": first_output,
+            "test_case_outputs": test_case_outputs,
+            "all_passed": all_passed,
+            "passed_test_cases": passed_count,
+            "total_test_cases": total_test_cases,
+            "failed_test_case": failed_test_case,
+            "error_message": error_message,
+            "compile_output": compile_output,
+            "execution_time": max_execution_time,
+            "memory_used": max_memory_used,
+            "time_limit": problem.time_limit_seconds * 1000 if problem else None,
+            "memory_limit": problem.memory_limit_mb * 1024 if problem else None,
+            "cpu_time_seconds": max_execution_time / 1000 if max_execution_time else 0
+        })
+
 
 class ContestProblemExecuteAPIView(APIView):
     """Execute and judge code for a contest problem (Submit button)"""
@@ -245,14 +330,6 @@ class ContestProblemExecuteAPIView(APIView):
                 res = requests.post(JD_URL, json=payload, timeout=15)
                 res_data = res.json()
 
-                print("=" * 50)
-                print(f"DEBUG - ContestProblemExecuteAPIView JDoodle Response (Test case {i}):")
-                print(f"Full JDoodle response: {res_data}")
-                print(f"cpuTime: {res_data.get('cpuTime')}, type: {type(res_data.get('cpuTime'))}")
-                print(f"memory: {res_data.get('memory')}, type: {type(res_data.get('memory'))}")
-                print(f"isExecutionSuccess: {res_data.get('isExecutionSuccess')}")
-                print(f"statusCode: {res_data.get('statusCode')}")
-                print("=" * 50)
                 
                 # Replace lines 156-161 with:
                 jdoodle_output = res_data.get("output", "").strip()

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from mongoengine.errors import ValidationError as MEValidationError
 import pytz
 from .broadcast import broadcast_contest_update
-from .models import Contest, ContestProblem, ContestRegistration, TestCase, TestContest
+from .models import Contest, ContestProblem, ContestRegistration, TestCase, TestContest, ContestScreenRecording
 from .serializers import ContestCreateSerializer, TestContestCreateSerializer
 from .utils.auth import get_user_from_request
 from account.models import Account
@@ -19,6 +19,7 @@ from contest.models import Contest
 from submission.models import Submission
 from account.models import Account
 from contest.broadcast import broadcast_global_update
+from datetime import datetime
 
 
 class UserProblemStatusAPIView(APIView):
@@ -1491,4 +1492,766 @@ class ContestPublishTestAPIView(APIView):
                 "error": f"Failed to create test contest: {str(e)}"
             }, status=400)
         
+# contest/views.py - Add these new views
 
+import os
+import hashlib
+from django.conf import settings
+from django.http import JsonResponse, FileResponse
+from django.core.files.storage import FileSystemStorage
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.parsers import MultiPartParser, FileUploadParser
+import uuid
+# Add this to contest/views.py imports
+from django.core.files.storage import default_storage
+
+class ContestRecordingStatusAPIView(APIView):
+    """Check if user needs to start recording for a contest"""
+    
+    def get(self, request, contest_id):
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+        
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=404)
+        
+        # Check if contest requires recording
+        requires_recording = getattr(contest, 'require_screen_recording', True)
+        
+        # Check if user has already started recording for this contest
+        recording_started = False
+        recording_record = None
+        
+        if requires_recording:
+            # Check in contest.recordings_started list
+            if hasattr(contest, 'recordings_started'):
+                recording_started = str(user.id) in contest.recordings_started
+            else:
+                contest.recordings_started = []
+                contest.save()
+            
+            # Check if there's an active recording record
+            recording_record = ContestScreenRecording.objects.filter(
+                contest=contest,
+                user=user,
+                recording_status__in=["recording", "stopped"]
+            ).first()
+            
+            if recording_record:
+                recording_started = True
+        
+        return Response({
+            "requires_recording": requires_recording,
+            "recording_started": recording_started,
+            "recording_id": str(recording_record.id) if recording_record else None,
+            "max_duration_minutes": getattr(contest, 'recording_max_duration', 180)
+        })
+
+# contest/views.py - Updated StartContestRecordingAPIView with better debugging
+
+class StartContestRecordingAPIView(APIView):
+    """Start screen recording for a contest (marks user as started)"""
+    
+    def post(self, request, contest_id):
+        print(f"\n=== DEBUG: StartContestRecordingAPIView called ===")
+        print(f"Contest ID: {contest_id}")
+        
+        user = get_user_from_request(request)
+        if not user:
+            print("DEBUG: No user found")
+            return Response({"error": "Authentication required"}, status=401)
+        
+        print(f"DEBUG: User ID: {user.id}, Email: {user.email}")
+        
+        try:
+            contest = Contest.objects.get(id=contest_id)
+            print(f"DEBUG: Contest found: {contest.title}")
+            print(f"DEBUG: Contest require_screen_recording: {getattr(contest, 'require_screen_recording', 'NOT SET')}")
+        except Contest.DoesNotExist as e:
+            print(f"DEBUG: Contest not found error: {e}")
+            return Response({"error": "Contest not found"}, status=404)
+        except Exception as e:
+            print(f"DEBUG: Error getting contest: {e}")
+            return Response({"error": f"Error getting contest: {str(e)}"}, status=500)
+        
+        # Check if contest requires recording
+        requires_recording = getattr(contest, 'require_screen_recording', False)
+        print(f"DEBUG: Requires recording: {requires_recording}")
+        
+        if not requires_recording:
+            return Response({
+                "error": "This contest does not require screen recording"
+            }, status=400)
+        
+        # Check if user has already started recording
+        recordings_started = getattr(contest, 'recordings_started', [])
+        print(f"DEBUG: Recordings started list: {recordings_started}")
+        print(f"DEBUG: User ID string: {str(user.id)}")
+        
+        if str(user.id) in recordings_started:
+            print(f"DEBUG: User already in recordings_started")
+            return Response({
+                "error": "Recording already started for this contest"
+            }, status=400)
+        
+        # Check if there's an existing recording record
+        try:
+            print(f"DEBUG: Checking for existing ContestScreenRecording records...")
+            existing_recordings = ContestScreenRecording.objects.filter(
+                contest=contest,
+                user=user
+            )
+            print(f"DEBUG: Found {existing_recordings.count()} existing recordings")
+            
+            existing_recording = existing_recordings.filter(
+                recording_status__in=["recording", "stopped"]
+            ).first()
+            
+            if existing_recording:
+                print(f"DEBUG: Found active recording: {existing_recording.id}")
+                return Response({
+                    "error": "Recording already in progress or completed"
+                }, status=400)
+        except Exception as e:
+            print(f"DEBUG: Error checking existing recordings: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Create recording record
+        try:
+            print(f"DEBUG: Creating new ContestScreenRecording...")
+            
+            # Create with minimal required fields first
+            recording = ContestScreenRecording()
+            recording.contest = contest
+            recording.user = user
+            recording.start_time = datetime.now()
+            
+            # Try to save
+            print(f"DEBUG: Saving recording...")
+            recording.save()
+            print(f"DEBUG: Recording saved successfully! ID: {recording.id}")
+            
+        except Exception as e:
+            print(f"DEBUG: ERROR saving recording:")
+            import traceback
+            error_traceback = traceback.format_exc()
+            print(error_traceback)
+            
+            # Try alternative save method
+            try:
+                print(f"DEBUG: Trying alternative save method...")
+                recording = ContestScreenRecording(
+                    contest=contest,
+                    user=user,
+                    start_time=datetime.now()
+                )
+                # Don't set recording_status, use default
+                recording.save()
+                print(f"DEBUG: Alternative save worked! ID: {recording.id}")
+            except Exception as e2:
+                print(f"DEBUG: Alternative save also failed: {e2}")
+                return Response({
+                    "error": f"Failed to create recording record",
+                    "details": str(e),
+                    "model_error": str(e2)
+                }, status=500)
+        
+        # Add user to contest's recordings_started list
+        try:
+            if not hasattr(contest, 'recordings_started'):
+                contest.recordings_started = []
+            
+            if str(user.id) not in contest.recordings_started:
+                contest.recordings_started.append(str(user.id))
+                print(f"DEBUG: Updating contest recordings_started...")
+                contest.save()
+                print(f"DEBUG: Contest updated successfully")
+        except Exception as e:
+            print(f"DEBUG: Warning - Could not update contest: {e}")
+        
+        # Prepare response
+        try:
+            recording_id_str = str(recording.id) if hasattr(recording, 'id') else "unknown"
+            start_time_iso = recording.start_time.isoformat() if hasattr(recording.start_time, 'isoformat') else datetime.now().isoformat()
+            
+            print(f"DEBUG: Returning success response")
+            return Response({
+                "message": "Recording started successfully",
+                "recording_id": recording_id_str,
+                "start_time": start_time_iso,
+                "contest_id": str(contest.id),
+                "user_id": str(user.id)
+            })
+        except Exception as e:
+            print(f"DEBUG: Error preparing response: {e}")
+            return Response({
+                "message": "Recording started",
+                "recording_id": "check_logs_for_id",
+                "details": f"Error in response: {str(e)}"
+            })
+
+class UploadContestRecordingAPIView(APIView):
+    """Upload completed screen recording"""
+    
+    parser_classes = [MultiPartParser]
+    
+    def post(self, request, contest_id, recording_id):
+        
+        user = get_user_from_request(request)
+        if not user:
+            print("❌ No user found")
+            return Response({"error": "Authentication required"}, status=401)
+        
+        print(f"✅ User authenticated: {user.id} - {user.email}")
+        
+        try:
+            contest = Contest.objects.get(id=contest_id)
+            recording = ContestScreenRecording.objects.get(
+                id=recording_id,
+                contest=contest,
+                user=user
+            )
+            print(f"✅ Found contest: {contest.title}")
+            print(f"✅ Found recording: {recording.id}, Status: {recording.recording_status}")
+        except Contest.DoesNotExist:
+            print("❌ Contest not found")
+            return Response({"error": "Contest not found"}, status=404)
+        except ContestScreenRecording.DoesNotExist:
+            print("❌ Recording not found or access denied")
+            return Response({"error": "Not found"}, status=404)
+        
+        # Check if recording is already completed
+        if recording.recording_status == "completed":
+            print("❌ Recording already completed")
+            return Response({"error": "Recording already completed"}, status=400)
+        
+        # Get the video file from request
+        video_file = request.FILES.get('video')
+        if not video_file:
+            print("❌ No video file provided")
+            return Response({"error": "No video file provided"}, status=400)
+        
+        # Validate file size (max 500MB)
+        max_size = 500 * 1024 * 1024  # 500MB
+        if video_file.size > max_size:
+            print(f"❌ File too large: {video_file.size} bytes")
+            return Response({"error": "File too large (max 500MB)"}, status=400)
+        
+        # Validate file type
+        allowed_extensions = ['.webm', '.mp4', '.mkv']
+        file_extension = os.path.splitext(video_file.name)[1].lower()
+        if file_extension not in allowed_extensions:
+            print(f"❌ Invalid file type: {file_extension}")
+            return Response({"error": f"Invalid file type. Allowed: {allowed_extensions}"}, status=400)
+
+        
+        # Create directory if it doesn't exist
+        if hasattr(settings, 'MEDIA_ROOT'):
+            media_root = settings.MEDIA_ROOT
+        else:
+            # Fallback
+            media_root = os.path.join(settings.BASE_DIR, 'media')
+        
+        recordings_dir = os.path.join(media_root, 'contest_recordings', str(contest_id))
+
+        
+        # Create directory
+        try:
+            os.makedirs(recordings_dir, exist_ok=True)
+            print(f"✅ Created/verified directory: {recordings_dir}")
+            
+            # Test if we can write to the directory
+            test_file = os.path.join(recordings_dir, 'test_write.txt')
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+            print(f"✅ Directory is writable")
+        except Exception as e:
+            print(f"❌ Cannot create/write to directory: {e}")
+            return Response({"error": f"Cannot create directory: {str(e)}"}, status=500)
+        
+        # Generate unique filename
+        unique_filename = f"{recording_id}_{user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{file_extension}"
+        file_path = os.path.join(recordings_dir, unique_filename)
+        
+        print(f"\n💾 Saving file:")
+        print(f"   Filename: {unique_filename}")
+        print(f"   Full path: {file_path}")
+        
+        # Save the file
+        try:
+            bytes_written = 0
+            with open(file_path, 'wb+') as destination:
+                for chunk in video_file.chunks(chunk_size=8192):
+                    destination.write(chunk)
+                    bytes_written += len(chunk)
+            
+            if os.path.exists(file_path):
+                print(f"   File verified on disk")
+            else:
+                print(f"❌ File NOT found after saving!")
+                return Response({"error": "File not saved properly"}, status=500)
+                
+        except Exception as e:
+            print(f"❌ Failed to save file: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({"error": f"Failed to save file: {str(e)}"}, status=500)
+        
+        # Update recording record
+        print(f"\n📝 Updating database record...")
+        recording.recording_file = file_path
+        recording.end_time = datetime.now()
+        recording.duration = (recording.end_time - recording.start_time).total_seconds()
+        recording.recording_status = "completed"
+        recording.file_size = os.path.getsize(file_path)
+        recording.video_format = file_extension.lstrip('.')
+        
+        try:
+            recording.save()
+            print(f"✅ Database updated successfully")
+        except Exception as e:
+            print(f"❌ Failed to update recording record: {str(e)}")
+            # Clean up the file if saving failed
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return Response({"error": f"Failed to update recording record: {str(e)}"}, status=500)
+        
+        # Generate URL for frontend
+        media_url = getattr(settings, 'MEDIA_URL', '/media/')
+        video_url = f"{media_url}contest_recordings/{contest_id}/{unique_filename}"
+        
+        print(f"\n🌐 Access URL:")
+        print(f"   Media URL: {media_url}")
+        print(f"   Video URL: {video_url}")
+        
+        # List files in directory for verification
+        print(f"\n📁 Files in recordings directory:")
+        try:
+            files = os.listdir(recordings_dir)
+            for f in files:
+                filepath = os.path.join(recordings_dir, f)
+                size = os.path.getsize(filepath) if os.path.isfile(filepath) else 0
+                print(f"   - {f} ({size} bytes)")
+        except Exception as e:
+            print(f"   Error listing files: {e}")
+        
+        print(f"=== ✅ UPLOAD COMPLETE ===\n")
+        
+        return Response({
+            "message": "Recording uploaded successfully",
+            "recording_id": str(recording.id),
+            "file_url": video_url,
+            "file_size": recording.file_size,
+            "duration": recording.duration,
+            "file_path": file_path,  # Add for debugging
+        })
+
+# class UploadContestRecordingAPIView(APIView):
+#     """Upload completed screen recording"""
+    
+#     parser_classes = [MultiPartParser]
+    
+#     def post(self, request, contest_id, recording_id):
+#         print(f"\n=== UPLOAD RECORDING DEBUG ===")
+#         print(f"Contest ID: {contest_id}")
+#         print(f"Recording ID: {recording_id}")
+#         print(f"User authenticated: {bool(request.user)}")
+#         print(f"Files in request: {list(request.FILES.keys())}")
+        
+#         user = get_user_from_request(request)
+#         if not user:
+#             print("DEBUG: No user found")
+#             return Response({"error": "Authentication required"}, status=401)
+        
+#         try:
+#             contest = Contest.objects.get(id=contest_id)
+#             recording = ContestScreenRecording.objects.get(
+#                 id=recording_id,
+#                 contest=contest,
+#                 user=user
+#             )
+#             print(f"DEBUG: Found contest and recording")
+#         except (Contest.DoesNotExist, ContestScreenRecording.DoesNotExist) as e:
+#             print(f"DEBUG: Not found error: {e}")
+#             return Response({"error": "Not found"}, status=404)
+        
+#         # Check if recording is already completed
+#         if recording.recording_status == "completed":
+#             print(f"DEBUG: Recording already completed")
+#             return Response({"error": "Recording already completed"}, status=400)
+        
+#         # Get the video file from request
+#         video_file = request.FILES.get('video')
+#         if not video_file:
+#             print(f"DEBUG: No video file provided")
+#             return Response({"error": "No video file provided"}, status=400)
+        
+#         print(f"DEBUG: Video file: {video_file.name}, Size: {video_file.size}")
+        
+#         # Validate file size (max 500MB)
+#         max_size = 500 * 1024 * 1024  # 500MB
+#         if video_file.size > max_size:
+#             print(f"DEBUG: File too large: {video_file.size}")
+#             return Response({"error": "File too large (max 500MB)"}, status=400)
+        
+#         # Validate file type
+#         allowed_extensions = ['.webm', '.mp4', '.mkv']
+#         file_extension = os.path.splitext(video_file.name)[1].lower()
+#         if file_extension not in allowed_extensions:
+#             print(f"DEBUG: Invalid file type: {file_extension}")
+#             return Response({"error": f"Invalid file type. Allowed: {allowed_extensions}"}, status=400)
+        
+#         # Create directory if it doesn't exist
+#         media_root = getattr(settings, 'MEDIA_ROOT', 'media')
+#         recordings_dir = os.path.join(media_root, 'contest_recordings', contest_id)
+        
+#         # FIX THE TYPO HERE!
+#         os.makedirs(recordings_dir, exist_ok=True)  # NOT records_dir!
+        
+#         print(f"DEBUG: Media root: {media_root}")
+#         print(f"DEBUG: Recordings dir: {recordings_dir}")
+        
+#         # Generate unique filename
+#         unique_filename = f"{recording_id}_{user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{file_extension}"
+#         file_path = os.path.join(recordings_dir, unique_filename)
+        
+#         print(f"DEBUG: Saving to: {file_path}")
+        
+#         # Save the file
+#         try:
+#             with open(file_path, 'wb+') as destination:
+#                 for chunk in video_file.chunks():
+#                     destination.write(chunk)
+#             print(f"DEBUG: File saved successfully")
+#         except Exception as e:
+#             print(f"DEBUG: Failed to save file: {str(e)}")
+#             return Response({"error": f"Failed to save file: {str(e)}"}, status=500)
+        
+#         # Update recording record
+#         recording.recording_file = file_path
+#         recording.end_time = datetime.now()
+#         recording.duration = (recording.end_time - recording.start_time).total_seconds()
+#         recording.recording_status = "completed"
+#         recording.file_size = os.path.getsize(file_path)
+#         recording.video_format = file_extension.lstrip('.')
+        
+#         print(f"DEBUG: Updating recording with file: {file_path}")
+        
+#         try:
+#             recording.save()
+#             print(f"DEBUG: Recording saved to database successfully")
+#         except Exception as e:
+#             print(f"DEBUG: Failed to update recording record: {str(e)}")
+#             # Clean up the file if saving failed
+#             if os.path.exists(file_path):
+#                 os.remove(file_path)
+#             return Response({"error": f"Failed to update recording record: {str(e)}"}, status=500)
+        
+#         # Generate URL for frontend
+#         media_url = getattr(settings, 'MEDIA_URL', '/media/')
+#         video_url = f"{media_url}contest_recordings/{contest_id}/{unique_filename}"
+        
+#         print(f"DEBUG: Upload complete. URL: {video_url}")
+#         print("=== END DEBUG ===\n")
+        
+#         return Response({
+#             "message": "Recording uploaded successfully",
+#             "recording_id": str(recording.id),
+#             "file_url": video_url,
+#             "file_size": recording.file_size,
+#             "duration": recording.duration,
+#         })
+
+class StopContestRecordingAPIView(APIView):
+    """Mark recording as stopped (without uploading)"""
+    
+    def post(self, request, contest_id, recording_id):
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+        
+        try:
+            contest = Contest.objects.get(id=contest_id)
+            recording = ContestScreenRecording.objects.get(
+                id=recording_id,
+                contest=contest,
+                user=user
+            )
+        except (Contest.DoesNotExist, ContestScreenRecording.DoesNotExist):
+            return Response({"error": "Not found"}, status=404)
+        
+        # Update recording status
+        if recording.recording_status == "recording":
+            recording.recording_status = "stopped"
+            recording.end_time = datetime.now()
+            if recording.start_time:
+                recording.duration = (recording.end_time - recording.start_time).total_seconds()
+            
+            try:
+                recording.save()
+                return Response({
+                    "message": "Recording stopped",
+                    "recording_id": str(recording.id),
+                    "duration": recording.duration
+                })
+            except Exception as e:
+                return Response({"error": f"Failed to update recording: {str(e)}"}, status=500)
+        else:
+            return Response({
+                "message": f"Recording already in {recording.recording_status} state"
+            })
+
+# contest/views.py - Add admin endpoint to toggle recording requirements
+
+class ContestRecordingSettingsAPIView(APIView):
+    """Admin API to manage recording settings for contests"""
+    
+    def patch(self, request, contest_id):
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+        
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=404)
+        
+        # Check if user is admin or contest creator
+        is_admin = hasattr(user, 'role') and user.role in ['admin', 'superadmin']
+        is_creator = contest.created_by and str(contest.created_by.id) == str(user.id)
+        
+        if not (is_admin or is_creator):
+            return Response({"error": "Permission denied"}, status=403)
+        
+        # Update recording settings
+        if 'require_screen_recording' in request.data:
+            contest.require_screen_recording = request.data['require_screen_recording']
+        
+        if 'recording_max_duration' in request.data:
+            contest.recording_max_duration = request.data['recording_max_duration']
+        
+        try:
+            contest.save()
+            return Response({
+                "message": "Recording settings updated",
+                "require_screen_recording": contest.require_screen_recording,
+                "recording_max_duration": contest.recording_max_duration
+            })
+        except Exception as e:
+            return Response({"error": f"Failed to update settings: {str(e)}"}, status=500)
+        
+# Add these imports at the top of contest/views.py if not already present
+from django.db.models import Q as DjangoQ
+from mongoengine.queryset.visitor import Q
+
+# contest/views.py
+class ContestRecordingsListAPIView(APIView):
+    """Get list of recordings for a specific contest (admin/creator view)"""
+    
+    def get(self, request, contest_id):
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+        
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=404)
+        
+        # Check if user is admin or contest creator
+        is_admin = hasattr(user, 'role') and user.role in ['admin', 'superadmin']
+        is_creator = contest.created_by and str(contest.created_by.id) == str(user.id)
+        
+        if not (is_admin or is_creator):
+            return Response({"error": "Permission denied"}, status=403)
+        
+        # Get query parameters
+        search_query = request.GET.get('search', '').strip()
+        user_filter = request.GET.get('user', '').strip()
+        status_filter = request.GET.get('status', '').strip()
+        date_from = request.GET.get('date_from', '').strip()
+        date_to = request.GET.get('date_to', '').strip()
+        
+        # Build base query - filter by contest
+        recordings = ContestScreenRecording.objects.filter(contest=contest)
+        
+        # Apply filters
+        if search_query:
+            # Search by user name/email
+            users_by_name = Account.objects.filter(
+                Q(name__icontains=search_query) | Q(email__icontains=search_query)
+            )
+            user_ids = [str(u.id) for u in users_by_name]
+            recordings = recordings.filter(user__in=user_ids)
+        
+        if user_filter:
+            users = Account.objects.filter(
+                Q(name__icontains=user_filter) | 
+                Q(email__icontains=user_filter) |
+                Q(id=user_filter)
+            )
+            user_ids = [str(u.id) for u in users]
+            recordings = recordings.filter(user__in=user_ids)
+        
+        if status_filter:
+            recordings = recordings.filter(recording_status=status_filter)
+        
+        if date_from:
+            try:
+                from_date = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+                recordings = recordings.filter(start_time__gte=from_date)
+            except:
+                pass
+        
+        if date_to:
+            try:
+                to_date = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+                recordings = recordings.filter(start_time__lte=to_date)
+            except:
+                pass
+        
+        # Order by most recent first
+        recordings = recordings.order_by('-start_time')
+        
+        # Pagination
+        page = int(request.GET.get('page', 1))
+        per_page = int(request.GET.get('per_page', 20))
+        total_count = recordings.count()
+        offset = (page - 1) * per_page
+        recordings = recordings.skip(offset).limit(per_page)
+        
+        # Prepare response data
+        recordings_list = []
+        for recording in recordings:
+            try:
+                user_account = Account.objects.get(id=recording.user.id)
+
+                # Generate video URL
+                video_url = ""
+                if recording.recording_file:
+                    # Extract filename from path
+                    filename = os.path.basename(recording.recording_file)
+                    # Use the URL format that actually works
+                    video_url = f"http://localhost:8000/media/contest_recordings/{contest_id}/{filename}"
+                
+                recording_data = {
+                    "id": str(recording.id),
+                    "contest_id": contest_id,
+                    "contest_title": contest.title,
+                    "user_id": str(user_account.id),
+                    "user_name": user_account.name,
+                    "user_email": user_account.email,
+                    "start_time": recording.start_time.isoformat() if recording.start_time else None,
+                    "end_time": recording.end_time.isoformat() if recording.end_time else None,
+                    "duration": recording.duration,
+                    "file_size": recording.file_size,
+                    "recording_status": recording.recording_status,
+                    "video_url": video_url,
+                    "video_format": recording.video_format,
+                    "file_path": recording.recording_file,
+                    "created_at": recording.created_at.isoformat() if recording.created_at else None,
+                }
+                recordings_list.append(recording_data)
+            except Exception as e:
+                print(f"Error processing recording {recording.id}: {str(e)}")
+                continue
+        
+        return Response({
+            "recordings": recordings_list,
+            "contest_info": {
+                "id": str(contest.id),
+                "title": contest.title,
+                "start_time": contest.start_time.isoformat() if contest.start_time else None,
+                "duration": contest.duration,
+                "created_by": {
+                    "id": str(contest.created_by.id) if contest.created_by else None,
+                    "name": contest.created_by.name if contest.created_by else None
+                }
+            },
+            "total_count": total_count,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total_count + per_page - 1) // per_page
+        })
+
+class ContestUserRecordingsAPIView(APIView):
+    """Get recordings for a specific user in a contest"""
+    
+    def get(self, request, contest_id, user_id):
+        user = get_user_from_request(request)
+        if not user:
+            return Response({"error": "Authentication required"}, status=401)
+        
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return Response({"error": "Contest not found"}, status=404)
+        
+        # Check if user is admin, contest creator, OR the user themselves
+        is_admin = hasattr(user, 'role') and user.role in ['admin', 'superadmin']
+        is_creator = contest.created_by and str(contest.created_by.id) == str(user.id)
+        is_target_user = str(user.id) == user_id
+        
+        if not (is_admin or is_creator or is_target_user):
+            return Response({"error": "Permission denied"}, status=403)
+        
+        # Get the target user
+        try:
+            target_user = Account.objects.get(id=user_id)
+        except Account.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+        
+        # Get recordings for this user in this contest
+        recordings = ContestScreenRecording.objects.filter(
+            contest=contest,
+            user=target_user
+        ).order_by('-start_time')
+        
+        # Prepare response data
+        recordings_list = []
+        for recording in recordings:
+            # Generate video URL
+            video_url = ""
+            if recording.recording_file:
+                filename = os.path.basename(recording.recording_file)
+                video_url = f"http://localhost:8000/media/contest_recordings/{contest_id}/{filename}"
+            
+            recording_data = {
+                "id": str(recording.id),
+                "contest_id": contest_id,
+                "contest_title": contest.title,
+                "user_id": str(target_user.id),
+                "user_name": target_user.name,
+                "user_email": target_user.email,
+                "start_time": recording.start_time.isoformat() if recording.start_time else None,
+                "end_time": recording.end_time.isoformat() if recording.end_time else None,
+                "duration": recording.duration,
+                "file_size": recording.file_size,
+                "recording_status": recording.recording_status,
+                "video_url": video_url,
+                "video_format": recording.video_format,
+                "file_path": recording.recording_file,
+                "created_at": recording.created_at.isoformat() if recording.created_at else None,
+            }
+            recordings_list.append(recording_data)
+        
+        return Response({
+            "recordings": recordings_list,
+            "contest_info": {
+                "id": str(contest.id),
+                "title": contest.title,
+            },
+            "user_info": {
+                "id": str(target_user.id),
+                "name": target_user.name,
+                "email": target_user.email
+            },
+            "total_count": len(recordings_list)
+        })
+    
+    
