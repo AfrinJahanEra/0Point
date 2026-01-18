@@ -533,9 +533,19 @@ const InterviewSession = () => {
     const track = audioTracks[0];
     const newState = !track.enabled;
 
+    // Toggle the track enabled state
     track.enabled = newState;
     setLocalAudioActive(newState);
 
+    // Update WebRTC audio sender
+    if (pc.current) {
+      const sender = pc.current.getSenders().find(s => s.track?.kind === 'audio');
+      if (sender) {
+        sender.track.enabled = newState;
+      }
+    }
+
+    // Send update to remote peer
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({
         type: 'media_update',
@@ -610,6 +620,25 @@ const InterviewSession = () => {
       }
     }
   }, [remoteVideoEnabled]);
+
+  // Effect to ensure audio track is properly handled
+  useEffect(() => {
+    if (streamRef.current) {
+      const audioTracks = streamRef.current.getAudioTracks();
+      if (audioTracks.length > 0) {
+        const audioTrack = audioTracks[0];
+        audioTrack.enabled = localAudioActive;
+        
+        // Update WebRTC audio sender if it exists
+        if (pc.current) {
+          const sender = pc.current.getSenders().find(s => s.track?.kind === 'audio');
+          if (sender && sender.track) {
+            sender.track.enabled = localAudioActive;
+          }
+        }
+      }
+    }
+  }, [localAudioActive]);
 
   // 📄 Render PDF viewer
   const renderPDFViewer = () => {
