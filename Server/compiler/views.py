@@ -13,10 +13,9 @@ from submission.models import Submission
 from contest.models import Contest, ContestProblem
 
 # JDoodle credentials
-JD_CLIENT_ID = "fd5008b0be3517adb097999e752bdc36"
-# JD_CLIENT_ID = "6c83bb2cd0b9e9a790f59a2484011318"
-JD_CLIENT_SECRET = "99df47ceee2ae9af0137b30d0d7eebcdc3aac2fc400b16ef5298bff3576ad5e2"
-# JD_CLIENT_SECRET = "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4"
+import os
+JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', 'your_default_value')
+JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', 'your_default_value')
 JD_URL = "https://api.jdoodle.com/v1/execute"
 
 

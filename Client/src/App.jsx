@@ -1,7 +1,7 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useContext } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useApp } from './context/AppContext';
 import Header from './components/Header';
 import ProblemInside from './pages/ProblemInside';
 import RegisterNow from './pages/RegisterNow';
@@ -63,6 +63,42 @@ const FullScreenLayout = ({ children }) => (
     {children}
   </main>
 );
+
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useApp();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return isAuthenticated ? children : <Navigate to="/login" />;
+};
+
+// Public Route Component (redirects to contests if already logged in)
+const PublicRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useApp();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return !isAuthenticated ? children : <Navigate to="/contests" />;
+};
 function App() {
   return (
     <AppProvider>
@@ -85,8 +121,16 @@ function App() {
             <Route path="/" element={<Landing />} />
            
             {/* Login and Register pages without Header and Footer */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/login" element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            } />
+            <Route path="/register" element={
+              <PublicRoute>
+                <Register />
+              </PublicRoute>
+            } />
            
             {/* Visualizer and InterviewSession take full screen without Header and Footer */}
             <Route path="/visualizer" element={<Visualizer />} />
@@ -150,9 +194,11 @@ function App() {
             } />
            
             <Route path="/contests" element={
-              <Layout>
-                <Contests />
-              </Layout>
+              <ProtectedRoute>
+                <Layout>
+                  <Contests />
+                </Layout>
+              </ProtectedRoute>
             } />
            
             <Route path="/create-contest" element={

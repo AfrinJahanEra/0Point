@@ -886,75 +886,80 @@ class ContestListCreateAPIView(APIView):
     def get(self, request):
         user = get_user_from_request(request)
         
-        # Get all contests (no status filter needed now)
-        contests = Contest.objects.all().order_by("-start_time").limit(200)
+        try:
+            # Get all contests (no status filter needed now)
+            contests = Contest.objects.all().order_by("-start_time").limit(200)
 
-        test_contests = []
+            test_contests = []
 
-        if user:
-            # Get test contests where user is a tester or creator
-            test_contests = TestContest.objects.filter(
-                Q(testers__contains=user.email) | Q(created_by=user)
-            ).order_by("-test_start_time").limit(50)
-        
-        data = []
-
-        for c in contests:
-            # Calculate status dynamically
-            status_value = get_contest_status(c)
+            if user:
+                # Get test contests where user is a tester or creator
+                test_contests = TestContest.objects.filter(
+                    Q(testers__contains=user.email) | Q(created_by=user)
+                ).order_by("-test_start_time").limit(50)
             
-            # Filter out drafts for non-creators
-            if status_value == "draft":
-                if not user or not c.created_by or str(c.created_by.id) != str(user.id):
-                    continue
-            
-            participant_count = ContestRegistration.objects(contest=c).count()
-            
-            is_creator = user and c.created_by and str(c.created_by.id) == str(user.id)
+            data = []
 
-            data.append({
-                "id": str(c.id),
-                "title": c.title,
-                "description": c.description,
-                "start_time": c.start_time.isoformat() if c.start_time else None,
-                "duration": c.duration,
-                "type": c.type,
-                "platform": c.platform,
-                "created_by": str(c.created_by.id) if c.created_by else None,
-                "is_creator": is_creator,
-                "status": status_value,  # Use calculated status
-                "participants": participant_count,
+            for c in contests:
+                # Calculate status dynamically
+                status_value = get_contest_status(c)
+                
+                # Filter out drafts for non-creators
+                if status_value == "draft":
+                    if not user or not c.created_by or str(c.created_by.id) != str(user.id):
+                        continue
+                
+                participant_count = ContestRegistration.objects(contest=c).count()
+                
+                is_creator = user and c.created_by and str(c.created_by.id) == str(user.id)
+
+                data.append({
+                    "id": str(c.id),
+                    "title": c.title,
+                    "description": c.description,
+                    "start_time": c.start_time.isoformat() if c.start_time else None,
+                    "duration": c.duration,
+                    "type": c.type,
+                    "platform": c.platform,
+                    "created_by": str(c.created_by.id) if c.created_by else None,
+                    "is_creator": is_creator,
+                    "status": status_value,  # Use calculated status
+                    "participants": participant_count,
+                })
+
+            for tc in test_contests:
+                status_value = get_contest_status(tc)
+                
+                participant_count = ContestRegistration.objects(contest=tc).count()
+                
+                data.append({
+                    "id": str(tc.id),
+                    "title": f"[TEST] {tc.title}",
+                    "description": tc.description,
+                    "start_time": tc.test_start_time.isoformat() if tc.test_start_time else None,
+                    "duration": tc.duration,
+                    "type": tc.type,
+                    "platform": tc.platform,
+                    "created_by": str(tc.created_by.id) if tc.created_by else None,
+                    "is_creator": user and tc.created_by and str(tc.created_by.id) == str(user.id),
+                    "status": status_value,
+                    "participants": participant_count,
+                    "is_test_contest": True,  # Flag to identify test contests
+                    "original_contest_id": str(tc.original_contest.id) if tc.original_contest else None,
+                    "testers_count": len(tc.testers)
+                })
+
+            # Broadcast update
+            broadcast_global_update({
+                "event": "contest_list_update",
+                "contests": data,
             })
 
-        for tc in test_contests:
-            status_value = get_contest_status(tc)
-            
-            participant_count = ContestRegistration.objects(contest=tc).count()
-            
-            data.append({
-                "id": str(tc.id),
-                "title": f"[TEST] {tc.title}",
-                "description": tc.description,
-                "start_time": tc.test_start_time.isoformat() if tc.test_start_time else None,
-                "duration": tc.duration,
-                "type": tc.type,
-                "platform": tc.platform,
-                "created_by": str(tc.created_by.id) if tc.created_by else None,
-                "is_creator": user and tc.created_by and str(tc.created_by.id) == str(user.id),
-                "status": status_value,
-                "participants": participant_count,
-                "is_test_contest": True,  # Flag to identify test contests
-                "original_contest_id": str(tc.original_contest.id) if tc.original_contest else None,
-                "testers_count": len(tc.testers)
-            })
-
-        # Broadcast update
-        broadcast_global_update({
-            "event": "contest_list_update",
-            "contests": data,
-        })
-
-        return Response({"contests": data})
+            return Response({"contests": data})
+        except Exception as e:
+            # Return empty contests list if database is unavailable
+            print(f"Database error in ContestListCreateAPIView: {e}")
+            return Response({"contests": [], "warning": "Contest data temporarily unavailable"}, status=200)
 
 class ContestFullCreateAPIView(APIView):
     def post(self, request):
@@ -1033,24 +1038,31 @@ class ContestRegisterAPIView(APIView):
             contest = Contest.objects.get(id=contest_id)
         except Contest.DoesNotExist:
             return Response({"error": "Contest not found"}, status=404)
+        except Exception as e:
+            print(f"Database error in ContestRegisterAPIView: {e}")
+            return Response({"error": "Database temporarily unavailable"}, status=503)
         
         # Check if contest is in a state that allows registration
-        if get_contest_status(contest) not in ["live", "upcoming"]:
-            return Response({"error": "Registration is closed for this contest"}, status=400)
-        
-        # Check if already registered
-        existing = ContestRegistration.objects(user=user, contest=contest).first()
-        if existing:
-            return Response({"message": "Already registered"}, status=200)
-
-        # Create registration
-        registration = ContestRegistration(user=user, contest=contest)
         try:
-            registration.save()
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+            if get_contest_status(contest) not in ["live", "upcoming"]:
+                return Response({"error": "Registration is closed for this contest"}, status=400)
+            
+            # Check if already registered
+            existing = ContestRegistration.objects(user=user, contest=contest).first()
+            if existing:
+                return Response({"message": "Already registered"}, status=200)
 
-        return Response({"message": "Successfully registered"}, status=201)
+            # Create registration
+            registration = ContestRegistration(user=user, contest=contest)
+            try:
+                registration.save()
+            except Exception as e:
+                return Response({"error": str(e)}, status=400)
+
+            return Response({"message": "Successfully registered"}, status=201)
+        except Exception as e:
+            print(f"Database error in ContestRegisterAPIView during processing: {e}")
+            return Response({"error": "Database temporarily unavailable"}, status=503)
 
 class ContestDetailAPIView(APIView):
     def get(self, request, contest_id):
@@ -1058,73 +1070,80 @@ class ContestDetailAPIView(APIView):
             c = Contest.objects.get(id=contest_id)
         except Contest.DoesNotExist:
             return Response({"error": "Contest not found"}, status=404)
+        except Exception as e:
+            print(f"Database error in ContestDetailAPIView retrieving contest: {e}")
+            return Response({"error": "Database temporarily unavailable"}, status=503)
 
-        user = get_user_from_request(request)
-        
-        # Calculate status dynamically
-        status_value = get_contest_status(c)
-        
-        # Check if user can access
-        can_access = False
-        needs_registration = False
-        is_registered = False
-        
-        # Check registration status
-        if user:
-            registration = ContestRegistration.objects(user=user, contest=c).first()
-            is_registered = bool(registration)
-        
-        # Check access based on calculated contest status
-        if status_value == "live":
-            can_access = is_registered
-            if not can_access:
-                needs_registration = True
-                
-        elif status_value == "upcoming":
-            can_access = is_registered
-            if not can_access:
-                needs_registration = True
-                
-        elif status_value == "past":
-            can_access = True
-        elif status_value == "draft":
-            if user and c.created_by and str(c.created_by.id) == str(user.id):
+        try:
+            user = get_user_from_request(request)
+            
+            # Calculate status dynamically
+            status_value = get_contest_status(c)
+            
+            # Check if user can access
+            can_access = False
+            needs_registration = False
+            is_registered = False
+            
+            # Check registration status
+            if user:
+                registration = ContestRegistration.objects(user=user, contest=c).first()
+                is_registered = bool(registration)
+            
+            # Check access based on calculated contest status
+            if status_value == "live":
+                can_access = is_registered
+                if not can_access:
+                    needs_registration = True
+                    
+            elif status_value == "upcoming":
+                can_access = is_registered
+                if not can_access:
+                    needs_registration = True
+                    
+            elif status_value == "past":
                 can_access = True
-        
-        participant_count = ContestRegistration.objects(contest=c).count()
-        
-        # Check if user is creator
-        is_creator = user and c.created_by and str(c.created_by.id) == str(user.id)
-        
-        # Prepare contest data
-        contest_data = {
-            "id": str(c.id),
-            "title": c.title,
-            "description": c.description or "",
-            "start_time": c.start_time.isoformat() if c.start_time else None,
-            "duration": c.duration,  # This is in hours
-            "duration_minutes": c.duration * 60 if c.duration else None,
-            "type": c.type,
-            "platform": c.platform,
-            "status": status_value,  # Use calculated status
-            "participants": participant_count,
-            "problems_count": len(c.problems) if c.problems else 0,
-            "is_creator": is_creator,
-            "created_by": {
-                "id": str(c.created_by.id) if c.created_by else None,
-                "name": c.created_by.name if c.created_by else None,
-                "email": c.created_by.email if c.created_by else None
-            } if c.created_by else None,
-            "editorial_published": getattr(c, 'editorial_published', False),
-            "access": {
-                "can_access": can_access,
-                "needs_registration": needs_registration,
-                "is_registered": is_registered,
-                "can_register": status_value in ["live", "upcoming"]
+            elif status_value == "draft":
+                if user and c.created_by and str(c.created_by.id) == str(user.id):
+                    can_access = True
+            
+            participant_count = ContestRegistration.objects(contest=c).count()
+            
+            # Check if user is creator
+            is_creator = user and c.created_by and str(c.created_by.id) == str(user.id)
+            
+            # Prepare contest data
+            contest_data = {
+                "id": str(c.id),
+                "title": c.title,
+                "description": c.description or "",
+                "start_time": c.start_time.isoformat() if c.start_time else None,
+                "duration": c.duration,  # This is in hours
+                "duration_minutes": c.duration * 60 if c.duration else None,
+                "type": c.type,
+                "platform": c.platform,
+                "status": status_value,  # Use calculated status
+                "participants": participant_count,
+                "problems_count": len(c.problems) if c.problems else 0,
+                "is_creator": is_creator,
+                "created_by": {
+                    "id": str(c.created_by.id) if c.created_by else None,
+                    "name": c.created_by.name if c.created_by else None,
+                    "email": c.created_by.email if c.created_by else None
+                } if c.created_by else None,
+                "editorial_published": getattr(c, 'editorial_published', False),
+                "access": {
+                    "can_access": can_access,
+                    "needs_registration": needs_registration,
+                    "is_registered": is_registered,
+                    "can_register": status_value in ["live", "upcoming"]
+                }
             }
-        }
 
-        return Response(contest_data)
+            return Response(contest_data)
+        except Exception as e:
+            print(f"Database error in ContestDetailAPIView processing request: {e}")
+            return Response({"error": "Database temporarily unavailable"}, status=503)
         
 class MyContestRegistrationsAPIView(APIView):
     def get(self, request):

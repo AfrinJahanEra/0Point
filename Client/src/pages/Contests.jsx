@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { Video} from 'lucide-react';
-import { Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Video } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useNavigate } from 'react-router-dom';
 
@@ -23,299 +21,123 @@ const Contests = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [paginatedContests, setPaginatedContests] = useState([]);
 
-  const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjk0NTYwMTY5MjM3MWFmMGU5OWMyYWZjIiwiZW1haWwiOiJlcmFAZ29vZ2xlLmNvbSIsInJvbGUiOiJ1c2VyIn0.zwibsApLmoW3oQ-Aq9OXw6g56gPqaWr2piZMQypVrew";
+  // Get token from localStorage (from successful login)
+  const TOKEN = localStorage.getItem('token');
 
-  // Normalize external contest → unified shape
-  const normalizeExternalContest = (c) => ({
-    id: `${c.platform}-${c.external_id}`,
-    title: c.title,
-    description: `${getPlatformName(c.platform)} Contest`,
-    platform: c.platform,                    // 'cf', 'lc', 'cc', 'ac'
-    start_time: c.start_time,
-    duration_seconds: c.duration_seconds,
-    duration_formatted: c.duration_formatted, // preferred
-    status: c.status === 'finished' ? 'past' : c.status,
-    type: 'individual',
-    participants: c.participants || 0,
-    url: c.url,
-    external: true
-  });
-
-  // Fetch all contests (manual + all external platforms)
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-
-      // 1. Manual contests (your platform)
-      const manualRes = await axios.get('http://localhost:8000/contests/', {
-        headers: { Authorization: `Bearer ${TOKEN}` }
-      });
-      const manualContests = (manualRes.data.contests || []).map(c => ({
-        ...c,
-        external: false,
-        platform: c.platform || 'IUT',           // fallback
-        id: c.id || `manual-${c._id || Math.random()}`
-      }));
-
-      // 2. All external contests in one call
-      const externalRes = await axios.get('http://localhost:8000/external/contests/?platform=all', {
-        headers: { Authorization: `Bearer ${TOKEN}` }
-      });
-      const externalContests = (externalRes.data || []).map(normalizeExternalContest);
-
-      const allContests = [...manualContests, ...externalContests];
-      setContests(allContests);
-
-      // 3. Registrations (only for manual contests)
-      try {
-        const regRes = await axios.get('http://localhost:8000/contests/registrations/', {
-          headers: { Authorization: `Bearer ${TOKEN}` }
-        });
-        setRegisteredContests(regRes.data.registered_contests || []);
-      } catch (regErr) {
-        console.warn('Registrations fetch failed', regErr);
-        setRegisteredContests([]);
-      }
-
-      setError(null);
-    } catch (err) {
-      console.error('Contests fetch failed:', err);
-
-  const navigate = useNavigate();
-
-  const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
-
-// Initial data fetch - FIXED VERSION
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      console.log('📡 Fetching initial contests data...');
-      
-      // ========== FIX: Fetch ONLY regular contests ==========
-      const contestsRes = await axios.get('http://localhost:8000/contests/', {
-        headers: { Authorization: `Bearer ${TOKEN}` }
-      });
-      
-      // IMPORTANT: Filter out test contests that might be included
-      const regularContests = (contestsRes.data.contests || []).filter(contest => 
-        !contest.is_test_contest && contest.visibility !== 'test'
-      );
-      
-      // Fetch test contests separately
-      const testContestsRes = await axios.get('http://localhost:8000/test-contests/my/', {
-        headers: { Authorization: `Bearer ${TOKEN}` }
-      });
-      
-      console.log('✅ Regular contests loaded:', regularContests.length);
-      console.log('✅ Test contests loaded:', testContestsRes.data.test_contests?.length || 0);
-      
-      // Combine regular and test contests
-      const allContests = [
-        ...regularContests,
-        ...(testContestsRes.data.test_contests || [])
-      ];
-      
-      setContests(allContests);
-      // ========== END OF FIX ==========
-      
-      // Fetch user's registrations
-      try {
-        const registrationsRes = await axios.get('http://localhost:8000/contests/registrations/', {
-          headers: { Authorization: `Bearer ${TOKEN}` }
-        });
-        console.log('✅ Registrations loaded:', registrationsRes.data.registered_contests?.length || 0);
-        setRegisteredContests(registrationsRes.data.registered_contests || []);
-      } catch (regErr) {
-        console.warn('⚠️ Could not fetch registrations:', regErr);
-      }
-      
-      setError(null);
-    } catch (err) {
-      console.error('❌ Error fetching contests:', err);
-      setError(err.response?.data?.error || 'Failed to load contests');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Initial data fetch
   useEffect(() => {
+    // Check if user is logged in
+    if (!TOKEN) {
+      console.log('⚠️ User not logged in, redirecting to login');
+      // In a real app, this would redirect to login
+      // For now, we'll show an error
+      setError('Please log in to view contests');
+      setLoading(false);
+      return;
+    }
+    
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        console.log('📡 Fetching initial contests data...');
+        
+        // ========== Fetch ONLY regular contests ==========  
+        const contestsRes = await axios.get('http://localhost:8000/contests/', {
+          headers: { Authorization: `Bearer ${TOKEN}` }
+        });
+        
+        // IMPORTANT: Filter out test contests that might be included
+        const regularContests = (contestsRes.data.contests || []).filter(contest => 
+          !contest.is_test_contest && contest.visibility !== 'test'
+        );
+        
+        // Fetch test contests separately
+        const testContestsRes = await axios.get('http://localhost:8000/test-contests/my/', {
+          headers: { Authorization: `Bearer ${TOKEN}` }
+        });
+        
+        console.log('✅ Regular contests loaded:', regularContests.length);
+        console.log('✅ Test contests loaded:', testContestsRes.data.test_contests?.length || 0);
+        
+        // Combine regular and test contests
+        const allContests = [
+          ...regularContests,
+          ...(testContestsRes.data.test_contests || [])
+        ];
+        
+        setContests(allContests);
+        
+        // Fetch user's registrations
+        try {
+          const registrationsRes = await axios.get('http://localhost:8000/contests/registrations/', {
+            headers: { Authorization: `Bearer ${TOKEN}` }
+          });
+          console.log('✅ Registrations loaded:', registrationsRes.data.registered_contests?.length || 0);
+          setRegisteredContests(registrationsRes.data.registered_contests || []);
+        } catch (regErr) {
+          console.warn('⚠️ Could not fetch registrations:', regErr);
+        }
+        
+        setError(null);
+      } catch (err) {
+        console.error('❌ Error fetching contests:', err);
+        setError(err.response?.data?.error || 'Failed to load contests');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchData();
   }, []);
-
-  // WebSocket – only refresh manual contests
-  useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8000/ws/contest/global/");
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.event === "contest_list_update") {
-          setContests(prev => {
-            const external = prev.filter(c => c.external);
-            const updatedManual = data.contests || [];
-            return [...updatedManual, ...external];
-          });
-        }
-      } catch (e) {
-        console.error('WS parse error', e);
-      }
-    };
-    return () => ws.close();
-  }, []);
-
-  // Filtering
-  useEffect(() => {
-    let result = [...contests];
-
-    // Status filter
-    if (activeTab !== 'all') {
-      if (activeTab === 'draft') {
-        result = result.filter(c => c.status === 'draft' && !c.external);
-      } else {
-        result = result.filter(c => c.status === activeTab);
-      }
-    }
-
-    // Platform filter
-    if (activePlatform !== 'all') {
-      result = result.filter(c => c.platform === activePlatform);
-    }
-
-    // Search - Made case-insensitive
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(c => {
-        // Check title (case-insensitive)
-        const titleMatch = c.title?.toLowerCase().includes(q);
-        // Check description (case-insensitive)
-        const descMatch = c.description?.toLowerCase().includes(q);
-        // Check platform name (case-insensitive)
-        const platformMatch = getPlatformName(c.platform)?.toLowerCase().includes(q);
-        // Check status (case-insensitive)
-        const statusMatch = c.status?.toLowerCase().includes(q);
-        
-        return titleMatch || descMatch || platformMatch || statusMatch;
-      });
-    }
-
-    setFilteredContests(result);
-    // Reset to first page when filters change
-    setCurrentPage(1);
-  }, [contests, activeTab, activePlatform, searchQuery]);
-
-  // Pagination effect
-  useEffect(() => {
-    // Calculate total pages
-    const total = Math.ceil(filteredContests.length / itemsPerPage);
-    setTotalPages(total || 1);
-    
-    // Adjust current page if it's beyond total pages
-    if (currentPage > total && total > 0) {
-      setCurrentPage(1);
-    }
-    
-    // Calculate paginated contests
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginated = filteredContests.slice(startIndex, endIndex);
-    setPaginatedContests(paginated);
-  }, [filteredContests, currentPage, itemsPerPage]);
-
-  const getPlatformName = (p) => {
-    const map = {
-      'cf': 'Codeforces',
-      'lc': 'LeetCode',
-      'cc': 'CodeChef',
-      'ac': 'AtCoder',
-      'IUT': 'IUT Platform',
-    };
-    return map[p] || p || 'Unknown';
-  };
-
-  const getStatusBadge = (status) => {
-    const base = "px-2 py-1 rounded-full text-xs font-semibold border";
-    const styles = {
-      live:     "bg-red-50 text-red-800 border-red-200",
-      upcoming: "bg-blue-50 text-blue-800 border-blue-200",
-      past:     "bg-green-50 text-green-800 border-green-200",
-      draft:    "bg-yellow-50 text-yellow-800 border-yellow-200",
-      test:     "bg-purple-50 text-purple-800 border-purple-200",
-    };
-    return `${base} ${styles[status] || "bg-gray-50 text-gray-800 border-gray-200"}`;
-  };
-
-  const formatHourDuration = (c) => {
-    if (c.duration_formatted) return c.duration_formatted;
-    if (c.duration_seconds) {
-      const totalMin = Math.floor(c.duration_seconds / 60);
-      const h = Math.floor(totalMin / 60);
-      const m = totalMin % 60;
-      if (h > 0 && m > 0) return `${h}h ${m}m`;
-      if (h > 0) return `${h}h`;
-      if (m > 0) return `${m}m`;
-    }
-    if (c.duration) { // manual fallback
-      const h = Math.floor(c.duration);
-      const m = Math.round((c.duration - h) * 60);
-      if (h > 0 && m > 0) return `${h}h ${m}m`;
-      if (h > 0) return `${h}h`;
-      if (m > 0) return `${m}m`;
-    }
-    return '—';
-  };
-
-  const formatDateTime = (iso) => {
-    if (!iso) return 'Not scheduled';
-    try {
-      const d = new Date(iso);
-      if (isNaN(d)) return 'Invalid date';
-      return d.toLocaleString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', hour12: true
-      });
-    } catch {
-  fetchData();
-}, []);
 
   // WebSocket connection for real-time updates
   useEffect(() => {
     console.log('🔌 [WebSocket] Initializing connection...');
     
-    const ws = new WebSocket("ws://localhost:8000/ws/contest/global/");
+    let ws;
     
-    ws.onopen = () => {
-      console.log('✅ [WebSocket] Connected to real-time contest updates');
-    };
+    try {
+      ws = new WebSocket("ws://localhost:8000/ws/contest/global/");
+      
+      ws.onopen = () => {
+        console.log('✅ [WebSocket] Connected to real-time contest updates');
+      };
 
-    ws.onerror = (err) => {
-      console.error('❌ [WebSocket] Error:', err);
-    };
+      ws.onerror = (err) => {
+        console.warn('⚠️ [WebSocket] Connection failed (Redis may not be running):', err);
+        // WebSocket failure shouldn't break the app functionality
+      };
 
-    ws.onclose = (event) => {
-      console.log('⚠️ [WebSocket] Disconnected');
-      console.log('📊 Close code:', event.code);
-    };
+      ws.onclose = (event) => {
+        console.log('⚠️ [WebSocket] Disconnected');
+        console.log('📊 Close code:', event.code);
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('📩 [WebSocket] Message received:', data.event);
-        
-        if (data.event === "contest_list_update") {
-          console.log('🔄 [WebSocket] Updating contest list:', data.contests?.length || 0);
-          setContests(data.contests || []);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('📩 [WebSocket] Message received:', data.event);
+          
+          if (data.event === "contest_list_update") {
+            console.log('🔄 [WebSocket] Updating contest list:', data.contests?.length || 0);
+            setContests(data.contests || []);
+          }
+        } catch (error) {
+          console.error('❌ [WebSocket] Error parsing message:', error);
         }
-      } catch (error) {
-        console.error('❌ [WebSocket] Error parsing message:', error);
-      }
-    };
+      };
+    } catch (error) {
+      console.warn('⚠️ [WebSocket] Failed to initialize connection (Redis may not be running):', error);
+    }
 
     // Cleanup on unmount
     return () => {
       console.log('🔌 [WebSocket] Cleaning up connection...');
-      ws.close();
+      if (ws) {
+        ws.close();
+      }
     };
-  }, []); // Only run once
+  }, []);
 
   // Filter contests based on tab, platform, search query
   useEffect(() => {
@@ -344,6 +166,24 @@ useEffect(() => {
     setFilteredContests(filtered);
   }, [contests, activeTab, activePlatform, searchQuery]);
 
+  // Pagination effect
+  useEffect(() => {
+    // Calculate total pages
+    const total = Math.ceil(filteredContests.length / itemsPerPage);
+    setTotalPages(total || 1);
+    
+    // Adjust current page if it's beyond total pages
+    if (currentPage > total && total > 0) {
+      setCurrentPage(1);
+    }
+    
+    // Calculate paginated contests
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginated = filteredContests.slice(startIndex, endIndex);
+    setPaginatedContests(paginated);
+  }, [filteredContests, currentPage, itemsPerPage]);
+
   const getPlatformName = (platform) => {
     switch (platform) {
       case 'IUT': return 'IUT Platform';
@@ -356,55 +196,42 @@ useEffect(() => {
     }
   };
 
-  const handlePublishDraft = async (contestId) => {
-    if (window.confirm("Publish this draft contest? Once published, it will be visible to users.")) {
-      try {
-        await axios.post(
-          `http://localhost:8000/contests/${contestId}/publish/`,
-          { type: "final" },
-          { headers: { Authorization: `Bearer ${TOKEN}` } }
-        );
-        alert("Contest published successfully!");
-        
-        // Refresh contests list
-        const contestsRes = await axios.get('http://localhost:8000/contests/', {
-          headers: { Authorization: `Bearer ${TOKEN}` }
-        });
-        setContests(contestsRes.data.contests || []);
-      } catch (err) {
-        console.error('Failed to publish contest:', err);
-        alert(err.response?.data?.error || "Failed to publish contest");
-      }
+  const getStatusBadge = (status, isTestContest) => {
+    const base = "px-2 py-1 rounded-full text-xs font-semibold border";
+    
+    // If it's a test contest and status is upcoming/live/past, show test badge
+    if (isTestContest && ['upcoming', 'live', 'past'].includes(status)) {
+      return `${base} bg-purple-50 text-purple-800 border-purple-200`;
+    }
+    
+    switch (status) {
+      case 'live': return `${base} bg-red-50 text-red-800 border-red-200`;
+      case 'upcoming': return `${base} bg-blue-50 text-blue-800 border-blue-200`;
+      case 'past': return `${base} bg-green-50 text-green-800 border-green-200`;
+      case 'draft': return `${base} bg-yellow-50 text-yellow-800 border-yellow-200`;
+      case 'test': return `${base} bg-purple-50 text-purple-800 border-purple-200`;
+      default: return `${base} bg-gray-50 text-gray-800 border-gray-200`;
     }
   };
 
-const getStatusBadge = (status, isTestContest) => {
-  const base = "px-2 py-1 rounded-full text-xs font-semibold border";
-  
-  // If it's a test contest and status is upcoming/live/past, show test badge
-  if (isTestContest && ['upcoming', 'live', 'past'].includes(status)) {
-    return `${base} bg-purple-50 text-purple-800 border-purple-200`;
-  }
-  
-  switch (status) {
-    case 'live': return `${base} bg-red-50 text-red-800 border-red-200`;
-    case 'upcoming': return `${base} bg-blue-50 text-blue-800 border-blue-200`;
-    case 'past': return `${base} bg-green-50 text-green-800 border-green-200`;
-    case 'draft': return `${base} bg-yellow-50 text-yellow-800 border-yellow-200`;
-    case 'test': return `${base} bg-purple-50 text-purple-800 border-purple-200`;
-    default: return `${base} bg-gray-50 text-gray-800 border-gray-200`;
-  }
-};
-
-
-
-  const formatHourDuration = (hours) => {
-    if (!hours) return 'Not set';
-    const h = Math.floor(hours);
-    const m = Math.round((hours - h) * 60);
-    if (h > 0 && m > 0) return `${h}h ${m}m`;
-    if (h > 0) return `${h}h`;
-    return `${m}m`;
+  const formatHourDuration = (contest) => {
+    if (contest.duration_formatted) return contest.duration_formatted;
+    if (contest.duration_seconds) {
+      const totalMin = Math.floor(contest.duration_seconds / 60);
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      if (h > 0 && m > 0) return `${h}h ${m}m`;
+      if (h > 0) return `${h}h`;
+      if (m > 0) return `${m}m`;
+    }
+    if (contest.duration) { // manual fallback
+      const h = Math.floor(contest.duration);
+      const m = Math.round((contest.duration - h) * 60);
+      if (h > 0 && m > 0) return `${h}h ${m}m`;
+      if (h > 0) return `${h}h`;
+      if (m > 0) return `${m}m`;
+    }
+    return '—';
   };
 
   const formatDateTime = (date) => {
@@ -420,149 +247,101 @@ const getStatusBadge = (status, isTestContest) => {
     }
   };
 
-  const handleContestEntry = async (contest, e) => {
-    e?.stopPropagation?.();
-    const { id, status, external, url } = contest;
+  const refreshRegisteredContests = async () => {
+    try {
+      const registrationsRes = await axios.get('http://localhost:8000/contests/registrations/', {
+        headers: { Authorization: `Bearer ${TOKEN}` }
+      });
+      console.log('✅ Updated registrations:', registrationsRes.data.registered_contests?.length || 0);
+      setRegisteredContests(registrationsRes.data.registered_contests || []);
+    } catch (regErr) {
+      console.warn('⚠️ Could not refresh registrations:', regErr);
+    }
+  };
 
-    if (external && url) {
-      window.open(url, '_blank');
+  const handleContestEntry = async (contestId, contestStatus, contestData) => {
+    console.log('🎯 Contest entry:', { contestId, contestStatus, contestData });
+    
+    // If it's a draft, navigate to edit page
+    if (contestStatus === 'draft') {
+      navigate(`/contests/${contestId}/edit`);
       return;
     }
-
-    if (status === 'draft') {
-      navigate(`/contests/${id}/edit`);
+    
+    // Check if it's a test contest by looking for specific fields
+    const isTestContest = contestData && (
+      contestData.is_test_contest || 
+      contestData.visibility === 'test' || 
+      contestData.original_contest_id !== undefined
+    );
+    
+    console.log('🔍 Contest type check:', { 
+      isTestContest, 
+      contestId,
+      hasIsTestField: contestData?.is_test_contest,
+      visibility: contestData?.visibility,
+      hasOriginalId: contestData?.original_contest_id !== undefined
+    });
+    
+    // If it's a test contest, navigate to test contest page
+    if (isTestContest) {
+      console.log('🔧 Navigating to test contest page:', contestId);
+      navigate(`/test-contests/${contestId}/problems`);
       return;
     }
-
-    if (status === 'upcoming' || status === 'live' || status === 'past') {
-      try {
-        const res = await axios.get(
-          `http://localhost:8000/contests/${id}/problems/`,
-          { headers: { Authorization: `Bearer ${TOKEN}` } }
-        );
-        if ((res.data.problems || []).length === 0 && status !== 'past') {
-          alert('No problems available yet.');
-          return;
-        }
-        navigate(`/contests/${id}`);
-      } catch (err) {
-        if (err.response?.status === 403 && err.response.data?.can_register) {
-          const ok = window.confirm(`Register for this ${status} contest?`);
-          if (ok) {
+    
+    // Regular contest flow...
+    try {
+      const problemsRes = await axios.get(
+        `http://localhost:8000/contests/${contestId}/problems/`,
+        { headers: { Authorization: `Bearer ${TOKEN}` } }
+      );
+      
+      const problems = problemsRes.data.problems || [];
+      
+      if (problems.length === 0) {
+        alert('This contest has no problems yet.');
+        return;
+      }
+      
+      navigate(`/contests/${contestId}`);
+      
+    } catch (error) {
+      console.error('Error fetching contest problems:', error);
+      
+      if (error.response?.status === 403) {
+        const errorData = error.response.data;
+        
+        if (errorData.can_register) {
+          const shouldRegister = window.confirm(
+            `You need to register for this ${contestStatus} contest. Register now?`
+          );
+          
+          if (shouldRegister) {
             try {
               await axios.post(
-                `http://localhost:8000/contests/${id}/register/`,
+                `http://localhost:8000/contests/${contestId}/register/`,
                 {},
                 { headers: { Authorization: `Bearer ${TOKEN}` } }
               );
-              setRegisteredContests(prev => [...prev, id]);
-              navigate(`/contests/${id}`);
-            } catch (regErr) {
-              alert('Registration failed.');
+              
+              await refreshRegisteredContests();
+              alert('Successfully registered! You can now enter the contest.');
+              navigate(`/contests/${contestId}`);
+              
+            } catch (registerError) {
+              console.error('Registration error:', registerError);
+              navigate(`/contests/${contestId}/register`);
             }
           }
         } else {
-          alert(err.response?.data?.message || 'Cannot access contest.');
+          alert(errorData.message || 'Access denied to this contest.');
         }
+      } else {
+        alert('Failed to load contest. Please try again.');
       }
     }
   };
-  const refreshRegisteredContests = async () => {
-  try {
-    const registrationsRes = await axios.get('http://localhost:8000/contests/registrations/', {
-      headers: { Authorization: `Bearer ${TOKEN}` }
-    });
-    console.log('✅ Updated registrations:', registrationsRes.data.registered_contests?.length || 0);
-    setRegisteredContests(registrationsRes.data.registered_contests || []);
-  } catch (regErr) {
-    console.warn('⚠️ Could not refresh registrations:', regErr);
-  }
-};
-
-
-const handleContestEntry = async (contestId, contestStatus, contestData) => {
-  console.log('🎯 Contest entry:', { contestId, contestStatus, contestData });
-  
-  // If it's a draft, navigate to edit page
-  if (contestStatus === 'draft') {
-    navigate(`/contests/${contestId}/edit`);
-    return;
-  }
-  
-  // Check if it's a test contest by looking for specific fields
-  const isTestContest = contestData && (
-    contestData.is_test_contest || 
-    contestData.visibility === 'test' || 
-    contestData.original_contest_id !== undefined
-  );
-  
-  console.log('🔍 Contest type check:', { 
-    isTestContest, 
-    contestId,
-    hasIsTestField: contestData?.is_test_contest,
-    visibility: contestData?.visibility,
-    hasOriginalId: contestData?.original_contest_id !== undefined
-  });
-  
-  // If it's a test contest, navigate to test contest page
-  if (isTestContest) {
-    console.log('🔧 Navigating to test contest page:', contestId);
-    navigate(`/test-contests/${contestId}/problems`);
-    return;
-  }
-  
-  // Regular contest flow...
-  try {
-    const problemsRes = await axios.get(
-      `http://localhost:8000/contests/${contestId}/problems/`,
-      { headers: { Authorization: `Bearer ${TOKEN}` } }
-    );
-    
-    const problems = problemsRes.data.problems || [];
-    
-    if (problems.length === 0) {
-      alert('This contest has no problems yet.');
-      return;
-    }
-    
-    navigate(`/contests/${contestId}`);
-    
-  } catch (error) {
-    console.error('Error fetching contest problems:', error);
-    
-    if (error.response?.status === 403) {
-      const errorData = error.response.data;
-      
-      if (errorData.can_register) {
-        const shouldRegister = window.confirm(
-          `You need to register for this ${contestStatus} contest. Register now?`
-        );
-        
-        if (shouldRegister) {
-          try {
-            await axios.post(
-              `http://localhost:8000/contests/${contestId}/register/`,
-              {},
-              { headers: { Authorization: `Bearer ${TOKEN}` } }
-            );
-            
-            await refreshRegisteredContests();
-            alert('Successfully registered! You can now enter the contest.');
-            navigate(`/contests/${contestId}`);
-            
-          } catch (registerError) {
-            console.error('Registration error:', registerError);
-            navigate(`/contests/${contestId}/register`);
-          }
-        }
-      } else {
-        alert(errorData.message || 'Access denied to this contest.');
-      }
-    } else {
-      alert('Failed to load contest. Please try again.');
-    }
-  }
-};
 
   const handleDraftEdit = (contestId, e) => {
     e.stopPropagation();
@@ -613,25 +392,6 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
   };
 
   const statusTabs = [
-    { value: 'all',     label: 'All Contests' },
-    { value: 'live',    label: 'Live Now' },
-    { value: 'upcoming',label: 'Upcoming' },
-    { value: 'past',    label: 'Past' },
-    { value: 'draft',   label: 'My Drafts' },
-  ];
-
-  if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-gray-600">Loading contests...</div>
-    </div>
-  );
-  
-  const handleDraftPublish = async (contestId, e) => {
-    e.stopPropagation();
-    handlePublishDraft(contestId);
-  };
-
-  const statusTabs = [
     { value: 'all', label: 'All Contests' },
     { value: 'live', label: 'Live Now' },
     { value: 'upcoming', label: 'Upcoming' },
@@ -654,8 +414,6 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">Error Loading Contests</h3>
           <p className="text-gray-600 text-sm text-center">{error}</p>
-          <button
-            onClick={fetchData}
           <button 
             onClick={() => window.location.reload()}
             className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors"
@@ -704,28 +462,13 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
                   <div className="relative w-full lg:w-64">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <input
+                      type="text"
                       placeholder="Search contests..."
                       value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
+                      onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
                     />
                   </div>
-                </div>
-              </div>
-
-              {/* Tabs */}
-                    {contests.length} contest{contests.length !== 1 ? 's' : ''} found
-                  </p>
-                </div>
-                <div className="relative w-full lg:w-64">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Search contests..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
-                  />
                 </div>
               </div>
 
@@ -748,7 +491,7 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
 
             {/* Contest list */}
             <div className="grid gap-4">
-              {paginatedContests.length === 0 ? (
+              {filteredContests.length === 0 ? (
                 <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
                   <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No contests found</h3>
@@ -761,19 +504,6 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
                   </p>
                 </div>
               ) : (
-                paginatedContests.map(c => (
-                  <div
-                    key={c.id}
-                    className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200"
-                    style={{
-                      cursor: c.status === 'upcoming' ? 'default' : 'pointer'
-                    }}
-                    onClick={() => {
-                      if (c.status !== 'upcoming' && c.status !== 'draft') {
-                        handleContestEntry(c);
-                      }
-            <div className="grid gap-4">
-              {filteredContests.length > 0 ? (
                 filteredContests.map(contest => (
                   <div 
                     key={contest.id} 
@@ -785,74 +515,90 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
                     <div className="p-4 flex justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-1">
-                          <h3 className="text-xs font-semibold truncate text-gray-900">{c.title}</h3>
-                          <span className={getStatusBadge(c.status)}>
-                            {c.status.toUpperCase()}
+                          <h3 className="text-xs font-semibold truncate text-gray-900">{contest.title}
+                            {(contest.visibility === 'test' || contest.is_test_contest) && (
+                              <span className="ml-2 bg-purple-100 text-purple-900 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+                                TEST
+                              </span>
+                            )}
+                          </h3>
+
+                          <span className={getStatusBadge(contest.status, contest.visibility === 'test' || contest.is_test_contest)}>
+                            {contest.status.toUpperCase()}
                           </span>
-                          {/* REMOVED: External platform badge since platform name is shown below */}
                         </div>
                         <p className="text-xs text-gray-600 mb-2">
-                          {getPlatformName(c.platform)} • {c.type === 'individual' ? 'Individual' : 'Team'}
+                          {getPlatformName(contest.platform)} • {contest.type === 'individual' ? 'Individual' : 'Team'}
                         </p>
-
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <span className="flex items-center space-x-1">
                             <Calendar className="w-3 h-3" />
-                            <span>{formatDateTime(c.start_time)}</span>
+                            <span>{formatDateTime(contest.start_time)}</span>
                           </span>
                           <span className="flex items-center space-x-1">
                             <Clock className="w-3 h-3" />
-                            <span>{formatHourDuration(c)}</span>
+                            <span>{formatHourDuration(contest)}</span>
                           </span>
-                          {!c.external && (
-                            <span className="flex items-center space-x-1">
-                              <Users className="w-3 h-3" />
-                              <span>{c.participants || 0} participants</span>
-                            </span>
-                          )}
+                          <span className="flex items-center space-x-1">
+                            <Users className="w-3 h-3" />
+                            <span>{contest.participants || 0} participants</span>
+                          </span>
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex flex-col space-y-2 ml-4" onClick={e => e.stopPropagation()}>
-                        {c.external ? (
-                          <button
-                            onClick={() => window.open(c.url, '_blank')}
-                            className={`px-3 py-1.5 rounded text-xs font-medium hover:transition-colors duration-200 flex items-center space-x-1 ${
-                              c.status === 'live'
-                                ? 'bg-red-600 hover:bg-red-700 text-white'
-                                : 'bg-blue-600 hover:bg-blue-700 text-white'
-                            }`}
-                          >
-                            <Eye className="w-3 h-3" />
-                            <span>{c.status === 'live' ? 'Join' : 'View Details'}</span>
-                          </button>
-                        ) : c.status === 'draft' ? (
+                      <div className="flex flex-col space-y-2 ml-4" onClick={(e) => e.stopPropagation()}>
+                        {contest.status === 'draft' ? (
+                          // Draft contest buttons: Edit and Publish
                           <div className="flex space-x-2">
                             <button
-                              onClick={(e) => handleDraftEdit(c.id, e)}
+                              onClick={(e) => handleDraftEdit(contest.id, e)}
                               className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-1"
                             >
                               <Edit className="w-3 h-3" />
                               <span>Edit</span>
                             </button>
                           </div>
-                        ) : c.status === 'upcoming' ? (
-                          registeredContests.includes(c.id) ? (
+                        ) : contest.visibility === 'test' || contest.is_test_contest ? (
+                          // TEST CONTEST BUTTONS (no registration needed)
+                          contest.status === 'live' ? (
+                            <button
+                              onClick={() => handleContestEntry(contest.id, 'live', contest)}
+                              className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-1"
+                            >
+                              <Play className="w-3 h-3" />
+                              <span>Enter</span>
+                            </button>
+                          ) : contest.status === 'upcoming' ? (
+                            <span className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-xs font-medium border border-gray-200">
+                              Upcoming
+                            </span>
+                          ) : contest.status === 'past' ? (
+                            <button 
+                              onClick={() => handleContestEntry(contest.id, 'past', contest)}
+                              className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200 flex items-center justify-center space-x-1"
+                            >
+                              <Eye className="w-3 h-3" />
+                              View
+                            </button>
+                          ) : null
+                        ) : contest.status === 'upcoming' ? (
+                          // REGULAR CONTEST - Upcoming (needs registration)
+                          registeredContests.includes(contest.id) ? (
                             <span className="px-3 py-1.5 bg-gray-300 text-gray-600 rounded text-xs font-medium">Registered</span>
                           ) : (
                             <button
-                              onClick={() => navigate(`/contests/${c.id}/register`)}
+                              onClick={() => navigate(`/contests/${contest.id}/register`)}
                               className="bg-blue-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-900 transition-colors duration-200 flex items-center space-x-1"
                             >
                               <Eye className="w-3 h-3" />
                               <span>Register</span>
                             </button>
                           )
-                        ) : c.status === 'live' ? (
-                          registeredContests.includes(c.id) ? (
+                        ) : contest.status === 'live' ? (
+                          // REGULAR CONTEST - Live
+                          registeredContests.includes(contest.id) ? (
                             <button
-                              onClick={() => handleContestEntry(c)}
+                              onClick={() => handleContestEntry(contest.id, 'live', contest)}
                               className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-1"
                             >
                               <Play className="w-3 h-3" />
@@ -860,20 +606,31 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
                             </button>
                           ) : (
                             <button
-                              onClick={() => navigate(`/contests/${c.id}/register`)}
-                              className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-1"
+                              onClick={() => navigate(`/contests/${contest.id}/register`)}
+                              className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-orange-700 transition-colors duration-200 flex items-center space-x-1"
                             >
                               <Eye className="w-3 h-3" />
                               <span>Live</span>
                             </button>
                           )
-                        ) : c.status === 'past' ? (
-                          <button
-                            onClick={() => handleContestEntry(c)}
-                            className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200"
-                          >
-                            View
-                          </button>
+                        ) : contest.status === 'past' ? (
+                          // Past contest buttons
+                          <div className="flex flex-col space-y-2">
+                            <button 
+                              onClick={() => handleContestEntry(contest.id, 'past', contest)}
+                              className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200 flex items-center justify-center space-x-1"
+                            >
+                             <Eye className="w-3 h-3" />
+                             <span>View</span>
+                            </button>
+                            <button 
+                              onClick={() => navigate(`/contests/${contest.id}/recordings`)}
+                              className="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-purple-700 transition-colors duration-200 flex items-center justify-center space-x-1"
+                            >
+                              <Video className="w-3 h-3" />
+                              <span>Recordings</span>
+                            </button>
+                          </div>
                         ) : null}
                       </div>
                     </div>
@@ -970,155 +727,11 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
             )}
           </div>
 
-          {/* Sidebar */}
-                          <h3 className="text-xs font-semibold truncate text-gray-900">{contest.title}
-                            {(contest.visibility === 'test' || contest.is_test_contest) && (
-                              <span className="ml-2 bg-purple-100 text-purple-900 text-[10px] px-1.5 py-0.5 rounded font-semibold">
-                                TEST
-                              </span>
-                            )}
-                          </h3>
-
-                        <span className={getStatusBadge(contest.status, contest.visibility === 'test' || contest.is_test_contest)}>
-                          {contest.status.toUpperCase()}
-                        </span>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-2">
-                          {getPlatformName(contest.platform)} • {contest.type === 'individual' ? 'Individual' : 'Team'}
-                        </p>
-                        <div className="flex items-center space-x-4 text-xs text-gray-500">
-                          <span className="flex items-center space-x-1">
-                            <Calendar className="w-3 h-3" />
-                            <span>{formatDateTime(contest.start_time)}</span>
-                          </span>
-                          <span className="flex items-center space-x-1">
-                            <Clock className="w-3 h-3" />
-                            <span>{formatHourDuration(contest.duration)}</span>
-                          </span>
-                          <span className="flex items-center space-x-1">
-                            <Users className="w-3 h-3" />
-                            <span>{contest.participants || 0} participants</span>
-                          </span>
-                        </div>
-                      </div>
-
-<div className="flex flex-col space-y-2 ml-4" onClick={(e) => e.stopPropagation()}>
-  {contest.status === 'draft' ? (
-    // Draft contest buttons: Edit and Publish
-    <div className="flex space-x-2">
-      <button
-        onClick={(e) => handleDraftEdit(contest.id, e)}
-        className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-1"
-      >
-        <Edit className="w-3 h-3" />
-        <span>Edit</span>
-      </button>
-    </div>
-  ) : contest.visibility === 'test' || contest.is_test_contest ? (
-    // TEST CONTEST BUTTONS (no registration needed)
-    contest.status === 'live' ? (
-      <button
-        onClick={() => handleContestEntry(contest.id, 'live', contest)}
-        className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-1"
-      >
-        <Play className="w-3 h-3" />
-        <span>Enter</span>
-      </button>
-    ) : contest.status === 'upcoming' ? (
-      <span className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-xs font-medium border border-gray-200">
-        Upcoming
-      </span>
-    ) : contest.status === 'past' ? (
-      <button 
-        onClick={() => handleContestEntry(contest.id, 'past', contest)}
-        className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200 flex items-center justify-center space-x-1"
-      >
-        <Eye className="w-3 h-3" />
-        View
-      </button>
-    ) : null
-  ) : contest.status === 'upcoming' ? (
-    // REGULAR CONTEST - Upcoming (needs registration)
-    registeredContests.includes(contest.id) ? (
-      <span className="px-3 py-1.5 bg-gray-300 text-gray-600 rounded text-xs font-medium">Registered</span>
-    ) : (
-      <button
-        onClick={() => navigate(`/contests/${contest.id}/register`)}
-        className="bg-blue-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-900 transition-colors duration-200 flex items-center space-x-1"
-      >
-        <Eye className="w-3 h-3" />
-        <span>Register</span>
-      </button>
-    )
-  ) : contest.status === 'live' ? (
-    // REGULAR CONTEST - Live
-    registeredContests.includes(contest.id) ? (
-      <button
-        onClick={() => handleContestEntry(contest.id, 'live', contest)}
-        className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-1"
-      >
-        <Play className="w-3 h-3" />
-        <span>Enter</span>
-      </button>
-    ) : (
-      <button
-        onClick={() => navigate(`/contests/${contest.id}/register`)}
-        className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-orange-700 transition-colors duration-200 flex items-center space-x-1"
-      >
-        <Eye className="w-3 h-3" />
-        <span>Live</span>
-      </button>
-    )
-  ) : contest.status === 'past' ? (
-    // Past contest buttons
-    <div className="flex flex-col space-y-2">
-    <button 
-      onClick={() => handleContestEntry(contest.id, 'past', contest)}
-      className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200 flex items-center justify-center space-x-1"
-    >
-     <Eye className="w-3 h-3" />
-     <span>View</span>
-    </button>
-    <button 
-        onClick={() => navigate(`/contests/${contest.id}/recordings`)}
-        className="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-purple-700 transition-colors duration-200 flex items-center justify-center space-x-1"
-      >
-        <Video className="w-3 h-3" />
-        <span>Recordings</span>
-      </button>
-      </div>
-  ) : null}
-</div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                  <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No contests found</h3>
-                  <p className="text-gray-600 text-xs">
-                    {activeTab === 'draft' 
-                      ? "You don't have any draft contests." 
-                      : activeTab !== 'all'
-                      ? `No ${activeTab} contests found. Try a different filter.`
-                      : "Try adjusting your filters to find more contests."}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
           <div className="lg:col-span-3 space-y-4">
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="p-3 border-b border-gray-200">
                 <h2 className="text-xs font-semibold text-gray-900 mb-3">Filter by Platform</h2>
                 <div className="space-y-1">
-                  {['all', 'IUT', 'cf', 'cc', 'ac', 'lc'].map(p => (
-                    <button
-                      key={p}
-                      onClick={() => setActivePlatform(p)}
-                      className={`w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors duration-200 ${
-                        activePlatform === p
                   {['all','IUT','cf','codechef','atcoder','hackerrank','leetcode'].map(platform => (
                     <button
                       key={platform}
@@ -1129,16 +742,12 @@ const handleContestEntry = async (contestId, contestStatus, contestData) => {
                           : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
-                      <span>{p === 'all' ? 'All Platforms' : getPlatformName(p)}</span>
                       <span>{platform === 'all' ? 'All Platforms' : getPlatformName(platform)}</span>
                     </button>
                   ))}
                 </div>
               </div>
             </div>
-
-            <Sidebar />
-          </div>
 
             <Sidebar />
           </div>

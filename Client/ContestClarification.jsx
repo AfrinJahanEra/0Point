@@ -60,7 +60,7 @@ const ContestClarification = () => {
   const [pendingCount, setPendingCount] = useState(0);
   const [replyingTo, setReplyingTo] = useState({}); // For reply cancellation tracking
 
-  const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
+  const TOKEN = localStorage.getItem('token');
 
   // Fetch clarifications from backend
   const fetchClarifications = async () => {

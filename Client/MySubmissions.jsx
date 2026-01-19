@@ -74,7 +74,7 @@ const MySubmissions = () => {
         console.log('Fetching submissions from URL:', url);
         
         // Get token from localStorage
-        const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
+        const token = localStorage.getItem('token');
         const headers = {
           'Content-Type': 'application/json',
         };
