@@ -301,10 +301,11 @@ const Contests = () => {
   const handleContestEntry = async (contestId, contestStatus, contestData) => {
     console.log('🎯 Contest entry:', { contestId, contestStatus, contestData });
     
-    // Handle external contests - open in new tab
+    // Handle external contests - navigate to contest detail page
     if (contestData?.is_external) {
-      console.log('🌍 Opening external contest:', contestData.external_url);
-      window.open(contestData.external_url, '_blank');
+      console.log('🌍 Navigating to external contest detail:', contestId);
+      // Navigate to a special external contest detail page
+      navigate(`/external-contests/${encodeURIComponent(contestId)}`);
       return;
     }
     

@@ -29,6 +29,7 @@ import ContestLeaderboard from './pages/ContestLeaderboard';
 import ContestEditorial from './pages/ContestEditorial';
 import ContestDiscussion from './pages/ContestDiscussion';
 import ContestClarification from './pages/ContestClarification';
+import ExternalContestDetail from './pages/ExternalContestDetail';
 import VirtualContestInside from './pages/VirtualContestInside';
 import VirtualProblem from './pages/VirtualProblem';
 import TestContestInside from './pages/TestContestInside';
@@ -190,6 +191,13 @@ function App() {
             <Route path="/contests/:contestId" element={
               <Layout>
                 <ContestInside />
+              </Layout>
+            } />
+            
+            {/* External contest detail route */}
+            <Route path="/external-contests/:contestId" element={
+              <Layout>
+                <ExternalContestDetail />
               </Layout>
             } />
            
