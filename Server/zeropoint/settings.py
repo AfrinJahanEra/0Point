@@ -20,6 +20,7 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -42,7 +43,6 @@ INSTALLED_APPS = [
     'ide',
     'corsheaders',
     'channels',
-    # 'daphne',
     'compiler',
     'virtual',
     'discussion',
@@ -60,7 +60,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',  # Re-enabled but configured for PDF embedding
 ]
 
 ROOT_URLCONF = 'zeropoint.urls'
@@ -133,14 +133,23 @@ connect_to_mongo()
 
 ASGI_APPLICATION = "zeropoint.asgi.application"
 
+# For development, using in-memory channel layer
+# For production with Redis, uncomment the Redis configuration below
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
     },
 }
+
+# Production Redis configuration (uncomment when Redis is available):
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {
+#             "hosts": [("127.0.0.1", 6379)],
+#         },
+#     },
+# }
 
 # if os.getenv('DJANGO_ENV') == 'production':
 #     REDIS_URL = os.getenv('REDIS_URL') 
@@ -196,7 +205,8 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.dummy',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -230,6 +240,9 @@ if (BASE_DIR / 'static').exists():
     STATICFILES_DIRS.append(BASE_DIR / 'static')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# X-Frame-Options setting to allow PDF embedding in iframes
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # JDoodle API Settings
 JD_CLIENT_ID = os.getenv('JD_CLIENT_ID')

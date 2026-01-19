@@ -59,13 +59,7 @@ def sync_codeforces_contests():
             "last_synced": now,
         }
 
-        obj = ExternalContest.objects(platform="codeforces", external_id=str(c["id"])).first()
-        if obj:
-            for key, value in update_data.items():
-                setattr(obj, key, value)
-            obj.save()
-        else:
-            ExternalContest(platform="codeforces", external_id=str(c["id"]), **update_data).save()
+        ExternalContest.objects(platform="codeforces", external_id=str(c["id"])).update_one(upsert=True, **update_data)
 
 
         # Clean up very old contests (older than ~70 days)
