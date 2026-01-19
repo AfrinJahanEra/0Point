@@ -190,9 +190,14 @@ const CreateContest = () => {
       const fetchContestForEdit = async () => {
         setLoadingContest(true);
         try {
+          const token = localStorage.getItem('token');
+          if (!token) {
+            throw new Error('Authentication required');
+          }
+          
           const response = await fetch(`http://localhost:8000/contests/${contestId}/`, {
             headers: { 
-              "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY"
+              "Authorization": `Bearer ${token}`
             }
           });
           
@@ -211,7 +216,7 @@ const CreateContest = () => {
           
           const problemsResponse = await fetch(`http://localhost:8000/contests/${contestId}/problems/`, {
             headers: { 
-              "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY"
+              "Authorization": `Bearer ${localStorage.getItem('token')}`
             }
           });
           
@@ -225,7 +230,7 @@ const CreateContest = () => {
                     `http://localhost:8000/contests/${contestId}/problems/${problem.code}/`,
                     {
                       headers: { 
-                        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY"
+                        "Authorization": `Bearer ${localStorage.getItem('token')}`
                       }
                     }
                   );
@@ -460,7 +465,7 @@ const CreateContest = () => {
         method: method,
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY"
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify(payload),
       });
@@ -605,7 +610,7 @@ const CreateContest = () => {
           method: method,
           headers: { 
             "Content-Type": "application/json",
-            "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY"
+            "Authorization": `Bearer ${localStorage.getItem('token')}`
           },
           body: JSON.stringify(payload),
         });
@@ -699,11 +704,16 @@ const CreateContest = () => {
         method = "POST";
       }
 
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
       const response = await fetch(url, {
         method: method,
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY"
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify(payload),
       });
@@ -775,13 +785,18 @@ const CreateContest = () => {
         type: 'run'
       });
       
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
       const response = await fetch(
         `http://localhost:8000/contests/${contestId}/problems/${currentProblem.problemIndex}/run/`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY'
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify(runData)
         }

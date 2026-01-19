@@ -11,7 +11,7 @@ class ExternalContest(Document):
     }
 
     platform = StringField(required=True)          # codeforces
-    external_id = IntField(required=True)           # CF contest id
+    external_id = StringField(required=True)           # Contest platform-specific ID
     title = StringField(required=True)
     url = URLField(required=True)
     start_time = DateTimeField(required=True)

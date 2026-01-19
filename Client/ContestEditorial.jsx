@@ -24,7 +24,7 @@ const ContestEditorial = () => {
   const [editorialData, setEditorialData] = useState(null);
   const [problemTutorials, setProblemTutorials] = useState({}); // Store tutorials by problem index
   
-  const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
+  const TOKEN = localStorage.getItem('token');
 
 
   const customComponents = {

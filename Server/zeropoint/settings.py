@@ -20,6 +20,7 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -42,7 +43,6 @@ INSTALLED_APPS = [
     'ide',
     'corsheaders',
     'channels',
-    # 'daphne',
     'compiler',
     'virtual',
     'discussion',
@@ -60,7 +60,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',  # Re-enabled but configured for PDF embedding
 ]
 
 ROOT_URLCONF = 'zeropoint.urls'
@@ -82,25 +82,74 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'zeropoint.wsgi.application'
 
-connect(
-    db=os.getenv('MONGO_DB_NAME', 'zeropoint'),
-    host=os.getenv('MONGO_URI'),
-    alias='default',
-    # ssl=True,
-    # retryWrites=True,
-    # w='majority'
-)
+# Connect to MongoDB with fallback
+import sys
+import time
+
+def connect_to_mongo():
+    # Try local MongoDB first (more reliable for development)
+    try:
+        connect(
+            db='zeropoint',
+            host='mongodb://localhost:27017/',
+            alias='default',
+            connectTimeoutMS=10000,
+            socketTimeoutMS=10000,
+            serverSelectionTimeoutMS=10000,
+            retryWrites=True,
+            w='majority'
+        )
+        print("Successfully connected to local MongoDB")
+        return True
+    except Exception as local_e:
+        print(f"Warning: Could not connect to local MongoDB: {local_e}")
+        
+        # Try MongoDB Atlas as fallback
+        try:
+            mongo_uri = os.getenv('MONGO_URI')
+            db_name = os.getenv('MONGO_DB_NAME', 'zeropoint')
+            
+            # Simple connection without complex URI manipulation
+            connect(
+                db=db_name,
+                host=mongo_uri,
+                alias='default',
+                ssl=True,
+                ssl_cert_reqs=False,
+                connectTimeoutMS=30000,
+                socketTimeoutMS=30000,
+                serverSelectionTimeoutMS=30000,
+                retryWrites=True,
+                w='majority'
+            )
+            print("Successfully connected to MongoDB Atlas")
+            return True
+        except Exception as atlas_e:
+            print(f"Warning: Could not connect to MongoDB Atlas: {atlas_e}")
+            print("App will run with limited functionality - database operations will fail")
+            return False
+
+connect_to_mongo()
 
 ASGI_APPLICATION = "zeropoint.asgi.application"
 
+# For development, using in-memory channel layer
+# For production with Redis, uncomment the Redis configuration below
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
     },
 }
+
+# Production Redis configuration (uncomment when Redis is available):
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {
+#             "hosts": [("127.0.0.1", 6379)],
+#         },
+#     },
+# }
 
 # if os.getenv('DJANGO_ENV') == 'production':
 #     REDIS_URL = os.getenv('REDIS_URL') 
@@ -143,10 +192,21 @@ cloudinary.config(
     secure=True
 )
 
+# Email Configuration
+# For development, you can switch to console backend to see emails in terminal
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Uncomment for dev
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.dummy',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -173,10 +233,20 @@ USE_TZ = True             # ✅ CHANGE THIS
 USE_I18N = True
 
 STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = []
+
+# Only add static directory if it exists
+if (BASE_DIR / 'static').exists():
+    STATICFILES_DIRS.append(BASE_DIR / 'static')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# X-Frame-Options setting to allow PDF embedding in iframes
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+# JDoodle API Settings
+JD_CLIENT_ID = os.getenv('JD_CLIENT_ID')
+JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET')
 
 
 

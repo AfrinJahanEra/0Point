@@ -51,7 +51,7 @@ const ContestDiscussion = () => {
   const [replyingTo, setReplyingTo] = useState({});
   const [showPreview, setShowPreview] = useState(false);
 
-  const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkzNDJlYjJhMWU4ODJiMmJkZjc3ZWFjIiwiZW1haWwiOiJmYWl6YUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIn0.uroarEPp_ECHjie7mwRe2FpXJoOt8QvUoQkj3lxxpuY";
+  const TOKEN = localStorage.getItem('token');
 
   // Custom Markdown components for discussion rendering
   const customComponents = {
@@ -672,7 +672,17 @@ const ContestDiscussion = () => {
                 
                 {!showPreview ? (
                   <textarea
-                    placeholder={`Write your post content using Markdown...\n\nExamples:\n**bold text**\n[link](https://example.com)\n\`\`\`cpp\n// code block\n\`\`\`\n$a + b = c$ for inline math\n$$E = mc^2$$ for display math\n<spoiler summary="Spoiler Title">Hidden content</spoiler>`}
+                    placeholder={`Write your post content using Markdown...
+
+Examples:
+**bold text**
+[link](https://example.com)
+\`\`\`cpp
+// code block
+\`\`\`
+$a + b = c$ for inline math
+$$E = mc^2$$ for display math
+<spoiler summary="Spoiler Title">Hidden content</spoiler>`}
                     value={newPost.content}
                     onChange={(e) => setNewPost({...newPost, content: e.target.value})}
                     rows={4}

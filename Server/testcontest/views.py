@@ -18,9 +18,10 @@ from account.models import Account
 from contest.views import get_contest_status as get_regular_contest_status
 from contest.broadcast import broadcast_contest_update, broadcast_global_update
 
-# JDoodle credentials (add these near the top of your views.py after other imports)
-JD_CLIENT_ID = "6c83bb2cd0b9e9a790f59a2484011318"
-JD_CLIENT_SECRET = "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4"
+# JDoodle credentials (using values from settings)
+from django.conf import settings
+JD_CLIENT_ID = settings.JD_CLIENT_ID
+JD_CLIENT_SECRET = settings.JD_CLIENT_SECRET
 JD_URL = "https://api.jdoodle.com/v1/execute"
 
 # Map for language -> recommended versionIndex
@@ -520,8 +521,8 @@ class TestContestSubmissionCreateAPIView(APIView):
             for i, test_case in enumerate(problem.test_cases):
                 # Execute code with this test case
                 payload = {
-                    "clientId": "6c83bb2cd0b9e9a790f59a2484011318",  # Your JDoodle ID
-                    "clientSecret": "2b433bdfaaa947357b8e1e7b22d9facd9fe829f6921fa9f6de2db4a0142319d4",
+                    "clientId": settings.JD_CLIENT_ID,
+                    "clientSecret": settings.JD_CLIENT_SECRET,
                     "script": data['code'],
                     "stdin": test_case.input,
                     "language": language,
