@@ -37,6 +37,7 @@ import TestContestProblemDetail from './pages/TestContestProblemDetail';
 import TestContestLeaderboard  from './pages/TestContestLeaderboard';
 import TestContestSubmission from './pages/TestContestSubmission';
 import BlogDetail from './pages/BlogDetail';
+import Recording from './pages/Recording';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -186,7 +187,19 @@ function App() {
             } />
            
             <Route path="/contests/:contestId/editorial" element={<ContestEditorial />} />
-           
+            
+            <Route path="/contests/:contestId/recordings" element={
+              <Layout>
+                <Recording />
+              </Layout>
+            } />
+            
+            <Route path="/contests/:contestId/recordings/user/:userId" element={
+              <Layout>
+                <Recording />
+              </Layout>
+            } />
+            
             {/* General contest route */}
             <Route path="/contests/:contestId" element={
               <Layout>
