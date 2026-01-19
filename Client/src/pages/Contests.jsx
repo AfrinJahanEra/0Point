@@ -190,6 +190,7 @@ const Contests = () => {
           'lc': 'leetcode'
         };
         
+        // Check if the contest platform matches the selected platform
         return c.platform === activePlatform || externalPlatformMap[c.platform] === activePlatform;
       });
     }
@@ -538,7 +539,7 @@ const Contests = () => {
 
             {/* Contest list */}
             <div className="grid gap-4">
-              {filteredContests.length === 0 ? (
+              {paginatedContests.length === 0 ? (
                 <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
                   <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No contests found</h3>
@@ -551,7 +552,7 @@ const Contests = () => {
                   </p>
                 </div>
               ) : (
-                filteredContests.map(contest => (
+                paginatedContests.map(contest => (
                   <div 
                     key={contest.id} 
                     className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200"
