@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Video } from 'lucide-react';
+import { Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Video, ExternalLink } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useNavigate } from 'react-router-dom';
 
@@ -41,7 +41,7 @@ const Contests = () => {
         setLoading(true);
         console.log('📡 Fetching initial contests data...');
         
-        // ========== Fetch ONLY regular contests ==========  
+        // ========== Fetch local contests ==========  
         const contestsRes = await axios.get('http://localhost:8000/contests/', {
           headers: { Authorization: `Bearer ${TOKEN}` }
         });
@@ -56,13 +56,36 @@ const Contests = () => {
           headers: { Authorization: `Bearer ${TOKEN}` }
         });
         
+        // ========== Fetch external contests from other platforms ==========
+        const externalContestsRes = await axios.get('http://localhost:8000/external/contests/?platform=all', {
+          headers: { Authorization: `Bearer ${TOKEN}` }
+        });
+        
+        // Transform external contests to match local contest structure
+        const transformedExternalContests = (externalContestsRes.data || []).map(contest => ({
+          id: `external_${contest.platform}_${contest.external_id}`,
+          title: contest.title,
+          platform: contest.platform, // Will be 'cf', 'cc', 'ac', 'lc'
+          status: contest.status === 'finished' ? 'past' : contest.status,
+          start_time: contest.start_time,
+          duration_seconds: contest.duration_seconds,
+          duration_formatted: contest.duration_formatted,
+          participants: contest.participants || 0,
+          type: 'individual', // External contests are always individual
+          is_external: true, // Flag to distinguish external contests
+          external_url: contest.url, // Store original URL
+          description: `External contest from ${getPlatformName(contest.platform)}`
+        }));
+        
         console.log('✅ Regular contests loaded:', regularContests.length);
         console.log('✅ Test contests loaded:', testContestsRes.data.test_contests?.length || 0);
+        console.log('✅ External contests loaded:', transformedExternalContests.length);
         
-        // Combine regular and test contests
+        // Combine all contests: local regular + test + external
         const allContests = [
           ...regularContests,
-          ...(testContestsRes.data.test_contests || [])
+          ...(testContestsRes.data.test_contests || []),
+          ...transformedExternalContests
         ];
         
         setContests(allContests);
@@ -152,7 +175,23 @@ const Contests = () => {
     }
 
     if (activePlatform !== 'all') {
-      filtered = filtered.filter(c => c.platform === activePlatform);
+      // Handle platform filtering for both local and external contests
+      filtered = filtered.filter(c => {
+        // For local contests, platform matches directly
+        if (!c.is_external) {
+          return c.platform === activePlatform;
+        }
+        
+        // For external contests, map platform codes to display names
+        const externalPlatformMap = {
+          'cf': 'cf',
+          'cc': 'codechef', 
+          'ac': 'atcoder',
+          'lc': 'leetcode'
+        };
+        
+        return c.platform === activePlatform || externalPlatformMap[c.platform] === activePlatform;
+      });
     }
 
     if (searchQuery) {
@@ -261,6 +300,13 @@ const Contests = () => {
 
   const handleContestEntry = async (contestId, contestStatus, contestData) => {
     console.log('🎯 Contest entry:', { contestId, contestStatus, contestData });
+    
+    // Handle external contests - open in new tab
+    if (contestData?.is_external) {
+      console.log('🌍 Opening external contest:', contestData.external_url);
+      window.open(contestData.external_url, '_blank');
+      return;
+    }
     
     // If it's a draft, navigate to edit page
     if (contestStatus === 'draft') {
@@ -521,6 +567,11 @@ const Contests = () => {
                                 TEST
                               </span>
                             )}
+                            {contest.is_external && (
+                              <span className="ml-2 bg-blue-100 text-blue-900 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+                                EXTERNAL
+                              </span>
+                            )}
                           </h3>
 
                           <span className={getStatusBadge(contest.status, contest.visibility === 'test' || contest.is_test_contest)}>
@@ -547,7 +598,16 @@ const Contests = () => {
                       </div>
 
                       <div className="flex flex-col space-y-2 ml-4" onClick={(e) => e.stopPropagation()}>
-                        {contest.status === 'draft' ? (
+                        {contest.is_external ? (
+                          // EXTERNAL CONTEST BUTTONS
+                          <button
+                            onClick={() => handleContestEntry(contest.id, contest.status, contest)}
+                            className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-green-700 transition-colors duration-200 flex items-center space-x-1"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Visit</span>
+                          </button>
+                        ) : contest.status === 'draft' ? (
                           // Draft contest buttons: Edit and Publish
                           <div className="flex space-x-2">
                             <button
@@ -732,7 +792,7 @@ const Contests = () => {
               <div className="p-3 border-b border-gray-200">
                 <h2 className="text-xs font-semibold text-gray-900 mb-3">Filter by Platform</h2>
                 <div className="space-y-1">
-                  {['all','IUT','cf','codechef','atcoder','hackerrank','leetcode'].map(platform => (
+                  {['all','IUT','cf','codechef','atcoder','leetcode'].map(platform => (
                     <button
                       key={platform}
                       onClick={() => setActivePlatform(platform)}
