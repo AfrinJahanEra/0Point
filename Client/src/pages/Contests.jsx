@@ -6,18 +6,24 @@ import {
   ChevronsRight, Video, ExternalLink 
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const Contests = () => {
   const [contests, setContests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('all');
-  const [activePlatform, setActivePlatform] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredContests, setFilteredContests] = useState([]);
   const [registeredContests, setRegisteredContests] = useState([]);
   const navigate = useNavigate();
+  
+  // Get URL parameters
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  
+  // Set activeTab based on URL parameter or default to 'all'
+  const [activeTab, setActiveTab] = useState(urlTab || 'all');
+  const [activePlatform, setActivePlatform] = useState('all');
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -138,6 +144,15 @@ const Contests = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Update activeTab when URL parameter changes
+  useEffect(() => {
+    if (urlTab) {
+      setActiveTab(urlTab);
+      // Clear the URL parameter after setting it
+      setSearchParams({});
+    }
+  }, [urlTab, setSearchParams]);
 
   // WebSocket – only refresh manual contests (from first version with enhancements)
   useEffect(() => {
