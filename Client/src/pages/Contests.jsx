@@ -203,6 +203,37 @@ const Contests = () => {
     };
   }, []);
 
+  // Sort contests by date - closest first for upcoming/live
+  const sortContestsByDate = (contestsArray, status) => {
+    if (status === 'upcoming' || status === 'live') {
+      return [...contestsArray].sort((a, b) => {
+        // Handle missing start times
+        if (!a.start_time && !b.start_time) return 0;
+        if (!a.start_time) return 1; // a with no date goes last
+        if (!b.start_time) return -1; // b with no date goes last
+        
+        const dateA = new Date(a.start_time).getTime();
+        const dateB = new Date(b.start_time).getTime();
+        return dateA - dateB; // Closest date first
+      });
+    } else {
+      // For other tabs (past, draft, all), keep original order
+      // or sort by most recent first for past contests
+      if (status === 'past') {
+        return [...contestsArray].sort((a, b) => {
+          if (!a.start_time && !b.start_time) return 0;
+          if (!a.start_time) return 1;
+          if (!b.start_time) return -1;
+          
+          const dateA = new Date(a.start_time).getTime();
+          const dateB = new Date(b.start_time).getTime();
+          return dateB - dateA; // Most recent first
+        });
+      }
+      return contestsArray; // Keep original order for other tabs
+    }
+  };
+
   // Filtering with case-insensitive search (from first version)
   useEffect(() => {
     let result = [...contests];
@@ -248,6 +279,9 @@ const Contests = () => {
         return titleMatch || descMatch || platformMatch || statusMatch;
       });
     }
+
+    // Sort the filtered contests based on active tab
+    result = sortContestsByDate(result, activeTab);
 
     setFilteredContests(result);
     setCurrentPage(1); // Reset to first page when filters change
