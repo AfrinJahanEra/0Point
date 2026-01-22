@@ -8,6 +8,7 @@ import remarkBreaks from 'remark-breaks';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
+import { Link } from 'react-router-dom';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import api from '../utils/api';
@@ -100,120 +101,238 @@ const CreateBlog = () => {
 
   const togglePreview = () => setShowPreview(!showPreview);
 
-const customComponents = {
-  spoiler: ({ summary, children }) => (
-    <details className="my-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
-      <summary className="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900 list-none">
-        <span className="inline-block mr-2">▶</span>
-        {summary || 'Solution / Spoiler'}
-      </summary>
-      <div className="mt-3 pl-8 border-l-4 border-blue-400">{children}</div>
-    </details>
-  ),
-
-  // Enhanced headings with anchor links (Codeforces style)
-  h1: ({ children }) => {
-    const id = children ? String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
-    return (
-      <h1 id={id} className="text-3xl font-bold mt-10 mb-6 text-blue-900 border-b-2 border-blue-300 pb-3 group">
-        <a href={`#${id}`} className="opacity-0 group-hover:opacity-100 mr-3 text-blue-600">§</a>
-        {children}
-      </h1>
-    );
-  },
-  h2: ({ children }) => {
-    const id = children ? String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
-    return (
-      <h2 id={id} className="text-2xl font-bold mt-8 mb-4 text-gray-800 group flex items-center">
-        <a href={`#${id}`} className="opacity-0 group-hover:opacity-100 mr-2 text-blue-600 text-lg">§</a>
-        {children}
-      </h2>
-    );
-  },
-  h3: ({ children }) => (
-    <h3 className="text-xl font-semibold mt-7 mb-3 text-gray-700 flex items-center group">
-      <span className="opacity-0 group-hover:opacity-100 mr-2 text-blue-500 text-sm">›</span>
-      {children}
-    </h3>
-  ),
-  ol: ({ depth, ...props }) => {
-    const isTopLevel = depth === 0;
-    return (
-      <ol
-        className={`
-          my-5 space-y-3
-          ${isTopLevel
-            ? 'list-decimal ml-9 text-lg marker:font-bold marker:text-blue-800'
-            : 'list-decimal ml-8 text-base marker:font-medium marker:text-blue-600'
-          }
-        `}
-        {...props}
-      />
-    );
-  },
-  
-  // Unordered list component for -, *, + bullets
-  ul: ({ depth, ...props }) => {
-    const isTopLevel = depth === 0;
-    return (
-      <ul
-        className={`
-          my-5 space-y-3
-          ${isTopLevel
-            ? 'list-disc ml-9 text-lg marker:text-blue-600'
-            : 'list-disc ml-8 text-base marker:text-blue-500'
-          }
-        `}
-        {...props}
-      />
-    );
-  },
-  
-  li: ({ ordered, children, ...props }) => (
-    <li
-      className="leading-relaxed text-gray-800 pl-2 hover:text-gray-900 transition-colors"
-      {...props}
-    >
-      <span className="drop-cap:inline">{children}</span>
-    </li>
-  ),
-  
-  // Blockquote component for > syntax (simple grey style)
-  blockquote: ({ children }) => (
-    <blockquote className="my-6 pl-5 border-l-4 border-gray-400 bg-gray-100 py-3 pr-4 rounded-r">
-      <div className="text-gray-800">
-        {children}
-      </div>
-    </blockquote>
-  ),
-  
-  // Image component supporting base64 and regular URLs
-  img: ({ src, alt, ...props }) => {
-    // Check if it's a base64 image
-    const isBase64 = src && (src.startsWith('data:image/') || src.startsWith('base64,'));
+  // Function to parse Codeforces-style tags
+  const parseCodeforcesTags = (text) => {
+    if (!text) return text;
     
-    return (
-      <div className="my-6 flex flex-col items-center">
-        <img
-          src={src}
-          alt={alt || 'Image'}
-          className="max-w-full h-auto rounded-lg shadow-md border border-gray-300"
+    // Parse [user:username]
+    text = text.replace(/\[user:([^\]]+)\]/g, (match, username) => {
+      return `<a href="/profile/${username.trim()}" class="cf-tag user-tag" data-username="${username.trim()}">${username.trim()}</a>`;
+    });
+    
+    // Parse [submission:id] (assuming id is numeric)
+    text = text.replace(/\[submission:([^\]]+)\]/g, (match, id) => {
+      return `<a href="/submission/${id.trim()}" class="cf-tag submission-tag" data-id="${id.trim()}">#${id.trim()}</a>`;
+    });
+    
+    // Parse [problem:code] (e.g., 1850A, 1850B, etc.)
+    text = text.replace(/\[problem:([^\]]+)\]/g, (match, code) => {
+      return `<a href="/problem/${code.trim()}" class="cf-tag problem-tag" data-code="${code.trim()}">${code.trim()}</a>`;
+    });
+    
+    // Parse [contest:id]
+    text = text.replace(/\[contest:([^\]]+)\]/g, (match, id) => {
+      return `<a href="/contest/${id.trim()}" class="cf-tag contest-tag" data-id="${id.trim()}">Contest ${id.trim()}</a>`;
+    });
+    
+    // Parse [standings:id]
+    text = text.replace(/\[standings:([^\]]+)\]/g, (match, id) => {
+      return `<a href="/contest/${id.trim()}/standings" class="cf-tag standings-tag" data-id="${id.trim()}">Standings ${id.trim()}</a>`;
+    });
+    
+    return text;
+  };
+
+  const customComponents = {
+    // Codeforces-style spoiler
+    spoiler: ({ node, children, ...props }) => {
+      const summary = props.summary || node?.properties?.summary || 'Solution / Spoiler';
+      return (
+        <details className="my-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
+          <summary className="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900 list-none">
+            <span className="inline-block mr-2">▶</span>
+            {summary}
+          </summary>
+          <div className="mt-3 pl-8 border-l-4 border-blue-400">{children}</div>
+        </details>
+      );
+    },
+
+    // Enhanced paragraph to handle Codeforces tags
+    p: ({ node, children, ...props }) => {
+      let content = React.Children.toArray(children);
+      
+      // Check if paragraph contains text that might have Codeforces tags
+      if (typeof children === 'string' || (Array.isArray(children) && children.some(child => typeof child === 'string'))) {
+        const text = Array.isArray(children) ? children.join('') : children.toString();
+        const parsedHtml = parseCodeforcesTags(text);
+        
+        // If tags were found, render with dangerouslySetInnerHTML
+        if (parsedHtml !== text) {
+          return <p className="my-4 leading-relaxed" dangerouslySetInnerHTML={{ __html: parsedHtml }} />;
+        }
+      }
+      
+      return <p className="my-4 leading-relaxed" {...props}>{children}</p>;
+    },
+
+    // Enhanced link component to handle Codeforces tags in links
+    a: ({ href, children, ...props }) => {
+      // Check if it's a Codeforces tag link
+      if (href && href.startsWith('/')) {
+        const match = href.match(/^\/(profile|submission|problem|contest|contest\/\d+\/standings)\/(.+)$/);
+        if (match) {
+          const [_, type, id] = match;
+          const className = `cf-tag ${type}-tag inline-flex items-center gap-1 px-2 py-1 rounded text-sm font-medium`;
+          
+          let displayText = children;
+          if (typeof children === 'string') {
+            displayText = children;
+          }
+          
+          return (
+            <Link to={href} className={className} {...props}>
+              {type === 'user' && (
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              )}
+              {type === 'submission' && '#'}
+              {displayText}
+            </Link>
+          );
+        }
+      }
+      
+      return <a href={href} className="text-blue-600 hover:text-blue-800 underline" {...props}>{children}</a>;
+    },
+
+    // Enhanced headings with anchor links (Codeforces style)
+    h1: ({ children }) => {
+      const id = children ? String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
+      return (
+        <h1 id={id} className="text-3xl font-bold mt-10 mb-6 text-blue-900 border-b-2 border-blue-300 pb-3 group">
+          <a href={`#${id}`} className="opacity-0 group-hover:opacity-100 mr-3 text-blue-600">§</a>
+          {children}
+        </h1>
+      );
+    },
+    h2: ({ children }) => {
+      const id = children ? String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
+      return (
+        <h2 id={id} className="text-2xl font-bold mt-8 mb-4 text-gray-800 group flex items-center">
+          <a href={`#${id}`} className="opacity-0 group-hover:opacity-100 mr-2 text-blue-600 text-lg">§</a>
+          {children}
+        </h2>
+      );
+    },
+    h3: ({ children }) => (
+      <h3 className="text-xl font-semibold mt-7 mb-3 text-gray-700 flex items-center group">
+        <span className="opacity-0 group-hover:opacity-100 mr-2 text-blue-500 text-sm">›</span>
+        {children}
+      </h3>
+    ),
+    
+    // Other components remain the same...
+    ol: ({ depth, ...props }) => {
+      const isTopLevel = depth === 0;
+      return (
+        <ol
+          className={`
+            my-5 space-y-3
+            ${isTopLevel
+              ? 'list-decimal ml-9 text-lg marker:font-bold marker:text-blue-800'
+              : 'list-decimal ml-8 text-base marker:font-medium marker:text-blue-600'
+            }
+          `}
           {...props}
         />
-        {alt && (
-          <p className="mt-2 text-sm text-gray-600 text-center italic">
-            {alt}
-          </p>
-        )}
-        {isBase64 && (
-          <p className="mt-1 text-xs text-gray-500 text-center">
-            (Base64 Image)
-          </p>
-        )}
-      </div>
-    );
-  },
-};
+      );
+    },
+    
+    ul: ({ depth, ...props }) => {
+      const isTopLevel = depth === 0;
+      return (
+        <ul
+          className={`
+            my-5 space-y-3
+            ${isTopLevel
+              ? 'list-disc ml-9 text-lg marker:text-blue-600'
+              : 'list-disc ml-8 text-base marker:text-blue-500'
+            }
+          `}
+          {...props}
+        />
+      );
+    },
+    
+    li: ({ ordered, children, ...props }) => (
+      <li
+        className="leading-relaxed text-gray-800 pl-2 hover:text-gray-900 transition-colors"
+        {...props}
+      >
+        <span className="drop-cap:inline">{children}</span>
+      </li>
+    ),
+    
+    blockquote: ({ children }) => (
+      <blockquote className="my-6 pl-5 border-l-4 border-gray-400 bg-gray-100 py-3 pr-4 rounded-r">
+        <div className="text-gray-800">
+          {children}
+        </div>
+      </blockquote>
+    ),
+    
+    img: ({ src, alt, ...props }) => {
+      const isBase64 = src && (src.startsWith('data:image/') || src.startsWith('base64,'));
+      
+      return (
+        <div className="my-6 flex flex-col items-center">
+          <img
+            src={src}
+            alt={alt || 'Image'}
+            className="max-w-full h-auto rounded-lg shadow-md border border-gray-300"
+            {...props}
+          />
+          {alt && (
+            <p className="mt-2 text-sm text-gray-600 text-center italic">
+              {alt}
+            </p>
+          )}
+          {isBase64 && (
+            <p className="mt-1 text-xs text-gray-500 text-center">
+              (Base64 Image)
+            </p>
+          )}
+        </div>
+      );
+    },
+    
+    // Handle inline code that might contain Codeforces tags
+    code: ({ node, inline, children, ...props }) => {
+      if (inline) {
+        // Check if it's a Codeforces tag
+        const text = typeof children === 'string' ? children : children.join('');
+        const cfTagMatch = text.match(/\[(user|submission|problem|contest|standings):([^\]]+)\]/);
+        
+        if (cfTagMatch) {
+          const [fullMatch, type, id] = cfTagMatch;
+          const href = type === 'user' ? `/profile/${id}` :
+                      type === 'submission' ? `/submission/${id}` :
+                      type === 'problem' ? `/problem/${id}` :
+                      type === 'standings' ? `/contest/${id}/standings` :
+                      `/contest/${id}`;
+          
+          let displayText = id;
+          if (type === 'submission') displayText = `#${id}`;
+          if (type === 'contest') displayText = `Contest ${id}`;
+          if (type === 'standings') displayText = `Standings ${id}`;
+          
+          return (
+            <Link to={href} className="cf-tag inline-tag px-1.5 py-0.5 rounded text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100">
+              {displayText}
+            </Link>
+          );
+        }
+      }
+      
+      return (
+        <code className={`${inline ? 'bg-gray-100 px-1 py-0.5 rounded text-sm' : 'block'} font-mono`} {...props}>
+          {children}
+        </code>
+      );
+    },
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -228,6 +347,22 @@ const customComponents = {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
+            </div>
+
+            {/* Instructions Panel */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <h3 className="font-bold text-blue-800 mb-2">Codeforces-style Tags Support</h3>
+              <div className="text-sm text-blue-700 space-y-1">
+                <p>Use the following syntax for Codeforces-style tags:</p>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <code className="block px-2 py-1 bg-white rounded border">[user:tourist]</code>
+                  <code className="block px-2 py-1 bg-white rounded border">[submission:123456]</code>
+                  <code className="block px-2 py-1 bg-white rounded border">[problem:1850A]</code>
+                  <code className="block px-2 py-1 bg-white rounded border">[contest:1850]</code>
+                  <code className="block px-2 py-1 bg-white rounded border">[standings:1850]</code>
+                  <code className="block px-2 py-1 bg-white rounded border">&lt;spoiler summary="Title"&gt;...&lt;/spoiler&gt;</code>
+                </div>
+              </div>
             </div>
 
             <form onSubmit={(e) => handleSubmit(e, false)}>
@@ -256,7 +391,7 @@ const customComponents = {
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Content (Markdown supported, including LaTeX, code blocks, and Codeforces-style spoilers)
+                  Content (Markdown supported, including LaTeX, code blocks, and Codeforces-style tags)
                 </label>
 
                 {!showPreview ? (
@@ -265,7 +400,7 @@ const customComponents = {
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md font-mono"
-                    placeholder={`Write your blog content here using Markdown syntax...\n\nFor example:\n**bold text**\n[link](https://example.com)\n\`\`\`cpp\n// code block\n\`\`\`\n$a + b = c$ for inline math\n$$E = mc^2$$ for display math\n<spoiler summary="Spoiler Title">Hidden content</spoiler>`}
+                    placeholder={`Write your blog content here using Markdown syntax...\n\nFor example:\n**bold text**\n[link](https://example.com)\n\`\`\`cpp\n// code block\n\`\`\`\n$a + b = c$ for inline math\n$$E = mc^2$$ for display math\n\nCodeforces-style tags:\n[user:tourist]\n[submission:123456]\n[problem:1850A]\n[contest:1850]\n[standings:1850]\n<spoiler summary="Spoiler Title">Hidden content</spoiler>`}
                     required
                   />
                 ) : (
@@ -391,6 +526,60 @@ const customComponents = {
           </div>
         </div>
       </div>
+
+      {/* Add CSS for Codeforces tags */}
+      <style jsx>{`
+        .cf-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          font-size: 0.875rem;
+          font-weight: 500;
+          text-decoration: none;
+          transition: all 0.2s;
+        }
+        
+        .user-tag {
+          background-color: #dbeafe;
+          color: #1e40af;
+          border: 1px solid #93c5fd;
+        }
+        
+        .submission-tag {
+          background-color: #f0f9ff;
+          color: #0369a1;
+          border: 1px solid #bae6fd;
+        }
+        
+        .problem-tag {
+          background-color: #fef3c7;
+          color: #92400e;
+          border: 1px solid #fcd34d;
+        }
+        
+        .contest-tag {
+          background-color: #e0e7ff;
+          color: #3730a3;
+          border: 1px solid #c7d2fe;
+        }
+        
+        .standings-tag {
+          background-color: #ecfdf5;
+          color: #065f46;
+          border: 1px solid #a7f3d0;
+        }
+        
+        .cf-tag:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .inline-tag {
+          margin: 0 2px;
+        }
+      `}</style>
     </div>
   );
 };
