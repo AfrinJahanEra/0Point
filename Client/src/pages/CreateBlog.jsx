@@ -101,36 +101,139 @@ const CreateBlog = () => {
 
   const togglePreview = () => setShowPreview(!showPreview);
 
-  // Function to parse Codeforces-style tags
+  // Function to parse Codeforces-style tags with your specific routing patterns
   const parseCodeforcesTags = (text) => {
     if (!text) return text;
     
-    // Parse [user:username]
+    // Parse [user:username] - redirect to profile page
     text = text.replace(/\[user:([^\]]+)\]/g, (match, username) => {
-      return `<a href="/profile/${username.trim()}" class="cf-tag user-tag" data-username="${username.trim()}">${username.trim()}</a>`;
+      const trimmedUsername = username.trim();
+      return `<a href="/profile/${trimmedUsername}" class="cf-tag user-tag" data-username="${trimmedUsername}">${trimmedUsername}</a>`;
     });
     
-    // Parse [submission:id] (assuming id is numeric)
+    // Parse [submission:id] - redirect to contest submissions or specific submission
     text = text.replace(/\[submission:([^\]]+)\]/g, (match, id) => {
-      return `<a href="/submission/${id.trim()}" class="cf-tag submission-tag" data-id="${id.trim()}">#${id.trim()}</a>`;
+      const trimmedId = id.trim();
+      // Assuming submission ID format, redirect to contest submissions page
+      // You might need to adjust this based on your actual submission ID format
+      return `<a href="/contests/submissions/${trimmedId}" class="cf-tag submission-tag" data-id="${trimmedId}">#${trimmedId}</a>`;
     });
     
-    // Parse [problem:code] (e.g., 1850A, 1850B, etc.)
-    text = text.replace(/\[problem:([^\]]+)\]/g, (match, code) => {
-      return `<a href="/problem/${code.trim()}" class="cf-tag problem-tag" data-code="${code.trim()}">${code.trim()}</a>`;
+    // Parse [problem:contests/contest_id/problems/problem_index]
+    text = text.replace(/\[problem:contests\/([^\/]+)\/problems\/([^\]]+)\]/g, (match, contestId, problemIndex) => {
+      const trimmedContestId = contestId.trim();
+      const trimmedProblemIndex = problemIndex.trim();
+      return `<a href="/contests/${trimmedContestId}/problems/${trimmedProblemIndex}" class="cf-tag problem-tag" data-contest-id="${trimmedContestId}" data-problem-index="${trimmedProblemIndex}">Problem ${trimmedProblemIndex}</a>`;
     });
     
-    // Parse [contest:id]
-    text = text.replace(/\[contest:([^\]]+)\]/g, (match, id) => {
-      return `<a href="/contest/${id.trim()}" class="cf-tag contest-tag" data-id="${id.trim()}">Contest ${id.trim()}</a>`;
+    // Parse [problem:problem_code] - simplified format
+    text = text.replace(/\[problem:([A-Za-z0-9]+)\]/g, (match, problemCode) => {
+      const trimmedCode = problemCode.trim();
+      return `<a href="/problems/${trimmedCode}" class="cf-tag problem-tag" data-code="${trimmedCode}">${trimmedCode}</a>`;
     });
     
-    // Parse [standings:id]
-    text = text.replace(/\[standings:([^\]]+)\]/g, (match, id) => {
-      return `<a href="/contest/${id.trim()}/standings" class="cf-tag standings-tag" data-id="${id.trim()}">Standings ${id.trim()}</a>`;
+    // Parse [contest:contest_id] - redirect to contest detail
+    text = text.replace(/\[contest:([^\]]+)\]/g, (match, contestId) => {
+      const trimmedId = contestId.trim();
+      return `<a href="/contests/${trimmedId}" class="cf-tag contest-tag" data-id="${trimmedId}">Contest ${trimmedId}</a>`;
+    });
+    
+    // Parse [standings:contest_id] - redirect to contest standings
+    text = text.replace(/\[standings:([^\]]+)\]/g, (match, contestId) => {
+      const trimmedId = contestId.trim();
+      return `<a href="/contests/${trimmedId}/standings" class="cf-tag standings-tag" data-id="${trimmedId}">Standings ${trimmedId}</a>`;
     });
     
     return text;
+  };
+
+  // Function to render Codeforces tags as React components
+  const renderCodeforcesTag = (type, value) => {
+    const trimmedValue = value.trim();
+    
+    switch (type) {
+      case 'user':
+        return (
+          <Link 
+            to={`/profile/${trimmedValue}`} 
+            className="cf-tag user-tag"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            </svg>
+            {trimmedValue}
+          </Link>
+        );
+        
+      case 'submission':
+        return (
+          <Link 
+            to={`/contests/submissions/${trimmedValue}`} 
+            className="cf-tag submission-tag"
+            onClick={(e) => e.stopPropagation()}
+          >
+            #{trimmedValue}
+          </Link>
+        );
+        
+      case 'problem':
+        // Check if it's in format "contests/contest_id/problems/problem_index"
+        const problemMatch = trimmedValue.match(/^contests\/([^\/]+)\/problems\/(.+)$/);
+        if (problemMatch) {
+          const [, contestId, problemIndex] = problemMatch;
+          return (
+            <Link 
+              to={`/contests/${contestId.trim()}/problems/${problemIndex.trim()}`} 
+              className="cf-tag problem-tag"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Problem {problemIndex.trim()}
+            </Link>
+          );
+        }
+        // Simple problem code format
+        return (
+          <Link 
+            to={`/problems/${trimmedValue}`} 
+            className="cf-tag problem-tag"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {trimmedValue}
+          </Link>
+        );
+        
+      case 'contest':
+        return (
+          <Link 
+            to={`/contests/${trimmedValue}`} 
+            className="cf-tag contest-tag"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+            </svg>
+            Contest {trimmedValue}
+          </Link>
+        );
+        
+      case 'standings':
+        return (
+          <Link 
+            to={`/contests/${trimmedValue}/standings`} 
+            className="cf-tag standings-tag"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 2a1 1 0 00-1 1v1a1 1 0 002 0V3a1 1 0 00-1-1zM4 4h3a3 3 0 006 0h3a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm2.5 7a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm2.45 4a2.5 2.5 0 10-4.9 0h4.9zM12 9a1 1 0 100 2h3a1 1 0 100-2h-3zm-1 4a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1z" clipRule="evenodd" />
+            </svg>
+            Standings {trimmedValue}
+          </Link>
+        );
+        
+      default:
+        return <span className="cf-tag">[{type}:{trimmedValue}]</span>;
+    }
   };
 
   const customComponents = {
@@ -150,48 +253,50 @@ const CreateBlog = () => {
 
     // Enhanced paragraph to handle Codeforces tags
     p: ({ node, children, ...props }) => {
-      let content = React.Children.toArray(children);
-      
-      // Check if paragraph contains text that might have Codeforces tags
-      if (typeof children === 'string' || (Array.isArray(children) && children.some(child => typeof child === 'string'))) {
-        const text = Array.isArray(children) ? children.join('') : children.toString();
-        const parsedHtml = parseCodeforcesTags(text);
-        
-        // If tags were found, render with dangerouslySetInnerHTML
-        if (parsedHtml !== text) {
-          return <p className="my-4 leading-relaxed" dangerouslySetInnerHTML={{ __html: parsedHtml }} />;
+      // Convert children to text for parsing
+      const childArray = React.Children.toArray(children);
+      const hasCodeforcesTags = childArray.some(child => {
+        if (typeof child === 'string') {
+          return /\[(user|submission|problem|contest|standings):[^\]]+\]/.test(child);
         }
+        return false;
+      });
+
+      if (hasCodeforcesTags) {
+        const newChildren = childArray.map((child, index) => {
+          if (typeof child === 'string') {
+            const parts = child.split(/(\[(?:user|submission|problem|contest|standings):[^\]]+\])/);
+            return parts.map((part, partIndex) => {
+              const match = part.match(/\[(user|submission|problem|contest|standings):([^\]]+)\]/);
+              if (match) {
+                const [, type, value] = match;
+                return (
+                  <React.Fragment key={`${index}-${partIndex}`}>
+                    {renderCodeforcesTag(type, value)}
+                  </React.Fragment>
+                );
+              }
+              return part;
+            });
+          }
+          return child;
+        });
+
+        return <p className="my-4 leading-relaxed" {...props}>{newChildren}</p>;
       }
-      
+
       return <p className="my-4 leading-relaxed" {...props}>{children}</p>;
     },
 
-    // Enhanced link component to handle Codeforces tags in links
+    // Enhanced link component
     a: ({ href, children, ...props }) => {
       // Check if it's a Codeforces tag link
-      if (href && href.startsWith('/')) {
-        const match = href.match(/^\/(profile|submission|problem|contest|contest\/\d+\/standings)\/(.+)$/);
-        if (match) {
-          const [_, type, id] = match;
-          const className = `cf-tag ${type}-tag inline-flex items-center gap-1 px-2 py-1 rounded text-sm font-medium`;
-          
-          let displayText = children;
-          if (typeof children === 'string') {
-            displayText = children;
-          }
-          
-          return (
-            <Link to={href} className={className} {...props}>
-              {type === 'user' && (
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                </svg>
-              )}
-              {type === 'submission' && '#'}
-              {displayText}
-            </Link>
-          );
-        }
+      if (href && (href.startsWith('/profile/') || href.startsWith('/contests/') || href.startsWith('/problems/'))) {
+        return (
+          <Link to={href} className="text-blue-600 hover:text-blue-800 underline" {...props}>
+            {children}
+          </Link>
+        );
       }
       
       return <a href={href} className="text-blue-600 hover:text-blue-800 underline" {...props}>{children}</a>;
@@ -223,6 +328,31 @@ const CreateBlog = () => {
       </h3>
     ),
     
+    // Handle inline code that might contain Codeforces tags
+    code: ({ node, inline, children, ...props }) => {
+      if (inline) {
+        const text = typeof children === 'string' ? children : children.join('');
+        
+        // Check for Codeforces tags in inline code
+        const cfTagMatch = text.match(/\[(user|submission|problem|contest|standings):([^\]]+)\]/);
+        
+        if (cfTagMatch) {
+          const [, type, value] = cfTagMatch;
+          return (
+            <React.Fragment>
+              {renderCodeforcesTag(type, value)}
+            </React.Fragment>
+          );
+        }
+      }
+      
+      return (
+        <code className={`${inline ? 'bg-gray-100 px-1 py-0.5 rounded text-sm' : 'block'} font-mono`} {...props}>
+          {children}
+        </code>
+      );
+    },
+
     // Other components remain the same...
     ol: ({ depth, ...props }) => {
       const isTopLevel = depth === 0;
@@ -297,41 +427,6 @@ const CreateBlog = () => {
         </div>
       );
     },
-    
-    // Handle inline code that might contain Codeforces tags
-    code: ({ node, inline, children, ...props }) => {
-      if (inline) {
-        // Check if it's a Codeforces tag
-        const text = typeof children === 'string' ? children : children.join('');
-        const cfTagMatch = text.match(/\[(user|submission|problem|contest|standings):([^\]]+)\]/);
-        
-        if (cfTagMatch) {
-          const [fullMatch, type, id] = cfTagMatch;
-          const href = type === 'user' ? `/profile/${id}` :
-                      type === 'submission' ? `/submission/${id}` :
-                      type === 'problem' ? `/problem/${id}` :
-                      type === 'standings' ? `/contest/${id}/standings` :
-                      `/contest/${id}`;
-          
-          let displayText = id;
-          if (type === 'submission') displayText = `#${id}`;
-          if (type === 'contest') displayText = `Contest ${id}`;
-          if (type === 'standings') displayText = `Standings ${id}`;
-          
-          return (
-            <Link to={href} className="cf-tag inline-tag px-1.5 py-0.5 rounded text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100">
-              {displayText}
-            </Link>
-          );
-        }
-      }
-      
-      return (
-        <code className={`${inline ? 'bg-gray-100 px-1 py-0.5 rounded text-sm' : 'block'} font-mono`} {...props}>
-          {children}
-        </code>
-      );
-    },
   };
 
   return (
@@ -352,15 +447,33 @@ const CreateBlog = () => {
             {/* Instructions Panel */}
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
               <h3 className="font-bold text-blue-800 mb-2">Codeforces-style Tags Support</h3>
-              <div className="text-sm text-blue-700 space-y-1">
+              <div className="text-sm text-blue-700 space-y-2">
                 <p>Use the following syntax for Codeforces-style tags:</p>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <code className="block px-2 py-1 bg-white rounded border">[user:tourist]</code>
-                  <code className="block px-2 py-1 bg-white rounded border">[submission:123456]</code>
-                  <code className="block px-2 py-1 bg-white rounded border">[problem:1850A]</code>
-                  <code className="block px-2 py-1 bg-white rounded border">[contest:1850]</code>
-                  <code className="block px-2 py-1 bg-white rounded border">[standings:1850]</code>
-                  <code className="block px-2 py-1 bg-white rounded border">&lt;spoiler summary="Title"&gt;...&lt;/spoiler&gt;</code>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                  <div>
+                    <code className="block px-2 py-1 bg-white rounded border mb-1">[user:tourist]</code>
+                    <span className="text-xs text-gray-600">Links to user profile</span>
+                  </div>
+                  <div>
+                    <code className="block px-2 py-1 bg-white rounded border mb-1">[submission:123456]</code>
+                    <span className="text-xs text-gray-600">Links to submission</span>
+                  </div>
+                  <div>
+                    <code className="block px-2 py-1 bg-white rounded border mb-1">[problem:contests/694619cc17471397ca246fd7/problems/A]</code>
+                    <span className="text-xs text-gray-600">Links to specific contest problem</span>
+                  </div>
+                  <div>
+                    <code className="block px-2 py-1 bg-white rounded border mb-1">[contest:694619cc17471397ca246fd7]</code>
+                    <span className="text-xs text-gray-600">Links to contest page</span>
+                  </div>
+                  <div>
+                    <code className="block px-2 py-1 bg-white rounded border mb-1">[standings:694619cc17471397ca246fd7]</code>
+                    <span className="text-xs text-gray-600">Links to contest standings</span>
+                  </div>
+                  <div>
+                    <code className="block px-2 py-1 bg-white rounded border mb-1">&lt;spoiler summary="Title"&gt;...&lt;/spoiler&gt;</code>
+                    <span className="text-xs text-gray-600">Creates a collapsible spoiler section</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -400,7 +513,7 @@ const CreateBlog = () => {
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md font-mono"
-                    placeholder={`Write your blog content here using Markdown syntax...\n\nFor example:\n**bold text**\n[link](https://example.com)\n\`\`\`cpp\n// code block\n\`\`\`\n$a + b = c$ for inline math\n$$E = mc^2$$ for display math\n\nCodeforces-style tags:\n[user:tourist]\n[submission:123456]\n[problem:1850A]\n[contest:1850]\n[standings:1850]\n<spoiler summary="Spoiler Title">Hidden content</spoiler>`}
+                    placeholder={`Write your blog content here using Markdown syntax...\n\nFor example:\n**bold text**\n[link](https://example.com)\n\`\`\`cpp\n// code block\n\`\`\`\n$a + b = c$ for inline math\n$$E = mc^2$$ for display math\n\nCodeforces-style tags:\n[user:tourist]\n[submission:694619cc17471397ca246fd7]\n[problem:contests/694619cc17471397ca246fd7/problems/A]\n[contest:694619cc17471397ca246fd7]\n[standings:694619cc17471397ca246fd7]\n<spoiler summary="Spoiler Title">Hidden content</spoiler>`}
                     required
                   />
                 ) : (
@@ -539,6 +652,8 @@ const CreateBlog = () => {
           font-weight: 500;
           text-decoration: none;
           transition: all 0.2s;
+          margin: 0 2px;
+          cursor: pointer;
         }
         
         .user-tag {
@@ -547,10 +662,20 @@ const CreateBlog = () => {
           border: 1px solid #93c5fd;
         }
         
+        .user-tag:hover {
+          background-color: #bfdbfe;
+          color: #1e3a8a;
+        }
+        
         .submission-tag {
           background-color: #f0f9ff;
           color: #0369a1;
           border: 1px solid #bae6fd;
+        }
+        
+        .submission-tag:hover {
+          background-color: #e0f2fe;
+          color: #075985;
         }
         
         .problem-tag {
@@ -559,10 +684,20 @@ const CreateBlog = () => {
           border: 1px solid #fcd34d;
         }
         
+        .problem-tag:hover {
+          background-color: #fde68a;
+          color: #78350f;
+        }
+        
         .contest-tag {
           background-color: #e0e7ff;
           color: #3730a3;
           border: 1px solid #c7d2fe;
+        }
+        
+        .contest-tag:hover {
+          background-color: #c7d2fe;
+          color: #312e81;
         }
         
         .standings-tag {
@@ -571,13 +706,14 @@ const CreateBlog = () => {
           border: 1px solid #a7f3d0;
         }
         
+        .standings-tag:hover {
+          background-color: #d1fae5;
+          color: #047857;
+        }
+        
         .cf-tag:hover {
           transform: translateY(-1px);
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        
-        .inline-tag {
-          margin: 0 2px;
         }
       `}</style>
     </div>
