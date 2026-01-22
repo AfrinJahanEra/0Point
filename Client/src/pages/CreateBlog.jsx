@@ -9,6 +9,7 @@ import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import { Link } from 'react-router-dom';
+import MarkdownSyntaxPopup from '../components/MarkdownSyntaxPopup';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import api from '../utils/api';
@@ -101,52 +102,6 @@ const CreateBlog = () => {
 
   const togglePreview = () => setShowPreview(!showPreview);
 
-  // Function to parse Codeforces-style tags with your specific routing patterns
-  const parseCodeforcesTags = (text) => {
-    if (!text) return text;
-    
-    // Parse [user:username] - redirect to profile page
-    text = text.replace(/\[user:([^\]]+)\]/g, (match, username) => {
-      const trimmedUsername = username.trim();
-      return `<a href="/profile/${trimmedUsername}" class="cf-tag user-tag" data-username="${trimmedUsername}">${trimmedUsername}</a>`;
-    });
-    
-    // Parse [submission:id] - redirect to contest submissions or specific submission
-    text = text.replace(/\[submission:([^\]]+)\]/g, (match, id) => {
-      const trimmedId = id.trim();
-      // Assuming submission ID format, redirect to contest submissions page
-      // You might need to adjust this based on your actual submission ID format
-      return `<a href="/contests/submissions/${trimmedId}" class="cf-tag submission-tag" data-id="${trimmedId}">#${trimmedId}</a>`;
-    });
-    
-    // Parse [problem:contests/contest_id/problems/problem_index]
-    text = text.replace(/\[problem:contests\/([^\/]+)\/problems\/([^\]]+)\]/g, (match, contestId, problemIndex) => {
-      const trimmedContestId = contestId.trim();
-      const trimmedProblemIndex = problemIndex.trim();
-      return `<a href="/contests/${trimmedContestId}/problems/${trimmedProblemIndex}" class="cf-tag problem-tag" data-contest-id="${trimmedContestId}" data-problem-index="${trimmedProblemIndex}">Problem ${trimmedProblemIndex}</a>`;
-    });
-    
-    // Parse [problem:problem_code] - simplified format
-    text = text.replace(/\[problem:([A-Za-z0-9]+)\]/g, (match, problemCode) => {
-      const trimmedCode = problemCode.trim();
-      return `<a href="/problems/${trimmedCode}" class="cf-tag problem-tag" data-code="${trimmedCode}">${trimmedCode}</a>`;
-    });
-    
-    // Parse [contest:contest_id] - redirect to contest detail
-    text = text.replace(/\[contest:([^\]]+)\]/g, (match, contestId) => {
-      const trimmedId = contestId.trim();
-      return `<a href="/contests/${trimmedId}" class="cf-tag contest-tag" data-id="${trimmedId}">Contest ${trimmedId}</a>`;
-    });
-    
-    // Parse [standings:contest_id] - redirect to contest standings
-    text = text.replace(/\[standings:([^\]]+)\]/g, (match, contestId) => {
-      const trimmedId = contestId.trim();
-      return `<a href="/contests/${trimmedId}/standings" class="cf-tag standings-tag" data-id="${trimmedId}">Standings ${trimmedId}</a>`;
-    });
-    
-    return text;
-  };
-
   // Function to render Codeforces tags as React components
   const renderCodeforcesTag = (type, value) => {
     const trimmedValue = value.trim();
@@ -156,21 +111,33 @@ const CreateBlog = () => {
         return (
           <Link 
             to={`/profile/${trimmedValue}`} 
-            className="cf-tag user-tag"
+            className="text-blue-600 hover:text-blue-800 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-            </svg>
             {trimmedValue}
           </Link>
         );
         
       case 'submission':
+        // Handle both formats: [submission:contests/contest_id/submissions] and [submission:id]
+        const submissionMatch = trimmedValue.match(/^contests\/([^\/]+)\/submissions$/);
+        if (submissionMatch) {
+          const contestId = submissionMatch[1];
+          return (
+            <Link 
+              to={`/contests/${contestId}/submissions`} 
+              className="text-blue-600 hover:text-blue-800 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Submissions
+            </Link>
+          );
+        }
+        // Simple submission ID format
         return (
           <Link 
-            to={`/contests/submissions/${trimmedValue}`} 
-            className="cf-tag submission-tag"
+            to={`/submissions/${trimmedValue}`} 
+            className="text-blue-600 hover:text-blue-800 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
             #{trimmedValue}
@@ -185,7 +152,7 @@ const CreateBlog = () => {
           return (
             <Link 
               to={`/contests/${contestId.trim()}/problems/${problemIndex.trim()}`} 
-              className="cf-tag problem-tag"
+              className="text-blue-600 hover:text-blue-800 hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
               Problem {problemIndex.trim()}
@@ -196,7 +163,7 @@ const CreateBlog = () => {
         return (
           <Link 
             to={`/problems/${trimmedValue}`} 
-            className="cf-tag problem-tag"
+            className="text-blue-600 hover:text-blue-800 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
             {trimmedValue}
@@ -207,12 +174,9 @@ const CreateBlog = () => {
         return (
           <Link 
             to={`/contests/${trimmedValue}`} 
-            className="cf-tag contest-tag"
+            className="text-blue-600 hover:text-blue-800 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-            </svg>
             Contest {trimmedValue}
           </Link>
         );
@@ -221,18 +185,15 @@ const CreateBlog = () => {
         return (
           <Link 
             to={`/contests/${trimmedValue}/standings`} 
-            className="cf-tag standings-tag"
+            className="text-blue-600 hover:text-blue-800 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 2a1 1 0 00-1 1v1a1 1 0 002 0V3a1 1 0 00-1-1zM4 4h3a3 3 0 006 0h3a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm2.5 7a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm2.45 4a2.5 2.5 0 10-4.9 0h4.9zM12 9a1 1 0 100 2h3a1 1 0 100-2h-3zm-1 4a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1z" clipRule="evenodd" />
-            </svg>
             Standings {trimmedValue}
           </Link>
         );
         
       default:
-        return <span className="cf-tag">[{type}:{trimmedValue}]</span>;
+        return <span>[{type}:{trimmedValue}]</span>;
     }
   };
 
@@ -291,15 +252,15 @@ const CreateBlog = () => {
     // Enhanced link component
     a: ({ href, children, ...props }) => {
       // Check if it's a Codeforces tag link
-      if (href && (href.startsWith('/profile/') || href.startsWith('/contests/') || href.startsWith('/problems/'))) {
+      if (href && (href.startsWith('/profile/') || href.startsWith('/contests/') || href.startsWith('/problems/') || href.startsWith('/submissions/'))) {
         return (
-          <Link to={href} className="text-blue-600 hover:text-blue-800 underline" {...props}>
+          <Link to={href} className="text-blue-600 hover:text-blue-800 hover:underline" {...props}>
             {children}
           </Link>
         );
       }
       
-      return <a href={href} className="text-blue-600 hover:text-blue-800 underline" {...props}>{children}</a>;
+      return <a href={href} className="text-blue-600 hover:text-blue-800 hover:underline" {...props}>{children}</a>;
     },
 
     // Enhanced headings with anchor links (Codeforces style)
@@ -444,40 +405,6 @@ const CreateBlog = () => {
               </button>
             </div>
 
-            {/* Instructions Panel */}
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-              <h3 className="font-bold text-blue-800 mb-2">Codeforces-style Tags Support</h3>
-              <div className="text-sm text-blue-700 space-y-2">
-                <p>Use the following syntax for Codeforces-style tags:</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                  <div>
-                    <code className="block px-2 py-1 bg-white rounded border mb-1">[user:tourist]</code>
-                    <span className="text-xs text-gray-600">Links to user profile</span>
-                  </div>
-                  <div>
-                    <code className="block px-2 py-1 bg-white rounded border mb-1">[submission:123456]</code>
-                    <span className="text-xs text-gray-600">Links to submission</span>
-                  </div>
-                  <div>
-                    <code className="block px-2 py-1 bg-white rounded border mb-1">[problem:contests/694619cc17471397ca246fd7/problems/A]</code>
-                    <span className="text-xs text-gray-600">Links to specific contest problem</span>
-                  </div>
-                  <div>
-                    <code className="block px-2 py-1 bg-white rounded border mb-1">[contest:694619cc17471397ca246fd7]</code>
-                    <span className="text-xs text-gray-600">Links to contest page</span>
-                  </div>
-                  <div>
-                    <code className="block px-2 py-1 bg-white rounded border mb-1">[standings:694619cc17471397ca246fd7]</code>
-                    <span className="text-xs text-gray-600">Links to contest standings</span>
-                  </div>
-                  <div>
-                    <code className="block px-2 py-1 bg-white rounded border mb-1">&lt;spoiler summary="Title"&gt;...&lt;/spoiler&gt;</code>
-                    <span className="text-xs text-gray-600">Creates a collapsible spoiler section</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <form onSubmit={(e) => handleSubmit(e, false)}>
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
@@ -503,9 +430,12 @@ const CreateBlog = () => {
               </div>
 
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Content (Markdown supported, including LaTeX, code blocks, and Codeforces-style tags)
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Content (Markdown supported, including LaTeX, code blocks, and Codeforces-style tags)
+                  </label>
+                  <MarkdownSyntaxPopup />
+                </div>
 
                 {!showPreview ? (
                   <textarea
@@ -513,7 +443,7 @@ const CreateBlog = () => {
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md font-mono"
-                    placeholder={`Write your blog content here using Markdown syntax...\n\nFor example:\n**bold text**\n[link](https://example.com)\n\`\`\`cpp\n// code block\n\`\`\`\n$a + b = c$ for inline math\n$$E = mc^2$$ for display math\n\nCodeforces-style tags:\n[user:tourist]\n[submission:694619cc17471397ca246fd7]\n[problem:contests/694619cc17471397ca246fd7/problems/A]\n[contest:694619cc17471397ca246fd7]\n[standings:694619cc17471397ca246fd7]\n<spoiler summary="Spoiler Title">Hidden content</spoiler>`}
+                    placeholder="Write your blog content here"
                     required
                   />
                 ) : (
@@ -639,83 +569,6 @@ const CreateBlog = () => {
           </div>
         </div>
       </div>
-
-      {/* Add CSS for Codeforces tags */}
-      <style jsx>{`
-        .cf-tag {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 2px 8px;
-          border-radius: 4px;
-          font-size: 0.875rem;
-          font-weight: 500;
-          text-decoration: none;
-          transition: all 0.2s;
-          margin: 0 2px;
-          cursor: pointer;
-        }
-        
-        .user-tag {
-          background-color: #dbeafe;
-          color: #1e40af;
-          border: 1px solid #93c5fd;
-        }
-        
-        .user-tag:hover {
-          background-color: #bfdbfe;
-          color: #1e3a8a;
-        }
-        
-        .submission-tag {
-          background-color: #f0f9ff;
-          color: #0369a1;
-          border: 1px solid #bae6fd;
-        }
-        
-        .submission-tag:hover {
-          background-color: #e0f2fe;
-          color: #075985;
-        }
-        
-        .problem-tag {
-          background-color: #fef3c7;
-          color: #92400e;
-          border: 1px solid #fcd34d;
-        }
-        
-        .problem-tag:hover {
-          background-color: #fde68a;
-          color: #78350f;
-        }
-        
-        .contest-tag {
-          background-color: #e0e7ff;
-          color: #3730a3;
-          border: 1px solid #c7d2fe;
-        }
-        
-        .contest-tag:hover {
-          background-color: #c7d2fe;
-          color: #312e81;
-        }
-        
-        .standings-tag {
-          background-color: #ecfdf5;
-          color: #065f46;
-          border: 1px solid #a7f3d0;
-        }
-        
-        .standings-tag:hover {
-          background-color: #d1fae5;
-          color: #047857;
-        }
-        
-        .cf-tag:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-      `}</style>
     </div>
   );
 };
