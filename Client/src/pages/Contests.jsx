@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Video, ExternalLink } from 'lucide-react';
+import { 
+  Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, 
+  AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, 
+  ChevronsRight, Video, ExternalLink 
+} from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useNavigate } from 'react-router-dom';
 
@@ -21,99 +25,121 @@ const Contests = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [paginatedContests, setPaginatedContests] = useState([]);
 
-  // Get token from localStorage (from successful login)
+  // Get token from localStorage
   const TOKEN = localStorage.getItem('token');
 
-  // Initial data fetch
-  useEffect(() => {
-    // Check if user is logged in
-    if (!TOKEN) {
-      console.log('⚠️ User not logged in, redirecting to login');
-      // In a real app, this would redirect to login
-      // For now, we'll show an error
-      setError('Please log in to view contests');
-      setLoading(false);
-      return;
-    }
-    
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        console.log('📡 Fetching initial contests data...');
-        
-        // ========== Fetch local contests ==========  
-        const contestsRes = await axios.get('http://localhost:8000/contests/', {
-          headers: { Authorization: `Bearer ${TOKEN}` }
-        });
-        
-        // IMPORTANT: Filter out test contests that might be included
-        const regularContests = (contestsRes.data.contests || []).filter(contest => 
-          !contest.is_test_contest && contest.visibility !== 'test'
-        );
-        
-        // Fetch test contests separately
-        const testContestsRes = await axios.get('http://localhost:8000/test-contests/my/', {
-          headers: { Authorization: `Bearer ${TOKEN}` }
-        });
-        
-        // ========== Fetch external contests from other platforms ==========
-        const externalContestsRes = await axios.get('http://localhost:8000/external/contests/?platform=all', {
-          headers: { Authorization: `Bearer ${TOKEN}` }
-        });
-        
-        // Transform external contests to match local contest structure
-        const transformedExternalContests = (externalContestsRes.data || []).map(contest => ({
-          id: `external_${contest.platform}_${contest.external_id}`,
-          title: contest.title,
-          platform: contest.platform, // Will be 'cf', 'cc', 'ac', 'lc'
-          status: contest.status === 'finished' ? 'past' : contest.status,
-          start_time: contest.start_time,
-          duration_seconds: contest.duration_seconds,
-          duration_formatted: contest.duration_formatted,
-          participants: contest.participants || 0,
-          type: 'individual', // External contests are always individual
-          is_external: true, // Flag to distinguish external contests
-          external_url: contest.url, // Store original URL
-          description: `External contest from ${getPlatformName(contest.platform)}`
-        }));
-        
-        console.log('✅ Regular contests loaded:', regularContests.length);
-        console.log('✅ Test contests loaded:', testContestsRes.data.test_contests?.length || 0);
-        console.log('✅ External contests loaded:', transformedExternalContests.length);
-        
-        // Combine all contests: local regular + test + external
-        const allContests = [
-          ...regularContests,
-          ...(testContestsRes.data.test_contests || []),
-          ...transformedExternalContests
-        ];
-        
-        setContests(allContests);
-        
-        // Fetch user's registrations
-        try {
-          const registrationsRes = await axios.get('http://localhost:8000/contests/registrations/', {
-            headers: { Authorization: `Bearer ${TOKEN}` }
-          });
-          console.log('✅ Registrations loaded:', registrationsRes.data.registered_contests?.length || 0);
-          setRegisteredContests(registrationsRes.data.registered_contests || []);
-        } catch (regErr) {
-          console.warn('⚠️ Could not fetch registrations:', regErr);
-        }
-        
-        setError(null);
-      } catch (err) {
-        console.error('❌ Error fetching contests:', err);
-        setError(err.response?.data?.error || 'Failed to load contests');
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Normalize external contest → unified shape (from first version)
+  const normalizeExternalContest = (c) => ({
+    id: `${c.platform}-${c.external_id}`,
+    title: c.title,
+    description: `${getPlatformName(c.platform)} Contest`,
+    platform: c.platform, // 'cf', 'lc', 'cc', 'ac'
+    start_time: c.start_time,
+    duration_seconds: c.duration_seconds,
+    duration_formatted: c.duration_formatted,
+    status: c.status === 'finished' ? 'past' : c.status,
+    type: 'individual',
+    participants: c.participants || 0,
+    url: c.url,
+    external: true
+  });
 
+  // Combined fetch function
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      if (!TOKEN) {
+        console.log('⚠️ User not logged in');
+        setError('Please log in to view contests');
+        setLoading(false);
+        return;
+      }
+
+      console.log('📡 Fetching initial contests data...');
+
+      // 1. Manual contests (from first version)
+      const manualRes = await axios.get('http://localhost:8000/contests/', {
+        headers: { Authorization: `Bearer ${TOKEN}` }
+      });
+      
+      // Filter out test contests (from second version)
+      const regularContests = (manualRes.data.contests || []).filter(contest => 
+        !contest.is_test_contest && contest.visibility !== 'test'
+      ).map(c => ({
+        ...c,
+        external: false,
+        platform: c.platform || 'IUT',
+        id: c.id || `manual-${c._id || Math.random()}`
+      }));
+
+      // 2. Test contests separately (from second version)
+      const testContestsRes = await axios.get('http://localhost:8000/test-contests/my/', {
+        headers: { Authorization: `Bearer ${TOKEN}` }
+      });
+
+      const testContests = (testContestsRes.data.test_contests || []).map(c => ({
+        ...c,
+        is_test_contest: true,
+        external: false
+      }));
+
+      // 3. All external contests in one call (from first version)
+      const externalRes = await axios.get('http://localhost:8000/external/contests/?platform=all', {
+        headers: { Authorization: `Bearer ${TOKEN}` }
+      });
+      
+      // Transform external contests (from second version)
+      const externalContests = (externalRes.data || []).map(contest => ({
+        id: `external_${contest.platform}_${contest.external_id}`,
+        title: contest.title,
+        platform: contest.platform,
+        status: contest.status === 'finished' ? 'past' : contest.status,
+        start_time: contest.start_time,
+        duration_seconds: contest.duration_seconds,
+        duration_formatted: contest.duration_formatted,
+        participants: contest.participants || 0,
+        type: 'individual',
+        is_external: true,
+        external_url: contest.url,
+        description: `External contest from ${getPlatformName(contest.platform)}`,
+        external: true
+      }));
+
+      console.log('✅ Regular contests loaded:', regularContests.length);
+      console.log('✅ Test contests loaded:', testContests.length);
+      console.log('✅ External contests loaded:', externalContests.length);
+
+      // Combine all contests
+      const allContests = [...regularContests, ...testContests, ...externalContests];
+      setContests(allContests);
+
+      // 4. Registrations (only for manual contests)
+      try {
+        const regRes = await axios.get('http://localhost:8000/contests/registrations/', {
+          headers: { Authorization: `Bearer ${TOKEN}` }
+        });
+        console.log('✅ Registrations loaded:', regRes.data.registered_contests?.length || 0);
+        setRegisteredContests(regRes.data.registered_contests || []);
+      } catch (regErr) {
+        console.warn('⚠️ Registrations fetch failed', regErr);
+        setRegisteredContests([]);
+      }
+
+      setError(null);
+    } catch (err) {
+      console.error('❌ Contests fetch failed:', err);
+      setError(err.response?.data?.error || 'Failed to load contests');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
-  // WebSocket connection for real-time updates
+  // WebSocket – only refresh manual contests (from first version with enhancements)
   useEffect(() => {
     console.log('🔌 [WebSocket] Initializing connection...');
     
@@ -128,7 +154,6 @@ const Contests = () => {
 
       ws.onerror = (err) => {
         console.warn('⚠️ [WebSocket] Connection failed (Redis may not be running):', err);
-        // WebSocket failure shouldn't break the app functionality
       };
 
       ws.onclose = (event) => {
@@ -142,47 +167,49 @@ const Contests = () => {
           console.log('📩 [WebSocket] Message received:', data.event);
           
           if (data.event === "contest_list_update") {
-            console.log('🔄 [WebSocket] Updating contest list:', data.contests?.length || 0);
-            setContests(data.contests || []);
+            setContests(prev => {
+              const external = prev.filter(c => c.external || c.is_external);
+              const test = prev.filter(c => c.is_test_contest);
+              const updatedManual = data.contests || [];
+              return [...updatedManual, ...test, ...external];
+            });
           }
-        } catch (error) {
-          console.error('❌ [WebSocket] Error parsing message:', error);
+        } catch (e) {
+          console.error('❌ WS parse error', e);
         }
       };
     } catch (error) {
-      console.warn('⚠️ [WebSocket] Failed to initialize connection (Redis may not be running):', error);
+      console.warn('⚠️ [WebSocket] Failed to initialize connection:', error);
     }
 
-    // Cleanup on unmount
     return () => {
       console.log('🔌 [WebSocket] Cleaning up connection...');
-      if (ws) {
-        ws.close();
-      }
+      if (ws) ws.close();
     };
   }, []);
 
-  // Filter contests based on tab, platform, search query
+  // Filtering with case-insensitive search (from first version)
   useEffect(() => {
-    let filtered = [...contests];
+    let result = [...contests];
 
+    // Status filter
     if (activeTab !== 'all') {
       if (activeTab === 'draft') {
-        filtered = filtered.filter(c => c.status === 'draft');
+        result = result.filter(c => c.status === 'draft' && !c.external && !c.is_external);
       } else {
-        filtered = filtered.filter(c => c.status === activeTab);
+        result = result.filter(c => c.status === activeTab);
       }
     }
 
+    // Platform filter (enhanced from second version)
     if (activePlatform !== 'all') {
-      // Handle platform filtering for both local and external contests
-      filtered = filtered.filter(c => {
+      result = result.filter(c => {
         // For local contests, platform matches directly
-        if (!c.is_external) {
+        if (!c.external && !c.is_external) {
           return c.platform === activePlatform;
         }
         
-        // For external contests, map platform codes to display names
+        // For external contests, map platform codes
         const externalPlatformMap = {
           'cf': 'cf',
           'cc': 'codechef', 
@@ -190,50 +217,55 @@ const Contests = () => {
           'lc': 'leetcode'
         };
         
-        // Check if the contest platform matches the selected platform
         return c.platform === activePlatform || externalPlatformMap[c.platform] === activePlatform;
       });
     }
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(c =>
-        c.title.toLowerCase().includes(query) ||
-        (c.description && c.description.toLowerCase().includes(query))
-      );
+    // Search - Made case-insensitive (from first version)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(c => {
+        const titleMatch = c.title?.toLowerCase().includes(q);
+        const descMatch = c.description?.toLowerCase().includes(q);
+        const platformMatch = getPlatformName(c.platform)?.toLowerCase().includes(q);
+        const statusMatch = c.status?.toLowerCase().includes(q);
+        
+        return titleMatch || descMatch || platformMatch || statusMatch;
+      });
     }
 
-    setFilteredContests(filtered);
+    setFilteredContests(result);
+    setCurrentPage(1); // Reset to first page when filters change
   }, [contests, activeTab, activePlatform, searchQuery]);
 
-  // Pagination effect
+  // Pagination effect (from first and second versions)
   useEffect(() => {
-    // Calculate total pages
     const total = Math.ceil(filteredContests.length / itemsPerPage);
     setTotalPages(total || 1);
     
-    // Adjust current page if it's beyond total pages
     if (currentPage > total && total > 0) {
       setCurrentPage(1);
     }
     
-    // Calculate paginated contests
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const paginated = filteredContests.slice(startIndex, endIndex);
     setPaginatedContests(paginated);
   }, [filteredContests, currentPage, itemsPerPage]);
 
-  const getPlatformName = (platform) => {
-    switch (platform) {
-      case 'IUT': return 'IUT Platform';
-      case 'cf': return 'Codeforces';
-      case 'codechef': return 'CodeChef';
-      case 'atcoder': return 'AtCoder';
-      case 'hackerrank': return 'HackerRank';
-      case 'leetcode': return 'LeetCode';
-      default: return platform || 'Unknown';
-    }
+  const getPlatformName = (p) => {
+    const map = {
+      'IUT': 'IUT Platform',
+      'cf': 'Codeforces',
+      'lc': 'LeetCode',
+      'cc': 'CodeChef',
+      'codechef': 'CodeChef',
+      'ac': 'AtCoder',
+      'atcoder': 'AtCoder',
+      'hackerrank': 'HackerRank',
+      'leetcode': 'LeetCode',
+    };
+    return map[p] || p || 'Unknown';
   };
 
   const getStatusBadge = (status, isTestContest) => {
@@ -244,29 +276,29 @@ const Contests = () => {
       return `${base} bg-purple-50 text-purple-800 border-purple-200`;
     }
     
-    switch (status) {
-      case 'live': return `${base} bg-red-50 text-red-800 border-red-200`;
-      case 'upcoming': return `${base} bg-blue-50 text-blue-800 border-blue-200`;
-      case 'past': return `${base} bg-green-50 text-green-800 border-green-200`;
-      case 'draft': return `${base} bg-yellow-50 text-yellow-800 border-yellow-200`;
-      case 'test': return `${base} bg-purple-50 text-purple-800 border-purple-200`;
-      default: return `${base} bg-gray-50 text-gray-800 border-gray-200`;
-    }
+    const styles = {
+      live: "bg-red-50 text-red-800 border-red-200",
+      upcoming: "bg-blue-50 text-blue-800 border-blue-200",
+      past: "bg-green-50 text-green-800 border-green-200",
+      draft: "bg-yellow-50 text-yellow-800 border-yellow-200",
+      test: "bg-purple-50 text-purple-800 border-purple-200",
+    };
+    return `${base} ${styles[status] || "bg-gray-50 text-gray-800 border-gray-200"}`;
   };
 
-  const formatHourDuration = (contest) => {
-    if (contest.duration_formatted) return contest.duration_formatted;
-    if (contest.duration_seconds) {
-      const totalMin = Math.floor(contest.duration_seconds / 60);
+  const formatHourDuration = (c) => {
+    if (c.duration_formatted) return c.duration_formatted;
+    if (c.duration_seconds) {
+      const totalMin = Math.floor(c.duration_seconds / 60);
       const h = Math.floor(totalMin / 60);
       const m = totalMin % 60;
       if (h > 0 && m > 0) return `${h}h ${m}m`;
       if (h > 0) return `${h}h`;
       if (m > 0) return `${m}m`;
     }
-    if (contest.duration) { // manual fallback
-      const h = Math.floor(contest.duration);
-      const m = Math.round((contest.duration - h) * 60);
+    if (c.duration) {
+      const h = Math.floor(c.duration);
+      const m = Math.round((c.duration - h) * 60);
       if (h > 0 && m > 0) return `${h}h ${m}m`;
       if (h > 0) return `${h}h`;
       if (m > 0) return `${m}m`;
@@ -274,15 +306,16 @@ const Contests = () => {
     return '—';
   };
 
-  const formatDateTime = (date) => {
-    if (!date) return 'Not scheduled';
+  const formatDateTime = (iso) => {
+    if (!iso) return 'Not scheduled';
     try {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return 'Invalid date';
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
-             ' ' + 
-             d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-    } catch (e) {
+      const d = new Date(iso);
+      if (isNaN(d)) return 'Invalid date';
+      return d.toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true
+      });
+    } catch {
       return 'Invalid date';
     }
   };
@@ -299,94 +332,101 @@ const Contests = () => {
     }
   };
 
-  const handleContestEntry = async (contestId, contestStatus, contestData) => {
-    console.log('🎯 Contest entry:', { contestId, contestStatus, contestData });
-    
-    // Handle external contests - navigate to contest detail page
-    if (contestData?.is_external) {
-      console.log('🌍 Navigating to external contest detail:', contestId);
-      // Navigate to a special external contest detail page
-      navigate(`/external-contests/${encodeURIComponent(contestId)}`);
+  // Publish draft function (from third version)
+  const handlePublishDraft = async (contestId) => {
+    if (window.confirm("Publish this draft contest? Once published, it will be visible to users.")) {
+      try {
+        await axios.post(
+          `http://localhost:8000/contests/${contestId}/publish/`,
+          { type: "final" },
+          { headers: { Authorization: `Bearer ${TOKEN}` } }
+        );
+        alert("Contest published successfully!");
+        fetchData(); // Refresh contests list
+      } catch (err) {
+        console.error('Failed to publish contest:', err);
+        alert(err.response?.data?.error || "Failed to publish contest");
+      }
+    }
+  };
+
+  // Combined contest entry handler
+  const handleContestEntry = async (contest, e) => {
+    e?.stopPropagation?.();
+    const { id, status, external, is_external, external_url } = contest;
+
+    console.log('🎯 Contest entry:', { id, status, external, is_external });
+
+    // Handle external contests
+    if ((external || is_external) && external_url) {
+      window.open(external_url, '_blank');
       return;
     }
-    
+
     // If it's a draft, navigate to edit page
-    if (contestStatus === 'draft') {
-      navigate(`/contests/${contestId}/edit`);
+    if (status === 'draft') {
+      navigate(`/contests/${id}/edit`);
       return;
     }
-    
-    // Check if it's a test contest by looking for specific fields
-    const isTestContest = contestData && (
-      contestData.is_test_contest || 
-      contestData.visibility === 'test' || 
-      contestData.original_contest_id !== undefined
+
+    // Check if it's a test contest
+    const isTestContest = contest && (
+      contest.is_test_contest || 
+      contest.visibility === 'test' || 
+      contest.original_contest_id !== undefined
     );
-    
+
     console.log('🔍 Contest type check:', { 
       isTestContest, 
-      contestId,
-      hasIsTestField: contestData?.is_test_contest,
-      visibility: contestData?.visibility,
-      hasOriginalId: contestData?.original_contest_id !== undefined
+      id,
+      hasIsTestField: contest?.is_test_contest,
+      visibility: contest?.visibility,
+      hasOriginalId: contest?.original_contest_id !== undefined
     });
-    
+
     // If it's a test contest, navigate to test contest page
     if (isTestContest) {
-      console.log('🔧 Navigating to test contest page:', contestId);
-      navigate(`/test-contests/${contestId}/problems`);
+      console.log('🔧 Navigating to test contest page:', id);
+      navigate(`/test-contests/${id}/problems`);
       return;
     }
-    
+
     // Regular contest flow...
-    try {
-      const problemsRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/problems/`,
-        { headers: { Authorization: `Bearer ${TOKEN}` } }
-      );
-      
-      const problems = problemsRes.data.problems || [];
-      
-      if (problems.length === 0) {
-        alert('This contest has no problems yet.');
-        return;
-      }
-      
-      navigate(`/contests/${contestId}`);
-      
-    } catch (error) {
-      console.error('Error fetching contest problems:', error);
-      
-      if (error.response?.status === 403) {
-        const errorData = error.response.data;
+    if (status === 'upcoming' || status === 'live' || status === 'past') {
+      try {
+        const res = await axios.get(
+          `http://localhost:8000/contests/${id}/problems/`,
+          { headers: { Authorization: `Bearer ${TOKEN}` } }
+        );
         
-        if (errorData.can_register) {
-          const shouldRegister = window.confirm(
-            `You need to register for this ${contestStatus} contest. Register now?`
-          );
-          
-          if (shouldRegister) {
+        if ((res.data.problems || []).length === 0 && status !== 'past') {
+          alert('No problems available yet.');
+          return;
+        }
+        
+        navigate(`/contests/${id}`);
+        
+      } catch (err) {
+        if (err.response?.status === 403 && err.response.data?.can_register) {
+          const ok = window.confirm(`Register for this ${status} contest?`);
+          if (ok) {
             try {
               await axios.post(
-                `http://localhost:8000/contests/${contestId}/register/`,
+                `http://localhost:8000/contests/${id}/register/`,
                 {},
                 { headers: { Authorization: `Bearer ${TOKEN}` } }
               );
-              
               await refreshRegisteredContests();
-              alert('Successfully registered! You can now enter the contest.');
-              navigate(`/contests/${contestId}`);
-              
-            } catch (registerError) {
-              console.error('Registration error:', registerError);
-              navigate(`/contests/${contestId}/register`);
+              alert('Successfully registered!');
+              navigate(`/contests/${id}`);
+            } catch (regErr) {
+              alert('Registration failed.');
+              navigate(`/contests/${id}/register`);
             }
           }
         } else {
-          alert(errorData.message || 'Access denied to this contest.');
+          alert(err.response?.data?.message || 'Cannot access contest.');
         }
-      } else {
-        alert('Failed to load contest. Please try again.');
       }
     }
   };
@@ -396,7 +436,7 @@ const Contests = () => {
     navigate(`/contests/${contestId}/edit`);
   };
 
-  // Pagination handlers
+  // Pagination handlers (from first version)
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -411,7 +451,7 @@ const Contests = () => {
   const handleItemsPerPageChange = (e) => {
     const value = parseInt(e.target.value);
     setItemsPerPage(value);
-    setCurrentPage(1); // Reset to first page when changing items per page
+    setCurrentPage(1);
   };
 
   // Generate page numbers for pagination
@@ -462,8 +502,8 @@ const Contests = () => {
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">Error Loading Contests</h3>
           <p className="text-gray-600 text-sm text-center">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
+          <button
+            onClick={fetchData}
             className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors"
           >
             Retry
@@ -513,13 +553,14 @@ const Contests = () => {
                       type="text"
                       placeholder="Search contests..."
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={e => setSearchQuery(e.target.value)}
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
                     />
                   </div>
                 </div>
               </div>
 
+              {/* Tabs */}
               <div className="flex space-x-1 mt-4 bg-gray-100 rounded-lg p-1">
                 {statusTabs.map(tab => (
                   <button
@@ -552,115 +593,121 @@ const Contests = () => {
                   </p>
                 </div>
               ) : (
-                paginatedContests.map(contest => (
-                  <div 
-                    key={contest.id} 
+                paginatedContests.map(c => (
+                  <div
+                    key={c.id}
                     className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200"
-                    style={{ 
-                      cursor: contest.status === 'upcoming' ? 'default' : 'pointer'
+                    style={{
+                      cursor: c.status === 'upcoming' ? 'default' : 'pointer'
+                    }}
+                    onClick={(e) => {
+                      if (c.status !== 'upcoming' && c.status !== 'draft') {
+                        handleContestEntry(c, e);
+                      }
                     }}
                   >
                     <div className="p-4 flex justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-1">
-                          <h3 className="text-xs font-semibold truncate text-gray-900">{contest.title}
-                            {(contest.visibility === 'test' || contest.is_test_contest) && (
+                          <h3 className="text-xs font-semibold truncate text-gray-900">
+                            {c.title}
+                            {/* Only show TEST badge for test contests, removed EXTERNAL badge */}
+                            {(c.visibility === 'test' || c.is_test_contest) && (
                               <span className="ml-2 bg-purple-100 text-purple-900 text-[10px] px-1.5 py-0.5 rounded font-semibold">
                                 TEST
                               </span>
                             )}
-                            {contest.is_external && (
-                              <span className="ml-2 bg-blue-100 text-blue-900 text-[10px] px-1.5 py-0.5 rounded font-semibold">
-                                EXTERNAL
-                              </span>
-                            )}
                           </h3>
-
-                          <span className={getStatusBadge(contest.status, contest.visibility === 'test' || contest.is_test_contest)}>
-                            {contest.status.toUpperCase()}
+                          <span className={getStatusBadge(c.status, c.visibility === 'test' || c.is_test_contest)}>
+                            {c.status.toUpperCase()}
                           </span>
                         </div>
                         <p className="text-xs text-gray-600 mb-2">
-                          {getPlatformName(contest.platform)} • {contest.type === 'individual' ? 'Individual' : 'Team'}
+                          {getPlatformName(c.platform)} • {c.type === 'individual' ? 'Individual' : 'Team'}
                         </p>
+
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <span className="flex items-center space-x-1">
                             <Calendar className="w-3 h-3" />
-                            <span>{formatDateTime(contest.start_time)}</span>
+                            <span>{formatDateTime(c.start_time)}</span>
                           </span>
                           <span className="flex items-center space-x-1">
                             <Clock className="w-3 h-3" />
-                            <span>{formatHourDuration(contest)}</span>
+                            <span>{formatHourDuration(c)}</span>
                           </span>
-                          <span className="flex items-center space-x-1">
-                            <Users className="w-3 h-3" />
-                            <span>{contest.participants || 0} participants</span>
-                          </span>
+                          {!c.external && !c.is_external && (
+                            <span className="flex items-center space-x-1">
+                              <Users className="w-3 h-3" />
+                              <span>{c.participants || 0} participants</span>
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex flex-col space-y-2 ml-4" onClick={(e) => e.stopPropagation()}>
-                        {contest.is_external ? (
-                          // EXTERNAL CONTEST BUTTONS
+                      {/* Actions */}
+                      <div className="flex flex-col space-y-2 ml-4" onClick={e => e.stopPropagation()}>
+                        {c.external || c.is_external ? (
                           <button
-                            onClick={() => handleContestEntry(contest.id, contest.status, contest)}
+                            onClick={() => window.open(c.external_url || c.url, '_blank')}
                             className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-green-700 transition-colors duration-200 flex items-center space-x-1"
                           >
                             <ExternalLink className="w-3 h-3" />
                             <span>Visit</span>
                           </button>
-                        ) : contest.status === 'draft' ? (
-                          // Draft contest buttons: Edit and Publish
+                        ) : c.status === 'draft' ? (
                           <div className="flex space-x-2">
                             <button
-                              onClick={(e) => handleDraftEdit(contest.id, e)}
+                              onClick={(e) => handleDraftEdit(c.id, e)}
                               className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-1"
                             >
                               <Edit className="w-3 h-3" />
                               <span>Edit</span>
                             </button>
-                          </div>
-                        ) : contest.visibility === 'test' || contest.is_test_contest ? (
-                          // TEST CONTEST BUTTONS (no registration needed)
-                          contest.status === 'live' ? (
                             <button
-                              onClick={() => handleContestEntry(contest.id, 'live', contest)}
+                              onClick={(e) => handlePublishDraft(c.id, e)}
+                              className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-green-700 transition-colors duration-200"
+                            >
+                              Publish
+                            </button>
+                          </div>
+                        ) : c.visibility === 'test' || c.is_test_contest ? (
+                          c.status === 'live' ? (
+                            <button
+                              onClick={(e) => handleContestEntry(c, e)}
                               className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-1"
                             >
                               <Play className="w-3 h-3" />
                               <span>Enter</span>
                             </button>
-                          ) : contest.status === 'upcoming' ? (
+                          ) : c.status === 'upcoming' ? (
                             <span className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-xs font-medium border border-gray-200">
                               Upcoming
                             </span>
-                          ) : contest.status === 'past' ? (
+                          ) : c.status === 'past' ? (
                             <button 
-                              onClick={() => handleContestEntry(contest.id, 'past', contest)}
+                              onClick={(e) => handleContestEntry(c, e)}
                               className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200 flex items-center justify-center space-x-1"
                             >
                               <Eye className="w-3 h-3" />
                               View
                             </button>
                           ) : null
-                        ) : contest.status === 'upcoming' ? (
-                          // REGULAR CONTEST - Upcoming (needs registration)
-                          registeredContests.includes(contest.id) ? (
+                        ) : c.status === 'upcoming' ? (
+                          registeredContests.includes(c.id) ? (
                             <span className="px-3 py-1.5 bg-gray-300 text-gray-600 rounded text-xs font-medium">Registered</span>
                           ) : (
                             <button
-                              onClick={() => navigate(`/contests/${contest.id}/register`)}
+                              onClick={() => navigate(`/contests/${c.id}/register`)}
                               className="bg-blue-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-900 transition-colors duration-200 flex items-center space-x-1"
                             >
                               <Eye className="w-3 h-3" />
                               <span>Register</span>
                             </button>
                           )
-                        ) : contest.status === 'live' ? (
-                          // REGULAR CONTEST - Live
-                          registeredContests.includes(contest.id) ? (
+                        ) : c.status === 'live' ? (
+                          registeredContests.includes(c.id) ? (
                             <button
-                              onClick={() => handleContestEntry(contest.id, 'live', contest)}
+                              onClick={(e) => handleContestEntry(c, e)}
                               className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-1"
                             >
                               <Play className="w-3 h-3" />
@@ -668,25 +715,24 @@ const Contests = () => {
                             </button>
                           ) : (
                             <button
-                              onClick={() => navigate(`/contests/${contest.id}/register`)}
+                              onClick={() => navigate(`/contests/${c.id}/register`)}
                               className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-orange-700 transition-colors duration-200 flex items-center space-x-1"
                             >
                               <Eye className="w-3 h-3" />
                               <span>Live</span>
                             </button>
                           )
-                        ) : contest.status === 'past' ? (
-                          // Past contest buttons
+                        ) : c.status === 'past' ? (
                           <div className="flex flex-col space-y-2">
                             <button 
-                              onClick={() => handleContestEntry(contest.id, 'past', contest)}
+                              onClick={(e) => handleContestEntry(c, e)}
                               className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-900 transition-colors duration-200 flex items-center justify-center space-x-1"
                             >
-                             <Eye className="w-3 h-3" />
-                             <span>View</span>
+                              <Eye className="w-3 h-3" />
+                              <span>View</span>
                             </button>
                             <button 
-                              onClick={() => navigate(`/contests/${contest.id}/recordings`)}
+                              onClick={() => navigate(`/contests/${c.id}/recordings`)}
                               className="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-purple-700 transition-colors duration-200 flex items-center justify-center space-x-1"
                             >
                               <Video className="w-3 h-3" />
@@ -701,7 +747,7 @@ const Contests = () => {
               )}
             </div>
 
-            {/* Pagination Controls - Only show if we have more than 1 page */}
+            {/* Pagination Controls */}
             {totalPages > 1 && filteredContests.length > 0 && (
               <div className="bg-white rounded-lg border border-gray-200 mt-4 p-4">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -710,7 +756,6 @@ const Contests = () => {
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    {/* First Page */}
                     <button
                       onClick={goToFirstPage}
                       disabled={currentPage === 1}
@@ -723,7 +768,6 @@ const Contests = () => {
                       <ChevronsLeft className="w-4 h-4" />
                     </button>
                     
-                    {/* Previous Page */}
                     <button
                       onClick={goToPrevPage}
                       disabled={currentPage === 1}
@@ -736,7 +780,6 @@ const Contests = () => {
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     
-                    {/* Page Numbers */}
                     <div className="flex items-center space-x-1">
                       {getPageNumbers().map(pageNum => (
                         <button
@@ -753,7 +796,6 @@ const Contests = () => {
                       ))}
                     </div>
                     
-                    {/* Next Page */}
                     <button
                       onClick={goToNextPage}
                       disabled={currentPage === totalPages}
@@ -766,7 +808,6 @@ const Contests = () => {
                       <ChevronRight className="w-4 h-4" />
                     </button>
                     
-                    {/* Last Page */}
                     <button
                       onClick={goToLastPage}
                       disabled={currentPage === totalPages}
@@ -780,7 +821,6 @@ const Contests = () => {
                     </button>
                   </div>
                   
-                  {/* Page info */}
                   <div className="text-xs text-gray-600">
                     Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
                   </div>
@@ -789,22 +829,23 @@ const Contests = () => {
             )}
           </div>
 
+          {/* Sidebar */}
           <div className="lg:col-span-3 space-y-4">
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="p-3 border-b border-gray-200">
                 <h2 className="text-xs font-semibold text-gray-900 mb-3">Filter by Platform</h2>
                 <div className="space-y-1">
-                  {['all','IUT','cf','codechef','atcoder','leetcode'].map(platform => (
+                  {['all', 'IUT', 'cf', 'codechef', 'atcoder', 'leetcode'].map(p => (
                     <button
-                      key={platform}
-                      onClick={() => setActivePlatform(platform)}
+                      key={p}
+                      onClick={() => setActivePlatform(p)}
                       className={`w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors duration-200 ${
-                        activePlatform === platform
+                        activePlatform === p
                           ? 'bg-blue-50 text-blue-800 border border-blue-200'
                           : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
-                      <span>{platform === 'all' ? 'All Platforms' : getPlatformName(platform)}</span>
+                      <span>{p === 'all' ? 'All Platforms' : getPlatformName(p)}</span>
                     </button>
                   ))}
                 </div>
@@ -813,6 +854,7 @@ const Contests = () => {
 
             <Sidebar />
           </div>
+
         </div>
       </div>
     </div>
