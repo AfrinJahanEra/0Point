@@ -102,99 +102,101 @@ const CreateBlog = () => {
 
   const togglePreview = () => setShowPreview(!showPreview);
 
-  // Function to render Codeforces tags as React components
-  const renderCodeforcesTag = (type, value) => {
+  // Function to render Codeforces tags as React components with new display format
+  const renderCodeforcesTag = (type, value, isPreview = false) => {
     const trimmedValue = value.trim();
+    
+    let displayText = trimmedValue;
+    let linkTo = '';
     
     switch (type) {
       case 'user':
-        return (
-          <Link 
-            to={`/profile/${trimmedValue}`} 
-            className="text-blue-600 hover:text-blue-800 hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {trimmedValue}
-          </Link>
-        );
+        linkTo = `/profile/${trimmedValue}`;
+        displayText = isPreview ? `user - ${trimmedValue}` : trimmedValue;
+        break;
         
       case 'submission':
-        // Handle both formats: [submission:contests/contest_id/submissions] and [submission:id]
+        // Handle format: [submission:contests/contest_id/submissions]
         const submissionMatch = trimmedValue.match(/^contests\/([^\/]+)\/submissions$/);
         if (submissionMatch) {
           const contestId = submissionMatch[1];
-          return (
-            <Link 
-              to={`/contests/${contestId}/submissions`} 
-              className="text-blue-600 hover:text-blue-800 hover:underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Submissions
-            </Link>
-          );
+          linkTo = `/contests/${contestId}/submissions`;
+          displayText = isPreview ? `submission - ${contestId}` : 'Submissions';
+        } else {
+          // Simple submission ID format
+          linkTo = `/submissions/${trimmedValue}`;
+          displayText = isPreview ? `submission - ${trimmedValue}` : `#${trimmedValue}`;
         }
-        // Simple submission ID format
-        return (
-          <Link 
-            to={`/submissions/${trimmedValue}`} 
-            className="text-blue-600 hover:text-blue-800 hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            #{trimmedValue}
-          </Link>
-        );
+        break;
         
       case 'problem':
-        // Check if it's in format "contests/contest_id/problems/problem_index"
+        // Handle format: [problem:contests/contest_id/problems/problem_index]
         const problemMatch = trimmedValue.match(/^contests\/([^\/]+)\/problems\/(.+)$/);
         if (problemMatch) {
-          const [, contestId, problemIndex] = problemMatch;
-          return (
-            <Link 
-              to={`/contests/${contestId.trim()}/problems/${problemIndex.trim()}`} 
-              className="text-blue-600 hover:text-blue-800 hover:underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Problem {problemIndex.trim()}
-            </Link>
-          );
+          const contestId = problemMatch[1];
+          const problemIndex = problemMatch[2];
+          linkTo = `/contests/${contestId}/problems/${problemIndex}`;
+          displayText = isPreview ? `problem - ${contestId}/${problemIndex}` : `Problem ${problemIndex}`;
+        } else {
+          // Simple problem code format
+          linkTo = `/problems/${trimmedValue}`;
+          displayText = isPreview ? `problem - ${trimmedValue}` : trimmedValue;
         }
-        // Simple problem code format
-        return (
-          <Link 
-            to={`/problems/${trimmedValue}`} 
-            className="text-blue-600 hover:text-blue-800 hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {trimmedValue}
-          </Link>
-        );
+        break;
         
       case 'contest':
-        return (
-          <Link 
-            to={`/contests/${trimmedValue}`} 
-            className="text-blue-600 hover:text-blue-800 hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            Contest {trimmedValue}
-          </Link>
-        );
+        linkTo = `/contests/${trimmedValue}`;
+        displayText = isPreview ? `contest - ${trimmedValue}` : `Contest ${trimmedValue}`;
+        break;
         
       case 'standings':
-        return (
-          <Link 
-            to={`/contests/${trimmedValue}/standings`} 
-            className="text-blue-600 hover:text-blue-800 hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            Standings {trimmedValue}
-          </Link>
-        );
+        linkTo = `/contests/${trimmedValue}/standings`;
+        displayText = isPreview ? `standings - ${trimmedValue}` : `Standings ${trimmedValue}`;
+        break;
         
       default:
         return <span>[{type}:{trimmedValue}]</span>;
     }
+    
+    if (isPreview) {
+      return (
+        <Link 
+          to={linkTo} 
+          className="text-blue-600 hover:text-blue-800 hover:underline font-medium inline-flex items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {type === 'user' && (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            </svg>
+          )}
+          {type === 'submission' && (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+            </svg>
+          )}
+          {type === 'problem' && (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+            </svg>
+          )}
+          {type === 'contest' && (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+            </svg>
+          )}
+          {type === 'standings' && (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+          )}
+          {displayText}
+        </Link>
+      );
+    }
+    
+    // For non-preview (when editing), show the tag as is
+    return <span className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono">[{type}:{trimmedValue}]</span>;
   };
 
   const customComponents = {
@@ -233,7 +235,7 @@ const CreateBlog = () => {
                 const [, type, value] = match;
                 return (
                   <React.Fragment key={`${index}-${partIndex}`}>
-                    {renderCodeforcesTag(type, value)}
+                    {renderCodeforcesTag(type, value, showPreview)}
                   </React.Fragment>
                 );
               }
@@ -254,7 +256,7 @@ const CreateBlog = () => {
       // Check if it's a Codeforces tag link
       if (href && (href.startsWith('/profile/') || href.startsWith('/contests/') || href.startsWith('/problems/') || href.startsWith('/submissions/'))) {
         return (
-          <Link to={href} className="text-blue-600 hover:text-blue-800 hover:underline" {...props}>
+          <Link to={href} className="text-blue-600 hover:text-blue-800 hover:underline font-medium" {...props}>
             {children}
           </Link>
         );
@@ -301,7 +303,7 @@ const CreateBlog = () => {
           const [, type, value] = cfTagMatch;
           return (
             <React.Fragment>
-              {renderCodeforcesTag(type, value)}
+              {renderCodeforcesTag(type, value, showPreview)}
             </React.Fragment>
           );
         }
@@ -391,7 +393,7 @@ const CreateBlog = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen bg-gray-50 ${showPreview ? '' : ''}`}>
       <div className="max-w-[1920px] mx-auto pl-10 pr-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Main Content */}
@@ -442,12 +444,12 @@ const CreateBlog = () => {
                     rows={12}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md font-mono"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300 rounded-md font-mono scrollbar-thin"
                     placeholder="Write your blog content here"
                     required
                   />
                 ) : (
-                  <div className="w-full p-4 border border-gray-300 rounded-md bg-white min-h-[300px] prose prose-sm max-w-none">
+                  <div className="w-full p-4 border border-gray-300 rounded-md bg-white min-h-[300px] prose prose-sm max-w-none overflow-y-auto scrollbar-thin">
                     <ReactMarkdown
                       remarkPlugins={[remarkMath, remarkBreaks]}
                       rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
@@ -502,7 +504,7 @@ const CreateBlog = () => {
                       />
 
                       {showSuggestions && suggestions.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto scrollbar-thin">
                           {suggestions.map(username => (
                             <div
                               key={username}
@@ -569,6 +571,33 @@ const CreateBlog = () => {
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 3px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 3px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
+        
+        /* For Firefox */
+        .scrollbar-thin {
+          scrollbar-width: thin;
+          scrollbar-color: #888 #f1f1f1;
+        }
+      `}</style>
     </div>
   );
 };
