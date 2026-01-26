@@ -42,6 +42,9 @@ const CreateContest = () => {
   const navigate = useNavigate();
   const { contestId } = useParams();
   const [activeProblem, setActiveProblem] = useState(null);
+  
+  // Backend URL configuration
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
   // Add this with other state declarations
 const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('problems'); // 'problems', 'tutorial', or 'publish'
@@ -189,7 +192,7 @@ useEffect(() => {
     const fetchContestForEdit = async () => {
       setLoadingContest(true);
       try {
-        const response = await fetch(`http://localhost:8000/contests/${contestId}/`, {
+        const response = await fetch(`${backendUrl}/contests/${contestId}/`, {
           headers: { 
             "Authorization": `Bearer ${localStorage.getItem('token')}`
           }
@@ -212,7 +215,7 @@ useEffect(() => {
         });
         
         // Now fetch problems for the contest
-        const problemsResponse = await fetch(`http://localhost:8000/contests/${contestId}/problems/`, {
+        const problemsResponse = await fetch(`${backendUrl}/contests/${contestId}/problems/`, {
           headers: { 
             "Authorization": `Bearer ${localStorage.getItem('token')}`
           }
@@ -227,7 +230,7 @@ useEffect(() => {
               problemsData.problems.map(async (problem, index) => {
                 // Fetch detailed problem data for test cases AND tutorial
                 const problemDetailResponse = await fetch(
-                  `http://localhost:8000/contests/${contestId}/problems/${problem.code}/`,
+                  `${backendUrl}/contests/${contestId}/problems/${problem.code}/`,
                   {
                     headers: { 
                       "Authorization": `Bearer ${localStorage.getItem('token')}`
@@ -470,11 +473,11 @@ const formattedProblems = problems.map((problem) => ({
   console.log("DEBUG: Payload being sent:", JSON.stringify(payload, null, 2));
 
   try {
-    let url = "http://localhost:8000/contests/create-full/";
+    let url = `${backendUrl}/contests/create-full/`;
     let method = "POST";
     
     if (editMode && contestId) {
-      url = `http://localhost:8000/contests/${contestId}/update/`;
+      url = `${backendUrl}/contests/${contestId}/update/`;
       method = "PATCH";  // Or "PUT" depending on your backend
     }
 
@@ -652,7 +655,7 @@ const handlePublishContest = async (type) => {
         payload.testStartTime = publishSettings.testStartTime + ":00Z";
       }
       
-      url = `http://localhost:8000/contests/${contestId}/publish/`;
+      url = `${backendUrl}/contests/${contestId}/publish/`;
       method = "POST";
     } else {
       // CREATE NEW MODE: Send full contest data
@@ -682,7 +685,7 @@ const handlePublishContest = async (type) => {
         payload.type = "test";
       }
 
-      url = "http://localhost:8000/contests/create-full/";
+      url = `${backendUrl}/contests/create-full/`;
       method = "POST";
     }
 
@@ -758,7 +761,7 @@ const handlePublishContest = async (type) => {
       expected_output: testCase.output
     };
 
-    const response = await fetch('http://localhost:8000/contests/test-execute/', {
+    const response = await fetch(`${backendUrl}/contests/test-execute/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

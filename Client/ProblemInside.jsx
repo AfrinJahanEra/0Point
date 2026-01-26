@@ -24,6 +24,9 @@ const ProblemInside = () => {
   const { contestId, problemIndex } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  
+  // Backend URL configuration
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
   const [contestData, setContestData] = useState(null);
   const [problemData, setProblemData] = useState(null);
   const [problemsList, setProblemsList] = useState([]);
@@ -47,7 +50,7 @@ const ProblemInside = () => {
     try {
       const problemIdentifier = problemData?.problem_index || problemIndex;
       const statsRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/problems/${problemIdentifier}/stats/`,
+        `${backendUrl}/contests/${contestId}/problems/${problemIdentifier}/stats/`,
         { headers: { Authorization: `Bearer ${TOKEN}` } }
       );
       
@@ -118,7 +121,7 @@ const ProblemInside = () => {
         // 1. Fetch contest problems list
         console.log('Fetching contest problems...');
         const problemsRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/problems/`,
+          `${backendUrl}/contests/${contestId}/problems/`,
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
         
@@ -157,7 +160,7 @@ const ProblemInside = () => {
           console.log('Fetching specific problem:', problemToFetch);
           try {
             const problemRes = await axios.get(
-              `http://localhost:8000/contests/${contestId}/problems/${problemToFetch}/`,
+              `${backendUrl}/contests/${contestId}/problems/${problemToFetch}/`,
               { headers: { Authorization: `Bearer ${TOKEN}` } }
             );
             
@@ -283,7 +286,7 @@ const ProblemInside = () => {
   const refreshProblemStatus = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:8000/contests/${contestId}/problems/`,
+        `${backendUrl}/contests/${contestId}/problems/`,
         { headers: { Authorization: `Bearer ${TOKEN}` } }
       );
       if (response.data.problems) {
@@ -320,7 +323,7 @@ const handleRun = async () => {
     console.log('Running code with data:', runData);
     
     const response = await axios.post(
-      `http://localhost:8000/contests/${contestId}/execute/`,
+      `${backendUrl}/contests/${contestId}/execute/`,
       runData,
       { 
         headers: { 
@@ -376,7 +379,7 @@ const handleSubmit = async () => {
     console.log('Submitting code:', submitData);
     
     const response = await axios.post(
-      `http://localhost:8000/contests/${contestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
+      `${backendUrl}/contests/${contestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
       submitData,
       { 
         headers: { 
@@ -435,7 +438,7 @@ const getVersionIndex = (lang) => {
 const fetchUserProblemStatus = async () => {
   try {
     const response = await axios.get(
-      `http://localhost:8000/contests/${contestId}/problems/status/`,
+      `${backendUrl}/contests/${contestId}/problems/status/`,
       { headers: { Authorization: `Bearer ${TOKEN}` } }
     );
     setUserStatus(response.data.problem_statuses || {});
