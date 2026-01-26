@@ -227,8 +227,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Dhaka'   # ✅ CHANGE THIS
-USE_TZ = True             # ✅ CHANGE THIS
+TIME_ZONE = 'Asia/Dhaka'   
+USE_TZ = True             
 
 USE_I18N = True
 
