@@ -20,7 +20,8 @@ class CreateSession(APIView):
             candidate_email=candidate_email
         )
 
-        base_url = 'http://localhost:5173/interview-room/' + str(session.id)
+        frontend_base_url = os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173')
+        base_url = f'{frontend_base_url}/interview-room/' + str(session.id)
         interviewer_link = base_url + '?role=interviewer'
         candidate_link = base_url + '?role=client'
 

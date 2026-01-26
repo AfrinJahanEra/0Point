@@ -17,12 +17,24 @@ class InterviewSessionSerializer(serializers.ModelSerializer):
     
     def get_interviewer_link(self, obj):
         request = self.context.get('request')
-        base_url = request.build_absolute_uri('/') if request else 'http://localhost:5173/'
+        if request:
+            base_url = request.build_absolute_uri('/')
+        else:
+            import os
+            base_url = os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173/')
+            if not base_url.endswith('/'):
+                base_url += '/'
         return f"{base_url}interview-room?session-id={obj.id}&role=interviewer"
     
     def get_candidate_link(self, obj):
         request = self.context.get('request')
-        base_url = request.build_absolute_uri('/') if request else 'http://localhost:5173/'
+        if request:
+            base_url = request.build_absolute_uri('/')
+        else:
+            import os
+            base_url = os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173/')
+            if not base_url.endswith('/'):
+                base_url += '/'
         return f"{base_url}interview-room?session-id={obj.id}&role=candidate"
     
     def get_participants_count(self, obj):
