@@ -6,6 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from videoconference.models import VideoSession
 import uuid
+import os
 
 @method_decorator(csrf_exempt, name='dispatch')
 class CreateSession(APIView):
