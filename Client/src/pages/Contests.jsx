@@ -17,6 +17,9 @@ const Contests = () => {
   const [registeredContests, setRegisteredContests] = useState([]);
   const navigate = useNavigate();
   
+  // Backend URL configuration
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+  
   // Get URL parameters
   const [searchParams, setSearchParams] = useSearchParams();
   const urlTab = searchParams.get('tab');
@@ -65,7 +68,7 @@ const Contests = () => {
       console.log('📡 Fetching initial contests data...');
 
       // 1. Manual contests (from first version)
-      const manualRes = await axios.get('http://localhost:8000/contests/', {
+      const manualRes = await axios.get(`${backendUrl}/contests/`, {
         headers: { Authorization: `Bearer ${TOKEN}` }
       });
       
@@ -80,7 +83,7 @@ const Contests = () => {
       }));
 
       // 2. Test contests separately (from second version)
-      const testContestsRes = await axios.get('http://localhost:8000/test-contests/my/', {
+      const testContestsRes = await axios.get(`${backendUrl}/test-contests/my/`, {
         headers: { Authorization: `Bearer ${TOKEN}` }
       });
 
@@ -91,7 +94,7 @@ const Contests = () => {
       }));
 
       // 3. All external contests in one call (from first version)
-      const externalRes = await axios.get('http://localhost:8000/external/contests/?platform=all', {
+      const externalRes = await axios.get(`${backendUrl}/external/contests/?platform=all`, {
         headers: { Authorization: `Bearer ${TOKEN}` }
       });
       
@@ -122,7 +125,7 @@ const Contests = () => {
 
       // 4. Registrations (only for manual contests)
       try {
-        const regRes = await axios.get('http://localhost:8000/contests/registrations/', {
+        const regRes = await axios.get(`${backendUrl}/contests/registrations/`, {
           headers: { Authorization: `Bearer ${TOKEN}` }
         });
         console.log('✅ Registrations loaded:', regRes.data.registered_contests?.length || 0);
@@ -371,7 +374,7 @@ const Contests = () => {
 
   const refreshRegisteredContests = async () => {
     try {
-      const registrationsRes = await axios.get('http://localhost:8000/contests/registrations/', {
+      const registrationsRes = await axios.get(`${backendUrl}/contests/registrations/`, {
         headers: { Authorization: `Bearer ${TOKEN}` }
       });
       console.log('✅ Updated registrations:', registrationsRes.data.registered_contests?.length || 0);
@@ -386,7 +389,7 @@ const Contests = () => {
     if (window.confirm("Publish this draft contest? Once published, it will be visible to users.")) {
       try {
         await axios.post(
-          `http://localhost:8000/contests/${contestId}/publish/`,
+          `${backendUrl}/contests/${contestId}/publish/`,
           { type: "final" },
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
@@ -444,7 +447,7 @@ const Contests = () => {
     if (status === 'upcoming' || status === 'live' || status === 'past') {
       try {
         const res = await axios.get(
-          `http://localhost:8000/contests/${id}/problems/`,
+          `${backendUrl}/contests/${id}/problems/`,
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
         
@@ -461,7 +464,7 @@ const Contests = () => {
           if (ok) {
             try {
               await axios.post(
-                `http://localhost:8000/contests/${id}/register/`,
+                `${backendUrl}/contests/${id}/register/`,
                 {},
                 { headers: { Authorization: `Bearer ${TOKEN}` } }
               );

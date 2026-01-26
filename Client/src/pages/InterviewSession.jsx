@@ -26,6 +26,10 @@ const InterviewSession = () => {
   const role = searchParams.get('role');
   const email = searchParams.get('email') ||
     (role === 'interviewer' ? 'interviewer@example.com' : 'candidate@example.com');
+  
+  // Backend URL configuration
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+    (role === 'interviewer' ? 'interviewer@example.com' : 'candidate@example.com');
 
   // Video refs
   const localVideoRef = useRef(null);
@@ -804,7 +808,7 @@ const InterviewSession = () => {
 
   const renderPDFViewer = () => {
     const absolutePdfUrl = pdfUrl 
-      ? (pdfUrl.startsWith('http') ? pdfUrl : `http://localhost:8000${pdfUrl}`)
+      ? (pdfUrl.startsWith('http') ? pdfUrl : `${backendUrl}${pdfUrl}`)
       : null;
 
     return (
