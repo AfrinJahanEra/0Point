@@ -34,6 +34,7 @@ const InterviewSession = () => {
   const ws = useRef(null);
   const codeWs = useRef(null);
   const streamRef = useRef(null);
+  const connectedParticipantsRef = useRef({});
 
   // Media state
   const [localAudioActive, setLocalAudioActive] = useState(false);
@@ -121,7 +122,7 @@ const InterviewSession = () => {
   }, []);
 
 
-  const handlePDFUpload = async (e) => {
+  const handlePDFUpload = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.pdf')) {
@@ -155,7 +156,30 @@ const InterviewSession = () => {
       console.error('PDF upload failed:', err);
       alert(`Failed to upload PDF: ${err.message}`);
     }
-  };
+  }, [sessionId]);
+
+  const createAndSendOffer = useCallback(async () => {
+    if (!pc.current || pc.current.signalingState !== 'stable') {
+      console.log('PeerConnection not ready for offer');
+      return;
+    }
+    
+    try {
+      console.log('Creating offer...');
+      const offer = await pc.current.createOffer();
+      await pc.current.setLocalDescription(offer);
+      
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({
+          type: 'offer',
+          offer: pc.current.localDescription
+        }));
+        console.log('Offer sent to remote participant');
+      }
+    } catch (err) {
+      console.error('Failed to create offer:', err);
+    }
+  }, []);
 
   const fetchLatestPDF = useCallback(async () => {
     try {
@@ -273,13 +297,34 @@ const InterviewSession = () => {
       initCodeSync();
 
       try {
-        const constraints = { video: true, audio: true };
+        const constraints = { 
+          video: { 
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30 }
+          }, 
+          audio: { 
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true 
+          } 
+        };
+        
+        console.log('Requesting media devices with constraints:', constraints);
         const s = await navigator.mediaDevices.getUserMedia(constraints);
         if (cleanupScheduled) return;
+        
+        console.log('Media devices acquired:', {
+          videoTracks: s.getVideoTracks().length,
+          audioTracks: s.getAudioTracks().length,
+          videoDevice: s.getVideoTracks()[0]?.label || 'Unknown',
+          audioDevice: s.getAudioTracks()[0]?.label || 'Unknown'
+        });
 
         streamRef.current = s;
         setLocalAudioActive(true);
         setLocalVideoActive(true);
+        setError(''); // Clear any previous errors
 
         // Ensure video element gets the stream with proper handling
         if (localVideoRef.current) {
@@ -296,15 +341,23 @@ const InterviewSession = () => {
             });
           }
         }
+        
+        console.log('Media devices successfully initialized');
 
         const peerConnection = new RTCPeerConnection({
           iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         });
         pc.current = peerConnection;
+        
+        // Add local tracks to peer connection
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => {
+            console.log('Adding local track to peer connection:', track.kind);
+            peerConnection.addTrack(track, streamRef.current);
+          });
+        }
 
-        s.getTracks().forEach(track => {
-          peerConnection.addTrack(track, s);
-        });
+
 
         const websocket = new WebSocket(`ws://localhost:8000/ws/video/${sessionId}/?role=${role}&email=${encodeURIComponent(email)}`);
         ws.current = websocket;
@@ -312,19 +365,22 @@ const InterviewSession = () => {
         websocket.onopen = () => {
           console.log(`WebSocket connected as ${role} (${email})`);
           setVideoConnectionStatus('connected');
-          if (role === 'client') {
-            peerConnection.createOffer()
-              .then(offer => peerConnection.setLocalDescription(offer))
-              .then(() => {
-                if (websocket.readyState === WebSocket.OPEN) {
-                  websocket.send(JSON.stringify({
-                    type: 'offer',
-                    offer: peerConnection.localDescription
-                  }));
-                }
-              })
-              .catch(err => console.error('Offer error:', err));
-          }
+          
+          // Wait a moment for participant list to sync
+          setTimeout(() => {
+            const participantCount = Object.keys(connectedParticipantsRef.current).length;
+            console.log(`Current participants: ${participantCount}`);
+            
+            // If we're the only one, wait for others
+            // If both are here, initiate connection
+            if (participantCount >= 2) {
+              // Both participants present - initiate connection
+              console.log('Both participants detected, initiating connection...');
+              setTimeout(() => {
+                createAndSendOffer();
+              }, 500);
+            }
+          }, 1000);
         };
 
         websocket.onclose = () => {
@@ -357,7 +413,21 @@ const InterviewSession = () => {
             if (data.media_type === 'video') setRemoteVideoEnabled(data.enabled);
           }
           else if (data.type === 'participant_list') {
+            // Update participant tracking
+            connectedParticipantsRef.current = data.participants.reduce((acc, p) => {
+              acc[p.email] = p.role;
+              return acc;
+            }, {});
+            
             setParticipants(data.participants);
+            
+            // When a new participant joins and we're already connected
+            if (data.count === 2 && pc.current?.signalingState === 'stable') {
+              console.log('New participant joined, initiating connection...');
+              setTimeout(() => {
+                createAndSendOffer();
+              }, 500);
+            }
           }
           else if (data.type === 'offer') {
             try {
@@ -387,46 +457,138 @@ const InterviewSession = () => {
 
         peerConnection.onicecandidate = (e) => {
           if (e.candidate && websocket.readyState === WebSocket.OPEN) {
+            console.log('Sending ICE candidate');
             websocket.send(JSON.stringify({
               type: 'ice_candidate',
               ice_candidate: e.candidate
             }));
           }
         };
+        
+        // Handle ICE connection state changes
+        peerConnection.oniceconnectionstatechange = () => {
+          console.log('ICE connection state:', peerConnection.iceConnectionState);
+          if (peerConnection.iceConnectionState === 'connected') {
+            console.log('ICE connection established!');
+          } else if (peerConnection.iceConnectionState === 'failed') {
+            console.warn('ICE connection failed');
+          }
+        };
 
         peerConnection.onconnectionstatechange = () => {
           console.log('PeerConnection state:', peerConnection.connectionState);
           setPeerConnectionStatus(peerConnection.connectionState);
+          
+          // Handle connection failures
+          if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
+            console.warn('Peer connection failed, attempting reconnect...');
+            setTimeout(() => {
+              if (websocket.readyState === WebSocket.OPEN) {
+                createAndSendOffer();
+              }
+            }, 2000);
+          } else if (peerConnection.connectionState === 'connected') {
+            console.log('Peer connection established successfully!');
+          }
         };
 
         peerConnection.onsignalingstatechange = () => {
           console.log('Signaling state:', peerConnection.signalingState);
         };
-
-        peerConnection.ontrack = (e) => {
-          if (remoteVideoRef.current && e.streams && e.streams[0]) {
-            const remoteStream = e.streams[0];
-            remoteVideoRef.current.srcObject = remoteStream;
-            
-            // Handle play promise to avoid uncaught exceptions
-            if (remoteVideoRef.current.paused) {
-              remoteVideoRef.current.play().catch(e => {
-                console.warn('Auto-play prevented for remote video:', e);
-                // On mobile devices, video might not autoplay until user interaction
-                // This is expected behavior
-              });
-            }
+        
+        // Log track events
+        peerConnection.ontrack = (event) => {
+          console.log('Received remote track:', event.track.kind);
+          if (event.track.kind === 'video' && remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+            console.log('Remote video stream set');
           }
         };
+        
+        // Add local tracks to peer connection
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => {
+            console.log('Adding local track:', track.kind);
+            peerConnection.addTrack(track, streamRef.current);
+          });
+        }
+
+
 
       } catch (err) {
         console.error('Media/init failed:', err);
-        let msg = 'Failed to access camera/microphone.';
-        if (err.name === 'NotAllowedError') {
-          msg = 'You blocked camera/mic. Click the camera icon in the address bar to allow.';
-        } else if (err.name === 'NotFoundError') {
-          msg = 'No camera or microphone detected.';
+        
+        // Don't show error if we already have a working stream
+        if (streamRef.current) {
+          console.log('Already have working media stream, clearing error');
+          setError('');
+          return;
         }
+        
+        // Detailed error messages based on error type
+        let msg = 'Failed to access camera/microphone.';
+        
+        switch (err.name) {
+          case 'NotAllowedError':
+            msg = 'Camera/microphone access denied. Please:\n' +
+                  '1. Click the camera/microphone icon in the address bar\n' +
+                  '2. Select "Allow" for camera and microphone\n' +
+                  '3. Refresh the page';
+            break;
+          case 'NotFoundError':
+            msg = 'No camera or microphone detected. Please:\n' +
+                  '1. Check if devices are properly connected\n' +
+                  '2. Ensure no other application is using them\n' +
+                  '3. Try restarting your computer';
+            break;
+          case 'NotReadableError':
+            msg = 'Camera/microphone is being used by another application. Please:\n' +
+                  '1. Close other applications using camera/microphone\n' +
+                  '2. Check browser extensions that might block access\n' +
+                  '3. Restart your browser';
+            break;
+          case 'OverconstrainedError':
+            msg = 'Requested media settings not supported. Trying with basic settings...';
+            setError(msg); // Show temporary message
+            
+            // Try with basic constraints
+            setTimeout(async () => {
+              try {
+                const basicStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                streamRef.current = basicStream;
+                setLocalAudioActive(true);
+                setLocalVideoActive(true);
+                
+                if (localVideoRef.current) {
+                  localVideoRef.current.srcObject = basicStream;
+                  localVideoRef.current.play().catch(e => console.warn('Auto-play prevented:', e));
+                }
+                
+                console.log('Successfully connected with basic camera/microphone settings');
+                setError(''); // Clear error on success
+              } catch (basicErr) {
+                console.error('Basic constraints also failed:', basicErr);
+                setError(`Could not access media devices: ${basicErr.message}`);
+              }
+            }, 100);
+            return;
+          case 'SecurityError':
+            msg = 'Security error. Please:\n' +
+                  '1. Make sure you\'re using HTTPS (or localhost)\n' +
+                  '2. Check browser security settings\n' +
+                  '3. Try in incognito/private browsing mode';
+            break;
+          default:
+            msg = `Media device error (${err.name}): ${err.message}\n` +
+                  'Please check browser permissions and device availability.';
+        }
+        
+        console.log('Media error details:', {
+          name: err.name,
+          message: err.message,
+          constraint: err.constraintName
+        });
+        
         setError(msg);
       }
     };
@@ -640,7 +802,6 @@ const InterviewSession = () => {
     }
   }, [localAudioActive]);
 
-  // 📄 Render PDF viewer
   const renderPDFViewer = () => {
     const absolutePdfUrl = pdfUrl 
       ? (pdfUrl.startsWith('http') ? pdfUrl : `http://localhost:8000${pdfUrl}`)
@@ -697,12 +858,18 @@ const InterviewSession = () => {
 
         <div style={{ flex: 1, position: 'relative' }}>
           {absolutePdfUrl ? (
-            <embed
+            <iframe
+              key={absolutePdfUrl} /* Prevent re-render when other state changes */
               src={absolutePdfUrl}
-              type="application/pdf"
               width="100%"
               height="100%"
               style={{ border: 'none' }}
+              title="PDF Viewer"
+              onError={(e) => {
+                console.error('PDF embed error:', e);
+                // Fallback to direct link
+                window.open(absolutePdfUrl, '_blank');
+              }}
             />
           ) : (
             <div style={{
