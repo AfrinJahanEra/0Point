@@ -60,6 +60,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'pdf.middleware.PDFCacheMiddleware',  # Custom middleware for PDF cache control
     'django.middleware.clickjacking.XFrameOptionsMiddleware',  # Re-enabled but configured for PDF embedding
 ]
 
@@ -87,45 +88,45 @@ import sys
 import time
 
 def connect_to_mongo():
-    # Try local MongoDB first (more reliable for development)
+    # Try MongoDB Atlas first (production database)
     try:
+        mongo_uri = os.getenv('MONGO_URI')
+        db_name = os.getenv('MONGO_DB_NAME', 'zeropoint')
+        
+        # Updated MongoDB Atlas connection with proper parameters
         connect(
-            db='zeropoint',
-            host='mongodb://localhost:27017/',
+            db=db_name,
+            host=mongo_uri,
             alias='default',
-            connectTimeoutMS=10000,
-            socketTimeoutMS=10000,
-            serverSelectionTimeoutMS=10000,
+            tls=True,
+            tlsAllowInvalidCertificates=True,
+            connectTimeoutMS=30000,
+            socketTimeoutMS=30000,
+            serverSelectionTimeoutMS=30000,
             retryWrites=True,
             w='majority'
         )
-        print("Successfully connected to local MongoDB")
+        print("Successfully connected to MongoDB Atlas")
         return True
-    except Exception as local_e:
-        print(f"Warning: Could not connect to local MongoDB: {local_e}")
+    except Exception as atlas_e:
+        print(f"Warning: Could not connect to MongoDB Atlas: {atlas_e}")
         
-        # Try MongoDB Atlas as fallback
+        # Try local MongoDB as fallback
         try:
-            mongo_uri = os.getenv('MONGO_URI')
-            db_name = os.getenv('MONGO_DB_NAME', 'zeropoint')
-            
-            # Simple connection without complex URI manipulation
             connect(
-                db=db_name,
-                host=mongo_uri,
+                db='zeropoint',
+                host='mongodb://localhost:27017/',
                 alias='default',
-                ssl=True,
-                ssl_cert_reqs=False,
-                connectTimeoutMS=30000,
-                socketTimeoutMS=30000,
-                serverSelectionTimeoutMS=30000,
+                connectTimeoutMS=10000,
+                socketTimeoutMS=10000,
+                serverSelectionTimeoutMS=10000,
                 retryWrites=True,
                 w='majority'
             )
-            print("Successfully connected to MongoDB Atlas")
+            print("Successfully connected to local MongoDB (fallback)")
             return True
-        except Exception as atlas_e:
-            print(f"Warning: Could not connect to MongoDB Atlas: {atlas_e}")
+        except Exception as local_e:
+            print(f"Warning: Could not connect to local MongoDB: {local_e}")
             print("App will run with limited functionality - database operations will fail")
             return False
 
@@ -227,8 +228,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Dhaka'   
-USE_TZ = True             
+TIME_ZONE = 'Asia/Dhaka'   # ✅ CHANGE THIS
+USE_TZ = True             # ✅ CHANGE THIS
 
 USE_I18N = True
 
@@ -247,6 +248,5 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 # JDoodle API Settings
 JD_CLIENT_ID = os.getenv('JD_CLIENT_ID')
 JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET')
-
 
 

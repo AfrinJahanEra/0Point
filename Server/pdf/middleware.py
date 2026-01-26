@@ -1,19 +1,29 @@
 # pdf/middleware.py
-class MediaCORSHeadersMiddleware:
-    def __init__(self, get_response):
-        self.get_response = get_response
+from django.utils.deprecation import MiddlewareMixin
+from django.http import HttpResponse
 
-    def __call__(self, request):
-        response = self.get_response(request)
-        
-        # Add CORS headers to /media/ responses
-        if request.path.startswith('/media/'):
-            response["Access-Control-Allow-Origin"] = "http://localhost:5173"
-            response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-            response["Access-Control-Allow-Headers"] = "Content-Type"
+class PDFCacheMiddleware(MiddlewareMixin):
+    """
+    Middleware to add cache control headers for PDF files
+    """
+    def process_response(self, request, response):
+        # Check if this is a PDF file request
+        if request.path.startswith('/media/pdfs/') and request.path.endswith('.pdf'):
+            # Set reasonable cache control - cache for 1 hour but allow revalidation
+            response['Cache-Control'] = 'public, max-age=3600, must-revalidate'
+            response['ETag'] = f'"pdf-{request.path}"'
             
-            # Allow iframes to display PDFs
-            if "X-Frame-Options" in response:
-                del response["X-Frame-Options"]
-        
+            # Add CORS headers for cross-origin requests
+            response['Access-Control-Allow-Origin'] = '*'
+            response['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+            response['Access-Control-Allow-Headers'] = 'Content-Type'
+            
+            # Allow embedding in iframes
+            if 'X-Frame-Options' in response:
+                del response['X-Frame-Options']
+            
+            # Add content type if not set
+            if not response.get('Content-Type'):
+                response['Content-Type'] = 'application/pdf'
+                
         return response
