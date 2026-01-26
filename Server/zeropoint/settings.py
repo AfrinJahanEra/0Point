@@ -180,7 +180,7 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOWED_ORIGINS = [
-    # 'https://tech-sage-5poh.vercel.app',
+    'https://0-point.vercel.app',
     'http://localhost:5173',  
 ]
 
