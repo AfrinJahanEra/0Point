@@ -248,5 +248,6 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 # JDoodle API Settings
 JD_CLIENT_ID = os.getenv('JD_CLIENT_ID')
 JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET')
+JD_API_URL = os.getenv('JD_API_URL', 'https://api.jdoodle.com/v1/execute')
 
 

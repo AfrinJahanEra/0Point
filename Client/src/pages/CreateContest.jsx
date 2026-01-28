@@ -92,6 +92,7 @@ const CreateContest = () => {
   ]);
   const [testInvites, setTestInvites] = useState('');
   const [publishErrors, setPublishErrors] = useState({});
+  const [isRunning, setIsRunning] = useState(false);
 
   const customComponents = {
     h1: ({ children }) => (
@@ -755,6 +756,8 @@ const CreateContest = () => {
   };
 
   const handleRunCode = async () => {
+    if (isRunning) return; // Prevent multiple clicks
+    
     if (!code.trim()) {
       alert('Please write some code before running.');
       return;
@@ -774,6 +777,8 @@ const CreateContest = () => {
     }
 
     try {
+      setIsRunning(true); // Set running state
+      
       const runData = {
         language: language,
         code: code,
@@ -839,7 +844,7 @@ const CreateContest = () => {
           ? { ...problem, testResults: [data] }
           : problem
       ));
-      
+        
     } catch (error) {
       console.error('Run error:', error);
       setCompilationStats({
@@ -847,6 +852,8 @@ const CreateContest = () => {
         message: error.response?.data?.error || 'Run failed',
         type: 'run'
       });
+    } finally {
+      setIsRunning(false); // Reset running state
     }
   };
 
@@ -1393,10 +1400,19 @@ const CreateContest = () => {
                       <button
                         type="button"
                         onClick={handleRunCode}
-                        className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 flex items-center gap-0.5"
+                        disabled={isRunning}
+                        className={`px-2 py-0.5 rounded text-xs font-medium flex items-center gap-0.5 ${
+                          isRunning 
+                            ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
                       >
-                        <Play className="w-2.5 h-2.5" />
-                        Run Code
+                        {isRunning ? (
+                          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                        ) : (
+                          <Play className="w-2.5 h-2.5" />
+                        )}
+                        {isRunning ? 'Running...' : 'Run Code'}
                       </button>
                     </div>
                   </div>

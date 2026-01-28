@@ -997,7 +997,7 @@ export const algorithms = [
     ],
     examples: [
       ['64,34,25,12,22,11,90,88,76,50'], 
-      ['5,2,8,1,9,3,7,4,6,10']
+      ['30,20,10,25,28']
     ],
     generateSteps: (data) => {
       const steps = [];
@@ -1081,7 +1081,7 @@ export const algorithms = [
         
         // Show traversal step with complete tree
         steps.push({ 
-          tree: deepCopyTree(tree), // Show the complete current tree
+          tree: deepCopyTree(tree, new Map()), // Show the complete current tree
           operation: 'traverse',
           insertedValue: value,
           comparing: node.value,
@@ -1110,7 +1110,7 @@ export const algorithms = [
         // Left Left Case
         if (balance > 1 && value < node.left.value) {
           steps.push({ 
-            tree: deepCopyTree(tree),
+            tree: deepCopyTree(tree, new Map()),
             operation: 'rotate',
             insertedValue: value,
             comparing: node.value,
@@ -1118,16 +1118,13 @@ export const algorithms = [
             rotation: 'right',
             traversalPath: currentTraversalPath
           });
-          const newRoot = rightRotate(node);
-          // Update the tree structure
-          updateTreeStructure(tree, node, newRoot);
-          return newRoot;
+          return rightRotate(node);
         }
         
         // Right Right Case
         if (balance < -1 && value > node.right.value) {
           steps.push({ 
-            tree: deepCopyTree(tree),
+            tree: deepCopyTree(tree, new Map()),
             operation: 'rotate',
             insertedValue: value,
             comparing: node.value,
@@ -1135,16 +1132,13 @@ export const algorithms = [
             rotation: 'left',
             traversalPath: currentTraversalPath
           });
-          const newRoot = leftRotate(node);
-          // Update the tree structure
-          updateTreeStructure(tree, node, newRoot);
-          return newRoot;
+          return leftRotate(node);
         }
         
         // Left Right Case
         if (balance > 1 && value > node.left.value) {
           steps.push({ 
-            tree: deepCopyTree(tree),
+            tree: deepCopyTree(tree, new Map()),
             operation: 'rotate',
             insertedValue: value,
             comparing: node.value,
@@ -1153,16 +1147,13 @@ export const algorithms = [
             traversalPath: currentTraversalPath
           });
           node.left = leftRotate(node.left);
-          const newRoot = rightRotate(node);
-          // Update the tree structure
-          updateTreeStructure(tree, node, newRoot);
-          return newRoot;
+          return rightRotate(node);
         }
         
         // Right Left Case
         if (balance < -1 && value < node.right.value) {
           steps.push({ 
-            tree: deepCopyTree(tree),
+            tree: deepCopyTree(tree, new Map()),
             operation: 'rotate',
             insertedValue: value,
             comparing: node.value,
@@ -1171,10 +1162,7 @@ export const algorithms = [
             traversalPath: currentTraversalPath
           });
           node.right = rightRotate(node.right);
-          const newRoot = leftRotate(node);
-          // Update the tree structure
-          updateTreeStructure(tree, node, newRoot);
-          return newRoot;
+          return leftRotate(node);
         }
         
         // Return unchanged node
@@ -1182,60 +1170,33 @@ export const algorithms = [
       };
       
       // Helper function to deep copy tree
-      const deepCopyTree = (node, visited = new Set(), depth = 0) => {
-        // Prevent stack overflow for very deep trees
-        if (depth > 1000) return null;
-        
+      const deepCopyTree = (node, visited = new Map()) => {
         if (!node) return null;
         
-        // Handle circular references
+        // Check if node has already been copied to avoid cycles
         if (visited.has(node)) {
-          return { 
-            value: node.value, 
-            left: null, 
-            right: null, 
-            height: node.height 
-          };
+          return visited.get(node);
         }
         
-        visited.add(node);
-        
-        return {
+        // Create a new node and store it in the visited map
+        const newNode = {
           value: node.value,
-          left: deepCopyTree(node.left, visited, depth + 1),
-          right: deepCopyTree(node.right, visited, depth + 1),
+          left: null,
+          right: null,
           height: node.height
         };
+        
+        // Store the mapping before recursively copying children to handle cycles
+        visited.set(node, newNode);
+        
+        // Recursively copy children
+        newNode.left = deepCopyTree(node.left, visited);
+        newNode.right = deepCopyTree(node.right, visited);
+        
+        return newNode;
       };
       
-      // Helper function to update tree structure after rotation
-      const updateTreeStructure = (root, oldNode, newNode) => {
-        if (!root) return;
-        
-        if (root === oldNode) {
-          // If we're replacing the root
-          Object.assign(root, newNode);
-          return;
-        }
-        
-        if (root.left === oldNode) {
-          root.left = newNode;
-          return;
-        }
-        
-        if (root.right === oldNode) {
-          root.right = newNode;
-          return;
-        }
-        
-        // Add safety check to prevent infinite recursion
-        if (root.left) {
-          updateTreeStructure(root.left, oldNode, newNode);
-        }
-        if (root.right) {
-          updateTreeStructure(root.right, oldNode, newNode);
-        }
-      };
+
       
       // Insert each value with proper step tracking
       for (let i = 0; i < values.length; i++) {
@@ -1245,7 +1206,7 @@ export const algorithms = [
           // First insertion - create root
           tree = createNode(value);
           steps.push({ 
-            tree: deepCopyTree(tree),
+            tree: deepCopyTree(tree, new Map()),
             operation: 'insert_root',
             insertedValue: value,
             comparing: null,
@@ -1256,7 +1217,7 @@ export const algorithms = [
         } else {
           // Show start of insertion for this value
           steps.push({ 
-            tree: deepCopyTree(tree),
+            tree: deepCopyTree(tree, new Map()),
             operation: 'insert_start',
             insertedValue: value,
             comparing: null,
@@ -1270,7 +1231,7 @@ export const algorithms = [
           
           // Show the tree after insertion and balancing
           steps.push({ 
-            tree: deepCopyTree(tree),
+            tree: deepCopyTree(tree, new Map()),
             operation: 'after_insert',
             insertedValue: value,
             comparing: null,
@@ -1283,7 +1244,7 @@ export const algorithms = [
       
       // Final state
       steps.push({ 
-        tree: deepCopyTree(tree),
+        tree: deepCopyTree(tree, new Map()),
         operation: 'complete',
         insertedValue: null,
         comparing: null,
@@ -1304,7 +1265,8 @@ export const algorithms = [
     ],
     examples: [
       ['algorithm,binary,compute,data,engine,format,graph,heap,index,json,key'], 
-      ['loop,map,node,object,parse,query,route,sort,tree,union']
+      ['loop,map,node,object,parse,query,route,sort,tree,union'],
+      ['anna,anni,cat,cap,bat']
     ],
     generateSteps: (data) => {
       const steps = [];
@@ -1581,8 +1543,8 @@ export const algorithms = [
     { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
   ],
   examples: [
-    ['A-B-5,B-C-3,C-D-2,D-E-4,E-F-1,F-G-7,G-H-3,H-I-6,I-J-2,J-A-8', 'A'],
-    ['1-2-4,2-3-1,3-4-2,4-5-5,5-6-3,6-7-2,7-8-4,8-9-1,9-10-3,1-10-9', '1']
+    ['A-B-4,A-C-2,B-C-1,B-D-5,C-D-8,C-E-10,D-E-2,D-F-6,E-F-3', 'A'],
+    ['1-2-2,1-3-5,2-3-1,2-4-2,3-4-3,3-5-6,4-5-1,4-6-4,5-6-2,1-6-10', '1']
   ],
   generateSteps: (data) => {
     const steps = [];
@@ -1710,8 +1672,8 @@ export const algorithms = [
       { label: 'Weighted Graph Edges', placeholder: 'Enter weighted edges as triplets separated by commas, e.g., A-B-5,B-C-3,C-D-2,A-C-10' }
     ],
     examples: [
-      ['A-B-5,B-C-3,C-D-2,D-E-4,E-F-1,F-G-7,G-H-3,H-I-6,I-J-2,J-A-8'],
-      ['1-2-4,2-3-1,3-4-2,4-5-5,5-6-3,6-7-2,7-8-4,8-9-1,9-10-3,1-10-9']
+      ['A-B-4,A-C-2,B-C-1,B-D-5,C-D-8,C-E-10,D-E-2,D-F-6,E-F-3'],
+      ['1-2-2,1-3-5,2-3-1,2-4-2,3-4-3,3-5-6,4-5-1,4-6-4,5-6-2,1-6-10']
     ],
     generateSteps: (data) => {
       const steps = [];
@@ -1861,7 +1823,7 @@ export const algorithms = [
       { label: 'Start Node', placeholder: 'Enter the starting node, e.g., A' }
     ],
     examples: [
-      ['A-B-5,B-C-3,C-D-2,D-E-4,E-F-1,F-G-7,G-H-3,H-I-6,I-J-2,J-A-8', 'A'],
+      ['A-B-4,A-C-2,B-C-1,B-D-5,C-D-8,C-E-10,D-E-2,D-F-6,E-F-3', 'A'],
       ['1-2-4,2-3-1,3-4-2,4-5-5,5-6-3,6-7-2,7-8-4,8-9-1,9-10-3,1-10-9', '1']
     ],
     generateSteps: (data) => {

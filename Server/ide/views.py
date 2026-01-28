@@ -8,7 +8,7 @@ import json
 
 JD_CLIENT_ID = settings.JD_CLIENT_ID
 JD_CLIENT_SECRET = settings.JD_CLIENT_SECRET
-JD_API_URL = "https://api.jdoodle.com/v1/execute"
+JD_API_URL = settings.JD_API_URL
 
 @csrf_exempt
 @require_http_methods(["POST"])

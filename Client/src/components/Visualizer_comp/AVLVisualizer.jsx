@@ -113,22 +113,22 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
                 
                 const resetTimer = setTimeout(() => {
                   setRotationPhase(null);
-                }, 800);
+                }, 1000);
                 
                 window.rotationTimeouts.push(resetTimer);
-              }, 800);
+              }, 1000);
               
               window.rotationTimeouts.push(stabilizingTimer);
-            }, 1200);
+            }, 1500);
             
             window.rotationTimeouts.push(attachingTimer);
-          }, 1200);
+          }, 1500);
           
           window.rotationTimeouts.push(rotatingTimer);
-        }, 800);
+        }, 1000);
         
         window.rotationTimeouts.push(highlightingTimer);
-      }, 500);
+      }, 700);
       
       window.rotationTimeouts.push(preparingTimer);
     } else {
@@ -428,6 +428,13 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
       (node.left && node.left.value === rotationNode) || 
       (node.right && node.right.value === rotationNode));
     
+    // Highlight nodes involved in rotation
+    const isRotationAffected = isRotation && (
+      node.value === rotationNode ||
+      (node.left && node.left.value === rotationNode) ||
+      (node.right && node.right.value === rotationNode)
+    );
+    
     return (
       <g key={`${level}-${x}-${y}`}>
         {/* Render connections to children first */}
@@ -471,7 +478,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             y2={parentY}
             stroke={isInTraversalPath ? "url(#gradient-traversal)" : (isInsertedNode ? "url(#gradient-insertion)" : (isComparingNode ? "url(#gradient-comparison)" : "url(#gradient-normal)"))}
             strokeWidth="3"
-            className="animated-line stroke-current"
+            className={`animated-line stroke-current ${isRotation && isRotationNode && rotationPhase === 'rotating' ? 'spin-animation pulse-grow-animation' : ''} ${isRotation && isRotationNode && rotationPhase === 'breaking' ? 'shake-animation flash-animation detach-animation' : ''} ${isRotation && isRotationNode && rotationPhase === 'attaching' ? 'swing-animation bounce-animation attach-animation' : ''} ${isRotation && isRotationNode && rotationPhase === 'preparing' ? 'pulse-grow-animation' : ''} ${isRotation && isRotationNode && rotationPhase === 'stabilizing' ? 'pulse-grow-animation' : ''}`}
             strokeLinecap="round"
             strokeDasharray={isInTraversalPath ? "0" : "5,5"}
             style={{
@@ -483,7 +490,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         {/* Render node circle with enhanced floating animation */}
         <g 
           onMouseDown={(e) => handleNodeMouseDown(node.value, actualX, actualY, e)}
-          className="cursor-move floating-animation glowing delay-3"
+          className={`cursor-move floating-animation glowing delay-3 ${isRotation && isRotationNode && rotationPhase === 'rotating' ? 'spin-animation pulse-grow-animation' : ''} ${isRotation && isRotationNode && rotationPhase === 'breaking' ? 'shake-animation flash-animation detach-animation' : ''} ${isRotation && isRotationNode && rotationPhase === 'attaching' ? 'swing-animation bounce-animation attach-animation' : ''} ${isRotation && isRotationNode && rotationPhase === 'preparing' ? 'pulse-grow-animation' : ''} ${isRotation && isRotationNode && rotationPhase === 'stabilizing' ? 'pulse-grow-animation' : ''}`}
         >
           <g transform={`translate(${actualX}, ${actualY})`}>
             <defs>
@@ -511,10 +518,10 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             
             <circle
               r={nodeSize / 2}
-              fill={isInTraversalPath ? "url(#node-gradient-" + node.value + ")" : (isInsertedNode ? "url(#node-gradient-" + node.value + ")" : (isComparingNode ? "url(#node-gradient-" + node.value + ")" : "url(#node-gradient-" + node.value + ")"))}
-              stroke={isInTraversalPath ? "#2563EB" : (isInsertedNode ? "#1D4ED8" : (isComparingNode ? "#D97706" : "#4F46E5"))}
-              strokeWidth="3"
-              className={`hover:stroke-indigo-700 transition-all duration-700 ease-out ${level % 4 === 0 ? 'delay-1' : level % 4 === 1 ? 'delay-2' : level % 4 === 2 ? 'delay-3' : 'delay-4'} ${isInsertedNode ? 'ring-4 ring-blue-300' : ''}`}
+              fill={isInTraversalPath ? "url(#node-gradient-" + node.value + ")" : (isInsertedNode ? "url(#node-gradient-" + node.value + ")" : (isComparingNode ? "url(#node-gradient-" + node.value + ")" : (isRotationAffected ? "url(#node-gradient-" + node.value + ")" : "url(#node-gradient-" + node.value + ")")))}
+              stroke={isInTraversalPath ? "#2563EB" : (isInsertedNode ? "#1D4ED8" : (isComparingNode ? "#D97706" : (isRotationAffected ? "#EF4444" : "#4F46E5")))}
+              strokeWidth={isRotationAffected ? "5" : "3"}
+              className={`hover:stroke-indigo-700 transition-all duration-700 ease-out ${level % 4 === 0 ? 'delay-1' : level % 4 === 1 ? 'delay-2' : level % 4 === 2 ? 'delay-3' : 'delay-4'} ${isInsertedNode ? 'ring-4 ring-blue-300' : ''} ${isRotationAffected ? 'animate-pulse ring-2 ring-red-400' : ''}`}
               onMouseEnter={() => setHoveredNode(node.value)}
               onMouseLeave={() => setHoveredNode(null)}
               filter="url(#glow-filter)"
@@ -572,6 +579,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         {/* Render rotation indicator */}
         {isRotation && isRotationNode && (
           <g transform={`translate(${actualX}, ${actualY})`}>
+            {/* Main rotation indicator */}
             <rect
               x={-40}
               y={20}
@@ -584,16 +592,30 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
                     rotationPhase === 'rotating' ? "#EC4899" : 
                     rotationPhase === 'attaching' ? "#10B981" : 
                     rotationPhase === 'stabilizing' ? "#06B6D4" : "#6366F1"}
-              className={`opacity-80 ${rotationPhase ? 'animate-pulse' : ''}`}
+              className={`opacity-80 ${rotationPhase ? 'animate-pulse' : ''} ${rotationPhase === 'rotating' ? 'rotate-element pulse-grow-animation' : ''} ${rotationPhase === 'breaking' ? 'shake-animation flash-animation detach-animation' : ''} ${rotationPhase === 'attaching' ? 'swing-animation bounce-animation attach-animation' : ''} ${rotationPhase === 'preparing' ? 'pulse-grow-animation' : ''} ${rotationPhase === 'stabilizing' ? 'pulse-grow-animation' : ''}`}
               filter="url(#glow-filter)"
             />
             <text
               y={37}
               textAnchor="middle"
-              className="text-xs font-bold fill-white"
+              className={`text-xs font-bold fill-white ${rotationPhase === 'rotating' ? 'rotate-element color-change-animation' : ''} ${rotationPhase === 'breaking' ? 'shake-animation flash-animation detach-animation' : ''} ${rotationPhase === 'attaching' ? 'swing-animation bounce-animation attach-animation' : ''} ${rotationPhase === 'preparing' ? 'pulse-grow-animation' : ''} ${rotationPhase === 'stabilizing' ? 'pulse-grow-animation' : ''}`}
             >
               {rotationPhase ? rotationPhase.replace(/\b\w/g, l => l.toUpperCase()) : 'ROTATING'}
             </text>
+            
+            {/* Additional rotation arrow indicator */}
+            <path
+              d="M -30 -15 C -40 -25, -40 -5, -30 5"
+              fill="none"
+              stroke="#FFFFFF"
+              strokeWidth="2"
+              className={`opacity-80 ${rotationPhase === 'rotating' ? 'rotate-element' : ''}`}
+            />
+            <polygon
+              points="-25,0 -35,-5 -35,5"
+              fill="#FFFFFF"
+              className={`opacity-80 ${rotationPhase === 'rotating' ? 'rotate-element' : ''}`}
+            />
           </g>
         )}
         
@@ -935,6 +957,159 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
         .delay-4 {
           animation-delay: 0.4s;
         }
+        
+        /* Rotation animations */
+        .rotate-element {
+          animation: rotateAnimation 1s ease-in-out;
+        }
+        
+        @keyframes rotateAnimation {
+          0% {
+            transform: rotate(0deg) scale(1);
+            filter: hue-rotate(0deg);
+          }
+          25% {
+            transform: rotate(90deg) scale(1.2);
+            filter: hue-rotate(90deg);
+          }
+          50% {
+            transform: rotate(180deg) scale(1.3);
+            filter: hue-rotate(180deg);
+          }
+          75% {
+            transform: rotate(270deg) scale(1.2);
+            filter: hue-rotate(270deg);
+          }
+          100% {
+            transform: rotate(360deg) scale(1);
+            filter: hue-rotate(360deg);
+          }
+        }
+        
+        .shake-animation {
+          animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+          20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        
+        .spin-animation {
+          animation: spin 0.8s linear;
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg) scale(1);
+               filter: brightness(1); }
+          25% { transform: rotate(90deg) scale(1.1);
+                filter: brightness(1.3); }
+          50% { transform: rotate(180deg) scale(1.2);
+                filter: brightness(1.5); }
+          75% { transform: rotate(270deg) scale(1.1);
+                filter: brightness(1.3); }
+          100% { transform: rotate(360deg) scale(1);
+                 filter: brightness(1); }
+        }
+        
+        .swing-animation {
+          animation: swing 0.6s ease-in-out;
+        }
+        
+        @keyframes swing {
+          0% { transform: rotate(0deg) scale(1); }
+          25% { transform: rotate(15deg) scale(1.1); }
+          50% { transform: rotate(-15deg) scale(1.15); }
+          75% { transform: rotate(10deg) scale(1.05); }
+          100% { transform: rotate(0deg) scale(1); }
+        }
+        
+        .bounce-animation {
+          animation: bounce 0.7s ease;
+        }
+        
+        @keyframes bounce {
+          0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+          40% {transform: translateY(-15px);}
+          60% {transform: translateY(-7px);}
+        }
+        
+        .flash-animation {
+          animation: flash 0.6s ease;
+        }
+        
+        @keyframes flash {
+          0%, 50%, 100% {opacity: 1;}
+          25%, 75% {opacity: 0.4;}
+        }
+        
+        .pulse-grow-animation {
+          animation: pulse-grow 0.8s ease-in-out;
+        }
+        
+        @keyframes pulse-grow {
+          0% {transform: scale(1);}
+          50% {transform: scale(1.4);}
+          100% {transform: scale(1);}
+        }
+        
+        .color-change-animation {
+          animation: color-change 1s linear infinite;
+        }
+        
+        @keyframes color-change {
+          0% {fill: #3B82F6;}
+          25% {fill: #EF4444;}
+          50% {fill: #10B981;}
+          75% {fill: #F59E0B;}
+          100% {fill: #3B82F6;}
+        }
+        
+        .detach-animation {
+          animation: detach 1.2s ease-in-out;
+        }
+        
+        @keyframes detach {
+          0% { transform: translate(0, 0) scale(1); opacity: 1; }
+          25% { transform: translate(-10px, -10px) scale(1.1); opacity: 0.9; }
+          50% { transform: translate(0, -20px) scale(1.2); opacity: 0.7; }
+          75% { transform: translate(10px, -15px) scale(1.1); opacity: 0.8; }
+          100% { transform: translate(0, 0) scale(1); opacity: 1; }
+        }
+        
+        .attach-animation {
+          animation: attach 1.2s ease-in-out;
+        }
+        
+        @keyframes attach {
+          0% { transform: translate(0, 0) scale(1); opacity: 1; }
+          25% { transform: translate(10px, -15px) scale(1.1); opacity: 0.8; }
+          50% { transform: translate(0, -20px) scale(1.2); opacity: 0.7; }
+          75% { transform: translate(-10px, -10px) scale(1.1); opacity: 0.9; }
+          100% { transform: translate(0, 0) scale(1); opacity: 1; }
+        }
+        
+        .lift-animation {
+          animation: lift 1.5s ease-in-out;
+        }
+        
+        @keyframes lift {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-30px); }
+        }
+        
+        .slide-animation {
+          animation: slide 1.2s ease-in-out;
+        }
+        
+        @keyframes slide {
+          0% { transform: translateX(0) rotate(0deg); }
+          25% { transform: translateX(-20px) rotate(-10deg); }
+          50% { transform: translateX(0) rotate(0deg); }
+          75% { transform: translateX(20px) rotate(10deg); }
+          100% { transform: translateX(0) rotate(0deg); }
+        }
         `}
       </style>
       
@@ -949,6 +1124,8 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
               onChange={(e) => handleSpeedChange(Number(e.target.value))}
               className="px-2 py-1 border border-gray-300 rounded text-sm"
             >
+              <option value={100}>Very Fast (0.1s)</option>
+              <option value={200}>Super Fast (0.2s)</option>
               <option value={500}>Fast (0.5s)</option>
               <option value={1000}>Medium (1s)</option>
               <option value={2000}>Slow (2s)</option>
