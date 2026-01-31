@@ -1191,7 +1191,7 @@ const AVLVisualizer = ({ data, steps, currentStep, totalSteps, isPlaying, onStop
             {currentStepData ? (
               <div className="w-full min-h-[400px] flex items-center justify-center overflow-hidden relative">
                 <svg 
-                  width="100%" 
+                  width="100%"
                   height="500" 
                   className={`border border-gray-200 rounded min-w-[600px] ${isFullscreen ? '!border-0' : ''}`} 
                   viewBox={`0 0 ${600 * calculateZoomLevel(currentStepData.tree)} 500`}
