@@ -7,6 +7,7 @@ from django.views.static import serve
 
 urlpatterns = [
     path("auth/", include("account.urls")),
+    path("account/", include("account.urls")),
     path("", include("contest.urls")),
     path("", include("submission.urls")),
     path("", include("problem.urls")), 
