@@ -1,161 +1,143 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 
 const RatingChart = ({ platformProfiles }) => {
   const svgRef = useRef();
+  const [tooltip, setTooltip] = useState(null);
 
   useEffect(() => {
-    if (!platformProfiles || platformProfiles.length === 0 || !svgRef.current) {
-      return;
-    }
+    if (!platformProfiles || platformProfiles.length === 0 || !svgRef.current) return;
 
-    // Prepare data for chart
-    const platforms = platformProfiles.map((p) => ({
-      name: p.platform.charAt(0).toUpperCase() + p.platform.slice(1),
-      current: p.current_rating || 0,
-      max: p.max_rating || 0,
-      min: p.min_rating || 0,
-      contests: p.contests_count || 0,
-    }));
+    // Collect contest data
+    const allContests = [];
+    platformProfiles.forEach((profile) => {
+      if (profile.rating_history && Array.isArray(profile.rating_history)) {
+        profile.rating_history.forEach((contest) => {
+          allContests.push({
+            date: new Date(contest.date || contest.datetime),
+            rating: contest.rating || 0,
+            contest_name: contest.contest_name || contest.name || 'Unknown',
+            rank: contest.rank || '-',
+            solved: contest.solved || 0,
+            platform: profile.platform,
+          });
+        });
+      }
+    });
 
-    const margin = { top: 20, right: 30, bottom: 20, left: 50 };
-    const width = 600 - margin.left - margin.right;
-    const height = 300 - margin.top - margin.bottom;
+    allContests.sort((a, b) => a.date - b.date);
+    if (allContests.length === 0) return;
 
-    // Clear previous SVG
-    d3.select(svgRef.current).selectAll("*").remove();
+    const margin = { top: 30, right: 40, bottom: 60, left: 60 };
+    const width = 1000 - margin.left - margin.right;
+    const height = 400 - margin.top - margin.bottom;
+
+    d3.select(svgRef.current).selectAll('*').remove();
 
     const svg = d3
       .select(svgRef.current)
       .attr('width', width + margin.left + margin.right)
       .attr('height', height + margin.top + margin.bottom)
+      .style('background', '#0f0f0f')
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Scales
-    const xScale = d3
-      .scaleBand()
-      .domain(platforms.map((d) => d.name))
-      .range([0, width])
-      .padding(0.4);
+    const xScale = d3.scaleTime().domain(d3.extent(allContests, (d) => d.date)).range([0, width]);
+    const yScale = d3.scaleLinear().domain([0, d3.max(allContests, (d) => d.rating) * 1.1]).range([height, 0]);
 
-    const maxValue = Math.max(...platforms.flatMap((p) => [p.current, p.max, p.min]));
-    const yScale = d3
-      .scaleLinear()
-      .domain([0, maxValue * 1.1])
-      .range([height, 0]);
+    // Axes
+    const xAxis = svg.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(xScale).tickFormat(d3.timeFormat('%Y')).ticks(6));
+    xAxis.selectAll('line').attr('stroke', '#333');
+    xAxis.selectAll('text').attr('fill', '#888').style('font-size', '12px');
+    xAxis.select('.domain').attr('stroke', '#333');
 
-    // X Axis
-    svg
-      .append('g')
-      .attr('transform', `translate(0,${height})`)
-      .call(d3.axisBottom(xScale))
-      .style('font-size', '12px');
+    const yAxis = svg.append('g').call(d3.axisLeft(yScale).ticks(5));
+    yAxis.selectAll('line').attr('stroke', '#333');
+    yAxis.selectAll('text').attr('fill', '#888').style('font-size', '12px');
+    yAxis.select('.domain').attr('stroke', '#333');
 
-    // Y Axis
-    svg
-      .append('g')
-      .call(d3.axisLeft(yScale))
-      .style('font-size', '12px');
+    // Line connecting points
+    const line = d3.line().x((d) => xScale(d.date)).y((d) => yScale(d.rating)).curve(d3.curveMonotoneX);
+    svg.append('path').datum(allContests).attr('d', line).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 2.2).attr('opacity', 0.95);
 
-    // Y Axis Label
-    svg
-      .append('text')
-      .attr('transform', 'rotate(-90)')
-      .attr('y', 0 - margin.left)
-      .attr('x', 0 - height / 2)
-      .attr('dy', '1em')
-      .style('text-anchor', 'middle')
-      .style('font-size', '12px')
-      .text('Rating');
-
-    // Bar groups
-    const barWidth = xScale.bandwidth() / 3;
-    const groups = svg
-      .selectAll('g.bar-group')
-      .data(platforms)
+    // Points: yellow fill, white halo
+    const points = svg
+      .selectAll('circle.point')
+      .data(allContests)
       .enter()
-      .append('g')
-      .attr('class', 'bar-group')
-      .attr('transform', (d) => `translate(${xScale(d.name)},0)`);
+      .append('circle')
+      .attr('class', 'point')
+      .attr('cx', (d) => xScale(d.date))
+      .attr('cy', (d) => yScale(d.rating))
+      .attr('r', (d, i) => (i === allContests.length - 1 ? 5.5 : 3.5))
+      .attr('fill', '#ffd54f')
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', 1.6)
+      .attr('opacity', (d, i) => (i === allContests.length - 1 ? 1 : 0.9))
+      .style('cursor', 'pointer');
 
-    // Current Rating Bars (Blue)
-    groups
-      .append('rect')
-      .attr('x', 0)
-      .attr('y', (d) => yScale(d.current))
-      .attr('width', barWidth)
-      .attr('height', (d) => height - yScale(d.current))
-      .attr('fill', '#3b82f6')
-      .attr('opacity', 0.8)
-      .append('title')
-      .text((d) => `Current: ${d.current}`);
+    // Hover behavior: raise point, enlarge, show tooltip positioned to not cover point
+    points
+      .on('mouseenter', function (event, d) {
+        const node = d3.select(this);
+        node.raise();
+        node.transition().duration(120).attr('r', 7).attr('stroke-width', 2.4).attr('opacity', 1);
 
-    // Max Rating Bars (Green)
-    groups
-      .append('rect')
-      .attr('x', barWidth)
-      .attr('y', (d) => yScale(d.max))
-      .attr('width', barWidth)
-      .attr('height', (d) => height - yScale(d.max))
-      .attr('fill', '#10b981')
-      .attr('opacity', 0.8)
-      .append('title')
-      .text((d) => `Max: ${d.max}`);
+        // compute tooltip position so it doesn't cover the point
+        const [px, py] = d3.pointer(event, svg.node());
+        const svgRect = svgRef.current.getBoundingClientRect();
+        const offsetX = px + margin.left;
+        let tipLeft;
+        const tipWidth = 220;
+        if (offsetX + tipWidth + 20 > svgRect.width) {
+          // position left of point
+          tipLeft = offsetX - tipWidth - 12;
+        } else {
+          // position right of point
+          tipLeft = offsetX + 12;
+        }
+        const tipTop = py + margin.top - 36;
 
-    // Min Rating Bars (Red)
-    groups
-      .append('rect')
-      .attr('x', barWidth * 2)
-      .attr('y', (d) => yScale(d.min))
-      .attr('width', barWidth)
-      .attr('height', (d) => height - yScale(d.min))
-      .attr('fill', '#ef4444')
-      .attr('opacity', 0.8)
-      .append('title')
-      .text((d) => `Min: ${d.min}`);
+        setTooltip({
+          x: tipLeft,
+          y: tipTop,
+          content: {
+            rating: d.rating,
+            contest: d.contest_name,
+            datetime: d.date.toLocaleString(),
+          },
+        });
+      })
+      .on('mouseleave', function (event, d) {
+        const node = d3.select(this);
+        const idx = allContests.indexOf(d);
+        node.transition().duration(120).attr('r', idx === allContests.length - 1 ? 5.5 : 3.5).attr('stroke-width', 1.6).attr('opacity', idx === allContests.length - 1 ? 1 : 0.9);
+        setTooltip(null);
+      });
 
-    // Legend
-    const legendData = [
-      { label: 'Current', color: '#3b82f6' },
-      { label: 'Max', color: '#10b981' },
-      { label: 'Min', color: '#ef4444' },
-    ];
-
-    const legend = svg
-      .selectAll('.legend')
-      .data(legendData)
-      .enter()
-      .append('g')
-      .attr('class', 'legend')
-      .attr('transform', (d, i) => `translate(${width - 150},${-15 + i * 20})`);
-
-    legend
-      .append('rect')
-      .attr('width', 12)
-      .attr('height', 12)
-      .attr('fill', (d) => d.color)
-      .attr('opacity', 0.8);
-
-    legend
-      .append('text')
-      .attr('x', 20)
-      .attr('y', 10)
-      .style('font-size', '12px')
-      .text((d) => d.label);
   }, [platformProfiles]);
 
   if (!platformProfiles || platformProfiles.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
+      <div className="flex items-center justify-center h-64 bg-gray-900 rounded-lg">
         <p className="text-gray-500">No rating data available</p>
       </div>
     );
   }
 
   return (
-    <div className="flex justify-center overflow-x-auto">
-      <svg ref={svgRef}></svg>
+    <div className="relative w-full bg-gray-900 rounded-lg p-4">
+      <svg ref={svgRef} className="w-full" />
+      {tooltip && (
+        <div
+          className="absolute bg-gray-800 text-white rounded-md p-2 shadow-lg z-20 pointer-events-none border border-gray-700"
+          style={{ left: `${tooltip.x}px`, top: `${tooltip.y}px`, width: 220, fontSize: '12px' }}
+        >
+          <div className="text-sm font-semibold text-yellow-400">{tooltip.content.rating}</div>
+          <div className="text-xs text-gray-300 truncate">{tooltip.content.contest}</div>
+          <div className="text-xs text-gray-400 mt-1">{tooltip.content.datetime}</div>
+        </div>
+      )}
     </div>
   );
 };
