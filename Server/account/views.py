@@ -9,6 +9,7 @@ from datetime import datetime
 
 from .models import Account
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
+from .platforms import fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
 from submission.models import Submission
 from leaderboard.models import LeaderboardEntry
 
@@ -160,7 +161,9 @@ class AddPlatformProfileView(APIView):
                 rating_data.get('current_rating', 0),
                 rating_data.get('max_rating', 0),
                 rating_data.get('min_rating', 0),
-                rating_data.get('contests_count', 0)
+                rating_data.get('contests_count', 0),
+                rating_data.get('badge', ''),
+                rating_data.get('rating_history', [])
             )
             
             return Response({
@@ -176,145 +179,36 @@ class AddPlatformProfileView(APIView):
 def fetch_platform_rating(platform, handle):
     """
     Fetch rating data from different coding platforms
+    (Delegated to platforms.py)
     """
-    if platform == "codeforces":
-        return fetch_codeforces_rating(handle)
-    elif platform == "codechef":
-        return fetch_codechef_rating(handle)
-    elif platform == "atcoder":
-        return fetch_atcoder_rating(handle)
-    elif platform == "leetcode":
-        return fetch_leetcode_rating(handle)
-    else:
-        raise ValueError(f"Unsupported platform: {platform}")
+    from .platforms import fetch_platform_rating as platform_fetch
+    return platform_fetch(platform, handle)
+
 
 
 def fetch_codeforces_rating(handle):
-    """Fetch rating from Codeforces API"""
-    try:
-        response = requests.get(f"https://codeforces.com/api/user.info?handles={handle}", timeout=5)
-        if response.status_code != 200:
-            raise Exception(f"Codeforces API error: {response.status_code}")
-        
-        data = response.json()
-        if not data.get('result'):
-            raise Exception("User not found on Codeforces")
-        
-        user_data = data['result'][0]
-        
-        # Get contest history for min/max and contests count
-        response = requests.get(f"https://codeforces.com/api/user.rating?handle={handle}", timeout=5)
-        rating_history = []
-        contests_count = 0
-        min_rating = user_data.get('minRating', user_data.get('rating', 1500))
-        max_rating = user_data.get('maxRating', user_data.get('rating', 1500))
-        
-        if response.status_code == 200:
-            history_data = response.json()
-            if history_data.get('result'):
-                contests_count = len(history_data['result'])
-                for entry in history_data['result']:
-                    rating_history.append({
-                        "date": datetime.fromtimestamp(entry['ratingUpdateTimeSeconds']).isoformat(),
-                        "rating": entry['newRating']
-                    })
-                min_rating = min(entry['newRating'] for entry in history_data['result'])
-                max_rating = max(entry['newRating'] for entry in history_data['result'])
-        
-        return {
-            "current_rating": user_data.get('rating', 1500),
-            "max_rating": max_rating,
-            "min_rating": min_rating,
-            "contests_count": contests_count,
-            "rank": user_data.get('rank', 'unrated'),
-            "badge": user_data.get('titlePhoto', ''),
-            "rating_history": rating_history
-        }
-    except Exception as e:
-        raise Exception(f"Failed to fetch Codeforces data: {str(e)}")
+    """Deprecated: Use platforms.fetch_codeforces_rating instead"""
+    from .platforms import fetch_codeforces_rating as platform_fetch
+    return platform_fetch(handle)
 
 
 def fetch_codechef_rating(handle):
-    """Fetch rating from CodeChef API"""
-    try:
-        # CodeChef doesn't have a free public API, so we'll use a workaround
-        response = requests.get(f"https://codechef.com/api/user/{handle}", timeout=5)
-        if response.status_code != 200:
-            raise Exception(f"CodeChef API error: {response.status_code}")
-        
-        data = response.json()
-        
-        return {
-            "current_rating": data.get('rating', 1500),
-            "max_rating": data.get('rating', 1500),
-            "min_rating": data.get('rating', 1500),
-            "contests_count": data.get('contests_count', 0),
-            "rank": data.get('global_rank', None),
-            "badge": '',
-            "rating_history": []
-        }
-    except Exception as e:
-        raise Exception(f"Failed to fetch CodeChef data: {str(e)}")
+    """Deprecated: Use platforms.fetch_codechef_rating instead"""
+    from .platforms import fetch_codechef_rating as platform_fetch
+    return platform_fetch(handle)
 
 
 def fetch_atcoder_rating(handle):
-    """Fetch rating from AtCoder API"""
-    try:
-        response = requests.get(f"https://atcoder.jp/api/v2/user/{handle}", timeout=5)
-        if response.status_code != 200:
-            raise Exception(f"AtCoder API error: {response.status_code}")
-        
-        data = response.json()['result']
-        
-        # Get contest history
-        response = requests.get(f"https://atcoder.jp/api/v2/user/{handle}/history", timeout=5)
-        rating_history = []
-        
-        if response.status_code == 200:
-            history_data = response.json()['result']
-            for entry in history_data:
-                rating_history.append({
-                    "date": entry['ended_at'][:10],
-                    "rating": entry['new_rating']
-                })
-        
-        return {
-            "current_rating": data.get('rating', 0),
-            "max_rating": data.get('highest_rating', 0),
-            "min_rating": data.get('lowest_rating', 0),
-            "contests_count": data.get('contests', 0),
-            "rank": str(data.get('rank', 'N/A')),
-            "badge": '',
-            "rating_history": rating_history
-        }
-    except Exception as e:
-        raise Exception(f"Failed to fetch AtCoder data: {str(e)}")
+    """Deprecated: Use platforms.fetch_atcoder_rating instead"""
+    from .platforms import fetch_atcoder_rating as platform_fetch
+    return platform_fetch(handle)
 
 
 def fetch_leetcode_rating(handle):
-    """Fetch rating from LeetCode API"""
-    try:
-        response = requests.get(f"https://leetcode.com/graphql/", 
-            json={
-                "query": f'query userProfile(username: "{handle}") {{ userProfile(username: username) {{ realName rating badge }}',
-            },
-            timeout=5)
-        if response.status_code != 200:
-            raise Exception(f"LeetCode API error: {response.status_code}")
-        
-        data = response.json()
-        
-        return {
-            "current_rating": data.get('rating', 1200),
-            "max_rating": data.get('rating', 1200),
-            "min_rating": data.get('rating', 1200),
-            "contests_count": 0,
-            "rank": None,
-            "badge": data.get('badge', ''),
-            "rating_history": []
-        }
-    except Exception as e:
-        raise Exception(f"Failed to fetch LeetCode data: {str(e)}")
+    """Deprecated: Use platforms.fetch_leetcode_rating instead"""
+    from .platforms import fetch_leetcode_rating as platform_fetch
+    return platform_fetch(handle)
+
 
 
 class ContestHistoryView(APIView):
@@ -378,9 +272,11 @@ class ContestHistoryView(APIView):
             for platform_profile in getattr(user, 'platform_profiles', []):
                 try:
                     if platform_profile.platform == "codeforces":
-                        contests.extend(self.fetch_codeforces_contests(platform_profile.handle))
+                        contests.extend(fetch_codeforces_contests(platform_profile.handle))
                     elif platform_profile.platform == "atcoder":
-                        contests.extend(self.fetch_atcoder_contests(platform_profile.handle))
+                        contests.extend(fetch_atcoder_contests(platform_profile.handle))
+                    elif platform_profile.platform == "leetcode":
+                        contests.extend(fetch_leetcode_contests(platform_profile.handle))
                 except Exception:
                     pass
 
@@ -402,58 +298,6 @@ class ContestHistoryView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-    def fetch_codeforces_contests(self, handle):
-        """Fetch contest history from Codeforces"""
-        contests = []
-        try:
-            # Get contest history from user.rating endpoint
-            response = requests.get(f"https://codeforces.com/api/user.rating?handle={handle}", timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('result'):
-                    for entry in data['result']:
-                        contests.append({
-                            "id": f"cf-{entry.get('contestId')}",
-                            "title": entry.get('contestName'),
-                            "date": datetime.fromtimestamp(entry.get('ratingUpdateTimeSeconds')).isoformat(),
-                            "duration_hours": 2,
-                            "rank": entry.get('rank', '-'),
-                            "score": entry.get('oldRating', 0),
-                            "penalty": 0,
-                            "platform": "codeforces",
-                            "status": "finished",
-                            "type": "rated",
-                            "performance": f"{entry.get('newRating', 1500)}"
-                        })
-        except Exception:
-            pass
-        return contests
-
-    def fetch_atcoder_contests(self, handle):
-        """Fetch contest history from AtCoder"""
-        contests = []
-        try:
-            response = requests.get(f"https://atcoder.jp/api/v2/user/{handle}/history", timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('result'):
-                    for entry in data['result']:
-                        contests.append({
-                            "id": f"ac-{entry.get('contest_id')}",
-                            "title": entry.get('contest_name'),
-                            "date": entry.get('ended_at')[:10] if entry.get('ended_at') else None,
-                            "duration_hours": 2,
-                            "rank": entry.get('rank', '-'),
-                            "score": entry.get('performance', 0),
-                            "penalty": 0,
-                            "platform": "atcoder",
-                            "status": "finished",
-                            "type": "rated" if entry.get('is_rated') else "unrated",
-                            "performance": f"{entry.get('new_rating', 0)}"
-                        })
-        except Exception:
-            pass
-        return contests
 
 
 

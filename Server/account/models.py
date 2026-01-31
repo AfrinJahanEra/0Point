@@ -67,8 +67,11 @@ class Account(Document):
                 return profile
         return None
     
-    def add_or_update_platform(self, platform, handle, rating=0, max_rating=0, min_rating=0, contests_count=0):
+    def add_or_update_platform(self, platform, handle, rating=0, max_rating=0, min_rating=0, contests_count=0, badge='', rating_history=None):
         """Add or update platform profile"""
+        if rating_history is None:
+            rating_history = []
+        
         existing = self.get_platform_profile(platform)
         if existing:
             existing.handle = handle
@@ -76,6 +79,8 @@ class Account(Document):
             existing.max_rating = max_rating
             existing.min_rating = min_rating
             existing.contests_count = contests_count
+            existing.badge = badge
+            existing.rating_history = rating_history
             existing.last_updated = datetime.utcnow()
         else:
             new_profile = PlatformProfile(
@@ -84,7 +89,9 @@ class Account(Document):
                 current_rating=rating,
                 max_rating=max_rating,
                 min_rating=min_rating,
-                contests_count=contests_count
+                contests_count=contests_count,
+                badge=badge,
+                rating_history=rating_history
             )
             self.platform_profiles.append(new_profile)
         self.save()
