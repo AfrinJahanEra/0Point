@@ -251,31 +251,48 @@ const Dashboard = () => {
                             <div className="flex items-center gap-3">
                               <span className="text-2xl">{platformIcons[profile.platform]}</span>
                               <div>
-                                <h3 className="font-semibold text-gray-900">{platformNames[profile.platform]}</h3>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold text-gray-900">{platformNames[profile.platform]}</h3>
+                                  {profile.badge && (
+                                    <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded font-semibold">
+                                      {profile.badge}
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-sm text-gray-600">{profile.handle}</p>
                               </div>
                             </div>
-                            {profile.badge && (
-                              <span className="text-sm px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
-                                {profile.badge}
-                              </span>
-                            )}
                           </div>
 
-                          {/* Platform Stats */}
-                          <div className="grid grid-cols-3 gap-2 text-sm">
-                            <div className="bg-blue-50 rounded p-2">
-                              <p className="text-gray-600 text-xs">Current</p>
-                              <p className="font-bold text-blue-600">{profile.current_rating}</p>
-                            </div>
-                            <div className="bg-green-50 rounded p-2">
-                              <p className="text-gray-600 text-xs">Max</p>
-                              <p className="font-bold text-green-600">{profile.max_rating}</p>
-                            </div>
-                            <div className="bg-orange-50 rounded p-2">
-                              <p className="text-gray-600 text-xs">Contests</p>
-                              <p className="font-bold text-orange-600">{profile.contests_count}</p>
-                            </div>
+                          {/* Platform Stats - Conditional based on platform */}
+                          <div className="grid gap-2 text-sm">
+                            {profile.platform === 'leetcode' ? (
+                              <>
+                                <div className="bg-blue-50 rounded p-2">
+                                  <p className="text-gray-600 text-xs">Contest Rating</p>
+                                  <p className="font-bold text-blue-600">{profile.current_rating}</p>
+                                </div>
+                                <div className="bg-orange-50 rounded p-2">
+                                  <p className="text-gray-600 text-xs">Participated Contests</p>
+                                  <p className="font-bold text-orange-600">{profile.contests_count}</p>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="grid grid-cols-3 gap-2">
+                                <div className="bg-blue-50 rounded p-2">
+                                  <p className="text-gray-600 text-xs">Current</p>
+                                  <p className="font-bold text-blue-600">{profile.current_rating}</p>
+                                </div>
+                                <div className="bg-green-50 rounded p-2">
+                                  <p className="text-gray-600 text-xs">Max</p>
+                                  <p className="font-bold text-green-600">{profile.max_rating}</p>
+                                </div>
+                                <div className="bg-orange-50 rounded p-2">
+                                  <p className="text-gray-600 text-xs">Contests</p>
+                                  <p className="font-bold text-orange-600">{profile.contests_count}</p>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -307,11 +324,11 @@ const Dashboard = () => {
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
-                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Contest</th>
-                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Date</th>
+                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Contest Name</th>
+                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Date & Time</th>
                             <th className="text-left px-4 py-3 font-semibold text-gray-900">Rank</th>
-                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Score</th>
-                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Performance</th>
+                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Problems Solved</th>
+                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Rating After</th>
                             <th className="text-left px-4 py-3 font-semibold text-gray-900">Platform</th>
                           </tr>
                         </thead>
@@ -319,27 +336,26 @@ const Dashboard = () => {
                           {contestHistory.map((contest, idx) => (
                             <tr key={idx} className="hover:bg-gray-50 transition-colors">
                               <td className="px-4 py-3">
-                                <div>
-                                  <p className="font-semibold text-gray-900">{contest.title}</p>
-                                  <p className="text-xs text-gray-600">{contest.type}</p>
-                                </div>
+                                <p className="font-semibold text-gray-900">{contest.title}</p>
                               </td>
-                              <td className="px-4 py-3 text-gray-600">
-                                {contest.date ? new Date(contest.date).toLocaleDateString() : 'N/A'}
+                              <td className="px-4 py-3 text-gray-600 text-xs">
+                                {contest.datetime 
+                                  ? new Date(contest.datetime).toLocaleString() 
+                                  : (contest.date ? new Date(contest.date).toLocaleDateString() : 'N/A')}
                               </td>
                               <td className="px-4 py-3">
                                 <span className="font-semibold text-blue-600">#{contest.rank || 'N/A'}</span>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="font-semibold text-gray-900">{Number(contest.score || 0).toFixed(1)}</span>
+                                <span className="font-semibold text-gray-900">{contest.solved || 0}</span>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">
-                                  {contest.performance}
+                                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
+                                  {contest.rating || contest.score || 'N/A'}
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="text-gray-600 capitalize">{contest.platform}</span>
+                                <span className="text-gray-600 capitalize font-medium">{contest.platform}</span>
                               </td>
                             </tr>
                           ))}
