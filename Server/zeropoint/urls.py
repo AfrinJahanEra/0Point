@@ -8,6 +8,7 @@ from django.views.static import serve
 urlpatterns = [
     path("auth/", include("account.urls")),
     path("", include("contest.urls")),
+    path("", include("submission.urls")),
     path("", include("problem.urls")), 
     path("", include("testcase.urls")),
     path("", include("leaderboard.urls")),
