@@ -1,6 +1,22 @@
-from mongoengine import Document, StringField, EmailField, BooleanField, DateTimeField, IntField
+from mongoengine import Document, StringField, EmailField, BooleanField, DateTimeField, IntField, EmbeddedDocument, EmbeddedDocumentField, DictField, ListField, FloatField
 from django.contrib.auth.hashers import make_password, check_password
 from datetime import datetime
+
+
+class PlatformProfile(EmbeddedDocument):
+    """Store coding platform handles and ratings"""
+    platform = StringField(required=True, choices=["codeforces", "codechef", "atcoder", "leetcode"])
+    handle = StringField(required=True)
+    current_rating = IntField(default=0)
+    max_rating = IntField(default=0)
+    min_rating = IntField(default=0)
+    contests_count = IntField(default=0)
+    rank = StringField(null=True)
+    badge = StringField(null=True)
+    last_updated = DateTimeField(default=datetime.utcnow)
+    
+    # Store historical rating data for graph
+    rating_history = ListField(DictField(), default=list)  # [{"date": "2023-01-15", "rating": 1500}, ...]
 
 
 class Account(Document):
@@ -24,6 +40,15 @@ class Account(Document):
 
     year = StringField(null=True)
     department = StringField(null=True)
+    
+    # Coding platform profiles
+    platform_profiles = ListField(EmbeddedDocumentField(PlatformProfile), default=list)
+    
+    # User profile stats
+    total_score = IntField(default=0)
+    global_rank = IntField(null=True)
+    problems_solved = IntField(default=0)
+    contests_count = IntField(default=0)
 
     meta = {
         "collection": "accounts"
@@ -34,3 +59,32 @@ class Account(Document):
 
     def check_password(self, raw_password):
         return check_password(raw_password, self.password)
+    
+    def get_platform_profile(self, platform):
+        """Get specific platform profile"""
+        for profile in self.platform_profiles:
+            if profile.platform == platform:
+                return profile
+        return None
+    
+    def add_or_update_platform(self, platform, handle, rating=0, max_rating=0, min_rating=0, contests_count=0):
+        """Add or update platform profile"""
+        existing = self.get_platform_profile(platform)
+        if existing:
+            existing.handle = handle
+            existing.current_rating = rating
+            existing.max_rating = max_rating
+            existing.min_rating = min_rating
+            existing.contests_count = contests_count
+            existing.last_updated = datetime.utcnow()
+        else:
+            new_profile = PlatformProfile(
+                platform=platform,
+                handle=handle,
+                current_rating=rating,
+                max_rating=max_rating,
+                min_rating=min_rating,
+                contests_count=contests_count
+            )
+            self.platform_profiles.append(new_profile)
+        self.save()
