@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource/inter": "^5.2.6",
     "@monaco-editor/react": "^4.7.0",
+    "ace-builds": "^1.43.6",
     "acorn": "^8.15.0",
     "axios": "^1.11.0",
     "canvas-confetti": "^1.9.4",

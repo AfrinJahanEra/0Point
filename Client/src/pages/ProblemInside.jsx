@@ -61,6 +61,8 @@ const ProblemInside = () => {
   const [compilationStats, setCompilationStats] = useState(null);
   const [userStatus, setUserStatus] = useState({});
   const [expandedTestCase, setExpandedTestCase] = useState(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const TOKEN = localStorage.getItem('token');
 
@@ -306,12 +308,16 @@ const ProblemInside = () => {
 
   // Run function
   const handleRun = async () => {
+    if (isRunning) return; // Prevent multiple clicks
+    
     if (!code.trim()) {
       alert('Please write some code before running.');
       return;
     }
 
     try {
+      setIsRunning(true); // Set running state
+      
       const runData = {
         language: language,
         code: code,
@@ -373,11 +379,15 @@ const ProblemInside = () => {
         message: error.response?.data?.error || 'Run failed',
         type: 'run'
       });
+    } finally {
+      setIsRunning(false); // Reset running state
     }
   };
 
   // Submit function
   const handleSubmit = async () => {
+    if (isSubmitting) return; // Prevent multiple clicks
+    
     if (!code.trim()) {
       alert('Please write some code before submitting.');
       return;
@@ -388,6 +398,8 @@ const ProblemInside = () => {
     }
 
     try {
+      setIsSubmitting(true); // Set submitting state
+      
       const submitData = {
         language: language,
         version_index: getVersionIndex(language),
@@ -450,6 +462,8 @@ const ProblemInside = () => {
         message: error.response?.data?.error || 'Submission failed',
         type: 'submit'
       });
+    } finally {
+      setIsSubmitting(false); // Reset submitting state
     }
   };
 
@@ -956,16 +970,30 @@ const ProblemInside = () => {
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={handleRun}
-                      className="px-3 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1"
+                      disabled={isRunning}
+                      className={`px-3 py-1.5 border rounded text-xs font-medium transition-colors flex items-center gap-1 ${
+                        isRunning 
+                          ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed' 
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
                     >
-                      <Play className="w-3 h-3" />
-                      Run
+                      {isRunning ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Play className="w-3 h-3" />
+                      )}
+                      {isRunning ? 'Running...' : 'Run'}
                     </button>
                     <button 
                       onClick={handleSubmit}
-                      className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+                      disabled={isSubmitting}
+                      className={`px-4 py-1.5 rounded text-xs font-medium transition-colors ${
+                        isSubmitting
+                          ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
                     >
-                      Submit
+                      {isSubmitting ? 'Submitting...' : 'Submit'}
                     </button>
                   </div>
                 </div>

@@ -13,10 +13,10 @@ from submission.models import Submission
 from contest.models import Contest, ContestProblem
 
 # JDoodle credentials
-import os
-JD_CLIENT_ID = os.getenv('JD_CLIENT_ID', 'your_default_value')
-JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET', 'your_default_value')
-JD_URL = "https://api.jdoodle.com/v1/execute"
+from django.conf import settings
+JD_CLIENT_ID = settings.JD_CLIENT_ID
+JD_CLIENT_SECRET = settings.JD_CLIENT_SECRET
+JD_URL = settings.JD_API_URL
 
 
 LANGUAGE_VERSION_MAP = {

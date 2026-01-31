@@ -460,12 +460,16 @@ const InterviewSession = () => {
         };
 
         peerConnection.onicecandidate = (e) => {
-          if (e.candidate && websocket.readyState === WebSocket.OPEN) {
-            console.log('Sending ICE candidate');
-            websocket.send(JSON.stringify({
-              type: 'ice_candidate',
-              ice_candidate: e.candidate
-            }));
+          try {
+            if (e.candidate && websocket.readyState === WebSocket.OPEN) {
+              console.log('Sending ICE candidate');
+              websocket.send(JSON.stringify({
+                type: 'ice_candidate',
+                ice_candidate: e.candidate
+              }));
+            }
+          } catch (error) {
+            console.error('Error sending ICE candidate:', error);
           }
         };
         
@@ -503,9 +507,32 @@ const InterviewSession = () => {
         // Log track events
         peerConnection.ontrack = (event) => {
           console.log('Received remote track:', event.track.kind);
-          if (event.track.kind === 'video' && remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-            console.log('Remote video stream set');
+          
+          if (event.track.kind === 'video') {
+            // Use a timeout to ensure the video element is ready
+            setTimeout(() => {
+              if (remoteVideoRef.current) {
+                // Check if the stream is different from current stream to avoid flickering
+                if (remoteVideoRef.current.srcObject !== event.streams[0]) {
+                  remoteVideoRef.current.srcObject = event.streams[0];
+                  console.log('Remote video stream set');
+                  
+                  // Ensure the video plays automatically
+                  if (remoteVideoRef.current.readyState >= 1) {
+                    remoteVideoRef.current.play().catch(e => {
+                      console.warn('Auto-play prevented for remote video:', e);
+                    });
+                  } else {
+                    // Wait for the video element to be ready
+                    remoteVideoRef.current.onloadedmetadata = () => {
+                      remoteVideoRef.current.play().catch(e => {
+                        console.warn('Auto-play prevented for remote video after metadata load:', e);
+                      });
+                    };
+                  }
+                }
+              }
+            }, 0);
           }
         };
         
@@ -592,24 +619,31 @@ const InterviewSession = () => {
           message: err.message,
           constraint: err.constraintName
         });
-        
+            
         setError(msg);
       }
     };
-
+    
     init();
-
+    
     return () => {
       cleanupScheduled = true;
 
       ws.current?.close();
       codeWs.current?.close();
 
+      // Close peer connection properly
       if (pc.current) {
+        pc.current.getSenders().forEach(sender => {
+          if (sender.track) {
+            sender.track.stop();
+          }
+        });
         pc.current.close();
         pc.current = null;
       }
 
+      // Stop all tracks in the local stream
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => {
           if (track.readyState === 'live') track.stop();
@@ -619,10 +653,14 @@ const InterviewSession = () => {
 
       // Properly clean up video elements
       if (localVideoRef.current) {
+        localVideoRef.current.pause();
         localVideoRef.current.srcObject = null;
+        localVideoRef.current.load(); // Reset the video element
       }
       if (remoteVideoRef.current) {
+        remoteVideoRef.current.pause();
         remoteVideoRef.current.srcObject = null;
+        remoteVideoRef.current.load(); // Reset the video element
       }
     };
   }, [sessionId, role, email, checkPermissions, fetchLatestPDF, initCodeSync]);

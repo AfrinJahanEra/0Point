@@ -22,7 +22,7 @@ from contest.broadcast import broadcast_contest_update, broadcast_global_update
 from django.conf import settings
 JD_CLIENT_ID = settings.JD_CLIENT_ID
 JD_CLIENT_SECRET = settings.JD_CLIENT_SECRET
-JD_URL = "https://api.jdoodle.com/v1/execute"
+JD_URL = settings.JD_API_URL
 
 # Map for language -> recommended versionIndex
 LANGUAGE_VERSION_MAP = {
@@ -530,7 +530,7 @@ class TestContestSubmissionCreateAPIView(APIView):
                 }
                 
                 try:
-                    res = requests.post("https://api.jdoodle.com/v1/execute", 
+                    res = requests.post(settings.JD_API_URL, 
                                       json=payload, timeout=15)
                     res_data = res.json()
                     
