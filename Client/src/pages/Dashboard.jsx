@@ -267,16 +267,16 @@ const Dashboard = () => {
                           {/* Platform Stats - Conditional based on platform */}
                           <div className="grid gap-2 text-sm">
                             {profile.platform === 'leetcode' ? (
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="bg-blue-50 rounded p-2 text-center">
-                                    <p className="text-gray-600 text-xs">Contest Rating</p>
-                                    <p className="font-bold text-blue-600">{profile.current_rating || 'N/A'}</p>
-                                  </div>
-                                  <div className="bg-orange-50 rounded p-2 text-center">
-                                    <p className="text-gray-600 text-xs">Contests</p>
-                                    <p className="font-bold text-orange-600">{profile.contests_count || 0}</p>
-                                  </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="bg-blue-50 rounded p-2">
+                                  <p className="text-gray-600 text-xs">Contest Rating</p>
+                                  <p className="font-bold text-blue-600">{profile.current_rating}</p>
                                 </div>
+                                <div className="bg-orange-50 rounded p-2">
+                                  <p className="text-gray-600 text-xs">Participated Contests</p>
+                                  <p className="font-bold text-orange-600">{profile.contests_count}</p>
+                                </div>
+                              </div>
                             ) : (
                               <div className="grid grid-cols-3 gap-2">
                                 <div className="bg-blue-50 rounded p-2">
