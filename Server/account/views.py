@@ -9,7 +9,7 @@ from datetime import datetime
 
 from .models import Account
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
-from .platforms import fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
+from .platforms import fetch_codechef_contests, fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
 from submission.models import Submission
 from leaderboard.models import LeaderboardEntry
 
@@ -302,6 +302,8 @@ class ContestHistoryView(APIView):
                         contests.extend(fetch_atcoder_contests(platform_profile.handle))
                     elif platform_profile.platform == "leetcode":
                         contests.extend(fetch_leetcode_contests(platform_profile.handle))
+                    elif platform_profile.platform == "codechef":
+                        contests.extend(fetch_codechef_contests(platform_profile.handle))
                 except Exception:
                     pass
 
