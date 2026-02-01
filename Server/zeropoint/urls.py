@@ -4,15 +4,11 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
-
 urlpatterns = [
     path("auth/", include("account.urls")),
     path("", include("contest.urls")),
-    path("", include("problem.urls")), 
-    path("", include("testcase.urls")),
     path("", include("leaderboard.urls")),
     path("", include("announcement.urls")),
-    path("", include("tutorial.urls")),
     path('admin/', admin.site.urls),
     path('api/executor/', include('executor.urls')),
     path('mock-interview/', include('mock_interview.urls')),
@@ -21,6 +17,7 @@ urlpatterns = [
     path('api/ide/', include('ide.urls')),
     path("", include("crossPlatform.urls")),
     path("blog/", include("blog.urls")),
+    path("", include("chatapp.urls")),  # Chat application URLs
 ]
 
 # Serve media files during development
