@@ -168,7 +168,7 @@ class AddPlatformProfileView(APIView):
             th.start()
 
             # wait up to 15 seconds for the fetch to complete
-            th.join(timeout=15)
+            th.join(timeout=45)
 
             if th.is_alive():
                 return Response({
