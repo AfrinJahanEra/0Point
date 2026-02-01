@@ -90,6 +90,7 @@ class Account(Document):
                 max_rating=max_rating,
                 min_rating=min_rating,
                 contests_count=contests_count,
+                
                 badge=badge,
                 rating_history=rating_history
             )
