@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import rehypeRaw from 'rehype-raw';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/github-dark.css'; // choose your highlight.js theme
+import 'katex/dist/katex.min.css'; // for math
+
 import {
-  MessageSquare,
-  X,
-  Send,
-  Bot,
-  User,
-  Minimize2,
-  Maximize2,
-  History,
-  Trash2
+  MessageSquare, X, Send, Bot, Minimize2, Maximize2, History, Trash2
 } from 'lucide-react';
 
 const Chatbot = () => {
@@ -21,12 +21,12 @@ const Chatbot = () => {
 
   const messagesEndRef = useRef(null);
 
-  /* ------------------ Scroll ------------------ */
+  // Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  /* ------------------ Initial Bot Message ------------------ */
+  // Initial bot message
   useEffect(() => {
     setMessages([
       {
@@ -38,7 +38,14 @@ const Chatbot = () => {
     ]);
   }, []);
 
-  /* ------------------ Send Message ------------------ */
+  // Highlight code blocks after render
+  useEffect(() => {
+    document.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightBlock(block);
+    });
+  }, [messages]);
+
+  // Send message
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -55,9 +62,12 @@ const Chatbot = () => {
     setIsTyping(true);
 
     try {
-      const res = await fetch('/chat', {
+      const res = await fetch('http://localhost:8000/chat/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
         body: JSON.stringify({
           message: userMessage.text,
           chat_id: chatId
@@ -93,31 +103,25 @@ const Chatbot = () => {
     }
   };
 
-  /* ------------------ Clear Chat ------------------ */
+  // Clear chat
   const handleClearChat = () => {
-    setMessages([
-      {
-        id: Date.now(),
-        text: "New chat started. Ask me something about programming!",
-        sender: 'bot',
-        timestamp: new Date()
-      }
-    ]);
+    setMessages([{
+      id: Date.now(),
+      text: "New chat started. Ask me something about programming!",
+      sender: 'bot',
+      timestamp: new Date()
+    }]);
     setChatId(null);
   };
 
   const formatTime = (date) =>
     date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  /* ================== UI ================== */
   return (
     <>
       {/* Toggle Button */}
       <button
-        onClick={() => {
-          setIsOpen(true);
-          setIsMinimized(false);
-        }}
+        onClick={() => { setIsOpen(true); setIsMinimized(false); }}
         className="fixed bottom-4 left-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700"
         style={{ display: isOpen ? 'none' : 'flex' }}
       >
@@ -128,7 +132,7 @@ const Chatbot = () => {
         <div className={`fixed bottom-4 left-4 z-50 bg-white rounded-lg shadow-xl border ${
           isMinimized ? 'w-64 h-12' : 'w-80 h-[500px]'
         }`}>
-
+          
           {/* Header */}
           <div className="flex justify-between items-center p-3 bg-blue-600 text-white rounded-t-lg">
             <div className="flex items-center gap-2">
@@ -139,9 +143,7 @@ const Chatbot = () => {
               <button onClick={() => setIsMinimized(!isMinimized)}>
                 {isMinimized ? <Maximize2 size={16}/> : <Minimize2 size={16}/>}
               </button>
-              <button onClick={() => setIsOpen(false)}>
-                <X size={16}/>
-              </button>
+              <button onClick={() => setIsOpen(false)}><X size={16}/></button>
             </div>
           </div>
 
@@ -152,11 +154,13 @@ const Chatbot = () => {
                 {messages.map(msg => (
                   <div key={msg.id} className={`mb-3 ${msg.sender === 'user' && 'text-right'}`}>
                     <div className={`inline-block max-w-[80%] p-3 rounded-lg text-sm ${
-                      msg.sender === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border'
+                      msg.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-white border'
                     }`}>
-                      {msg.text}
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath]}
+                        rehypePlugins={[rehypeKatex, rehypeRaw]}
+                        children={msg.text}
+                      />
                       <div className="text-xs mt-1 opacity-70">
                         {formatTime(msg.timestamp)}
                       </div>
@@ -207,5 +211,3 @@ const Chatbot = () => {
 };
 
 export default Chatbot;
-
-
