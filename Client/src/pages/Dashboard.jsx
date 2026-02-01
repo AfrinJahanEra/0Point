@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from '../components/Sidebar';
 import { useApp } from '../context/AppContext';
 import api from '../utils/api';
 import { Plus, Edit2, TrendingUp, Globe } from 'lucide-react';
+import { SiCodechef } from 'react-icons/si'; // Import CodeChef icon from react-icons
 import RatingChart from '../components/RatingChart';
 import toast from 'react-hot-toast';
+
+// Import platform logos as images for other platforms
+// You'll need to download these logos and place them in your public or assets folder
 
 const Dashboard = () => {
   const { user } = useApp();
@@ -24,6 +27,21 @@ const Dashboard = () => {
     handle: ''
   });
   const [savingPlatform, setSavingPlatform] = useState(false);
+
+  // Platform logo paths - only for platforms without react-icons
+  const platformLogos = {
+    codeforces: '/src/assets/codeforces-social-preview.png',
+    atcoder: '/src/assets/atcoder.png',
+    leetcode: '/src/assets/LeetCode_logo.png'
+  };
+
+  // Fallback logos if image fails to load
+  const platformInitials = {
+    codeforces: 'CF',
+    codechef: 'CC',
+    atcoder: 'A',
+    leetcode: 'LC'
+  };
 
   useEffect(() => {
     if (user) {
@@ -101,11 +119,32 @@ const Dashboard = () => {
     }
   };
 
-  const platformIcons = {
-    codeforces: '🟦',
-    codechef: '🟪',
-    atcoder: '⭕',
-    leetcode: '🟨'
+  // Platform Icon component with react-icons for CodeChef and images for others
+  const PlatformIcon = ({ platform, className = "w-5 h-5" }) => {
+    const [imgError, setImgError] = useState(false);
+    
+    // Use react-icons for CodeChef
+    if (platform === 'codechef') {
+      return <SiCodechef className={`${className} text-[#5B4638]`} />;
+    }
+    
+    // For other platforms, use images with fallback
+    if (imgError || !platformLogos[platform]) {
+      return (
+        <div className={`${className} flex items-center justify-center rounded bg-blue-100 text-blue-800 font-bold text-xs`}>
+          {platformInitials[platform] || platform.charAt(0).toUpperCase()}
+        </div>
+      );
+    }
+    
+    return (
+      <img
+        src={platformLogos[platform]}
+        alt={platform}
+        className={className}
+        onError={() => setImgError(true)}
+      />
+    );
   };
 
   const platformNames = {
@@ -113,6 +152,34 @@ const Dashboard = () => {
     codechef: 'CodeChef',
     atcoder: 'AtCoder',
     leetcode: 'LeetCode'
+  };
+
+  // All platforms use the same blue color scheme as Codeforces
+  const platformColors = {
+    codeforces: {
+      bg: 'bg-gray-50',
+      border: 'border-gray-100',
+      text: 'text-blue-700',
+      badge: 'bg-blue-100 text-blue-800'
+    },
+    codechef: {
+      bg: 'bg-gray-50',
+      border: 'border-gray-100',
+      text: 'text-blue-700',
+      badge: 'bg-blue-100 text-blue-800'
+    },
+    atcoder: {
+      bg: 'bg-gray-50',
+      border: 'border-gray-100',
+      text: 'text-blue-700',
+      badge: 'bg-blue-100 text-blue-800'
+    },
+    leetcode: {
+      bg: 'bg-gray-50',
+      border: 'border-gray-100',
+      text: 'text-blue-700',
+      badge: 'bg-blue-100 text-blue-800'
+    }
   };
 
   if (!user) {
@@ -129,95 +196,95 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-[1920px] mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="max-w-[1920px] mx-auto px-4 py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Sidebar - User Profile */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-lg shadow-md p-6 sticky top-6">
+            <div className="bg-white rounded-lg shadow-sm p-5 sticky top-4">
               {/* User Avatar */}
-              <div className="text-center mb-6">
-                <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
+              <div className="text-center mb-5">
+                <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold">
                   {user?.name?.charAt(0)?.toUpperCase()}
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900">{user?.name}</h2>
+                <h2 className="text-xl font-bold text-gray-900">{user?.name}</h2>
                 {userProfile?.department && (
-                  <p className="text-sm text-gray-600 mt-1">{userProfile.department}</p>
+                  <p className="text-xs text-gray-600 mt-1">{userProfile.department}</p>
                 )}
                 {userProfile?.year && (
-                  <p className="text-sm text-gray-600">{userProfile.year}</p>
+                  <p className="text-xs text-gray-600">{userProfile.year}</p>
                 )}
               </div>
 
-              {/* User Stats */}
-              <div className="space-y-4 border-t border-gray-200 pt-6">
+              {/* User Stats - More compact */}
+              <div className="space-y-3 border-t border-gray-200 pt-5">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Total Score</span>
-                  <span className="text-2xl font-bold text-blue-600">{userProfile?.total_score || 0}</span>
+                  <span className="text-gray-600 text-xs">Total Score</span>
+                  <span className="text-lg font-bold text-blue-600">{userProfile?.total_score || 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Global Rank</span>
-                  <span className="text-2xl font-bold text-purple-600">#{userProfile?.global_rank || 'N/A'}</span>
+                  <span className="text-gray-600 text-xs">Global Rank</span>
+                  <span className="text-lg font-bold text-purple-600">#{userProfile?.global_rank || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Problems Solved</span>
-                  <span className="text-2xl font-bold text-green-600">{userProfile?.problems_solved || 0}</span>
+                  <span className="text-gray-600 text-xs">Problems Solved</span>
+                  <span className="text-lg font-bold text-green-600">{userProfile?.problems_solved || 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Contests</span>
-                  <span className="text-2xl font-bold text-orange-600">{userProfile?.contests_count || 0}</span>
+                  <span className="text-gray-600 text-xs">Contests</span>
+                  <span className="text-lg font-bold text-orange-600">{userProfile?.contests_count || 0}</span>
                 </div>
               </div>
 
               {/* Edit Profile Button */}
               <button
                 onClick={() => navigate('/profile')}
-                className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                className="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
               >
-                <Edit2 size={16} />
+                <Edit2 size={14} />
                 Edit Profile
               </button>
             </div>
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-9">
+          <div className="lg:col-span-9 space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <p className="text-red-800">{error}</p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-red-800 text-sm">{error}</p>
               </div>
             )}
 
             {loading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-800 mx-auto mb-4"></div>
-                <p className="text-gray-500">Loading your dashboard...</p>
+              <div className="text-center py-10">
+                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-800 mx-auto mb-3"></div>
+                <p className="text-gray-500 text-sm">Loading your dashboard...</p>
               </div>
             ) : (
               <>
                 {/* Social Coding Profiles Section */}
-                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                  <div className="flex items-center justify-between mb-6">
+                <div className="bg-white rounded-lg shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-2">
-                      <Globe className="w-5 h-5 text-blue-600" />
-                      <h2 className="text-xl font-semibold text-gray-900">Social Coding Profiles</h2>
+                      <Globe className="w-4 h-4 text-blue-600" />
+                      <h2 className="text-lg font-semibold text-gray-900">Social Coding Profiles</h2>
                     </div>
                     <button
                       onClick={() => setShowAddPlatform(!showAddPlatform)}
-                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5 text-xs"
                     >
-                      <Plus size={16} />
+                      <Plus size={14} />
                       Add Profile
                     </button>
                   </div>
 
-                  {/* Add Platform Form */}
+                  {/* Add Platform Form - More compact */}
                   {showAddPlatform && (
-                    <form onSubmit={handleAddPlatform} className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <form onSubmit={handleAddPlatform} className="mb-5 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                         <select
                           value={platformForm.platform}
                           onChange={(e) => setPlatformForm({ ...platformForm, platform: e.target.value })}
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                         >
                           <option value="codeforces">Codeforces</option>
                           <option value="codechef">CodeChef</option>
@@ -229,12 +296,12 @@ const Dashboard = () => {
                           placeholder="Enter your handle"
                           value={platformForm.handle}
                           onChange={(e) => setPlatformForm({ ...platformForm, handle: e.target.value })}
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                         />
                         <button
                           type="submit"
                           disabled={savingPlatform}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm"
                         >
                           {savingPlatform ? 'Adding...' : 'Add'}
                         </button>
@@ -242,135 +309,144 @@ const Dashboard = () => {
                     </form>
                   )}
 
-                  {/* Platform Profiles Grid */}
+                  {/* Platform Profiles Grid - More compact */}
                   {userProfile?.platform_profiles && userProfile.platform_profiles.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {userProfile.platform_profiles.map((profile) => (
-                        <div key={profile.platform} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <span className="text-2xl">{platformIcons[profile.platform]}</span>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <h3 className="font-semibold text-gray-900">{platformNames[profile.platform]}</h3>
-                                  {profile.badge && (
-                                    <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded font-semibold">
-                                      {profile.badge}
-                                    </span>
-                                  )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {userProfile.platform_profiles.map((profile) => {
+                        const platformColor = platformColors[profile.platform] || platformColors.codeforces;
+                        
+                        return (
+                          <div 
+                            key={profile.platform} 
+                            className={`border ${platformColor.border} rounded-lg p-3 hover:shadow-sm transition-shadow ${platformColor.bg}`}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <div className={`p-1.5 rounded-md bg-white border ${platformColor.border} flex items-center justify-center`}>
+                                  <PlatformIcon platform={profile.platform} className="w-5 h-5" />
                                 </div>
-                                <p className="text-sm text-gray-600">{profile.handle}</p>
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-gray-900 text-sm mb-0.5">{platformNames[profile.platform]}</h3>
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-xs font-medium text-gray-700">{profile.handle}</p>
+                                    {profile.badge && (
+                                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${platformColor.badge}`}>
+                                        {profile.badge}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Platform Stats - Conditional based on platform */}
-                          <div className="grid gap-2 text-sm">
-                            {profile.platform === 'leetcode' ? (
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="bg-blue-50 rounded p-2">
-                                  <p className="text-gray-600 text-xs">Contest Rating</p>
-                                  <p className="font-bold text-blue-600">{profile.current_rating}</p>
+                            {/* Platform Stats - More compact */}
+                            <div className="grid gap-1.5 text-xs">
+                              {profile.platform === 'leetcode' ? (
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  <div className="bg-white rounded p-1.5 border">
+                                    <p className="text-gray-600 text-xs">Contest Rating</p>
+                                    <p className={`font-bold text-sm ${platformColor.text}`}>{profile.current_rating}</p>
+                                  </div>
+                                  <div className="bg-white rounded p-1.5 border">
+                                    <p className="text-gray-600 text-xs">Contests</p>
+                                    <p className="font-bold text-sm text-orange-600">{profile.contests_count}</p>
+                                  </div>
                                 </div>
-                                <div className="bg-orange-50 rounded p-2">
-                                  <p className="text-gray-600 text-xs">Participated Contests</p>
-                                  <p className="font-bold text-orange-600">{profile.contests_count}</p>
+                              ) : (
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  <div className="bg-white rounded p-1.5 border">
+                                    <p className="text-gray-600 text-xs">Current</p>
+                                    <p className={`font-bold text-sm ${platformColor.text}`}>{profile.current_rating}</p>
+                                  </div>
+                                  <div className="bg-white rounded p-1.5 border">
+                                    <p className="text-gray-600 text-xs">Max</p>
+                                    <p className="font-bold text-sm text-green-600">{profile.max_rating}</p>
+                                  </div>
+                                  <div className="bg-white rounded p-1.5 border">
+                                    <p className="text-gray-600 text-xs">Contests</p>
+                                    <p className="font-bold text-sm text-orange-600">{profile.contests_count}</p>
+                                  </div>
                                 </div>
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-3 gap-2">
-                                <div className="bg-blue-50 rounded p-2">
-                                  <p className="text-gray-600 text-xs">Current</p>
-                                  <p className="font-bold text-blue-600">{profile.current_rating}</p>
-                                </div>
-                                <div className="bg-green-50 rounded p-2">
-                                  <p className="text-gray-600 text-xs">Max</p>
-                                  <p className="font-bold text-green-600">{profile.max_rating}</p>
-                                </div>
-                                <div className="bg-orange-50 rounded p-2">
-                                  <p className="text-gray-600 text-xs">Contests</p>
-                                  <p className="font-bold text-orange-600">{profile.contests_count}</p>
-                                </div>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-6 text-gray-500 text-sm">
                       <p>No platform profiles yet. Add one to get started!</p>
                     </div>
                   )}
                 </div>
 
-                {/* Rating Progress Chart */}
+                {/* Rating Progress Chart - Placed BEFORE Contest History */}
                 {userProfile?.platform_profiles && userProfile.platform_profiles.length > 0 && (
-                  <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                    <div className="flex items-center gap-2 mb-6">
-                      <TrendingUp className="w-5 h-5 text-blue-600" />
-                      <h2 className="text-xl font-semibold text-gray-900">Rating Progress</h2>
+                  <div className="bg-white rounded-lg shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingUp className="w-4 h-4 text-blue-600" />
+                      <h2 className="text-lg font-semibold text-gray-900">Rating Progress</h2>
                     </div>
                     <RatingChart platformProfiles={userProfile.platform_profiles} />
                   </div>
                 )}
 
-                {/* Contest History Section */}
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Contest History</h2>
+                {/* Contest History Section - Updated as requested */}
+                <div className="bg-white rounded-lg shadow-sm p-5">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Contest History</h2>
 
                   {contestHistory && contestHistory.length > 0 ? (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                      <table className="w-full text-xs">
                         <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
-                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Contest Name</th>
-                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Date & Time</th>
-                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Rank</th>
-                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Problems Solved</th>
-                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Rating After</th>
-                            <th className="text-left px-4 py-3 font-semibold text-gray-900">Platform</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-900">Contest Name</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-900">Date & Time</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-900">Rank</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-900">Rating After</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-900">Platform</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                           {contestHistory.map((contest, idx) => (
                             <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-3">
-                                <p className="font-semibold text-gray-900">{contest.title}</p>
+                              <td className="px-3 py-2">
+                                <p className="font-medium text-gray-900 whitespace-normal break-words">
+                                  {contest.title}
+                                </p>
                               </td>
-                              <td className="px-4 py-3 text-gray-600 text-xs">
+                              <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
                                 {contest.datetime 
                                   ? new Date(contest.datetime).toLocaleString() 
                                   : (contest.date ? new Date(contest.date).toLocaleDateString() : 'N/A')}
                               </td>
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-2">
                                 <span className="font-semibold text-blue-600">#{contest.rank || 'N/A'}</span>
                               </td>
-                              <td className="px-4 py-3">
-                                <span className="font-semibold text-gray-900">{contest.solved || 0}</span>
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
+                              <td className="px-3 py-2">
+                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
                                   {contest.rating || contest.score || 'N/A'}
                                 </span>
                               </td>
-                              <td className="px-4 py-3">
-                                <span className="text-gray-600 capitalize font-medium">{contest.platform}</span>
+                              <td className="px-3 py-2">
+                                <span className="text-gray-600 capitalize font-medium text-xs">
+                                  {contest.platform}
+                                </span>
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                      <div className="flex items-center justify-between mt-4">
-                        <div className="text-gray-600 text-sm">Showing page {contestPage} of {totalPages} — {totalContests} contests</div>
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="text-gray-600 text-xs">Page {contestPage} of {totalPages} — {totalContests} contests</div>
+                        <div className="flex items-center gap-1.5">
                           <button
-                            className="px-3 py-1 bg-white border rounded disabled:opacity-50"
+                            className="px-2 py-0.5 bg-white border rounded text-xs disabled:opacity-50 hover:bg-gray-50"
                             onClick={() => { if (contestPage > 1) { fetchContestPage(contestPage - 1); } }}
                             disabled={contestPage <= 1}
                           >Prev</button>
                           <button
-                            className="px-3 py-1 bg-white border rounded disabled:opacity-50"
+                            className="px-2 py-0.5 bg-white border rounded text-xs disabled:opacity-50 hover:bg-gray-50"
                             onClick={() => { if (contestPage < totalPages) { fetchContestPage(contestPage + 1); } }}
                             disabled={contestPage >= totalPages}
                           >Next</button>
@@ -378,7 +454,7 @@ const Dashboard = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-6 text-gray-500 text-sm">
                       <p>No contest history yet. Participate in contests to see them here!</p>
                     </div>
                   )}
