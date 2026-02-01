@@ -152,9 +152,34 @@ class AddPlatformProfileView(APIView):
         platform = serializer.validated_data.get('platform')
         handle = serializer.validated_data.get('handle')
         
-        # Fetch rating data from the platform
+        # Fetch rating data from the platform with a cross-platform timeout
         try:
-            rating_data = fetch_platform_rating(platform, handle)
+            import threading
+
+            result = {"data": None, "error": None}
+
+            def _fetch():
+                try:
+                    result['data'] = fetch_platform_rating(platform, handle)
+                except Exception as ex:
+                    result['error'] = ex
+
+            th = threading.Thread(target=_fetch, daemon=True)
+            th.start()
+
+            # wait up to 15 seconds for the fetch to complete
+            th.join(timeout=15)
+
+            if th.is_alive():
+                return Response({
+                    "error": "Request to platform API took too long. Please try again in a moment."
+                }, status=408)
+
+            if result['error']:
+                return Response({"error": str(result['error'])}, status=400)
+
+            rating_data = result['data'] or {}
+
             user.add_or_update_platform(
                 platform,
                 handle,
@@ -165,7 +190,7 @@ class AddPlatformProfileView(APIView):
                 rating_data.get('badge', ''),
                 rating_data.get('rating_history', [])
             )
-            
+
             return Response({
                 "message": "Platform profile added successfully",
                 "platform": platform,
@@ -297,7 +322,3 @@ class ContestHistoryView(APIView):
             })
         except Exception as e:
             return Response({"error": str(e)}, status=400)
-
-
-
-
