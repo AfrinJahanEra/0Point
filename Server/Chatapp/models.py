@@ -28,3 +28,25 @@ class ChatSession(Document):
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
+
+class ChatMessage(Document):
+    meta = {
+        'collection': 'chat_messages',
+        'indexes': ['chat', 'created_at']
+    }
+
+    chat = ReferenceField(ChatSession, required=True)
+    role = StringField(required=True, choices=("user", "ai"))
+    content = StringField(required=True)
+
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": str(self.id),
+            "chat_id": str(self.chat.id),
+            "role": self.role,
+            "content": self.content,
+            "created_at": self.created_at.isoformat(),
+        }
+
