@@ -4,17 +4,26 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import hljs from 'highlight.js';
+
 import 'highlight.js/styles/github-dark.css';
 import 'katex/dist/katex.min.css';
 
 import {
-  MessageSquare, X, Send, Bot, History, Trash2, Box, Minus
+  MessageSquare,
+  X,
+  Send,
+  Bot,
+  History,
+  Trash2,
+  Minus,
+  Square
 } from 'lucide-react';
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [isMaximized, setIsMaximized] = useState(false);
+  const [windowMode, setWindowMode] = useState('normal'); 
+  // 'normal' | 'minimized' | 'maximized'
+
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -22,12 +31,12 @@ const Chatbot = () => {
 
   const messagesEndRef = useRef(null);
 
-  // Scroll to bottom on new message
+  /* ---------------- Scroll ---------------- */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // Initial bot message
+  /* ---------------- Initial Message ---------------- */
   useEffect(() => {
     setMessages([{
       id: Date.now(),
@@ -37,13 +46,14 @@ const Chatbot = () => {
     }]);
   }, []);
 
-  // Highlight code blocks
+  /* ---------------- Highlight Code ---------------- */
   useEffect(() => {
     document.querySelectorAll('pre code').forEach(block => {
-      hljs.highlightBlock(block);
+      hljs.highlightElement(block);
     });
   }, [messages]);
 
+  /* ---------------- Send Message ---------------- */
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -64,25 +74,27 @@ const Chatbot = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ message: userMessage.text, chat_id: chatId })
+        body: JSON.stringify({
+          message: userMessage.text,
+          chat_id: chatId
+        })
       });
-      const data = await res.json();
 
+      const data = await res.json();
       if (data.chat_id && !chatId) setChatId(data.chat_id);
 
-      const botMessage = {
+      setMessages(prev => [...prev, {
         id: Date.now() + 1,
-        text: data.reply || "Something went wrong.",
+        text: data.reply || 'Something went wrong.',
         sender: 'bot',
         timestamp: new Date()
-      };
-      setMessages(prev => [...prev, botMessage]);
+      }]);
     } catch {
       setMessages(prev => [...prev, {
         id: Date.now() + 2,
-        text: "Server error. Please try again.",
+        text: 'Server error. Please try again.',
         sender: 'bot',
         timestamp: new Date()
       }]);
@@ -91,86 +103,122 @@ const Chatbot = () => {
     }
   };
 
+  /* ---------------- Clear Chat ---------------- */
   const handleClearChat = () => {
     setMessages([{
       id: Date.now(),
-      text: "New chat started. Ask me something about programming!",
+      text: 'New chat started. Ask me something about programming!',
       sender: 'bot',
       timestamp: new Date()
     }]);
     setChatId(null);
   };
 
-  const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatTime = (date) =>
+    date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Determine width/height based on minimized/maximized state
-  const chatWidth = isMaximized ? 'w-[95vw]' : isMinimized ? 'w-64' : 'w-80';
-  const chatHeight = isMaximized ? 'h-[90vh]' : isMinimized ? 'h-12' : 'h-[500px]';
+  /* ---------------- Window Sizes ---------------- */
+  const sizeMap = {
+    normal: 'w-80 h-[500px]',
+    minimized: 'w-64 h-12',
+    maximized: 'w-[95vw] h-[90vh]'
+  };
+
+  const isMinimized = windowMode === 'minimized';
+  const isMaximized = windowMode === 'maximized';
 
   return (
     <>
-      {/* Open Chat Button */}
-      <button
-        onClick={() => { setIsOpen(true); setIsMinimized(false); }}
-        className="fixed bottom-4 left-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700"
-        style={{ display: isOpen ? 'none' : 'flex' }}
-      >
-        <MessageSquare className="w-6 h-6" />
-      </button>
+      {/* Open Button */}
+      {!isOpen && (
+        <button
+          onClick={() => {
+            setIsOpen(true);
+            setWindowMode('normal');
+          }}
+          className="fixed bottom-4 left-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700"
+        >
+          <MessageSquare className="w-6 h-6" />
+        </button>
+      )}
 
       {isOpen && (
-        <div className={`fixed bottom-4 left-4 z-50 bg-white rounded-lg shadow-xl border ${chatWidth} ${chatHeight}`}>
-          
+        <div
+          className={`fixed bottom-4 left-4 z-50 bg-white border rounded-lg shadow-xl transition-all duration-200 ${sizeMap[windowMode]}`}
+        >
           {/* Header */}
           <div className="flex justify-between items-center p-3 bg-blue-600 text-white rounded-t-lg">
             <div className="flex items-center gap-2">
               <Bot className="w-5 h-5" />
               <span className="text-sm font-semibold">Coding Assistant</span>
             </div>
-            <div className="flex gap-1">
-              {/* Minimize / restore from maximize */}
-              <button onClick={() => {
-                if (isMaximized) {
-                  setIsMaximized(false); // restore from maximize
-                } else {
-                  setIsMinimized(!isMinimized); // normal minimize toggle
-                }
-              }}>
-                <Minus size={16}/>
+
+            <div className="flex gap-2">
+              {/* Minimize */}
+              <button
+                onClick={() => setWindowMode('minimized')}
+                title="Minimize"
+              >
+                <Minus size={16} />
               </button>
 
-              {/* Maximize / restore normal */}
-              <button onClick={() => setIsMaximized(!isMaximized)}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="2" y="5" width="8" height="6" stroke="currentColor" strokeWidth="1.5"/>
-                </svg>
+              {/* Maximize / Restore */}
+              <button
+                onClick={() =>
+                  setWindowMode(isMaximized ? 'normal' : 'maximized')
+                }
+                title={isMaximized ? 'Restore' : 'Maximize'}
+              >
+                <Square size={16} />
               </button>
 
               {/* Close */}
-              <button onClick={() => setIsOpen(false)}><X size={16}/></button>
+              <button onClick={() => setIsOpen(false)} title="Close">
+                <X size={16} />
+              </button>
             </div>
           </div>
 
-          {/* Chat body */}
+          {/* Body */}
           {!isMinimized && (
             <>
-              <div className="overflow-y-auto p-3 bg-gray-50" style={{ height: isMaximized ? 'calc(100% - 120px)' : '340px' }}>
+              <div
+                className="overflow-y-auto p-3 bg-gray-50"
+                style={{
+                  height: isMaximized
+                    ? 'calc(100% - 120px)'
+                    : '340px'
+                }}
+              >
                 {messages.map(msg => (
-                  <div key={msg.id} className={`mb-3 ${msg.sender === 'user' && 'text-right'}`}>
-                    <div className={`inline-block max-w-[80%] p-3 rounded-lg text-sm ${msg.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-white border'}`}>
+                  <div
+                    key={msg.id}
+                    className={`mb-3 ${msg.sender === 'user' ? 'text-right' : ''}`}
+                  >
+                    <div
+                      className={`inline-block max-w-[80%] p-3 rounded-lg text-sm ${
+                        msg.sender === 'user'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white border'
+                      }`}
+                    >
                       <ReactMarkdown
                         remarkPlugins={[remarkMath]}
                         rehypePlugins={[rehypeKatex, rehypeRaw]}
-                        children={msg.text}
-                      />
-                      <div className="text-xs mt-1 opacity-70">
+                      >
+                        {msg.text}
+                      </ReactMarkdown>
+                      <div className="text-xs mt-1 opacity-60">
                         {formatTime(msg.timestamp)}
                       </div>
                     </div>
                   </div>
                 ))}
-                {isTyping && <div className="text-sm text-gray-500">AI is typing…</div>}
-                <div ref={messagesEndRef}/>
+
+                {isTyping && (
+                  <div className="text-sm text-gray-500">AI is typing…</div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Input */}
@@ -181,18 +229,28 @@ const Chatbot = () => {
                   className="flex-1 border rounded-lg px-3 py-2 text-sm"
                   placeholder="Ask something about coding…"
                 />
-                <button type="submit" disabled={!inputText.trim()} className="bg-blue-600 text-white p-2 rounded-lg">
-                  <Send size={16}/>
+                <button
+                  type="submit"
+                  disabled={!inputText.trim()}
+                  className="bg-blue-600 text-white p-2 rounded-lg"
+                >
+                  <Send size={16} />
                 </button>
               </form>
 
               {/* Footer */}
               <div className="flex justify-between px-3 pb-3 text-xs">
-                <button onClick={handleClearChat} className="text-gray-500 flex gap-1">
-                  <Trash2 size={12}/> Clear
+                <button
+                  onClick={handleClearChat}
+                  className="text-gray-500 flex gap-1"
+                >
+                  <Trash2 size={12} /> Clear
                 </button>
-                <button onClick={() => setInputText("Explain binary search")} className="text-blue-600 flex gap-1">
-                  <History size={12}/> Quick help
+                <button
+                  onClick={() => setInputText('Explain binary search')}
+                  className="text-blue-600 flex gap-1"
+                >
+                  <History size={12} /> Quick help
                 </button>
               </div>
             </>
