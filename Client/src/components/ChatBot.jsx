@@ -8,7 +8,7 @@ import 'highlight.js/styles/github-dark.css';
 import 'katex/dist/katex.min.css';
 
 import {
-  MessageSquare, X, Send, Bot, Minimize2, Maximize2, History, Trash2
+  MessageSquare, X, Send, Bot, History, Trash2, Box, Minus
 } from 'lucide-react';
 
 const Chatbot = () => {
@@ -22,10 +22,12 @@ const Chatbot = () => {
 
   const messagesEndRef = useRef(null);
 
+  // Scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
+  // Initial bot message
   useEffect(() => {
     setMessages([{
       id: Date.now(),
@@ -35,6 +37,7 @@ const Chatbot = () => {
     }]);
   }, []);
 
+  // Highlight code blocks
   useEffect(() => {
     document.querySelectorAll('pre code').forEach(block => {
       hljs.highlightBlock(block);
@@ -45,7 +48,13 @@ const Chatbot = () => {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    const userMessage = { id: Date.now(), text: inputText, sender: 'user', timestamp: new Date() };
+    const userMessage = {
+      id: Date.now(),
+      text: inputText,
+      sender: 'user',
+      timestamp: new Date()
+    };
+
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsTyping(true);
@@ -60,19 +69,35 @@ const Chatbot = () => {
         body: JSON.stringify({ message: userMessage.text, chat_id: chatId })
       });
       const data = await res.json();
+
       if (data.chat_id && !chatId) setChatId(data.chat_id);
 
-      const botMessage = { id: Date.now() + 1, text: data.reply || "Something went wrong.", sender: 'bot', timestamp: new Date() };
+      const botMessage = {
+        id: Date.now() + 1,
+        text: data.reply || "Something went wrong.",
+        sender: 'bot',
+        timestamp: new Date()
+      };
       setMessages(prev => [...prev, botMessage]);
     } catch {
-      setMessages(prev => [...prev, { id: Date.now() + 2, text: "Server error. Please try again.", sender: 'bot', timestamp: new Date() }]);
+      setMessages(prev => [...prev, {
+        id: Date.now() + 2,
+        text: "Server error. Please try again.",
+        sender: 'bot',
+        timestamp: new Date()
+      }]);
     } finally {
       setIsTyping(false);
     }
   };
 
   const handleClearChat = () => {
-    setMessages([{ id: Date.now(), text: "New chat started. Ask me something about programming!", sender: 'bot', timestamp: new Date() }]);
+    setMessages([{
+      id: Date.now(),
+      text: "New chat started. Ask me something about programming!",
+      sender: 'bot',
+      timestamp: new Date()
+    }]);
     setChatId(null);
   };
 
@@ -84,6 +109,7 @@ const Chatbot = () => {
 
   return (
     <>
+      {/* Open Chat Button */}
       <button
         onClick={() => { setIsOpen(true); setIsMinimized(false); }}
         className="fixed bottom-4 left-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700"
@@ -102,16 +128,30 @@ const Chatbot = () => {
               <span className="text-sm font-semibold">Coding Assistant</span>
             </div>
             <div className="flex gap-1">
-              <button onClick={() => setIsMinimized(!isMinimized)}>
-                {isMinimized ? <Maximize2 size={16}/> : <Minimize2 size={16}/>}
+              {/* Minimize / restore from maximize */}
+              <button onClick={() => {
+                if (isMaximized) {
+                  setIsMaximized(false); // restore from maximize
+                } else {
+                  setIsMinimized(!isMinimized); // normal minimize toggle
+                }
+              }}>
+                <Minus size={16}/>
               </button>
+
+              {/* Maximize / restore normal */}
               <button onClick={() => setIsMaximized(!isMaximized)}>
-                {isMaximized ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="2" y="5" width="8" height="6" stroke="currentColor" strokeWidth="1.5"/>
+                </svg>
               </button>
+
+              {/* Close */}
               <button onClick={() => setIsOpen(false)}><X size={16}/></button>
             </div>
           </div>
 
+          {/* Chat body */}
           {!isMinimized && (
             <>
               <div className="overflow-y-auto p-3 bg-gray-50" style={{ height: isMaximized ? 'calc(100% - 120px)' : '340px' }}>
@@ -133,6 +173,7 @@ const Chatbot = () => {
                 <div ref={messagesEndRef}/>
               </div>
 
+              {/* Input */}
               <form onSubmit={handleSendMessage} className="p-3 flex gap-2 border-t">
                 <input
                   value={inputText}
@@ -145,6 +186,7 @@ const Chatbot = () => {
                 </button>
               </form>
 
+              {/* Footer */}
               <div className="flex justify-between px-3 pb-3 text-xs">
                 <button onClick={handleClearChat} className="text-gray-500 flex gap-1">
                   <Trash2 size={12}/> Clear
