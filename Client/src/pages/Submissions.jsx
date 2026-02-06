@@ -74,10 +74,12 @@ const normalizeVerdict = (verdict) => {
         return 'text-red-600';
       case 'TLE':
         return 'text-orange-600';
+      case 'MLE':
+        return 'text-yellow-600';
       case 'RE':
         return 'text-purple-600';
       case 'CE':
-        return 'text-red-800';
+        return 'text-blue-600';
       default:
         return 'text-gray-600';
     }
@@ -141,30 +143,46 @@ const normalizeVerdict = (verdict) => {
 
       {/* Submission ID */}
       <td className="px-3 py-2 text-xs font-mono">
-  <a
-    href={`https://codeforces.com/contest/${s.contest_id}/submission/${s.submission_id}`}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="text-blue-600 hover:underline"
-  >
-    {s.submission_id}
-  </a>
-</td>
+   {s.platform === "codeforces" ? (
+            <a
+              href={`https://codeforces.com/contest/${s.contest_id}/submission/${s.submission_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+            >
+              {s.submission_id}
+            </a>
+          ) : (
+            <a
+              href={s.submission_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+            >
+              {s.id.split("-").slice(1).join("-")}
+            </a>
+          )}
+        </td>
 
 
       {/* Problem: index - name */}
       <td className="px-3 py-2 text-xs text-gray-900">
   <a
-    href={`https://codeforces.com/contest/${s.contest_id}/problem/${s.problem_code}`}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="hover:underline"
-  >
-    <span className="font-semibold">{s.problem_code}</span>
-    {" - "}
-    {s.problem_title}
-  </a>
+            href={s.platform === "codeforces"
+              ? `https://codeforces.com/contest/${s.contest_id}/problem/${s.problem_code}`
+              : s.problem.url
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline"
+          >
+            {s.platform === "codeforces"
+              ? `${s.problem_code} - ${s.problem_title}`
+              : s.problem.name
+            }
+          </a>
 </td>
+
 
 
       {/* Verdict */}
