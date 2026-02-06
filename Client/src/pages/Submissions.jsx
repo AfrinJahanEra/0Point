@@ -218,12 +218,14 @@ const normalizeVerdict = (verdict) => {
 
       {/* Time */}
       <td className="px-3 py-2 text-xs text-gray-500">
-        {s.execution_time} ms
+        {s.execution_time}
+        {s.execution_time && !s.execution_time.toString().toLowerCase().includes('ms') ? ' ms' : ''}
       </td>
 
       {/* Memory */}
       <td className="px-3 py-2 text-xs text-gray-500">
-        {s.memory} MB
+        {s.memory} 
+        {s.memory && !s.memory.toString().toLowerCase().includes('mb') ? ' MB' : ''}
       </td>
 
     </tr>
