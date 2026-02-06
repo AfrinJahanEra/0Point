@@ -154,10 +154,18 @@ const normalizeVerdict = (verdict) => {
 
       {/* Problem: index - name */}
       <td className="px-3 py-2 text-xs text-gray-900">
-        <span className="font-semibold">{s.problem_code}</span>
-        {" - "}
-        {s.problem_title}
-      </td>
+  <a
+    href={`https://codeforces.com/contest/${s.contest_id}/problem/${s.problem_code}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="hover:underline"
+  >
+    <span className="font-semibold">{s.problem_code}</span>
+    {" - "}
+    {s.problem_title}
+  </a>
+</td>
+
 
       {/* Verdict */}
       <td className="px-3 py-2 text-xs">
