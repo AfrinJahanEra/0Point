@@ -12,6 +12,7 @@ from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerialize
 from .platforms import fetch_codechef_contests, fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
 from submission.models import Submission
 from leaderboard.models import LeaderboardEntry
+from .platforms.codeforces import fetch_submissions as fetch_cf_submissions
 
 
 class SignupView(APIView):
@@ -324,3 +325,42 @@ class ContestHistoryView(APIView):
             })
         except Exception as e:
             return Response({"error": str(e)}, status=400)
+
+
+class ExternalSubmissionView(APIView):
+    """
+    Fetch submissions from external platforms (Codeforces, etc.)
+    """
+
+    def get(self, request):
+        # Auth
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return Response({"error": "Unauthorized"}, status=401)
+
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        submissions = []
+
+        for profile in user.platform_profiles:
+            try:
+                if profile.platform == "codeforces":
+                    submissions.extend(fetch_cf_submissions(profile.handle))
+            except Exception:
+                pass
+
+        # sort newest first
+        submissions.sort(key=lambda x: x.get("submitted_at", ""), reverse=True)
+
+        return Response({
+            "submissions": submissions
+        })

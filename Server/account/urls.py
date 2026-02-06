@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import SignupView, LoginView, UserProfileView, AddPlatformProfileView, ContestHistoryView
+from .views import SignupView, LoginView, UserProfileView, AddPlatformProfileView, ContestHistoryView, ExternalSubmissionView
 
 urlpatterns = [
     path("signup/", SignupView.as_view(), name="signup"),
@@ -9,4 +9,6 @@ urlpatterns = [
     path("platform/add/", AddPlatformProfileView.as_view(), name="add_platform"),
     path("contest-history/<str:user_id>/", ContestHistoryView.as_view(), name="contest_history_user"),
     path("contest-history/", ContestHistoryView.as_view(), name="contest_history"),
+    path("external-submissions/", ExternalSubmissionView.as_view(), name="external_submissions"),
+
 ]
