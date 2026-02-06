@@ -101,7 +101,7 @@ const normalizeVerdict = (verdict) => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Main Content */}
           <div className="lg:col-span-9">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">{user?.name}'s Submissions</h2>
+            
             
             {loading && (
               <div className="text-center py-12">
@@ -140,9 +140,17 @@ const normalizeVerdict = (verdict) => {
     <tr key={s.id} className="hover:bg-gray-50">
 
       {/* Submission ID */}
-      <td className="px-3 py-2 text-xs text-gray-800 font-mono">
-        {s.submission_id}
-      </td>
+      <td className="px-3 py-2 text-xs font-mono">
+  <a
+    href={`https://codeforces.com/contest/${s.contest_id}/submission/${s.submission_id}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-blue-600 hover:underline"
+  >
+    {s.submission_id}
+  </a>
+</td>
+
 
       {/* Problem: index - name */}
       <td className="px-3 py-2 text-xs text-gray-900">
