@@ -200,7 +200,7 @@ const normalizeVerdict = (verdict) => {
       {/* Tags */}
       <td className="px-3 py-2 text-xs">
         <div className="flex flex-wrap gap-1 max-w-[220px]">
-          {(s.tags || []).map((tag, i) => (
+          {(s.tags || s.problem?.tags || []).map((tag, i) => (
             <span
               key={i}
               className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded"
