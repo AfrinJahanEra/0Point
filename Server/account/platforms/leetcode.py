@@ -201,13 +201,14 @@ def fetch_contests(handle):
 def fetch_submissions(handle, limit=30):
     """
     Fetch recent LeetCode submissions (ALL verdicts)
+    using new API: leetcode-api-pied.vercel.app
     """
     submissions = []
     try:
         session = create_session()
 
         res = session.get(
-            f"{BASE_URL}/{handle}/submission",
+            f"https://leetcode-api-pied.vercel.app/user/{handle}/submissions",
             timeout=10
         )
 
@@ -215,44 +216,40 @@ def fetch_submissions(handle, limit=30):
             return submissions
 
         data = res.json()
-        sub_list = data.get("submission", [])
 
-        for sub in sub_list[:limit]:
+        for sub in data[:limit]:
             dt = ts_to_dt(sub.get("timestamp"))
 
             slug = sub.get("titleSlug")
             title = sub.get("title")
 
             verdict_map = {
-                "Accepted": "OK",
-                "Wrong Answer": "WA",
-                "Time Limit Exceeded": "TLE",
-                "Memory Limit Exceeded": "MLE",
-                "Runtime Error": "RE",
-                "Compilation Error": "CE"
+                10: "OK",  # Accepted
+                11: "WA",  # Wrong Answer
+                12: "TLE", # Time Limit Exceeded
+                13: "MLE", # Memory Limit Exceeded
+                14: "RE",  # Runtime Error
+                15: "CE",  # Compilation Error
             }
 
-            verdict = verdict_map.get(
-                sub.get("statusDisplay"),
-                sub.get("statusDisplay")
-            )
+            verdict = verdict_map.get(sub.get("status"), sub.get("statusDisplay"))
 
             submissions.append({
-                "id": f"lc-{slug}-{sub.get('timestamp')}",
+                "id": f"lc-{sub.get('id')}",               # internal unique key
                 "platform": "leetcode",
+                "submission_id": sub.get("id"),            # actual LC submission ID
                 "problem": {
-                    "code": None,   # LeetCode has no A/B/C
+                    "code": None,
                     "name": title,
                     "url": f"https://leetcode.com/problems/{slug}/",
-                    "tags": []
+                    "tags": sub.get("topicTags", [])
                 },
-
                 "verdict": verdict,
-                "language": sub.get("lang"),
+                "language": sub.get("langName"),
                 "submitted_at": dt.isoformat() if dt else None,
-
-                # LeetCode doesn't expose submission detail ID
-                "submission_url": f"https://leetcode.com/problems/{slug}/submissions/"
+                "execution_time": sub.get("runtime"),
+                "memory": sub.get("memory"),
+                "submission_url": f"https://leetcode.com{sub.get('url')}"
             })
 
     except Exception as e:
