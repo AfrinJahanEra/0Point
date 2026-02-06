@@ -1,15 +1,19 @@
 import os
 import json
 from dotenv import load_dotenv
+from datetime import datetime
 
 import google.generativeai as genai
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import ChatSession, ChatMessage
-from contest.utils.auth import get_user_from_request  # ✅ use same JWT helper
+from contest.utils.auth import get_user_from_request
 
 load_dotenv()
+
+# ------------------ Gemini Config ------------------
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 SYSTEM_PROMPT = """
 You are an AI assistant specialized strictly in Computer Science and programming.
@@ -29,8 +33,9 @@ If the user asks a question outside the Computer Science or coding domain,
 you must politely refuse and guide them back to CS topics.
 """
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
+# ==================================================
+# 1️⃣ Send message (create / continue chat)
+# ==================================================
 @csrf_exempt
 def chat_api(request):
     if request.method != "POST":
@@ -44,12 +49,11 @@ def chat_api(request):
         if not user_text:
             return JsonResponse({"error": "Empty message"}, status=400)
 
-        # ✅ Use project’s JWT authentication helper
         user = get_user_from_request(request)
         if not user:
             return JsonResponse({"error": "Authentication required"}, status=401)
 
-        # 1️⃣ Load or create chat
+        # Load or create chat
         if chat_id:
             chat = ChatSession.objects(id=chat_id, user=user).first()
             if not chat:
@@ -60,15 +64,15 @@ def chat_api(request):
                 title=user_text[:40]
             ).save()
 
-        # 2️⃣ Save user message
+        # Save user message
         ChatMessage(
             chat=chat,
             role="user",
             content=user_text
         ).save()
 
-        # 3️⃣ Build context for Gemini
-        messages = [{"role": "USER", "parts": [SYSTEM_PROMPT]}]
+        # Build Gemini context
+        messages = [{"role": "user", "parts": [SYSTEM_PROMPT]}]
 
         history = ChatMessage.objects(chat=chat).order_by("created_at")
         for msg in history:
@@ -77,13 +81,11 @@ def chat_api(request):
                 "parts": [msg.content]
             })
 
-        # 4️⃣ Call Gemini
         model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(messages)
 
         ai_reply = response.text.strip()
 
-        # 5️⃣ Save AI reply
         ChatMessage(
             chat=chat,
             role="ai",
@@ -98,3 +100,59 @@ def chat_api(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+
+# ==================================================
+# 2️⃣ List chat sessions (SIDEBAR)
+# ==================================================
+def chat_sessions(request):
+    user = get_user_from_request(request)
+    if not user:
+        return JsonResponse({"error": "Authentication required"}, status=401)
+
+    chats = ChatSession.objects(user=user).order_by("-updated_at")
+
+    return JsonResponse({
+        "chats": [chat.to_dict() for chat in chats]
+    })
+
+
+# ==================================================
+# 3️⃣ Load messages of a chat
+# ==================================================
+def chat_messages(request, chat_id):
+    user = get_user_from_request(request)
+    if not user:
+        return JsonResponse({"error": "Authentication required"}, status=401)
+
+    chat = ChatSession.objects(id=chat_id, user=user).first()
+    if not chat:
+        return JsonResponse({"error": "Chat not found"}, status=404)
+
+    messages = ChatMessage.objects(chat=chat).order_by("created_at")
+
+    return JsonResponse({
+        "chat": chat.to_dict(),
+        "messages": [msg.to_dict() for msg in messages]
+    })
+
+
+# ==================================================
+# 4️⃣ Delete chat (like ChatGPT)
+# ==================================================
+@csrf_exempt
+def delete_chat(request, chat_id):
+    if request.method != "DELETE":
+        return JsonResponse({"error": "DELETE request required"}, status=405)
+
+    user = get_user_from_request(request)
+    if not user:
+        return JsonResponse({"error": "Authentication required"}, status=401)
+
+    chat = ChatSession.objects(id=chat_id, user=user).first()
+    if not chat:
+        return JsonResponse({"error": "Chat not found"}, status=404)
+
+    ChatMessage.objects(chat=chat).delete()
+    chat.delete()
+
+    return JsonResponse({"message": "Chat deleted successfully"})
