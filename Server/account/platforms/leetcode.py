@@ -195,18 +195,33 @@ def fetch_contests(handle):
 
 
 # ---------------- Submissions ---------------- #
-
-# ---------------- Submissions ---------------- #
-
-def fetch_submissions(handle, limit=30):
+def fetch_problem_tags(slug):
     """
-    Fetch recent LeetCode submissions (ALL verdicts)
-    using new API: leetcode-api-pied.vercel.app
+    Fetch topic tags for a LeetCode problem
     """
-    submissions = []
     try:
         session = create_session()
+        res = session.get(
+            f"https://leetcode-api-pied.vercel.app/problem/{slug}",
+            timeout=10
+        )
 
+        if res.status_code != 200:
+            return []
+
+        data = res.json()
+        return [tag["name"] for tag in data.get("topicTags", [])]
+
+    except Exception:
+        return []
+
+
+def fetch_submissions(handle, limit=30):
+    submissions = []
+    tag_cache = {}   # slug -> [tags]
+
+    try:
+        session = create_session()
         res = session.get(
             f"https://leetcode-api-pied.vercel.app/user/{handle}/submissions",
             timeout=10
@@ -217,38 +232,41 @@ def fetch_submissions(handle, limit=30):
 
         data = res.json()
 
+        verdict_map = {
+            10: "OK",
+            11: "WA",
+            12: "TLE",
+            13: "MLE",
+            14: "RE",
+            15: "CE"
+        }
+
         for sub in data[:limit]:
+            slug = sub.get("titleSlug")
             dt = ts_to_dt(sub.get("timestamp"))
 
-            slug = sub.get("titleSlug")
-            title = sub.get("title")
-
-            verdict_map = {
-                10: "OK",  # Accepted
-                11: "WA",  # Wrong Answer
-                12: "TLE", # Time Limit Exceeded
-                13: "MLE", # Memory Limit Exceeded
-                14: "RE",  # Runtime Error
-                15: "CE",  # Compilation Error
-            }
-
-            verdict = verdict_map.get(sub.get("status"), sub.get("statusDisplay"))
+            # -------- tags (cached) --------
+            if slug not in tag_cache:
+                tag_cache[slug] = fetch_problem_tags(slug)
 
             submissions.append({
-                "id": f"lc-{sub.get('id')}",               # internal unique key
+                "id": f"lc-{sub.get('id')}",
+                "submission_id": sub.get("id"),
                 "platform": "leetcode",
-                "submission_id": sub.get("id"),            # actual LC submission ID
+
                 "problem": {
-                    "code": None,
-                    "name": title,
+                    "code": sub.get("frontendId"),  # 11, 1, 206 etc.
+                    "name": sub.get("title"),
                     "url": f"https://leetcode.com/problems/{slug}/",
-                    "tags": sub.get("topicTags", [])
+                    "tags": tag_cache[slug]
                 },
-                "verdict": verdict,
+
+                "verdict": verdict_map.get(sub.get("status"), sub.get("statusDisplay")),
                 "language": sub.get("langName"),
-                "submitted_at": dt.isoformat() if dt else None,
-                "execution_time": sub.get("runtime"),
+                "runtime": sub.get("runtime"),
                 "memory": sub.get("memory"),
+                "submitted_at": dt.isoformat() if dt else None,
+
                 "submission_url": f"https://leetcode.com{sub.get('url')}"
             })
 
