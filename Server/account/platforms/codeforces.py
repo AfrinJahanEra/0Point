@@ -83,3 +83,43 @@ def fetch_contests(handle):
     except Exception:
         pass
     return contests
+
+
+def fetch_submissions(handle, limit=100):
+    """
+    Fetch recent submissions from Codeforces
+    """
+    submissions = []
+    try:
+        url = f"https://codeforces.com/api/user.status?handle={handle}&count={limit}"
+        resp = requests.get(url, timeout=5)
+
+        if resp.status_code != 200:
+            return submissions
+
+        data = resp.json()
+        if data.get("status") != "OK":
+            return submissions
+
+        for sub in data.get("result", []):
+            problem = sub.get("problem", {})
+            contest_id = sub.get("contestId")
+
+            submissions.append({
+                "id": f"cf-{sub.get('id')}",
+                "problem_code": f"{problem.get('contestId', '')}{problem.get('index', '')}",
+                "problem_title": problem.get("name"),
+                "contest_id": contest_id,
+                "verdict": sub.get("verdict", "UNKNOWN"),
+                "language": sub.get("programmingLanguage"),
+                "execution_time": sub.get("timeConsumedMillis", 0),
+                "memory": round(sub.get("memoryConsumedBytes", 0) / (1024 * 1024), 2),
+                "submitted_at": datetime.fromtimestamp(sub.get("creationTimeSeconds")).isoformat(),
+                "tag": problem.get("tags", []),
+                "platform": "codeforces"
+
+            })
+    except Exception:
+        pass
+
+    return submissions
