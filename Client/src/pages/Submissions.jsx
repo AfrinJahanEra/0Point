@@ -123,75 +123,79 @@ const normalizeVerdict = (verdict) => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-100">
   <tr>
-    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Problem ID</th>
-    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Problem</th>
-    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Verdict</th>
-    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Submitted At</th>
-    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tags</th>
-    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Language</th>
-    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Memory</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Submission ID</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Problem</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Verdict</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Submitted</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Tags</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Lang</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Time</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Mem</th>
   </tr>
 </thead>
 
-                  <tbody className="bg-white divide-y divide-gray-200">
-  {submissions.map((submission) => (
-    <tr key={submission.id} className="hover:bg-gray-50">
-      
-      {/* Problem ID */}
-      <td className="px-6 py-4 text-sm text-gray-900 font-medium">
-        {submission.problem_code}
+
+                  <tbody className="bg-white divide-y divide-gray-100">
+  {submissions.map((s) => (
+    <tr key={s.id} className="hover:bg-gray-50">
+
+      {/* Submission ID */}
+      <td className="px-3 py-2 text-xs text-gray-800 font-mono">
+        {s.submission_id}
       </td>
 
-      {/* Problem Name */}
-      <td className="px-6 py-4 text-sm text-gray-900">
-        {submission.problem_title}
+      {/* Problem: index - name */}
+      <td className="px-3 py-2 text-xs text-gray-900">
+        <span className="font-semibold">{s.problem_code}</span>
+        {" - "}
+        {s.problem_title}
       </td>
 
       {/* Verdict */}
-      <td className="px-6 py-4 whitespace-nowrap">
-        <span className={`text-sm ${getVerdictColor(normalizeVerdict(submission.verdict))}`}>
-          {normalizeVerdict(submission.verdict)}
+      <td className="px-3 py-2 text-xs">
+        <span className={getVerdictColor(normalizeVerdict(s.verdict))}>
+          {normalizeVerdict(s.verdict)}
         </span>
       </td>
 
       {/* Submitted At */}
-      <td className="px-6 py-4 text-sm text-gray-500">
-        {new Date(submission.submitted_at).toLocaleString()}
+      <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+        {new Date(s.submitted_at).toLocaleString()}
       </td>
 
       {/* Tags */}
-      <td className="px-6 py-4 text-sm text-gray-500">
-        <div className="flex flex-wrap gap-1">
-          {(submission.tag || []).map((t, idx) => (
+      <td className="px-3 py-2 text-xs">
+        <div className="flex flex-wrap gap-1 max-w-[220px]">
+          {(s.tags || []).map((tag, i) => (
             <span
-              key={idx}
-              className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs"
+              key={i}
+              className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded"
             >
-              {t}
+              {tag}
             </span>
           ))}
         </div>
       </td>
 
       {/* Language */}
-      <td className="px-6 py-4 text-sm text-gray-500">
-        {submission.language}
+      <td className="px-3 py-2 text-xs text-gray-500">
+        {s.language}
       </td>
 
       {/* Time */}
-      <td className="px-6 py-4 text-sm text-gray-500">
-        {submission.execution_time} ms
+      <td className="px-3 py-2 text-xs text-gray-500">
+        {s.execution_time} ms
       </td>
 
       {/* Memory */}
-      <td className="px-6 py-4 text-sm text-gray-500">
-        {submission.memory} MB
+      <td className="px-3 py-2 text-xs text-gray-500">
+        {s.memory} MB
       </td>
 
     </tr>
   ))}
 </tbody>
+
 
                 </table>
               </div>
