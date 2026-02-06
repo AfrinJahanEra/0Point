@@ -106,8 +106,9 @@ def fetch_submissions(handle, limit=100):
             contest_id = sub.get("contestId")
 
             submissions.append({
-                "id": f"cf-{sub.get('id')}",
-                "problem_code": f"{problem.get('contestId', '')}{problem.get('index', '')}",
+                "id": f"cf-{sub.get('id')}",           # internal unique key
+                "submission_id": sub.get("id"),        # 👈 actual CF submission ID
+                "problem_code": f"{problem.get('index', '')}",
                 "problem_title": problem.get("name"),
                 "contest_id": contest_id,
                 "verdict": sub.get("verdict", "UNKNOWN"),
@@ -115,10 +116,9 @@ def fetch_submissions(handle, limit=100):
                 "execution_time": sub.get("timeConsumedMillis", 0),
                 "memory": round(sub.get("memoryConsumedBytes", 0) / (1024 * 1024), 2),
                 "submitted_at": datetime.fromtimestamp(sub.get("creationTimeSeconds")).isoformat(),
-                "tag": problem.get("tags", []),
+                "tags": problem.get("tags", []),        # rename tag → tags
                 "platform": "codeforces"
-
-            })
+                })
     except Exception:
         pass
 
