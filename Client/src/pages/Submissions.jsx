@@ -14,27 +14,57 @@ const Submissions = () => {
   }, [user]);
 
   const fetchUserSubmissions = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      if (!user) {
-        setSubmissions([]);
-        setLoading(false);
-        return;
-      }
+  try {
+    setLoading(true);
+    setError(null);
 
-      // Fetch submissions from backend - the backend will filter by authenticated user
-      const response = await api.get('/submissions/user/');
-      setSubmissions(response.data.submissions || []);
-    } catch (err) {
-      console.error('Error fetching submissions:', err);
-      setError('Failed to load submissions');
+    if (!user) {
       setSubmissions([]);
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    const [externalRes] = await Promise.all([
+      //api.get('/submissions/user/'),
+      api.get('/account/external-submissions/')
+    ]);
+
+    //const internalSubs = internalRes.data.submissions || [];
+    const externalSubs = externalRes.data.submissions || [];
+
+    const merged = [...externalSubs].sort(
+      (a, b) => new Date(b.submitted_at) - new Date(a.submitted_at)
+    );
+
+    setSubmissions(merged);
+  } catch (err) {
+    console.error(err);
+    setError('Failed to load submissions');
+  } finally {
+    setLoading(false);
+  }
+};
+
+const normalizeVerdict = (verdict) => {
+  switch (verdict) {
+    case "OK":
+    case "ACCEPTED":
+      return "AC";
+    case "WRONG_ANSWER":
+      return "WA";
+    case "TIME_LIMIT_EXCEEDED":
+      return "TLE";
+    case "MEMORY_LIMIT_EXCEEDED":
+      return "MLE";
+    case "COMPILATION_ERROR":
+      return "CE";
+    case "RUNTIME_ERROR":
+      return "RE";
+    default:
+      return verdict || "UNKNOWN";
+  }
+};
+
+
 
   const getVerdictColor = (verdict) => {
     switch (verdict) {
@@ -92,63 +122,77 @@ const Submissions = () => {
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-100">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Problem
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Contest
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Language
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Time
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Memory
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Submitted At
-                      </th>
-                    </tr>
-                  </thead>
+  <tr>
+    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Problem ID</th>
+    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Problem</th>
+    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Verdict</th>
+    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Submitted At</th>
+    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tags</th>
+    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Language</th>
+    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Memory</th>
+  </tr>
+</thead>
+
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {submissions.map((submission) => (
-                      <tr key={submission.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {submission.problem_code}. {submission.problem_title}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {submission.contest_id}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`text-sm ${getVerdictColor(submission.verdict)}`}>
-                            {submission.verdict}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {submission.language}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {submission.execution_time} ms
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {submission.memory} MB
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(submission.submitted_at).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
+  {submissions.map((submission) => (
+    <tr key={submission.id} className="hover:bg-gray-50">
+      
+      {/* Problem ID */}
+      <td className="px-6 py-4 text-sm text-gray-900 font-medium">
+        {submission.problem_code}
+      </td>
+
+      {/* Problem Name */}
+      <td className="px-6 py-4 text-sm text-gray-900">
+        {submission.problem_title}
+      </td>
+
+      {/* Verdict */}
+      <td className="px-6 py-4 whitespace-nowrap">
+        <span className={`text-sm ${getVerdictColor(normalizeVerdict(submission.verdict))}`}>
+          {normalizeVerdict(submission.verdict)}
+        </span>
+      </td>
+
+      {/* Submitted At */}
+      <td className="px-6 py-4 text-sm text-gray-500">
+        {new Date(submission.submitted_at).toLocaleString()}
+      </td>
+
+      {/* Tags */}
+      <td className="px-6 py-4 text-sm text-gray-500">
+        <div className="flex flex-wrap gap-1">
+          {(submission.tag || []).map((t, idx) => (
+            <span
+              key={idx}
+              className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      </td>
+
+      {/* Language */}
+      <td className="px-6 py-4 text-sm text-gray-500">
+        {submission.language}
+      </td>
+
+      {/* Time */}
+      <td className="px-6 py-4 text-sm text-gray-500">
+        {submission.execution_time} ms
+      </td>
+
+      {/* Memory */}
+      <td className="px-6 py-4 text-sm text-gray-500">
+        {submission.memory} MB
+      </td>
+
+    </tr>
+  ))}
+</tbody>
+
                 </table>
               </div>
             )}
