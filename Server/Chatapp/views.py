@@ -33,9 +33,6 @@ If the user asks a question outside the Computer Science or coding domain,
 you must politely refuse and guide them back to CS topics.
 """
 
-# ==================================================
-# 1️⃣ Send message (create / continue chat)
-# ==================================================
 @csrf_exempt
 def chat_api(request):
     if request.method != "POST":
@@ -101,9 +98,6 @@ def chat_api(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-# ==================================================
-# 2️⃣ List chat sessions (SIDEBAR)
-# ==================================================
 def chat_sessions(request):
     user = get_user_from_request(request)
     if not user:
@@ -116,9 +110,6 @@ def chat_sessions(request):
     })
 
 
-# ==================================================
-# 3️⃣ Load messages of a chat
-# ==================================================
 def chat_messages(request, chat_id):
     user = get_user_from_request(request)
     if not user:
@@ -136,9 +127,6 @@ def chat_messages(request, chat_id):
     })
 
 
-# ==================================================
-# 4️⃣ Delete chat (like ChatGPT)
-# ==================================================
 @csrf_exempt
 def delete_chat(request, chat_id):
     if request.method != "DELETE":
