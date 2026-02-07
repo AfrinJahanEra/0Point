@@ -31,6 +31,9 @@ const Chatbot = () => {
 
   const messagesEndRef = useRef(null);
 
+  const isMinimized = windowMode === "minimized";
+  const isMaximized = windowMode === "maximized";
+
   /* ---------------- Scroll ---------------- */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -51,9 +54,7 @@ const Chatbot = () => {
   const fetchChatSessions = async () => {
     try {
       const res = await fetch("http://localhost:8000/chat/sessions/", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const data = await res.json();
       setChatSessions(data.chats || []);
@@ -68,12 +69,11 @@ const Chatbot = () => {
       const res = await fetch(
         `http://localhost:8000/chat/sessions/${chat.id}/messages/`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
       );
       const data = await res.json();
+
       setActiveChat(chat);
       setMessages(
         (data.messages || []).map((m) => ({
@@ -93,7 +93,6 @@ const Chatbot = () => {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    // If no active chat, create a temporary chat for new message
     const chatId = activeChat?.id || null;
 
     const userMessage = {
@@ -102,6 +101,7 @@ const Chatbot = () => {
       sender: "user",
       created_at: new Date().toISOString(),
     };
+
     setMessages((prev) => [...prev, userMessage]);
     setInputText("");
     setIsTyping(true);
@@ -118,12 +118,11 @@ const Chatbot = () => {
           chat_id: chatId,
         }),
       });
+
       const data = await res.json();
 
-      // Update active chat if it was newly created
       if (data.chat_id && !activeChat) {
-        const newChat = { id: data.chat_id, title: inputText.slice(0, 40) };
-        setActiveChat(newChat);
+        setActiveChat({ id: data.chat_id, title: inputText.slice(0, 40) });
         fetchChatSessions();
       }
 
@@ -136,7 +135,7 @@ const Chatbot = () => {
           created_at: new Date().toISOString(),
         },
       ]);
-    } catch (err) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
@@ -148,7 +147,6 @@ const Chatbot = () => {
       ]);
     } finally {
       setIsTyping(false);
-      fetchChatSessions();
     }
   };
 
@@ -158,9 +156,7 @@ const Chatbot = () => {
     try {
       await fetch(`http://localhost:8000/chat/sessions/${activeChat.id}/`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setActiveChat(null);
       setMessages([]);
@@ -182,13 +178,8 @@ const Chatbot = () => {
     ]);
   };
 
-  /* ---------------- Format Time ---------------- */
-  const formatTime = (date) => {
-    if (!date) return "Invalid Date";
-    const d = new Date(date);
-    if (isNaN(d)) return "Invalid Date";
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
+  const formatTime = (date) =>
+    new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   /* ---------------- Window Sizes ---------------- */
   const sizeMap = {
@@ -196,19 +187,16 @@ const Chatbot = () => {
     minimized: "w-64 h-12",
     maximized: "w-[95vw] h-[90vh]",
   };
-  const isMinimized = windowMode === "minimized";
-  const isMaximized = windowMode === "maximized";
 
   return (
     <>
-      {/* Open Button */}
       {!isOpen && (
         <button
           onClick={() => {
             setIsOpen(true);
             setWindowMode("normal");
           }}
-          className="fixed bottom-4 left-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700"
+          className="fixed bottom-4 left-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg"
         >
           <MessageSquare className="w-6 h-6" />
         </button>
@@ -216,24 +204,25 @@ const Chatbot = () => {
 
       {isOpen && (
         <div
-          className={`fixed bottom-4 left-4 z-50 bg-white border rounded-lg shadow-xl transition-all duration-200 flex ${
+          className={`fixed bottom-4 left-4 z-50 bg-white border rounded-lg shadow-xl transition-all flex ${
             isMaximized ? "flex-row" : "flex-col"
           } ${sizeMap[windowMode]}`}
         >
           {/* Sidebar */}
           {isMaximized && (
-            <div className="w-64 border-r overflow-y-auto bg-gray-100 p-2">
+            <div className="w-64 border-r bg-gray-100 overflow-y-auto p-2">
               <div className="flex justify-between mb-2">
                 <span className="font-semibold">Chats</span>
-                <button onClick={createNewChat} className="text-sm text-blue-600">
+                <button onClick={createNewChat} className="text-blue-600 text-sm">
                   + New
                 </button>
               </div>
+
               {chatSessions.map((chat) => (
                 <div
                   key={chat.id}
                   onClick={() => loadChatMessages(chat)}
-                  className={`p-2 rounded hover:bg-blue-100 cursor-pointer ${
+                  className={`p-2 rounded cursor-pointer hover:bg-blue-100 ${
                     activeChat?.id === chat.id ? "bg-blue-200" : ""
                   }`}
                 >
@@ -243,28 +232,27 @@ const Chatbot = () => {
             </div>
           )}
 
-          {/* Chat Window */}
+          {/* Chat */}
           <div className="flex-1 flex flex-col">
             {/* Header */}
-            <div className="flex justify-between items-center p-3 bg-blue-600 text-white rounded-t-lg">
+            <div className="flex justify-between items-center p-3 bg-blue-600 text-white">
               <div className="flex items-center gap-2">
-                <Bot className="w-5 h-5" />
-                <span className="text-sm font-semibold">Coding Assistant</span>
+                <Bot size={18} />
+                <span className="font-semibold text-sm">Coding Assistant</span>
               </div>
 
               <div className="flex gap-2">
-                <button onClick={() => setWindowMode("minimized")} title="Minimize">
+                <button onClick={() => setWindowMode("minimized")}>
                   <Minus size={16} />
                 </button>
                 <button
                   onClick={() =>
                     setWindowMode(isMaximized ? "normal" : "maximized")
                   }
-                  title={isMaximized ? "Restore" : "Maximize"}
                 >
                   <Square size={16} />
                 </button>
-                <button onClick={() => setIsOpen(false)} title="Close">
+                <button onClick={() => setIsOpen(false)}>
                   <X size={16} />
                 </button>
               </div>
@@ -273,16 +261,13 @@ const Chatbot = () => {
             {/* Body */}
             {!isMinimized && (
               <>
-                <div
-                  className="overflow-y-auto p-3 bg-gray-50 flex-1"
-                  style={{
-                    height: isMaximized ? "calc(100% - 120px)" : "340px",
-                  }}
-                >
+                <div className="flex-1 overflow-y-auto p-3 bg-gray-50">
                   {messages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`mb-3 ${msg.sender === "user" ? "text-right" : ""}`}
+                      className={`mb-3 ${
+                        msg.sender === "user" ? "text-right" : ""
+                      }`}
                     >
                       <div
                         className={`inline-block max-w-[80%] p-3 rounded-lg text-sm ${
@@ -297,7 +282,7 @@ const Chatbot = () => {
                         >
                           {msg.text}
                         </ReactMarkdown>
-                        <div className="text-xs mt-1 opacity-60">
+                        <div className="text-xs opacity-60 mt-1">
                           {formatTime(msg.created_at)}
                         </div>
                       </div>
@@ -310,7 +295,6 @@ const Chatbot = () => {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input */}
                 <form
                   onSubmit={handleSendMessage}
                   className="p-3 flex gap-2 border-t"
@@ -330,17 +314,16 @@ const Chatbot = () => {
                   </button>
                 </form>
 
-                {/* Footer */}
                 <div className="flex justify-between px-3 pb-3 text-xs">
                   <button
                     onClick={handleClearChat}
-                    className="text-gray-500 flex gap-1"
+                    className="flex gap-1 text-gray-500"
                   >
                     <Trash2 size={12} /> Clear
                   </button>
                   <button
                     onClick={() => setInputText("Explain binary search")}
-                    className="text-blue-600 flex gap-1"
+                    className="flex gap-1 text-blue-600"
                   >
                     <History size={12} /> Quick help
                   </button>
