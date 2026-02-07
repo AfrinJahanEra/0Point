@@ -221,7 +221,7 @@ const Chatbot = () => {
           } ${sizeMap[windowMode]}`}
         >
           {/* Sidebar */}
-          {(isMaximized || true) && (
+          {isMaximized && (
             <div className="w-64 border-r overflow-y-auto bg-gray-100 p-2">
               <div className="flex justify-between mb-2">
                 <span className="font-semibold">Chats</span>
