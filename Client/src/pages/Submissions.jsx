@@ -14,55 +14,66 @@ const Submissions = () => {
   }, [user]);
 
   const fetchUserSubmissions = async () => {
-  try {
-    setLoading(true);
-    setError(null);
+    try {
+      setLoading(true);
+      setError(null);
 
-    if (!user) {
-      setSubmissions([]);
-      return;
+      if (!user) {
+        setSubmissions([]);
+        return;
+      }
+
+      const [externalRes] = await Promise.all([
+        //api.get('/submissions/user/'),
+        api.get('/account/external-submissions/')
+      ]);
+
+      //const internalSubs = internalRes.data.submissions || [];
+      const externalSubs = externalRes.data.submissions || [];
+
+      const merged = [...externalSubs].sort(
+        (a, b) => new Date(b.submitted_at) - new Date(a.submitted_at)
+      );
+
+      setSubmissions(merged);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load submissions');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const [externalRes] = await Promise.all([
-      //api.get('/submissions/user/'),
-      api.get('/account/external-submissions/')
-    ]);
+  const normalizeVerdict = (verdict) => {
+  if (!verdict) return "UNKNOWN";
 
-    //const internalSubs = internalRes.data.submissions || [];
-    const externalSubs = externalRes.data.submissions || [];
+  const v = verdict.toUpperCase().replace(/\s+/g, "_");
 
-    const merged = [...externalSubs].sort(
-      (a, b) => new Date(b.submitted_at) - new Date(a.submitted_at)
-    );
-
-    setSubmissions(merged);
-  } catch (err) {
-    console.error(err);
-    setError('Failed to load submissions');
-  } finally {
-    setLoading(false);
-  }
-};
-
-const normalizeVerdict = (verdict) => {
-  switch (verdict) {
+  switch (v) {
     case "OK":
     case "ACCEPTED":
       return "AC";
+
     case "WRONG_ANSWER":
       return "WA";
+
     case "TIME_LIMIT_EXCEEDED":
       return "TLE";
+
     case "MEMORY_LIMIT_EXCEEDED":
       return "MLE";
+
     case "COMPILATION_ERROR":
       return "CE";
+
     case "RUNTIME_ERROR":
       return "RE";
+
     default:
-      return verdict || "UNKNOWN";
+      return v;
   }
 };
+
 
 
 
@@ -103,8 +114,8 @@ const normalizeVerdict = (verdict) => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Main Content */}
           <div className="lg:col-span-9">
-            
-            
+
+
             {loading && (
               <div className="text-center py-12">
                 <div className="inline-block">
@@ -119,118 +130,118 @@ const normalizeVerdict = (verdict) => {
                 <p className="text-red-800">{error}</p>
               </div>
             )}
-            
+
             {!loading && !error && (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-100">
-  <tr>
-    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Submission ID</th>
-    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Problem</th>
-    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Verdict</th>
-    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Submitted</th>
-    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Tags</th>
-    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Lang</th>
-    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Time</th>
-    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Mem</th>
-  </tr>
-</thead>
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Submission ID</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Problem</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Verdict</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Submitted</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Tags</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Lang</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Time</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Mem</th>
+                    </tr>
+                  </thead>
 
 
                   <tbody className="bg-white divide-y divide-gray-100">
-  {submissions.map((s) => (
-    <tr key={s.id} className="hover:bg-gray-50">
+                    {submissions.map((s) => (
+                      <tr key={s.id} className="hover:bg-gray-50">
 
-      {/* Submission ID */}
-      <td className="px-3 py-2 text-xs font-mono">
-   {s.platform === "codeforces" ? (
-            <a
-              href={`https://codeforces.com/contest/${s.contest_id}/submission/${s.submission_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:underline"
-            >
-              {s.submission_id}
-            </a>
-          ) : (
-            <a
-              href={s.submission_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:underline"
-            >
-              {s.id.split("-").slice(1).join("-")}
-            </a>
-          )}
-        </td>
-
-
-      {/* Problem: index - name */}
-      <td className="px-3 py-2 text-xs text-gray-900">
-  <a
-            href={s.platform === "codeforces"
-              ? `https://codeforces.com/contest/${s.contest_id}/problem/${s.problem_code}`
-              : s.problem.url
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:underline"
-          >
-            {s.platform === "codeforces"
-              ? `${s.problem_code} - ${s.problem_title}`
-              : s.problem.name
-            }
-          </a>
-</td>
+                        {/* Submission ID */}
+                        <td className="px-3 py-2 text-xs font-mono">
+                          {s.platform === "codeforces" ? (
+                            <a
+                              href={`https://codeforces.com/contest/${s.contest_id}/submission/${s.submission_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                            >
+                              {s.submission_id}
+                            </a>
+                          ) : (
+                            <a
+                              href={s.submission_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                            >
+                              {s.submission_id}
+                            </a>
+                          )}
+                        </td>
 
 
+                        {/* Problem: index - name */}
+                        <td className="px-3 py-2 text-xs text-gray-900">
+                          <a
+                            href={s.platform === "codeforces"
+                              ? `https://codeforces.com/contest/${s.contest_id}/problem/${s.problem_code}`
+                              : s.problem.url
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline"
+                          >
+                            {s.platform === "codeforces"
+                              ? `${s.problem_code} - ${s.problem_title}`
+                              : s.problem.name
+                            }
+                          </a>
+                        </td>
 
-      {/* Verdict */}
-      <td className="px-3 py-2 text-xs">
-        <span className={getVerdictColor(normalizeVerdict(s.verdict))}>
-          {normalizeVerdict(s.verdict)}
-        </span>
-      </td>
 
-      {/* Submitted At */}
-      <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
-        {new Date(s.submitted_at).toLocaleString()}
-      </td>
 
-      {/* Tags */}
-      <td className="px-3 py-2 text-xs">
-        <div className="flex flex-wrap gap-1 max-w-[220px]">
-          {(s.tags || s.problem?.tags || []).map((tag, i) => (
-            <span
-              key={i}
-              className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      </td>
+                        {/* Verdict */}
+                        <td className="px-3 py-2 text-xs">
+                          <span className={getVerdictColor(normalizeVerdict(s.verdict))}>
+                            {normalizeVerdict(s.verdict)}
+                          </span>
+                        </td>
 
-      {/* Language */}
-      <td className="px-3 py-2 text-xs text-gray-500">
-        {s.language}
-      </td>
+                        {/* Submitted At */}
+                        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                          {new Date(s.submitted_at).toLocaleString()}
+                        </td>
 
-      {/* Time */}
-      <td className="px-3 py-2 text-xs text-gray-500">
-        {s.execution_time}
-        {s.execution_time && !s.execution_time.toString().toLowerCase().includes('ms') ? ' ms' : ''}
-      </td>
+                        {/* Tags */}
+                        <td className="px-3 py-2 text-xs">
+                          <div className="flex flex-wrap gap-1 max-w-[220px]">
+                            {(s.tags || s.problem?.tags || []).map((tag, i) => (
+                              <span
+                                key={i}
+                                className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
 
-      {/* Memory */}
-      <td className="px-3 py-2 text-xs text-gray-500">
-        {s.memory} 
-        {s.memory && !s.memory.toString().toLowerCase().includes('mb') ? ' MB' : ''}
-      </td>
+                        {/* Language */}
+                        <td className="px-3 py-2 text-xs text-gray-500">
+                          {s.language}
+                        </td>
 
-    </tr>
-  ))}
-</tbody>
+                        {/* Time */}
+                        <td className="px-3 py-2 text-xs text-gray-500">
+                          {s.execution_time}
+                          {s.execution_time && !s.execution_time.toString().toLowerCase().includes('ms') ? ' ms' : ''}
+                        </td>
+
+                        {/* Memory */}
+                        <td className="px-3 py-2 text-xs text-gray-500">
+                          {s.memory}
+                          {s.memory && !s.memory.toString().toLowerCase().includes('mb') ? ' MB' : ''}
+                        </td>
+
+                      </tr>
+                    ))}
+                  </tbody>
 
 
                 </table>
@@ -247,7 +258,7 @@ const normalizeVerdict = (verdict) => {
               </div>
             )}
           </div>
-          
+
           {/* Sidebar */}
           <div className="lg:col-span-3">
             <Sidebar />
