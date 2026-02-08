@@ -7,6 +7,8 @@ from math import ceil
 import requests
 from datetime import datetime
 
+from .tag_analysis import get_cf_tag_stats
+
 from .models import Account
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
 from .platforms import fetch_codechef_contests, fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
@@ -372,4 +374,30 @@ class ExternalSubmissionView(APIView):
 
         return Response({
             "submissions": submissions
+        })
+
+
+class CfTagStatsView(APIView):
+    def get(self, request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return Response({"error": "Unauthorized"}, status=401)
+
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        tag_stats = get_cf_tag_stats(user)
+
+        return Response({
+            "tag_stats": tag_stats,
+            "source": "codeforces",
+            "note": "Counts unique solved problems per tag from all accepted submissions"
         })
