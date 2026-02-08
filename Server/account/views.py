@@ -7,7 +7,6 @@ from math import ceil
 import requests
 from datetime import datetime
 
-from .tag_analysis import get_tag_stats
 
 from .models import Account
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
@@ -19,6 +18,9 @@ from .platforms.leetcode import fetch_submissions as fetch_leetcode_submissions
 from .platforms.codechef import fetch_submissions as fetch_codechef_submissions
 from .platforms.atcoder import fetch_submissions as fetch_atcoder_submissions
 
+from .tag_analysis import get_tag_stats
+
+from .calendar import get_user_calendar
 
 class SignupView(APIView):
     def post(self, request):
@@ -399,4 +401,35 @@ class TagStatsView(APIView):
         return Response({
             "tag_stats": tag_stats,
             "note": "Unique solved problems per tag (Codeforces full history + LeetCode all-time)"
+        })
+    
+
+
+
+class UserCalendarView(APIView):
+    """
+    Get submission calendar/heatmap data for the authenticated user
+    (currently only LeetCode)
+    """
+    def get(self, request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return Response({"error": "Unauthorized"}, status=401)
+
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        calendar_data = get_user_calendar(user)
+
+        return Response({
+            "calendar": calendar_data,
+            "platforms": ["leetcode"]  # extend later for CF, etc.
         })
