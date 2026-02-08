@@ -80,8 +80,8 @@ const CfTagDonutChart = ({ tagStats = {}, username = "user" }) => {
           className="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-gray-300"
           style={{ backgroundColor: color }}
         />
-        <span className="font-medium text-gray-900 truncate max-w-[110px]">{item.name}:</span>
-        <span className="text-gray-700 font-medium">{item.value}</span>
+        <span className="font-small text-gray-900 truncate max-w-[110px]">{item.name}:</span>
+        <span className="text-gray-700 font-small">{item.value}</span>
       </div>
     );
   };
