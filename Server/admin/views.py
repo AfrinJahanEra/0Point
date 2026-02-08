@@ -136,16 +136,15 @@ class AdminContestsView(APIView):
         contest_data = []
         
         for contest in contests:
-            creator = Account.objects.get(id=contest.created_by) if contest.created_by else None
+            creator = contest.created_by if contest.created_by else None
             contest_data.append({
                 "id": str(contest.id),
                 "title": contest.title,
                 "type": contest.type,
                 "created_by": creator.name if creator else "Unknown",
-                "created_at": contest.created_at,
                 "start_time": contest.start_time,
-                "duration_minutes": contest.duration_minutes,
-                "participants": contest.participants
+                "duration": contest.duration,
+                "status": contest.status
             })
         
         return Response(contest_data)
@@ -194,13 +193,12 @@ class AdminSubmissionsView(APIView):
         submission_data = []
         
         for submission in submissions:
-            user = Account.objects.get(id=submission.user_id) if submission.user_id else None
-            problem = Problem.objects.get(id=submission.problem_id) if submission.problem_id else None
+            user = submission.user if submission.user else None
             
             submission_data.append({
                 "id": str(submission.id),
                 "user": user.name if user else "Unknown",
-                "problem": problem.title if problem else "Unknown",
+                "problem": submission.problem_title if submission.problem_title else "Unknown",
                 "language": submission.language,
                 "status": submission.verdict,
                 "submitted_at": submission.submitted_at
