@@ -6,6 +6,7 @@ import jwt
 
 from .models import Account
 from .serializers import SignupSerializer, LoginSerializer
+from admin.secret import ADMIN_SECRET_PASSWORD
 
 
 class SignupView(APIView):
@@ -17,10 +18,18 @@ class SignupView(APIView):
             if Account.objects(email=serializer.validated_data["email"], is_deleted=False).first():
                 return Response({"error": "Email already exists"}, status=400)
 
+            role = serializer.validated_data.get("role", "user")
+            
+            # If role is admin, validate secret password
+            if role == "admin":
+                secret_password = request.data.get("secret_password")
+                if secret_password != ADMIN_SECRET_PASSWORD:
+                    return Response({"error": "Invalid admin secret password"}, status=400)
+            
             user = Account(
                 name=serializer.validated_data["name"],
                 email=serializer.validated_data["email"],
-                role=serializer.validated_data.get("role", "user"),
+                role=role,
                 year=serializer.validated_data.get("year"),
                 department=serializer.validated_data.get("department"),
             )

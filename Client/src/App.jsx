@@ -38,6 +38,7 @@ import TestContestLeaderboard  from './pages/TestContestLeaderboard';
 import TestContestSubmission from './pages/TestContestSubmission';
 import BlogDetail from './pages/BlogDetail';
 import Recording from './pages/Recording';
+import AdminDashboard from './pages/AdminDashboard';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -306,6 +307,12 @@ function App() {
               <NavLayout>
                 <Interview />
               </NavLayout>
+            } />
+            
+            <Route path="/admin" element={
+              <FullScreenLayout>
+                <AdminDashboard />
+              </FullScreenLayout>
             } />
           </Routes>
         </div>

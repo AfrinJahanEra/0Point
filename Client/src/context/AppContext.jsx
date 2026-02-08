@@ -22,15 +22,15 @@ export const AppProvider = ({ children }) => {
     try {
       const response = await authService.login(email, password);
       setUser(response.user);
-      return response;
+      return response.user; // Return user data instead of full response
     } catch (error) {
       throw error;
     }
   };
 
-  const register = async (name, email, password, year = null, department = null) => {
+  const register = async (name, email, password, role = "user", year = null, department = null, secretPassword = null) => {
     try {
-      const response = await authService.register(name, email, password, year, department);
+      const response = await authService.register(name, email, password, role, year, department, secretPassword);
       return response;
     } catch (error) {
       throw error;

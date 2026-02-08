@@ -24,15 +24,23 @@ class AuthService {
   }
 
   // Register user
-  async register(name, email, password, year = null, department = null) {
+  async register(name, email, password, role = "user", year = null, department = null, secretPassword = null) {
     try {
-      const response = await api.post('/auth/signup/', {
+      const requestData = {
         name,
         email,
         password,
+        role,
         year,
         department
-      });
+      };
+      
+      // Add secret password if role is admin
+      if (role === "admin" && secretPassword) {
+        requestData.secret_password = secretPassword;
+      }
+      
+      const response = await api.post('/auth/signup/', requestData);
       
       return response.data;
     } catch (error) {
