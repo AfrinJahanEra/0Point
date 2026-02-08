@@ -7,7 +7,7 @@ from math import ceil
 import requests
 from datetime import datetime
 
-from .tag_analysis import get_cf_tag_stats
+from .tag_analysis import get_tag_stats
 
 from .models import Account
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
@@ -377,7 +377,7 @@ class ExternalSubmissionView(APIView):
         })
 
 
-class CfTagStatsView(APIView):
+class TagStatsView(APIView):
     def get(self, request):
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
@@ -394,10 +394,9 @@ class CfTagStatsView(APIView):
         if not user:
             return Response({"error": "User not found"}, status=404)
 
-        tag_stats = get_cf_tag_stats(user)
+        tag_stats = get_tag_stats(user)
 
         return Response({
             "tag_stats": tag_stats,
-            "source": "codeforces",
-            "note": "Counts unique solved problems per tag from all accepted submissions"
+            "note": "Unique solved problems per tag (Codeforces full history + LeetCode all-time)"
         })
