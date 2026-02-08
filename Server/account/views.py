@@ -14,6 +14,8 @@ from submission.models import Submission
 from leaderboard.models import LeaderboardEntry
 from .platforms.codeforces import fetch_submissions as fetch_cf_submissions
 from .platforms.leetcode import fetch_submissions as fetch_leetcode_submissions
+from .platforms.codechef import fetch_submissions as fetch_codechef_submissions
+
 
 class SignupView(APIView):
     def post(self, request):
@@ -357,6 +359,8 @@ class ExternalSubmissionView(APIView):
                     submissions.extend(fetch_cf_submissions(profile.handle))
                 elif profile.platform == "leetcode":
                     submissions.extend(fetch_leetcode_submissions(profile.handle))
+                elif profile.platform == "codechef":
+                    submissions.extend(fetch_codechef_submissions(profile.handle))
             except Exception:
                 pass
 
