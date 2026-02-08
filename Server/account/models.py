@@ -24,6 +24,7 @@ class Account(Document):
 
     year = StringField(null=True)
     department = StringField(null=True)
+    ip_address = StringField(null=True)
 
     meta = {
         "collection": "accounts"
