@@ -8,7 +8,7 @@ import RatingChart from '../components/RatingChart';
 import toast from 'react-hot-toast';
 import CfTagDonutChart from '../components/CfTagDonutChart';
 import { PieChart as PieIcon } from 'lucide-react';
-
+import SubmissionHeatmap from '../components/SubmissionHeatmap';
 
 const Dashboard = () => {
   const { user } = useApp();
@@ -29,6 +29,10 @@ const Dashboard = () => {
   const [savingPlatform, setSavingPlatform] = useState(false);
 const [cfTagStats, setCfTagStats] = useState({});
 const [cfTagLoading, setCfTagLoading] = useState(true);
+
+const [calendarData, setCalendarData] = useState({});
+const [calendarLoading, setCalendarLoading] = useState(true);
+
   // Platform logo paths - only for platforms without react-icons
   const platformLogos = {
     codeforces: '/src/assets/codeforces-social-preview.png',
@@ -74,12 +78,20 @@ const [cfTagLoading, setCfTagLoading] = useState(true);
       setLoading(false);
     }
 try {
-  const resp = await api.get('/account/cf-tag-stats/');
+  const resp = await api.get('/account/tag-stats/');  // ← update endpoint if changed
   setCfTagStats(resp.data.tag_stats || {});
 } catch (err) {
   console.error('Failed to load CF tag stats:', err);
 } finally {
   setCfTagLoading(false);
+}
+try {
+  const calResp = await api.get('/account/calendar/');
+  setCalendarData(calResp.data.calendar || {});
+} catch (err) {
+  console.error('Failed to load calendar:', err);
+} finally {
+  setCalendarLoading(false);
 }
   };
 
@@ -399,6 +411,21 @@ try {
                     <RatingChart platformProfiles={userProfile.platform_profiles} />
                   </div>
                 )}
+
+                <div className="bg-white rounded-xl shadow-sm p-6">
+  {calendarLoading ? (
+    <div className="text-center py-12">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading submission activity...</p>
+    </div>
+  ) : (
+    <SubmissionHeatmap 
+  calendarData={calendarData?.leetcode?.calendar || {}} 
+  activeYears={calendarData?.leetcode?.activeYears || []}
+  title="LeetCode Submission Heatmap"
+/>
+  )}
+</div>
                 {/* In return JSX → after RatingChart section (or wherever you want)*/}
 <div className="bg-white rounded-lg shadow-sm p-5">
   <div className="flex items-center gap-2 mb-4">
