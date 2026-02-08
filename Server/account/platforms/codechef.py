@@ -188,3 +188,76 @@ def fetch_contests(handle: str):
         })
 
     return contests
+
+
+def parse_cc_time(title):
+    # example: "09:50 PM 04/02/26"
+    try:
+        return datetime.strptime(title, "%I:%M %p %d/%m/%y").isoformat()
+    except:
+        return None
+
+
+def fetch_submissions(handle, limit=20):
+    url = f"https://www.codechef.com/recent/user?page=0&user_handle={handle}"
+
+    resp = requests.get(url, headers=HEADERS, timeout=10)
+    resp.raise_for_status()
+
+    data = resp.json()  # ✅ JSON
+    html = data.get("content", "")
+
+    if not html:
+        return []
+
+    soup = BeautifulSoup(html, "lxml")
+
+    rows = soup.select("table.dataTable tbody tr")
+    submissions = []
+
+    for row in rows[:limit]:
+        cols = row.find_all("td")
+        if len(cols) < 5:
+            continue
+
+        # ---- Time ----
+        time_td = cols[0]
+        time_title = time_td.get("title")
+        submitted_at = parse_cc_time(time_title)
+
+        # ---- Problem ----
+        prob_td = cols[1]
+        prob_code = prob_td.get_text(strip=True)
+        prob_link = prob_td.find("a")["href"]
+
+        # ---- Verdict ----
+        verdict_td = cols[2]
+        verdict = verdict_td.find("span", title=True)
+        verdict = verdict["title"].upper() if verdict else "UNKNOWN"
+
+        # ---- Language ----
+        language = cols[3].get_text(strip=True)
+
+        # ---- Submission ----
+        sol_td = cols[4]
+        sol_link = sol_td.find("a")["href"]
+        submission_id = sol_link.split("/")[-1]
+
+        submissions.append({
+            "platform": "codechef",
+            "submission_id": submission_id,
+            "submitted_at": submitted_at,
+            "verdict": verdict,
+            "language": language,
+
+            "problem": {
+                "name": prob_code,
+                "url": f"https://www.codechef.com{prob_link}",
+                "tags": []
+            },
+
+            "submission_url": f"https://www.codechef.com{sol_link}"
+        })
+
+    return submissions
+
