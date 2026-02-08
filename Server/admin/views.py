@@ -3,9 +3,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 import jwt
+import hashlib
+from datetime import datetime  # Add this import
 
 from .secret import ADMIN_SECRET_PASSWORD
-from account.models import Account
+from account.models import Account, BannedAccount, IPAddress, DeviceFingerprint
 from contest.models import Contest
 from blog.models import Blog
 from problem.models import Problem
@@ -54,6 +56,7 @@ class AdminDashboardView(APIView):
     def get(self, request):
         # Get counts for dashboard
         user_count = Account.objects(is_deleted=False).count()
+        banned_count = BannedAccount.objects.count()
         blog_count = Blog.objects(is_draft=False).count()
         contest_count = Contest.objects.count()
         problem_count = Problem.objects.count()
@@ -62,6 +65,7 @@ class AdminDashboardView(APIView):
         return Response({
             "stats": {
                 "users": user_count,
+                "banned_users": banned_count,
                 "blogs": blog_count,
                 "contests": contest_count,
                 "problems": problem_count,
@@ -76,28 +80,157 @@ class AdminUsersView(APIView):
         user_data = []
         
         for user in users:
-            user_data.append({
-                "id": str(user.id),
-                "name": user.name,
-                "email": user.email,
-                "role": user.role,
-                "created_at": user.created_at,
-                "is_inactive": user.is_inactive,
-                "blog_count": user.blog_count,
-                "rating": user.rating,
-                "badge": user.badge
-            })
+            try:
+                # Get all IP addresses (including legacy)
+                all_ips = []
+                
+                # Check new ip_addresses field
+                if hasattr(user, 'ip_addresses'):
+                    for ip_obj in user.ip_addresses:
+                        if hasattr(ip_obj, 'address'):
+                            all_ips.append(ip_obj.address)
+                
+                # Check old ip_address field
+                if hasattr(user, 'ip_address') and user.ip_address:
+                    if user.ip_address not in all_ips:
+                        all_ips.append(user.ip_address)
+                
+                # Get device fingerprints
+                device_fps = []
+                if hasattr(user, 'device_fingerprints'):
+                    for df_obj in user.device_fingerprints:
+                        if hasattr(df_obj, 'fingerprint'):
+                            device_fps.append(df_obj.fingerprint)
+                
+                user_data.append({
+                    "id": str(user.id),
+                    "name": user.name,
+                    "email": user.email,
+                    "role": user.role,
+                    "created_at": user.created_at,
+                    "is_inactive": user.is_inactive,
+                    "is_banned": user.is_banned,
+                    "blog_count": user.blog_count,
+                    "rating": user.rating,
+                    "badge": user.badge,
+                    "ip_addresses": all_ips,
+                    "ip_count": len(all_ips),
+                    "device_count": len(device_fps),
+                })
+            except Exception as e:
+                # Fallback for users with data issues
+                user_data.append({
+                    "id": str(user.id),
+                    "name": user.name,
+                    "email": user.email,
+                    "role": user.role,
+                    "created_at": user.created_at,
+                    "is_inactive": user.is_inactive,
+                    "is_banned": user.is_banned,
+                    "blog_count": user.blog_count,
+                    "rating": user.rating,
+                    "badge": user.badge,
+                    "ip_addresses": [],
+                    "ip_count": 0,
+                    "device_count": 0,
+                    "error": "Data format issue"
+                })
         
         return Response(user_data)
     
     def delete(self, request, user_id):
         try:
+            # Get admin info from JWT token
+            auth_header = request.headers.get('Authorization', '')
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split(' ')[1]
+                try:
+                    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+                    admin_email = payload.get('email', 'System')
+                except:
+                    admin_email = 'System'
+            else:
+                admin_email = 'System'
+            
             user = Account.objects.get(id=user_id)
-            user.is_deleted = True
-            user.save()
-            return Response({"message": "User deleted successfully"})
+            
+            # Get ban reason from request
+            ban_reason = request.data.get('ban_reason', 'Violation of terms of service')
+            
+            # Get all IP addresses
+            all_ips = []
+            if hasattr(user, 'ip_addresses'):
+                for ip_obj in user.ip_addresses:
+                    if hasattr(ip_obj, 'address'):
+                        all_ips.append(ip_obj.address)
+            
+            if hasattr(user, 'ip_address') and user.ip_address:
+                if user.ip_address not in all_ips:
+                    all_ips.append(user.ip_address)
+            
+            # Get device fingerprints
+            device_fps = []
+            if hasattr(user, 'device_fingerprints'):
+                for df_obj in user.device_fingerprints:
+                    if hasattr(df_obj, 'fingerprint'):
+                        device_fps.append(df_obj.fingerprint)
+            
+            # Create banned account record BEFORE deleting
+            banned_account = BannedAccount(
+                original_user_id=str(user.id),
+                email=user.email,
+                name=user.name,
+                ip_addresses=all_ips,
+                device_fingerprints=device_fps,
+                reason=ban_reason,
+                banned_by=admin_email,
+                banned_at=datetime.utcnow()
+            )
+            banned_account.save()
+            
+            # Permanently delete the user
+            user.delete()  # This permanently removes from MongoDB
+            
+            return Response({
+                "message": "User permanently banned and deleted",
+                "details": {
+                    "email": user.email,
+                    "reason": ban_reason,
+                    "prevention_measures": [
+                        f"Email blocked from registration",
+                        f"IP addresses blocked: {len(all_ips)}",
+                        f"Devices blocked: {len(device_fps)}"
+                    ]
+                }
+            })
+            
         except Account.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
+        except Exception as e:
+            return Response({"error": f"Error banning user: {str(e)}"}, status=500)
+
+
+class AdminBannedAccountsView(APIView):
+    """View to see all banned accounts"""
+    def get(self, request):
+        banned_accounts = BannedAccount.objects.order_by("-banned_at")
+        banned_data = []
+        
+        for banned in banned_accounts:
+            banned_data.append({
+                "id": str(banned.id),
+                "original_user_id": banned.original_user_id,
+                "email": banned.email,
+                "name": banned.name,
+                "reason": banned.reason,
+                "banned_by": banned.banned_by,
+                "banned_at": banned.banned_at,
+                "ip_addresses": banned.ip_addresses,
+                "device_fingerprints_count": len(banned.device_fingerprints),
+                "prevention_summary": f"Prevents registration for {len(banned.ip_addresses)} IPs and {len(banned.device_fingerprints)} devices"
+            })
+        
+        return Response(banned_data)
 
 
 class AdminBlogsView(APIView):

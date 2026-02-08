@@ -12,7 +12,10 @@ import {
   Eye,
   EyeOff,
   Search,
-  RefreshCw
+  RefreshCw,
+  Shield,
+  ShieldOff,
+  AlertCircle
 } from 'lucide-react';
 import api from '../utils/api';
 
@@ -20,18 +23,23 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState({
     users: 0,
+    banned_users: 0,
     blogs: 0,
     contests: 0,
     problems: 0,
     submissions: 0
   });
   const [users, setUsers] = useState([]);
+  const [bannedUsers, setBannedUsers] = useState([]);
   const [blogs, setBlogs] = useState([]);
   const [contests, setContests] = useState([]);
   const [problems, setProblems] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showBanModal, setShowBanModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [banReason, setBanReason] = useState('Violation of terms of service');
   const navigate = useNavigate();
 
   // Check if user is admin
@@ -62,6 +70,15 @@ const AdminDashboard = () => {
       setUsers(response.data);
     } catch (error) {
       console.error('Error loading users:', error);
+    }
+  };
+
+  const loadBannedUsers = async () => {
+    try {
+      const response = await api.get('/admin-panel/banned-users/');
+      setBannedUsers(response.data);
+    } catch (error) {
+      console.error('Error loading banned users:', error);
     }
   };
 
@@ -107,6 +124,9 @@ const AdminDashboard = () => {
       case 'users':
         loadUsers();
         break;
+      case 'banned_users':
+        loadBannedUsers();
+        break;
       case 'blogs':
         loadBlogs();
         break;
@@ -124,15 +144,32 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+  const openBanModal = (user) => {
+    setSelectedUser(user);
+    setBanReason('Violation of terms of service');
+    setShowBanModal(true);
+  };
+
+  const handleBanUser = async () => {
+    if (!selectedUser) return;
+    
+    if (!window.confirm(`Permanently ban ${selectedUser.email}? This will:\n1. Delete their account permanently\n2. Block them from creating new accounts\n3. Block all their IP addresses\n4. Block all their devices\n\nThis action cannot be undone!`)) return;
     
     try {
-      await api.delete(`/admin-panel/users/${userId}/`);
-      setUsers(users.filter(user => user.id !== userId));
-      alert('User deleted successfully');
+      await api.delete(`/admin-panel/users/${selectedUser.id}/`, {
+        data: { ban_reason: banReason }
+      });
+      setUsers(users.filter(user => user.id !== selectedUser.id));
+      setStats(prev => ({
+        ...prev,
+        users: prev.users - 1,
+        banned_users: prev.banned_users + 1
+      }));
+      alert('User permanently banned and blocked from registration');
+      setShowBanModal(false);
+      setSelectedUser(null);
     } catch (error) {
-      alert('Error deleting user: ' + (error.response?.data?.error || error.message));
+      alert('Error banning user: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -185,6 +222,11 @@ const AdminDashboard = () => {
   };
 
   const filteredUsers = users.filter(user => 
+    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredBannedUsers = bannedUsers.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -268,6 +310,19 @@ const AdminDashboard = () => {
                 </li>
                 <li>
                   <button
+                    onClick={() => handleTabChange('banned_users')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                      activeTab === 'banned_users' 
+                        ? 'bg-red-100 text-red-700' 
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <ShieldOff className="w-5 h-5" />
+                    Banned Accounts ({stats.banned_users})
+                  </button>
+                </li>
+                <li>
+                  <button
                     onClick={() => handleTabChange('blogs')}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'blogs' 
@@ -339,13 +394,23 @@ const AdminDashboard = () => {
                       </button>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
                       <div className="bg-blue-50 p-6 rounded-lg">
                         <div className="flex items-center">
                           <Users className="w-8 h-8 text-blue-600 mr-3" />
                           <div>
                             <p className="text-2xl font-bold text-blue-900">{stats.users}</p>
-                            <p className="text-blue-700">Total Users</p>
+                            <p className="text-blue-700">Active Users</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-red-50 p-6 rounded-lg">
+                        <div className="flex items-center">
+                          <ShieldOff className="w-8 h-8 text-red-600 mr-3" />
+                          <div>
+                            <p className="text-2xl font-bold text-red-900">{stats.banned_users}</p>
+                            <p className="text-red-700">Banned Users</p>
                           </div>
                         </div>
                       </div>
@@ -393,10 +458,12 @@ const AdminDashboard = () => {
                   </div>
                 )}
 
-                {(activeTab === 'users' || activeTab === 'blogs' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions') && (
+                {(activeTab === 'users' || activeTab === 'banned_users' || activeTab === 'blogs' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions') && (
                   <div>
                     <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-xl font-semibold text-gray-900 capitalize">{activeTab}</h2>
+                      <h2 className="text-xl font-semibold text-gray-900 capitalize">
+                        {activeTab === 'banned_users' ? 'Banned Accounts' : activeTab}
+                      </h2>
                       <div className="flex items-center gap-4">
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -426,6 +493,7 @@ const AdminDashboard = () => {
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IPs/Devices</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
@@ -445,16 +513,75 @@ const AdminDashboard = () => {
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                      {user.ip_addresses?.length || 0} IPs
+                                    </span>
+                                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                      {user.device_count || 0} Devices
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                   {new Date(user.created_at).toLocaleDateString()}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                                   <button
-                                    onClick={() => handleDeleteUser(user.id)}
-                                    className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                                    onClick={() => openBanModal(user)}
+                                    className="text-red-600 hover:text-red-900 flex items-center gap-1 bg-red-50 px-3 py-1 rounded"
                                   >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
+                                    <ShieldOff className="w-4 h-4" />
+                                    Ban Permanently
                                   </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {activeTab === 'banned_users' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ban Reason</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blocked IPs/Devices</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banned By</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banned At</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredBannedUsers.map((user) => (
+                              <tr key={user.id} className="bg-red-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  <div className="flex items-center gap-2">
+                                    <ShieldOff className="w-4 h-4 text-red-600" />
+                                    {user.email}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                    {user.reason}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-xs bg-red-100 px-2 py-1 rounded">
+                                      {user.ip_addresses?.length || 0} IPs blocked
+                                    </span>
+                                    <span className="text-xs bg-red-100 px-2 py-1 rounded">
+                                      {user.device_fingerprints_count || 0} Devices blocked
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.banned_by}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {new Date(user.banned_at).toLocaleString()}
                                 </td>
                               </tr>
                             ))}
@@ -516,7 +643,7 @@ const AdminDashboard = () => {
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participants</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                           </thead>
@@ -526,7 +653,17 @@ const AdminDashboard = () => {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{contest.title}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contest.type}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contest.created_by}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contest.participants}</td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    contest.status === 'upcoming' 
+                                      ? 'bg-blue-100 text-blue-800' 
+                                      : contest.status === 'ongoing' 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {contest.status}
+                                  </span>
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                   <button
                                     onClick={() => handleDeleteContest(contest.id)}
@@ -645,6 +782,79 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Ban Modal */}
+      {showBanModal && selectedUser && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-red-100 p-2 rounded-full">
+                  <ShieldOff className="w-6 h-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Permanently Ban User</h3>
+              </div>
+              
+              <div className="mb-4 p-4 bg-red-50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-red-700">
+                      This action will <strong>permanently delete</strong> the account and <strong>prevent</strong> the user from creating new accounts.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-2">User to ban:</p>
+                <div className="p-3 bg-gray-50 rounded">
+                  <p className="font-medium">{selectedUser.name}</p>
+                  <p className="text-sm text-gray-500">{selectedUser.email}</p>
+                  <div className="mt-2 flex gap-2">
+                    <span className="text-xs bg-gray-200 px-2 py-1 rounded">{selectedUser.ip_addresses?.length || 0} IPs</span>
+                    <span className="text-xs bg-gray-200 px-2 py-1 rounded">{selectedUser.device_count || 0} Devices</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ban Reason
+                </label>
+                <select
+                  value={banReason}
+                  onChange={(e) => setBanReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                >
+                  <option value="Violation of terms of service">Violation of terms of service</option>
+                  <option value="Spamming">Spamming</option>
+                  <option value="Harassment">Harassment</option>
+                  <option value="Cheating">Cheating</option>
+                  <option value="Multiple accounts">Multiple accounts</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowBanModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBanUser}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md flex items-center gap-2"
+                >
+                  <ShieldOff className="w-4 h-4" />
+                  Ban Permanently
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
