@@ -6,9 +6,9 @@ import { Plus, Edit2, TrendingUp, Globe } from 'lucide-react';
 import { SiCodechef } from 'react-icons/si'; // Import CodeChef icon from react-icons
 import RatingChart from '../components/RatingChart';
 import toast from 'react-hot-toast';
+import CfTagDonutChart from '../components/CfTagDonutChart';
+import { PieChart as PieIcon } from 'lucide-react';
 
-// Import platform logos as images for other platforms
-// You'll need to download these logos and place them in your public or assets folder
 
 const Dashboard = () => {
   const { user } = useApp();
@@ -27,7 +27,8 @@ const Dashboard = () => {
     handle: ''
   });
   const [savingPlatform, setSavingPlatform] = useState(false);
-
+const [cfTagStats, setCfTagStats] = useState({});
+const [cfTagLoading, setCfTagLoading] = useState(true);
   // Platform logo paths - only for platforms without react-icons
   const platformLogos = {
     codeforces: '/src/assets/codeforces-social-preview.png',
@@ -72,6 +73,14 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
+try {
+  const resp = await api.get('/account/cf-tag-stats/');
+  setCfTagStats(resp.data.tag_stats || {});
+} catch (err) {
+  console.error('Failed to load CF tag stats:', err);
+} finally {
+  setCfTagLoading(false);
+}
   };
 
   const fetchContestPage = async (page = 1) => {
@@ -390,6 +399,29 @@ const Dashboard = () => {
                     <RatingChart platformProfiles={userProfile.platform_profiles} />
                   </div>
                 )}
+                {/* In return JSX → after RatingChart section (or wherever you want)*/}
+<div className="bg-white rounded-lg shadow-sm p-5">
+  <div className="flex items-center gap-2 mb-4">
+    <PieIcon className="w-5 h-5 text-indigo-600" />
+    <h2 className="text-lg font-semibold text-gray-900">
+      Codeforces Solved Problems by Tag
+    </h2>
+  </div>
+
+<div className="bg-white rounded-xl shadow-sm p-6">
+  {cfTagLoading ? (
+    <div className="text-center py-12">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading Codeforces tag distribution...</p>
+    </div>
+  ) : (
+    <CfTagDonutChart 
+      tagStats={cfTagStats} 
+      username={user?.name || "user"}  // or fetch handle from profile if you want
+    />
+  )}
+</div>
+</div>
 
                 {/* Contest History Section - Updated as requested */}
                 <div className="bg-white rounded-lg shadow-sm p-5">
