@@ -198,66 +198,77 @@ def parse_cc_time(title):
         return None
 
 
-def fetch_submissions(handle, limit=20):
-    url = f"https://www.codechef.com/recent/user?page=0&user_handle={handle}"
-
-    resp = requests.get(url, headers=HEADERS, timeout=10)
-    resp.raise_for_status()
-
-    data = resp.json()  # ✅ JSON
-    html = data.get("content", "")
-
-    if not html:
-        return []
-
-    soup = BeautifulSoup(html, "lxml")
-
-    rows = soup.select("table.dataTable tbody tr")
+def fetch_submissions(handle, limit=21):
     submissions = []
+    page = 0
 
-    for row in rows[:limit]:
-        cols = row.find_all("td")
-        if len(cols) < 5:
-            continue
+    while True:
+        url = f"https://www.codechef.com/recent/user?page={page}&user_handle={handle}"
 
-        # ---- Time ----
-        time_td = cols[0]
-        time_title = time_td.get("title")
-        submitted_at = parse_cc_time(time_title)
+        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp.raise_for_status()
 
-        # ---- Problem ----
-        prob_td = cols[1]
-        prob_code = prob_td.get_text(strip=True)
-        prob_link = prob_td.find("a")["href"]
+        data = resp.json()
+        html = data.get("content", "")
 
-        # ---- Verdict ----
-        verdict_td = cols[2]
-        verdict = verdict_td.find("span", title=True)
-        verdict = verdict["title"].upper() if verdict else "UNKNOWN"
+        if not html:
+            break  # no more pages
 
-        # ---- Language ----
-        language = cols[3].get_text(strip=True)
+        soup = BeautifulSoup(html, "lxml")
+        rows = soup.select("table.dataTable tbody tr")
 
-        # ---- Submission ----
-        sol_td = cols[4]
-        sol_link = sol_td.find("a")["href"]
-        submission_id = sol_link.split("/")[-1]
+        if not rows:
+            break  # reached last page
 
-        submissions.append({
-            "platform": "codechef",
-            "submission_id": submission_id,
-            "submitted_at": submitted_at,
-            "verdict": verdict,
-            "language": language,
+        for row in rows:
+            if len(submissions) >= limit:
+                return submissions
 
-            "problem": {
-                "name": prob_code,
-                "url": f"https://www.codechef.com{prob_link}",
-                "tags": []
-            },
+            cols = row.find_all("td")
+            if len(cols) < 5:
+                continue
 
-            "submission_url": f"https://www.codechef.com{sol_link}"
-        })
+            # ---- Time ----
+            time_td = cols[0]
+            time_title = time_td.get("title")
+            submitted_at = parse_cc_time(time_title)
+
+            # ---- Problem ----
+            prob_td = cols[1]
+            prob_code = prob_td.get_text(strip=True)
+            prob_link = prob_td.find("a")["href"]
+
+            # ---- Verdict ----
+            verdict_td = cols[2]
+            verdict_span = verdict_td.find("span", title=True)
+            verdict = verdict_span["title"].upper() if verdict_span else "UNKNOWN"
+
+            # ---- Language ----
+            language = cols[3].get_text(strip=True)
+
+            # ---- Submission ----
+            sol_td = cols[4]
+            sol_link = sol_td.find("a")["href"]
+            submission_id = sol_link.split("/")[-1]
+
+            submissions.append({
+                "platform": "codechef",
+                "submission_id": submission_id,
+                "submitted_at": submitted_at,
+                "verdict": verdict,
+                "language": language,
+                "execution_time": None,
+                "memory": None,
+
+                "problem": {
+                    "name": prob_code,
+                    "url": f"https://www.codechef.com{prob_link}",
+                    "tags": []
+                },
+
+                "submission_url": f"https://www.codechef.com{sol_link}"
+            })
+
+        page += 1  # 👉 NEXT PAGE
 
     return submissions
-
