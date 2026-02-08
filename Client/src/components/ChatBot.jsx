@@ -154,7 +154,7 @@ const Chatbot = () => {
   const handleClearChat = async () => {
     if (!activeChat) return;
     try {
-      await fetch(`http://localhost:8000/chat/sessions/${activeChat.id}/`, {
+      await fetch(`http://localhost:8000/chat/sessions/${activeChat.id}/delete/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
