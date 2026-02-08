@@ -64,7 +64,7 @@ def fetch_lc_tag_counts(username: str, max_limit=1000):
 
     try:
         url = LC_SUBMISSIONS_API.format(username)
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = requests.get(url, headers=HEADERS, timeout=45)
         if resp.status_code != 200:
             print(f"LeetCode API returned {resp.status_code}")
             return {}
