@@ -38,6 +38,7 @@ import TestContestLeaderboard  from './pages/TestContestLeaderboard';
 import TestContestSubmission from './pages/TestContestSubmission';
 import BlogDetail from './pages/BlogDetail';
 import Recording from './pages/Recording';
+import ContestHistory from './pages/ContestHistory';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -299,6 +300,12 @@ function App() {
             <Route path="/submissions" element={
               <NavLayout>
                 <Submissions />
+              </NavLayout>
+            } />
+
+            <Route path="/contest-history" element={
+              <NavLayout>
+                <ContestHistory />
               </NavLayout>
             } />
            
