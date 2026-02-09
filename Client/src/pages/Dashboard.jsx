@@ -8,17 +8,14 @@ import RatingChart from '../components/RatingChart';
 import toast from 'react-hot-toast';
 import CfTagDonutChart from '../components/CfTagDonutChart';
 import { PieChart as PieIcon } from 'lucide-react';
-import SubmissionHeatmap from '../components/SubmissionHeatmap';
+//import SubmissionHeatmap from '../components/SubmissionHeatmap';
 
 const Dashboard = () => {
   const { user } = useApp();
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState(null);
-  const [contestHistory, setContestHistory] = useState([]);
-  const [contestPage, setContestPage] = useState(1);
+  
   const [pageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalContests, setTotalContests] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddPlatform, setShowAddPlatform] = useState(false);
@@ -27,11 +24,11 @@ const Dashboard = () => {
     handle: ''
   });
   const [savingPlatform, setSavingPlatform] = useState(false);
-const [cfTagStats, setCfTagStats] = useState({});
-const [cfTagLoading, setCfTagLoading] = useState(true);
+  const [cfTagStats, setCfTagStats] = useState({});
+  const [cfTagLoading, setCfTagLoading] = useState(true);
 
-const [calendarData, setCalendarData] = useState({});
-const [calendarLoading, setCalendarLoading] = useState(true);
+  // const [calendarData, setCalendarData] = useState({});
+  // const [calendarLoading, setCalendarLoading] = useState(true);
 
   // Platform logo paths - only for platforms without react-icons
   const platformLogos = {
@@ -77,22 +74,22 @@ const [calendarLoading, setCalendarLoading] = useState(true);
     } finally {
       setLoading(false);
     }
-try {
-  const resp = await api.get('/account/tag-stats/');  // ← update endpoint if changed
-  setCfTagStats(resp.data.tag_stats || {});
-} catch (err) {
-  console.error('Failed to load CF tag stats:', err);
-} finally {
-  setCfTagLoading(false);
-}
-try {
-  const calResp = await api.get('/account/calendar/');
-  setCalendarData(calResp.data.calendar || {});
-} catch (err) {
-  console.error('Failed to load calendar:', err);
-} finally {
-  setCalendarLoading(false);
-}
+    try {
+      const resp = await api.get('/account/tag-stats/');  // ← update endpoint if changed
+      setCfTagStats(resp.data.tag_stats || {});
+    } catch (err) {
+      console.error('Failed to load CF tag stats:', err);
+    } finally {
+      setCfTagLoading(false);
+    }
+    // try {
+    //   const calResp = await api.get('/account/calendar/');
+    //   setCalendarData(calResp.data.calendar || {});
+    // } catch (err) {
+    //   console.error('Failed to load calendar:', err);
+    // } finally {
+    //   setCalendarLoading(false);
+    // }
   };
 
   const fetchContestPage = async (page = 1) => {
@@ -109,7 +106,7 @@ try {
 
   const handleAddPlatform = async (e) => {
     e.preventDefault();
-    
+
     if (!platformForm.handle.trim()) {
       toast.error('Please enter a handle');
       return;
@@ -121,11 +118,11 @@ try {
         platform: platformForm.platform,
         handle: platformForm.handle
       });
-      
+
       toast.success('Platform profile added successfully!');
       setPlatformForm({ platform: 'codeforces', handle: '' });
       setShowAddPlatform(false);
-      
+
       // Refresh user data
       fetchUserData();
     } catch (err) {
@@ -143,12 +140,12 @@ try {
   // Platform Icon component with react-icons for CodeChef and images for others
   const PlatformIcon = ({ platform, className = "w-5 h-5" }) => {
     const [imgError, setImgError] = useState(false);
-    
+
     // Use react-icons for CodeChef
     if (platform === 'codechef') {
       return <SiCodechef className={`${className} text-[#5B4638]`} />;
     }
-    
+
     // For other platforms, use images with fallback
     if (imgError || !platformLogos[platform]) {
       return (
@@ -157,7 +154,7 @@ try {
         </div>
       );
     }
-    
+
     return (
       <img
         src={platformLogos[platform]}
@@ -335,10 +332,10 @@ try {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {userProfile.platform_profiles.map((profile) => {
                         const platformColor = platformColors[profile.platform] || platformColors.codeforces;
-                        
+
                         return (
-                          <div 
-                            key={profile.platform} 
+                          <div
+                            key={profile.platform}
                             className={`border ${platformColor.border} rounded-lg p-3 hover:shadow-sm transition-shadow ${platformColor.bg}`}
                           >
                             <div className="flex items-start justify-between mb-2">
@@ -412,113 +409,31 @@ try {
                   </div>
                 )}
 
-                <div className="bg-white rounded-xl shadow-sm p-6">
-  {calendarLoading ? (
-    <div className="text-center py-12">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-      <p className="text-gray-600">Loading submission activity...</p>
-    </div>
-  ) : (
-    <SubmissionHeatmap 
-  calendarData={calendarData?.leetcode?.calendar || {}} 
-  activeYears={calendarData?.leetcode?.activeYears || []}
-  title="LeetCode Submission Heatmap"
-/>
-  )}
-</div>
+
                 {/* In return JSX → after RatingChart section (or wherever you want)*/}
-<div className="bg-white rounded-lg shadow-sm p-5">
-  <div className="flex items-center gap-2 mb-4">
-    <PieIcon className="w-5 h-5 text-indigo-600" />
-    <h2 className="text-lg font-semibold text-gray-900">
-      Codeforces Solved Problems by Tag
-    </h2>
-  </div>
-
-<div className="bg-white rounded-xl shadow-sm p-6">
-  {cfTagLoading ? (
-    <div className="text-center py-12">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-      <p className="text-gray-600">Loading Codeforces tag distribution...</p>
-    </div>
-  ) : (
-    <CfTagDonutChart 
-      tagStats={cfTagStats} 
-      username={user?.name || "user"}  // or fetch handle from profile if you want
-    />
-  )}
-</div>
-</div>
-
-                {/* Contest History Section - Updated as requested */}
                 <div className="bg-white rounded-lg shadow-sm p-5">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Contest History</h2>
+                  <div className="flex items-center gap-2 mb-4">
+                    <PieIcon className="w-5 h-5 text-indigo-600" />
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      Codeforces Solved Problems by Tag
+                    </h2>
+                  </div>
 
-                  {contestHistory && contestHistory.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="text-left px-3 py-2 font-semibold text-gray-900">Contest Name</th>
-                            <th className="text-left px-3 py-2 font-semibold text-gray-900">Date & Time</th>
-                            <th className="text-left px-3 py-2 font-semibold text-gray-900">Rank</th>
-                            <th className="text-left px-3 py-2 font-semibold text-gray-900">Rating After</th>
-                            <th className="text-left px-3 py-2 font-semibold text-gray-900">Platform</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {contestHistory.map((contest, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-3 py-2">
-                                <p className="font-medium text-gray-900 whitespace-normal break-words">
-                                  {contest.title}
-                                </p>
-                              </td>
-                              <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
-                                {contest.datetime 
-                                  ? new Date(contest.datetime).toLocaleString() 
-                                  : (contest.date ? new Date(contest.date).toLocaleDateString() : 'N/A')}
-                              </td>
-                              <td className="px-3 py-2">
-                                <span className="font-semibold text-blue-600">#{contest.rank || 'N/A'}</span>
-                              </td>
-                              <td className="px-3 py-2">
-                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
-                                  {contest.rating || contest.score || 'N/A'}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2">
-                                <span className="text-gray-600 capitalize font-medium text-xs">
-                                  {contest.platform}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="text-gray-600 text-xs">Page {contestPage} of {totalPages} — {totalContests} contests</div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            className="px-2 py-0.5 bg-white border rounded text-xs disabled:opacity-50 hover:bg-gray-50"
-                            onClick={() => { if (contestPage > 1) { fetchContestPage(contestPage - 1); } }}
-                            disabled={contestPage <= 1}
-                          >Prev</button>
-                          <button
-                            className="px-2 py-0.5 bg-white border rounded text-xs disabled:opacity-50 hover:bg-gray-50"
-                            onClick={() => { if (contestPage < totalPages) { fetchContestPage(contestPage + 1); } }}
-                            disabled={contestPage >= totalPages}
-                          >Next</button>
-                        </div>
+                  <div className="bg-white rounded-xl shadow-sm p-6">
+                    {cfTagLoading ? (
+                      <div className="text-center py-12">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Loading Codeforces tag distribution...</p>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-gray-500 text-sm">
-                      <p>No contest history yet. Participate in contests to see them here!</p>
-                    </div>
-                  )}
+                    ) : (
+                      <CfTagDonutChart
+                        tagStats={cfTagStats}
+                        username={user?.name || "user"}  // or fetch handle from profile if you want
+                      />
+                    )}
+                  </div>
                 </div>
-              </>
+             </>
             )}
           </div>
         </div>
