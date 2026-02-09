@@ -8,7 +8,7 @@ import requests
 from datetime import datetime
 
 
-from .models import Account
+from .models import Account, UserTagStats
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
 from .platforms import fetch_codechef_contests, fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
 from submission.models import Submission
@@ -20,7 +20,7 @@ from .platforms.atcoder import fetch_submissions as fetch_atcoder_submissions
 
 from .tag_analysis import get_tag_stats
 
-from .calendar import get_user_calendar
+#from .calendar import get_user_calendar
 
 class SignupView(APIView):
     def post(self, request):
@@ -198,7 +198,7 @@ class AddPlatformProfileView(APIView):
                 rating_data.get('badge', ''),
                 rating_data.get('rating_history', [])
             )
-
+            UserTagStats.objects(user_id=str(user.id)).delete()
             return Response({
                 "message": "Platform profile added successfully",
                 "platform": platform,
@@ -216,7 +216,6 @@ def fetch_platform_rating(platform, handle):
     """
     from .platforms import fetch_platform_rating as platform_fetch
     return platform_fetch(platform, handle)
-
 
 
 def fetch_codeforces_rating(handle):
@@ -406,30 +405,3 @@ class TagStatsView(APIView):
 
 
 
-class UserCalendarView(APIView):
-    """
-    Get submission calendar/heatmap data for the authenticated user
-    (currently only LeetCode)
-    """
-    def get(self, request):
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            return Response({"error": "Unauthorized"}, status=401)
-
-        try:
-            token = auth_header[7:]
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-            user_id = payload.get("user_id")
-        except:
-            return Response({"error": "Invalid token"}, status=401)
-
-        user = Account.objects(id=user_id, is_deleted=False).first()
-        if not user:
-            return Response({"error": "User not found"}, status=404)
-
-        calendar_data = get_user_calendar(user)
-
-        return Response({
-            "calendar": calendar_data,
-            "platforms": ["leetcode"]  # extend later for CF, etc.
-        })

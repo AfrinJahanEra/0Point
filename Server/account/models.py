@@ -95,3 +95,15 @@ class Account(Document):
             )
             self.platform_profiles.append(new_profile)
         self.save()
+
+# New model in Server/account/models.py
+from mongoengine import Document, StringField, DictField, DateTimeField
+
+class UserTagStats(Document):
+    user_id = StringField(required=True, unique=True)
+    tags = DictField(default=dict)  # {normalized_tag: int count}
+    last_update = DateTimeField()
+    last_cf_submission_time = IntField(default=0)
+    last_lc_submission_time = IntField(default=0)
+    
+    meta = {'collection': 'user_tag_stats'}
