@@ -1,3 +1,4 @@
+// Client/src/components/NavigationBar.jsx
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -11,7 +12,8 @@ const NavigationBar = () => {
   const getActiveTab = () => {
     if (currentPath === '/submissions') return 'submissions';
     if (currentPath === '/blog') return 'blog';
-    return 'dashboard'; 
+    if (currentPath === '/contest-history') return 'contests'; // ← new
+    return 'dashboard';
   };
 
   const activeTab = getActiveTab();
@@ -26,6 +28,9 @@ const NavigationBar = () => {
         break;
       case 'blog':
         navigate('/blog');
+        break;
+      case 'contests':               // ← new
+        navigate('/contest-history');
         break;
       default:
         navigate('/dashboard');
@@ -47,6 +52,7 @@ const NavigationBar = () => {
         >
           {userName}
         </button>
+
         <button
           onClick={() => handleTabChange('submissions')}
           className={`pb-2 text-sm font-medium ${
@@ -57,6 +63,7 @@ const NavigationBar = () => {
         >
           Submissions
         </button>
+
         <button
           onClick={() => handleTabChange('blog')}
           className={`pb-2 text-sm font-medium ${
@@ -66,6 +73,18 @@ const NavigationBar = () => {
           }`}
         >
           Blogs
+        </button>
+
+        {/* New: Contests tab */}
+        <button
+          onClick={() => handleTabChange('contests')}
+          className={`pb-2 text-sm font-medium ${
+            activeTab === 'contests'
+              ? 'text-blue-800 border-b-2 border-blue-800'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Contests
         </button>
       </div>
     </div>
