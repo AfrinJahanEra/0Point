@@ -400,8 +400,8 @@ const Dashboard = () => {
 
                 {/* Rating Progress Chart - Placed BEFORE Contest History */}
                 {userProfile?.platform_profiles && userProfile.platform_profiles.length > 0 && (
-                  <div className="bg-white rounded-lg shadow-sm p-5">
-                    <div className="flex items-center gap-2 mb-4">
+                  <div className="bg-white rounded-lg shadow-sm p-2">
+                    <div className="flex items-center gap-2 ">
                       <TrendingUp className="w-4 h-4 text-blue-600" />
                       <h2 className="text-lg font-semibold text-gray-900">Rating Progress</h2>
                     </div>
