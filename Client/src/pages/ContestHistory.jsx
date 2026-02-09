@@ -143,7 +143,7 @@ const ContestHistory = () => {
           {/* Main Content */}
           <div className="lg:col-span-9">
             {/* Top bar: total count + filter */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div className="text-xs text-gray-600">
                 Total: <span className="font-medium text-gray-900">{totalContests}</span> contest
                 {totalContests !== 1 ? 's' : ''}
@@ -207,32 +207,32 @@ const ContestHistory = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 ">
                         Contest Name
                       </th>
 
                       <th
-                        className="px-3 py-2 text-left text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-200"
+                        className="px-3 py-2 text-center text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-200"
                         onClick={() => requestSort('date')}
                       >
                         Date & Time {getSortIndicator('date')}
                       </th>
 
                       <th
-                        className="px-3 py-2 text-left text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-200"
+                        className="px-3 py-2 text-center text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-200"
                         onClick={() => requestSort('rank')}
                       >
                         Rank {getSortIndicator('rank')}
                       </th>
 
                       <th
-                        className="px-3 py-2 text-left text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-200"
+                        className="px-3 py-2 text-center text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-200"
                         onClick={() => requestSort('rating')}
                       >
                         Rating / Score {getSortIndicator('rating')}
                       </th>
 
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">
+                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600">
                         Platform
                       </th>
                     </tr>
