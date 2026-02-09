@@ -17,7 +17,7 @@ HEADERS = {
 }
 
 PROFILE_URL = "https://www.codechef.com/users/{}"
-TIMEOUT = 12
+TIMEOUT =50
 
 
 def fetch_rating(handle: str):
@@ -198,7 +198,7 @@ def parse_cc_time(title):
         return None
 
 
-def fetch_submissions(handle, limit=50):
+def fetch_submissions(handle, limit=21):
     submissions = []
     page = 0
 

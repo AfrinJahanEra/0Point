@@ -216,7 +216,7 @@ def fetch_problem_tags(slug):
         return []
 
 
-def fetch_submissions(handle, limit=50):
+def fetch_submissions(handle, limit=100):
     submissions = []
     tag_cache = {}   # slug -> [tags]
 
@@ -224,7 +224,7 @@ def fetch_submissions(handle, limit=50):
         session = create_session()
         res = session.get(
             f"https://leetcode-api-pied.vercel.app/user/{handle}/submissions",
-            timeout=10
+            timeout=20
         )
 
         if res.status_code != 200:
