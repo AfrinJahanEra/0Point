@@ -24,6 +24,12 @@ const ContestHistory = () => {
   const [error, setError] = useState(null);
   const [platformFilter, setPlatformFilter] = useState('all');
 
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState({
+    key: 'date',          // default sort by date
+    direction: 'desc',    // newest first
+  });
+
   const fetchContests = async (pageNum = 1, filter = platformFilter) => {
     if (!user) {
       setContests([]);
@@ -43,7 +49,12 @@ const ContestHistory = () => {
 
       const res = await api.get(`/account/contest-history/?${params.toString()}`);
 
-      setContests(res.data.contests || []);
+      let fetchedContests = res.data.contests || [];
+
+      // Apply client-side sorting immediately after fetch
+      const sorted = sortContests(fetchedContests, sortConfig);
+
+      setContests(sorted);
       setPage(res.data.page || pageNum);
       setTotalPages(res.data.total_pages || 1);
       setTotalContests(res.data.total_contests || 0);
@@ -55,13 +66,62 @@ const ContestHistory = () => {
     }
   };
 
+  // Sorting logic
+  const sortContests = (data, config) => {
+    if (!config.key) return data;
+
+    return [...data].sort((a, b) => {
+      let aValue, bValue;
+
+      if (config.key === 'date') {
+        aValue = a.datetime || a.date || '';
+        bValue = b.datetime || b.date || '';
+        // Convert to Date for comparison
+        aValue = aValue ? new Date(aValue).getTime() : 0;
+        bValue = bValue ? new Date(bValue).getTime() : 0;
+      } else if (config.key === 'rank') {
+        aValue = typeof a.rank === 'number' ? a.rank : Infinity;
+        bValue = typeof b.rank === 'number' ? b.rank : Infinity;
+      } else if (config.key === 'rating') {
+        aValue = parseFloat(a.rating || a.score || 0);
+        bValue = parseFloat(b.rating || b.score || 0);
+      } else {
+        return 0;
+      }
+
+      if (aValue < bValue) return config.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return config.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIndicator = (key) => {
+    if (sortConfig.key !== key) return '↕';
+    return sortConfig.direction === 'asc' ? '↑' : '↓';
+  };
+
   useEffect(() => {
     fetchContests(1, platformFilter);
   }, [user, platformFilter]);
 
+  // Re-sort when sortConfig changes (after fetch or manual sort)
+  useEffect(() => {
+    if (contests.length > 0) {
+      setContests((prev) => sortContests([...prev], sortConfig));
+    }
+  }, [sortConfig]);
+
   const handleFilterChange = (e) => {
     setPlatformFilter(e.target.value);
-    setPage(1); // reset to first page when filter changes
+    setPage(1);
   };
 
   if (!user) {
@@ -83,19 +143,18 @@ const ContestHistory = () => {
           {/* Main Content */}
           <div className="lg:col-span-9">
             {/* Top bar: total count + filter */}
-            <div className="flex flex-col sm:flex-row xs:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <div className="text-xs text-gray-600">
-                Total: <span className="font-xs text-gray-900">{totalContests}</span> contest
+                Total: <span className="font-medium text-gray-900">{totalContests}</span> contest
                 {totalContests !== 1 ? 's' : ''}
               </div>
 
-              {/* Filter moved to right side */}
               <select
                 value={platformFilter}
                 onChange={handleFilterChange}
-                className="block text-xs border border-gray-300 rounded-md px-3 py-1.5 
+                className="block text-xs border border-gray-300 rounded-md px-3 py-1 
                          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                         bg-white shadow-sm min-w-[180px]"
+                         bg-white shadow-sm min-w-[160px]"
               >
                 {PLATFORM_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -107,9 +166,7 @@ const ContestHistory = () => {
 
             {loading && (
               <div className="text-center py-12">
-                <div className="inline-block">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-800"></div>
-                </div>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-800"></div>
                 <p className="text-gray-500 mt-4">Loading contest history...</p>
               </div>
             )}
@@ -150,11 +207,34 @@ const ContestHistory = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Contest Name</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Date & Time</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Rank</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Rating / Score</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Platform</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">
+                        Contest Name
+                      </th>
+
+                      <th
+                        className="px-3 py-2 text-left text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-200"
+                        onClick={() => requestSort('date')}
+                      >
+                        Date & Time {getSortIndicator('date')}
+                      </th>
+
+                      <th
+                        className="px-3 py-2 text-left text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-200"
+                        onClick={() => requestSort('rank')}
+                      >
+                        Rank {getSortIndicator('rank')}
+                      </th>
+
+                      <th
+                        className="px-3 py-2 text-left text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-200"
+                        onClick={() => requestSort('rating')}
+                      >
+                        Rating / Score {getSortIndicator('rating')}
+                      </th>
+
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">
+                        Platform
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
@@ -190,7 +270,7 @@ const ContestHistory = () => {
               </div>
             )}
 
-                    </div>
+                     </div>
 
           {/* Sidebar */}
           <div className="lg:col-span-3">
