@@ -198,7 +198,11 @@ class AddPlatformProfileView(APIView):
                 rating_data.get('badge', ''),
                 rating_data.get('rating_history', [])
             )
+
+           # Reset timestamps for the changed platform (forces full re-fetch)
+            
             UserTagStats.objects(user_id=str(user.id)).delete()
+           
             return Response({
                 "message": "Platform profile added successfully",
                 "platform": platform,

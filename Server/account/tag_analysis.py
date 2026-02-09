@@ -235,13 +235,15 @@ def update_lc_tags(username: str, cached_stats: UserTagStats):
 
 def get_tag_stats(user):
     user_id = str(user.id)
+    
+    # Try to get existing cache
     cache = UserTagStats.objects(user_id=user_id).first()
 
     cf_handle = user.get_platform_profile("codeforces").handle if user.get_platform_profile("codeforces") else None
     lc_handle = user.get_platform_profile("leetcode").handle if user.get_platform_profile("leetcode") else None
 
-    # If no cache → full fetch once
     if not cache:
+        # First time - full fetch
         cf_tags, cf_last = fetch_cf_tag_counts(cf_handle) if cf_handle else ({}, 0)
         lc_tags, lc_last = fetch_lc_tag_counts(lc_handle) if lc_handle else ({}, 0)
 
@@ -251,32 +253,33 @@ def get_tag_stats(user):
         for tag, cnt in lc_tags.items():
             combined[tag] += cnt
 
-        cache = UserTagStats(
-            user_id=user_id,
-            tags=dict(combined),
-            last_update=datetime.utcnow(),
-            last_cf_submission_time=cf_last,
-            last_lc_submission_time=lc_last
+        # Atomic upsert - safe even in race conditions
+        UserTagStats.objects(user_id=user_id).update_one(
+            upsert=True,
+            set__tags=dict(combined),
+            set__last_update=datetime.utcnow(),
+            set__last_cf_submission_time=cf_last,
+            set__last_lc_submission_time=lc_last
         )
-        cache.save()
 
         return dict(sorted(combined.items(), key=lambda x: x[1], reverse=True))
 
-    # Incremental: only add new problems
+    # Incremental update
     new_cf_counts, new_cf_time = update_cf_tags(cf_handle, cache) if cf_handle else ({}, cache.last_cf_submission_time)
     new_lc_counts, new_lc_time = update_lc_tags(lc_handle, cache) if lc_handle else ({}, cache.last_lc_submission_time)
 
-    # Merge new counts into existing cache
+    # Merge new counts into existing
     for tag, cnt in new_cf_counts.items():
         cache.tags[tag] = cache.tags.get(tag, 0) + cnt
     for tag, cnt in new_lc_counts.items():
         cache.tags[tag] = cache.tags.get(tag, 0) + cnt
 
-    # Update timestamps and save
-    cache.last_cf_submission_time = new_cf_time
-    cache.last_lc_submission_time = new_lc_time
-    cache.last_update = datetime.utcnow()
-    cache.save()
+    # Atomic update cache
+    UserTagStats.objects(user_id=user_id).update_one(
+        set__tags=cache.tags,
+        set__last_update=datetime.utcnow(),
+        set__last_cf_submission_time=new_cf_time,
+        set__last_lc_submission_time=new_lc_time
+    )
 
-    # Return sorted
     return dict(sorted(cache.tags.items(), key=lambda x: x[1], reverse=True))
