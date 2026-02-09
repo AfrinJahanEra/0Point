@@ -15,7 +15,7 @@ HEADERS = {
 HISTORY_URL = "https://atcoder.jp/users/{handle}/history/json"
 SUBMISSIONS_URL = "https://kenkoooo.com/atcoder/atcoder-api/v3/user/submissions?user={handle}&from_second={from_second}"
 PROBLEMS_URL = "https://kenkoooo.com/atcoder/resources/problems.json"
-TIMEOUT = 10
+TIMEOUT = 50
 
 # -----------------------------
 # Fetch problem title map

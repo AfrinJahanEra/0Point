@@ -8,7 +8,7 @@ from datetime import datetime
 def fetch_rating(handle):
     """Fetch rating from Codeforces API"""
     try:
-        response = requests.get(f"https://codeforces.com/api/user.info?handles={handle}", timeout=5)
+        response = requests.get(f"https://codeforces.com/api/user.info?handles={handle}", timeout=50)
         if response.status_code != 200:
             raise Exception(f"Codeforces API error: {response.status_code}")
         
@@ -19,7 +19,7 @@ def fetch_rating(handle):
         user_data = data['result'][0]
         
         # Get contest history for min/max and contests count
-        response = requests.get(f"https://codeforces.com/api/user.rating?handle={handle}", timeout=5)
+        response = requests.get(f"https://codeforces.com/api/user.rating?handle={handle}", timeout=50)
         rating_history = []
         contests_count = 0
         total_solved = 0
@@ -62,7 +62,7 @@ def fetch_contests(handle):
     """Fetch contest history from Codeforces"""
     contests = []
     try:
-        response = requests.get(f"https://codeforces.com/api/user.rating?handle={handle}", timeout=5)
+        response = requests.get(f"https://codeforces.com/api/user.rating?handle={handle}", timeout=50)
         if response.status_code == 200:
             data = response.json()
             if data.get('result'):
@@ -92,7 +92,7 @@ def fetch_submissions(handle, limit=100):
     submissions = []
     try:
         url = f"https://codeforces.com/api/user.status?handle={handle}&count={limit}"
-        resp = requests.get(url, timeout=5)
+        resp = requests.get(url, timeout=50)
 
         if resp.status_code != 200:
             return submissions

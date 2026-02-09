@@ -45,7 +45,7 @@ def fetch_rating(handle):
         session = create_session()
 
         # -------- basic profile --------
-        profile_res = session.get(f"{BASE_URL}/{handle}", timeout=10)
+        profile_res = session.get(f"{BASE_URL}/{handle}", timeout=50)
         if profile_res.status_code != 200:
             raise Exception("LeetCode user not found")
 
@@ -53,7 +53,7 @@ def fetch_rating(handle):
         profile_name = profile.get("username") or profile.get("userSlug") or handle
 
         # -------- contest summary --------
-        contest_res = session.get(f"{BASE_URL}/{handle}/contest", timeout=10)
+        contest_res = session.get(f"{BASE_URL}/{handle}/contest", timeout=50)
         contest_data = contest_res.json() if contest_res.status_code == 200 else {}
 
         current_rating = contest_data.get("contestRating", 0)
@@ -64,7 +64,7 @@ def fetch_rating(handle):
             badge = contest_data["contestBadges"].get("name", "")
 
         # -------- contest history --------
-        history_res = session.get(f"{BASE_URL}/{handle}/contest/history", timeout=10)
+        history_res = session.get(f"{BASE_URL}/{handle}/contest/history", timeout=50)
         history_data = history_res.json() if history_res.status_code == 200 else {}
 
         history = history_data.get("contestHistory", [])
@@ -152,7 +152,7 @@ def fetch_contests(handle):
     contests = []
     try:
         session = create_session()
-        res = session.get(f"{BASE_URL}/{handle}/contest/history", timeout=10)
+        res = session.get(f"{BASE_URL}/{handle}/contest/history", timeout=50)
 
         if res.status_code != 200:
             return contests
@@ -216,7 +216,7 @@ def fetch_problem_tags(slug):
         return []
 
 
-def fetch_submissions(handle, limit=30):
+def fetch_submissions(handle, limit=50):
     submissions = []
     tag_cache = {}   # slug -> [tags]
 

@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import  SignupView, LoginView, TagStatsView, UserCalendarView, UserProfileView, AddPlatformProfileView, ContestHistoryView, ExternalSubmissionView
+from .views import  SignupView, LoginView, TagStatsView, UserProfileView, AddPlatformProfileView, ContestHistoryView, ExternalSubmissionView
 
 urlpatterns = [
     path("signup/", SignupView.as_view(), name="signup"),
@@ -11,5 +11,5 @@ urlpatterns = [
     path("contest-history/", ContestHistoryView.as_view(), name="contest_history"),
     path("external-submissions/", ExternalSubmissionView.as_view(), name="external_submissions"),
     path("tag-stats/", TagStatsView.as_view(), name="tag_stats"),
-    path("calendar/", UserCalendarView.as_view(), name="user_calendar"),
+    # path("calendar/", UserCalendarView.as_view(), name="user_calendar"),
 ]

@@ -198,14 +198,14 @@ def parse_cc_time(title):
         return None
 
 
-def fetch_submissions(handle, limit=21):
+def fetch_submissions(handle, limit=50):
     submissions = []
     page = 0
 
     while True:
         url = f"https://www.codechef.com/recent/user?page={page}&user_handle={handle}"
 
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp = requests.get(url, headers=HEADERS, timeout=50)
         resp.raise_for_status()
 
         data = resp.json()

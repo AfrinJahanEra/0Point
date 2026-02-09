@@ -57,7 +57,7 @@ def fetch_cf_tag_counts(handle: str):
     while True:
         try:
             url = f"{CF_API_BASE}/user.status?handle={handle}&from={from_idx}&count={count}"
-            resp = requests.get(url, headers=HEADERS, timeout=12)
+            resp = requests.get(url, headers=HEADERS, timeout=50)
             resp.raise_for_status()
             data = resp.json()
 
@@ -98,7 +98,7 @@ def fetch_lc_tag_counts(username: str, max_limit=1000):
 
     try:
         url = LC_SUBMISSIONS_API.format(username)
-        resp = requests.get(url, headers=HEADERS, timeout=45)
+        resp = requests.get(url, headers=HEADERS, timeout=50)
         if resp.status_code != 200:
             print(f"LC API status: {resp.status_code}")
             return {}, 0
@@ -193,7 +193,7 @@ def update_lc_tags(username: str, cached_stats: UserTagStats):
 
     try:
         url = LC_SUBMISSIONS_API.format(username)
-        resp = requests.get(url, headers=HEADERS, timeout=45)
+        resp = requests.get(url, headers=HEADERS, timeout=50)
         if resp.status_code != 200:
             print(f"LC API status: {resp.status_code}")
             return {}, new_last_time
