@@ -8,7 +8,7 @@ import requests
 from datetime import datetime
 
 
-from .models import Account, UserTagStats
+from .models import Account, UserTagStats, PlatformContestCache
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
 from .platforms import fetch_codechef_contests, fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
 from submission.models import Submission
@@ -252,6 +252,7 @@ class ContestHistoryView(APIView):
 
     def get(self, request, user_id=None):
         """Get paginated contest history"""
+        
         if user_id is None:
             # Get current user from token
             auth_header = request.headers.get('Authorization', '')
@@ -305,18 +306,53 @@ class ContestHistoryView(APIView):
                 })
 
             # External platforms
-            for platform_profile in getattr(user, 'platform_profiles', []):
+            CACHE_VALID_FOR_HOURS = 3
+
+            for profile in user.platform_profiles:
+                cache_entry = next((c for c in user.contest_cache
+                    if c.platform == profile.platform and c.handle == profile.handle), None)
+
+                if cache_entry and cache_entry.last_fetched:
+                    age_hours = (datetime.utcnow() - cache_entry.last_fetched).total_seconds() / 3600
+                    if age_hours < CACHE_VALID_FOR_HOURS:
+                        contests.extend(cache_entry.contests)
+                        continue
+
+                # Cache miss / stale → fetch and update (but still return old data if exists)
                 try:
-                    if platform_profile.platform == "codeforces":
-                        contests.extend(fetch_codeforces_contests(platform_profile.handle))
-                    elif platform_profile.platform == "atcoder":
-                        contests.extend(fetch_atcoder_contests(platform_profile.handle))
-                    elif platform_profile.platform == "leetcode":
-                        contests.extend(fetch_leetcode_contests(platform_profile.handle))
-                    elif platform_profile.platform == "codechef":
-                        contests.extend(fetch_codechef_contests(platform_profile.handle))
+                    if profile.platform == "codeforces":
+                        fresh = fetch_codeforces_contests(profile.handle)
+                    elif profile.platform == "atcoder":
+                        fresh = fetch_atcoder_contests(profile.handle)
+                    elif profile.platform == "leetcode":
+                        fresh = fetch_leetcode_contests(profile.handle)
+                    elif profile.platform == "codechef":
+                        fresh = fetch_codechef_contests(profile.handle)
+                    else:
+                        fresh = []
+                
+                    if fresh:
+                        # update or create cache
+                        if cache_entry:
+                            cache_entry.contests = fresh
+                            cache_entry.last_fetched = datetime.utcnow()
+                        else:
+                            user.contest_cache.append(PlatformContestCache(
+                            platform=profile.platform,
+                            handle=profile.handle,
+                            contests=fresh,
+                            last_fetched=datetime.utcnow()
+                        ))
+                        user.save()
+
+                        contests.extend(fresh)
+
                 except Exception:
-                    pass
+                    # If fetch fails → at least return old cache if we have it
+                    if cache_entry:
+                        contests.extend(cache_entry.contests)
+
+           
 
             # Sort and paginate
             contests.sort(key=lambda x: x.get('date', ''), reverse=True)

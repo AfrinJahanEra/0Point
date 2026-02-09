@@ -19,6 +19,15 @@ class PlatformProfile(EmbeddedDocument):
     rating_history = ListField(DictField(), default=list)  # [{"date": "2023-01-15", "rating": 1500}, ...]
 
 
+
+class PlatformContestCache(EmbeddedDocument):
+    platform       = StringField(required=True)
+    handle         = StringField(required=True)
+    contests       = ListField(DictField(), default=list)
+    last_fetched   = DateTimeField()
+    etag_or_hash   = StringField()          # optional – for conditional requests
+    fetch_status   = StringField()           # "success", "failed", "partial"
+
 class Account(Document):
     name = StringField(required=True, max_length=200)
     email = EmailField(required=True, unique=True)
@@ -49,6 +58,8 @@ class Account(Document):
     global_rank = IntField(null=True)
     problems_solved = IntField(default=0)
     contests_count = IntField(default=0)
+
+    contest_cache = ListField(EmbeddedDocumentField(PlatformContestCache), default=list)
 
     meta = {
         "collection": "accounts"
@@ -107,3 +118,4 @@ class UserTagStats(Document):
     last_lc_submission_time = IntField(default=0)
     
     meta = {'collection': 'user_tag_stats'}
+
