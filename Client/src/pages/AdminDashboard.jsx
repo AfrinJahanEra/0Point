@@ -330,15 +330,21 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-900 rounded-lg flex items-center justify-center">
+                <Shield className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+                <p className="text-xs text-gray-500">Complete platform control</p>
+              </div>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
             >
               <LogOut className="w-4 h-4" />
               Logout
@@ -347,101 +353,143 @@ const AdminDashboard = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Navigation */}
-          <div className="lg:w-64 flex-shrink-0">
-            <nav className="bg-white rounded-lg shadow p-4">
-              <ul className="space-y-2">
+          <div className="lg:w-72 flex-shrink-0">
+            <nav className="bg-white rounded-lg shadow-sm p-3">
+              <ul className="space-y-1">
                 <li>
                   <button
                     onClick={() => handleTabChange('dashboard')}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'dashboard' 
-                        ? 'bg-blue-100 text-blue-700' 
+                        ? 'bg-blue-900 text-white' 
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
                     <LayoutDashboard className="w-5 h-5" />
-                    Dashboard
+                    <span className="font-medium">Dashboard</span>
                   </button>
                 </li>
                 <li>
                   <button
                     onClick={() => handleTabChange('users')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'users' 
-                        ? 'bg-blue-100 text-blue-700' 
+                        ? 'bg-blue-900 text-white' 
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <Users className="w-5 h-5" />
-                    Users ({stats.users.total})
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5" />
+                      <span className="font-medium">Users</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'users' ? 'bg-white/20' : 'bg-blue-100 text-blue-900'
+                    }`}>
+                      {stats.users.total}
+                    </span>
                   </button>
                 </li>
                 <li>
                   <button
                     onClick={() => handleTabChange('banned_users')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'banned_users' 
-                        ? 'bg-red-100 text-red-700' 
+                        ? 'bg-gray-800 text-white' 
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <ShieldOff className="w-5 h-5" />
-                    Banned Accounts ({stats.users.banned})
+                    <div className="flex items-center gap-3">
+                      <ShieldOff className="w-5 h-5" />
+                      <span className="font-medium">Banned</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'banned_users' ? 'bg-white/20' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {stats.users.banned}
+                    </span>
                   </button>
                 </li>
                 <li>
                   <button
                     onClick={() => handleTabChange('blogs')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'blogs' 
-                        ? 'bg-blue-100 text-blue-700' 
+                        ? 'bg-blue-900 text-white' 
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <FileText className="w-5 h-5" />
-                    Blogs ({stats.blogs.published})
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5" />
+                      <span className="font-medium">Blogs</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'blogs' ? 'bg-white/20' : 'bg-blue-100 text-blue-900'
+                    }`}>
+                      {stats.blogs.published}
+                    </span>
                   </button>
                 </li>
                 <li>
                   <button
                     onClick={() => handleTabChange('contests')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'contests' 
-                        ? 'bg-blue-100 text-blue-700' 
+                        ? 'bg-blue-900 text-white' 
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <Trophy className="w-5 h-5" />
-                    Contests ({stats.contests.total})
+                    <div className="flex items-center gap-3">
+                      <Trophy className="w-5 h-5" />
+                      <span className="font-medium">Contests</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'contests' ? 'bg-white/20' : 'bg-blue-100 text-blue-900'
+                    }`}>
+                      {stats.contests.total}
+                    </span>
                   </button>
                 </li>
                 <li>
                   <button
                     onClick={() => handleTabChange('problems')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'problems' 
-                        ? 'bg-blue-100 text-blue-700' 
+                        ? 'bg-blue-900 text-white' 
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <Code className="w-5 h-5" />
-                    Problems ({stats.problems.total})
+                    <div className="flex items-center gap-3">
+                      <Code className="w-5 h-5" />
+                      <span className="font-medium">Problems</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'problems' ? 'bg-white/20' : 'bg-blue-100 text-blue-900'
+                    }`}>
+                      {stats.problems.total}
+                    </span>
                   </button>
                 </li>
                 <li>
                   <button
                     onClick={() => handleTabChange('submissions')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'submissions' 
-                        ? 'bg-blue-100 text-blue-700' 
+                        ? 'bg-blue-900 text-white' 
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <FileCode className="w-5 h-5" />
-                    Submissions ({stats.submissions.total})
+                    <div className="flex items-center gap-3">
+                      <FileCode className="w-5 h-5" />
+                      <span className="font-medium">Submissions</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'submissions' ? 'bg-white/20' : 'bg-blue-100 text-blue-900'
+                    }`}>
+                      {stats.submissions.total}
+                    </span>
                   </button>
                 </li>
               </ul>
@@ -450,83 +498,95 @@ const AdminDashboard = () => {
 
           {/* Main Content */}
           <div className="flex-1">
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
                 {activeTab === 'dashboard' && (
                   <div>
                     <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-xl font-semibold text-gray-900">Dashboard Overview</h2>
+                      <h2 className="text-2xl font-bold text-gray-900">Dashboard Overview</h2>
                       <button
                         onClick={loadDashboardData}
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-950 transition-colors"
                       >
                         <RefreshCw className="w-4 h-4" />
                         Refresh
                       </button>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
-                      <div className="bg-blue-50 p-6 rounded-lg">
-                        <div className="flex items-center">
-                          <Users className="w-8 h-8 text-blue-600 mr-3" />
-                          <div>
-                            <p className="text-2xl font-bold text-blue-900">{stats.users.total}</p>
-                            <p className="text-blue-700">Active Users</p>
-                            <p className="text-xs text-blue-600 mt-1">+{stats.users.new_today} today</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="p-5 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-gray-500 text-sm font-medium mb-1">Active Users</p>
+                            <p className="text-3xl font-bold text-gray-900 mb-1">{stats.users.total}</p>
+                            <p className="text-blue-900 text-xs">+{stats.users.new_today} today</p>
+                          </div>
+                          <div className="bg-blue-200 p-3 rounded-lg">
+                            <Users className="w-7 h-7 text-blue-900" />
                           </div>
                         </div>
                       </div>
                       
-                      <div className="bg-red-50 p-6 rounded-lg">
-                        <div className="flex items-center">
-                          <ShieldOff className="w-8 h-8 text-red-600 mr-3" />
-                          <div>
-                            <p className="text-2xl font-bold text-red-900">{stats.users.banned}</p>
-                            <p className="text-red-700">Banned Users</p>
-                            <p className="text-xs text-red-600 mt-1">{stats.users.admins} admins</p>
+                      <div className="p-5 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-gray-500 text-sm font-medium mb-1">Banned Users</p>
+                            <p className="text-3xl font-bold text-gray-900 mb-1">{stats.users.banned}</p>
+                            <p className="text-gray-600 text-xs">{stats.users.admins} admins</p>
+                          </div>
+                          <div className="bg-gray-100 p-3 rounded-lg">
+                            <ShieldOff className="w-7 h-7 text-gray-700" />
                           </div>
                         </div>
                       </div>
                       
-                      <div className="bg-green-50 p-6 rounded-lg">
-                        <div className="flex items-center">
-                          <FileText className="w-8 h-8 text-green-600 mr-3" />
-                          <div>
-                            <p className="text-2xl font-bold text-green-900">{stats.blogs.published}</p>
-                            <p className="text-green-700">Published Blogs</p>
-                            <p className="text-xs text-green-600 mt-1">{stats.blogs.comments} comments</p>
+                      <div className="p-5 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-gray-500 text-sm font-medium mb-1">Blogs</p>
+                            <p className="text-3xl font-bold text-gray-900 mb-1">{stats.blogs.published}</p>
+                            <p className="text-blue-900 text-xs">{stats.blogs.comments} comments</p>
+                          </div>
+                          <div className="bg-blue-200 p-3 rounded-lg">
+                            <FileText className="w-7 h-7 text-blue-900" />
                           </div>
                         </div>
                       </div>
                       
-                      <div className="bg-purple-50 p-6 rounded-lg">
-                        <div className="flex items-center">
-                          <Trophy className="w-8 h-8 text-purple-600 mr-3" />
-                          <div>
-                            <p className="text-2xl font-bold text-purple-900">{stats.contests.total}</p>
-                            <p className="text-purple-700">Total Contests</p>
-                            <p className="text-xs text-purple-600 mt-1">{stats.contests.live} live now</p>
+                      <div className="p-5 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-gray-500 text-sm font-medium mb-1">Contests</p>
+                            <p className="text-3xl font-bold text-gray-900 mb-1">{stats.contests.total}</p>
+                            <p className="text-blue-900 text-xs">{stats.contests.live} live</p>
+                          </div>
+                          <div className="bg-blue-200 p-3 rounded-lg">
+                            <Trophy className="w-7 h-7 text-blue-900" />
                           </div>
                         </div>
                       </div>
                       
-                      <div className="bg-amber-50 p-6 rounded-lg">
-                        <div className="flex items-center">
-                          <Code className="w-8 h-8 text-amber-600 mr-3" />
-                          <div>
-                            <p className="text-2xl font-bold text-amber-900">{stats.problems.total}</p>
-                            <p className="text-amber-700">Total Problems</p>
+                      <div className="p-5 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-gray-500 text-sm font-medium mb-1">Problems</p>
+                            <p className="text-3xl font-bold text-gray-900 mb-1">{stats.problems.total}</p>
+                            <p className="text-gray-600 text-xs">All contests</p>
+                          </div>
+                          <div className="bg-gray-100 p-3 rounded-lg">
+                            <Code className="w-7 h-7 text-gray-700" />
                           </div>
                         </div>
                       </div>
                       
-                      <div className="bg-cyan-50 p-6 rounded-lg">
-                        <div className="flex items-center">
-                          <FileCode className="w-8 h-8 text-cyan-600 mr-3" />
-                          <div>
-                            <p className="text-2xl font-bold text-cyan-900">{stats.submissions.total}</p>
-                            <p className="text-cyan-700">Total Submissions</p>
-                            <p className="text-xs text-cyan-600 mt-1">{stats.submissions.acceptance_rate}% AC</p>
+                      <div className="p-5 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-gray-500 text-sm font-medium mb-1">Submissions</p>
+                            <p className="text-3xl font-bold text-gray-900 mb-1">{stats.submissions.total}</p>
+                            <p className="text-blue-900 text-xs">{stats.submissions.acceptance_rate}% AC</p>
+                          </div>
+                          <div className="bg-blue-200 p-3 rounded-lg">
+                            <FileCode className="w-7 h-7 text-blue-900" />
                           </div>
                         </div>
                       </div>
@@ -537,23 +597,23 @@ const AdminDashboard = () => {
                 {(activeTab === 'users' || activeTab === 'banned_users' || activeTab === 'blogs' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions') && (
                   <div>
                     <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-xl font-semibold text-gray-900 capitalize">
+                      <h2 className="text-2xl font-bold text-gray-900 capitalize">
                         {activeTab === 'banned_users' ? 'Banned Accounts' : activeTab}
                       </h2>
                       <div className="flex items-center gap-4">
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <input
                             type="text"
                             placeholder="Search..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-blue-900 bg-white shadow-sm"
                           />
                         </div>
                         <button
                           onClick={() => handleTabChange(activeTab)}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                          className="flex items-center gap-2 px-4 py-2.5 bg-blue-900 text-white rounded-lg hover:bg-blue-950 transition-colors"
                         >
                           <RefreshCw className="w-4 h-4" />
                           Refresh
@@ -563,32 +623,32 @@ const AdminDashboard = () => {
 
                     {activeTab === 'users' && (
                       <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IPs/Devices</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <table className="min-w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Name</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Email</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Role</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">IPs/Devices</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Created</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                             </tr>
                           </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
+                          <tbody className="bg-white">
                             {filteredUsers.map((user) => (
-                              <tr key={user.id}>
+                              <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{user.email}</td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  <span className={`px-2 py-1 text-xs font-medium rounded ${
                                     user.role === 'admin' 
-                                      ? 'bg-purple-100 text-purple-800' 
-                                      : 'bg-green-100 text-green-800'
+                                      ? 'bg-blue-100 text-blue-900' 
+                                      : 'bg-gray-100 text-gray-700'
                                   }`}>
                                     {user.role}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                   <div className="flex flex-col gap-1">
                                     <span className="text-xs bg-gray-100 px-2 py-1 rounded">
                                       {user.ip_addresses?.length || 0} IPs
@@ -598,16 +658,16 @@ const AdminDashboard = () => {
                                     </span>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                   {new Date(user.created_at).toLocaleDateString()}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                                   <button
                                     onClick={() => openBanModal(user)}
-                                    className="text-red-600 hover:text-red-900 flex items-center gap-1 bg-red-50 px-3 py-1 rounded"
+                                    className="text-blue-900 hover:text-blue-950 font-medium flex items-center gap-1 transition-colors"
                                   >
                                     <ShieldOff className="w-4 h-4" />
-                                    Ban Permanently
+                                    Ban
                                   </button>
                                 </td>
                               </tr>
@@ -619,20 +679,20 @@ const AdminDashboard = () => {
 
                     {activeTab === 'banned_users' && (
                       <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ban Reason</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blocked IPs/Devices</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banned By</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banned At</th>
+                        <table className="min-w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Email</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Name</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Ban Reason</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Blocked IPs/Devices</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Banned By</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Banned At</th>
                             </tr>
                           </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
+                          <tbody className="bg-white">
                             {filteredBannedUsers.map((user) => (
-                              <tr key={user.id} className="bg-red-50">
+                              <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                   <div className="flex items-center gap-2">
                                     <ShieldOff className="w-4 h-4 text-red-600" />
@@ -668,26 +728,26 @@ const AdminDashboard = () => {
 
                     {activeTab === 'blogs' && (
                       <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stats</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <table className="min-w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Title</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Author</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Stats</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Created</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                             </tr>
                           </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
+                          <tbody className="bg-white">
                             {filteredBlogs.map((blog) => (
                               <React.Fragment key={blog.id}>
-                                <tr className="hover:bg-gray-50">
+                                <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                                   <td className="px-6 py-4 text-sm font-medium text-gray-900">
                                     <div className="flex items-center gap-2">
                                       <button
                                         onClick={() => toggleBlogExpand(blog.id)}
-                                        className="text-blue-600 hover:text-blue-800"
+                                        className="text-blue-900 hover:text-blue-950"
                                       >
                                         {expandedBlogIds.includes(blog.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                       </button>
@@ -700,36 +760,36 @@ const AdminDashboard = () => {
                                         {typeof blog.author === 'string' ? blog.author : blog.author?.name || 'Unknown'}
                                       </div>
                                       {blog.author?.email && (
-                                        <div className="text-xs text-gray-400">{blog.author.email}</div>
+                                        <div className="text-xs text-gray-500">{blog.author.email}</div>
                                       )}
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                     <div className="flex flex-col gap-1">
                                       {blog.comment_count !== undefined && (
-                                        <span className="text-xs bg-blue-100 px-2 py-1 rounded">{blog.comment_count} comments</span>
+                                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">{blog.comment_count} comments</span>
                                       )}
                                       {blog.upvotes !== undefined && (
-                                        <span className="text-xs bg-green-100 px-2 py-1 rounded">{blog.upvotes} upvotes</span>
+                                        <span className="text-xs bg-blue-100 text-blue-900 px-2 py-1 rounded">{blog.upvotes} upvotes</span>
                                       )}
                                     </div>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    <span className={`px-2 py-1 text-xs font-medium rounded ${
                                       blog.is_published 
-                                        ? 'bg-green-100 text-green-800' 
-                                        : 'bg-yellow-100 text-yellow-800'
+                                        ? 'bg-blue-100 text-blue-900' 
+                                        : 'bg-gray-100 text-gray-700'
                                     }`}>
                                       {blog.is_published ? 'Published' : 'Draft'}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                     {new Date(blog.created_at).toLocaleDateString()}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                                     <button
                                       onClick={() => handleDeleteBlog(blog.id)}
-                                      className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                                      className="text-blue-900 hover:text-blue-950 font-medium flex items-center gap-1 transition-colors"
                                     >
                                       <Trash2 className="w-4 h-4" />
                                       Delete
@@ -741,24 +801,24 @@ const AdminDashboard = () => {
                                     <td colSpan="6" className="px-6 py-4 bg-gray-50">
                                       <div className="space-y-3">
                                         <div>
-                                          <h4 className="font-semibold text-sm text-gray-700 mb-2">Content:</h4>
-                                          <div className="p-3 bg-white rounded border text-sm text-gray-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
+                                          <h4 className="font-semibold text-sm text-gray-900 mb-2">Content:</h4>
+                                          <div className="p-3 bg-white rounded border border-gray-200 text-sm text-gray-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
                                             {blog.full_content || blog.content_preview || 'No content available'}
                                           </div>
                                         </div>
                                         {blog.tags && blog.tags.length > 0 && (
                                           <div>
-                                            <h4 className="font-semibold text-sm text-gray-700 mb-2">Tags:</h4>
+                                            <h4 className="font-semibold text-sm text-gray-900 mb-2">Tags:</h4>
                                             <div className="flex flex-wrap gap-2">
                                               {blog.tags.map((tag, idx) => (
-                                                <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">{tag}</span>
+                                                <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-900 text-xs rounded">{tag}</span>
                                               ))}
                                             </div>
                                           </div>
                                         )}
                                         {blog.co_authors && blog.co_authors.length > 0 && (
                                           <div>
-                                            <h4 className="font-semibold text-sm text-gray-700 mb-2">Co-Authors:</h4>
+                                            <h4 className="font-semibold text-sm text-gray-900 mb-2">Co-Authors:</h4>
                                             <div className="flex flex-wrap gap-2">
                                               {blog.co_authors.map((coAuthor, idx) => (
                                                 <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
@@ -781,75 +841,75 @@ const AdminDashboard = () => {
 
                     {activeTab === 'contests' && (
                       <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stats</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <table className="min-w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Title</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Creator</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Stats</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                             </tr>
                           </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
+                          <tbody className="bg-white">
                             {filteredContests.map((contest) => (
                               <React.Fragment key={contest.id}>
-                                <tr className="hover:bg-gray-50">
+                                <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                                   <td className="px-6 py-4 text-sm font-medium text-gray-900">
                                     <div className="flex items-center gap-2">
                                       <button
                                         onClick={() => toggleContestExpand(contest.id)}
-                                        className="text-blue-600 hover:text-blue-800"
+                                        className="text-blue-900 hover:text-blue-950"
                                       >
                                         {expandedContestIds.includes(contest.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                       </button>
                                       <span>{contest.title}</span>
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <span className="px-2 py-1 bg-gray-100 rounded text-xs">{contest.type || 'N/A'}</span>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                    <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">{contest.type || 'N/A'}</span>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                     <div>
                                       <div className="font-medium">
                                         {typeof contest.created_by === 'string' ? contest.created_by : contest.created_by?.name || 'Unknown'}
                                       </div>
                                       {contest.created_by?.email && (
-                                        <div className="text-xs text-gray-400">{contest.created_by.email}</div>
+                                        <div className="text-xs text-gray-500">{contest.created_by.email}</div>
                                       )}
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                     <div className="flex flex-col gap-1">
                                       {contest.problem_count !== undefined && (
-                                        <span className="text-xs bg-purple-100 px-2 py-1 rounded">{contest.problem_count} problems</span>
+                                        <span className="text-xs bg-blue-100 text-blue-900 px-2 py-1 rounded">{contest.problem_count} problems</span>
                                       )}
                                       {contest.registration_count !== undefined && (
-                                        <span className="text-xs bg-blue-100 px-2 py-1 rounded">{contest.registration_count} registered</span>
+                                        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{contest.registration_count} registered</span>
                                       )}
                                       {contest.submission_count !== undefined && (
-                                        <span className="text-xs bg-green-100 px-2 py-1 rounded">{contest.submission_count} submissions</span>
+                                        <span className="text-xs bg-blue-100 text-blue-900 px-2 py-1 rounded">{contest.submission_count} submissions</span>
                                       )}
                                     </div>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    <span className={`px-2 py-1 text-xs font-medium rounded ${
                                       contest.status === 'upcoming' 
-                                        ? 'bg-blue-100 text-blue-800' 
+                                        ? 'bg-blue-100 text-blue-900' 
                                         : contest.status === 'live' 
-                                          ? 'bg-green-100 text-green-800' 
+                                          ? 'bg-blue-900 text-white' 
                                           : contest.status === 'past'
-                                            ? 'bg-gray-100 text-gray-800'
-                                            : 'bg-yellow-100 text-yellow-800'
+                                            ? 'bg-gray-100 text-gray-700'
+                                            : 'bg-gray-100 text-gray-700'
                                     }`}>
                                       {contest.status}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                                     <button
                                       onClick={() => handleDeleteContest(contest.id)}
-                                      className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                                      className="text-blue-900 hover:text-blue-950 font-medium flex items-center gap-1 transition-colors"
                                     >
                                       <Trash2 className="w-4 h-4" />
                                       Delete
@@ -861,9 +921,9 @@ const AdminDashboard = () => {
                                     <td colSpan="6" className="px-6 py-4 bg-gray-50">
                                       <div className="space-y-4">
                                         {/* Contest Details */}
-                                        <div className="grid grid-cols-2 gap-4 p-4 bg-white rounded border">
+                                        <div className="grid grid-cols-2 gap-4 p-4 bg-white rounded border border-gray-200">
                                           <div>
-                                            <h4 className="font-semibold text-sm text-gray-700 mb-1">Start Time:</h4>
+                                            <h4 className="font-semibold text-sm text-gray-900 mb-1">Start Time:</h4>
                                             <span className="text-sm">{contest.start_time ? new Date(contest.start_time).toLocaleString() : 'Not set'}</span>
                                           </div>
                                           <div>
@@ -1070,71 +1130,71 @@ const AdminDashboard = () => {
 
                     {activeTab === 'problems' && (
                       <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Problem</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contest</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Difficulty</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Limits</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Cases</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <table className="min-w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Problem</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contest</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Difficulty</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Limits</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Test Cases</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                             </tr>
                           </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
+                          <tbody className="bg-white">
                             {filteredProblems.map((problem) => {
                               const problemKey = `${problem.contest_id}-${problem.index}`;
                               return (
                                 <React.Fragment key={problemKey}>
-                                  <tr className="hover:bg-gray-50">
+                                  <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
                                       <div className="flex items-center gap-2">
                                         <button
                                           onClick={() => toggleProblemExpand(problemKey)}
-                                          className="text-blue-600 hover:text-blue-800"
+                                          className="text-blue-900 hover:text-blue-950"
                                         >
                                           {expandedProblemIds.includes(problemKey) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                         </button>
                                         <div>
                                           <div className="flex items-center gap-2">
-                                            <span className="px-2 py-1 bg-blue-600 text-white font-bold rounded text-xs">{problem.index}</span>
+                                            <span className="px-2 py-1 bg-blue-900 text-white font-bold rounded text-xs">{problem.index}</span>
                                             <span>{problem.title}</span>
                                           </div>
                                         </div>
                                       </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                       <div>
                                         <div className="font-medium">{problem.contest_title || 'N/A'}</div>
-                                        <div className="text-xs text-gray-400">{problem.contest_type || ''}</div>
+                                        <div className="text-xs text-gray-500">{problem.contest_type || ''}</div>
                                       </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                      <span className={`px-2 py-1 text-xs font-medium rounded ${
                                         problem.difficulty === 'Easy' 
-                                          ? 'bg-green-100 text-green-800' 
+                                          ? 'bg-blue-100 text-blue-900' 
                                           : problem.difficulty === 'Medium' 
-                                            ? 'bg-yellow-100 text-yellow-800' 
+                                            ? 'bg-gray-600 text-white' 
                                             : problem.difficulty === 'Hard'
-                                              ? 'bg-red-100 text-red-800'
-                                              : 'bg-gray-100 text-gray-800'
+                                              ? 'bg-gray-800 text-white'
+                                              : 'bg-gray-100 text-gray-700'
                                       }`}>
                                         {problem.difficulty || 'N/A'}
                                       </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                       <div className="flex flex-col gap-1">
                                         <span className="text-xs">Time: {problem.time_limit_seconds || 1}s</span>
                                         <span className="text-xs">Memory: {problem.memory_limit_mb || 256}MB</span>
                                       </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                       <div className="flex flex-col gap-1">
-                                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
                                           {problem.test_cases ? problem.test_cases.length : 0} total
                                         </span>
                                         {problem.test_cases && problem.test_cases.filter(tc => tc.sample).length > 0 && (
-                                          <span className="text-xs bg-green-100 px-2 py-1 rounded">
+                                          <span className="text-xs bg-blue-100 text-blue-900 px-2 py-1 rounded">
                                             {problem.test_cases.filter(tc => tc.sample).length} sample
                                           </span>
                                         )}
@@ -1261,52 +1321,52 @@ const AdminDashboard = () => {
 
                     {activeTab === 'submissions' && (
                       <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Problem</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Language</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <table className="min-w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">User</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Problem</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Language</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Submitted</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                             </tr>
                           </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
+                          <tbody className="bg-white">
                             {filteredSubmissions.map((submission) => (
                               <React.Fragment key={submission.id}>
-                                <tr className="hover:bg-gray-50">
+                                <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                     <div className="flex items-center gap-2">
                                       <button
                                         onClick={() => toggleSubmissionExpand(submission.id)}
-                                        className="text-blue-600 hover:text-blue-800"
+                                        className="text-blue-900 hover:text-blue-950"
                                       >
                                         {expandedSubmissionIds.includes(submission.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                       </button>
                                       <div>
                                         <div>{typeof submission.user === 'string' ? submission.user : submission.user?.name || 'Unknown'}</div>
                                         {submission.user?.email && (
-                                          <div className="text-xs text-gray-400">{submission.user.email}</div>
+                                          <div className="text-xs text-gray-500">{submission.user.email}</div>
                                         )}
                                       </div>
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 text-sm text-gray-500">
+                                  <td className="px-6 py-4 text-sm text-gray-700">
                                     <div>
                                       <div className="font-medium">{submission.problem_title || submission.problem || 'Unknown'}</div>
                                       {submission.problem_index && (
-                                        <div className="text-xs text-gray-400">Problem {submission.problem_index}</div>
+                                        <div className="text-xs text-gray-500">Problem {submission.problem_index}</div>
                                       )}
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <span className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">{submission.language}</span>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                    <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-mono">{submission.language}</span>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    <span className={`px-2 py-1 text-xs font-medium rounded ${
                                       (submission.verdict || submission.status) === 'AC' 
-                                        ? 'bg-green-100 text-green-800' 
+                                        ? 'bg-blue-900 text-white' 
                                         : (submission.verdict || submission.status) === 'WA' 
                                           ? 'bg-red-100 text-red-800' 
                                           : 'bg-yellow-100 text-yellow-800'
@@ -1388,7 +1448,6 @@ const AdminDashboard = () => {
                     )}
                   </div>
                 )}
-              </div>
             </div>
           </div>
         </div>
