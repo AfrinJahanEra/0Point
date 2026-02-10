@@ -320,7 +320,7 @@ const Chatbot = () => {
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={handleInputKeyDown}
                     className="flex-1 border rounded-lg px-3 py-2 text-sm resize-none"
-                    placeholder="Ask something..."
+                    placeholder="Ask something about coding..."
                     rows={3}
                   />
                   <button
@@ -356,3 +356,4 @@ const Chatbot = () => {
 };
 
 export default Chatbot;
+
