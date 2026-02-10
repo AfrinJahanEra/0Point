@@ -429,6 +429,35 @@ class AdminContestsView(APIView):
             # Get problem count
             problem_count = len(contest.problems) if contest.problems else 0
             
+            # Serialize problems
+            problems_data = []
+            if contest.problems:
+                for problem in contest.problems:
+                    test_cases_data = []
+                    if problem.test_cases:
+                        for tc in problem.test_cases:
+                            test_cases_data.append({
+                                "input": tc.input,
+                                "output": tc.output,
+                                "explanation": tc.explanation if hasattr(tc, 'explanation') else '',
+                                "difficulty": tc.difficulty if hasattr(tc, 'difficulty') else '',
+                                "sample": tc.sample if hasattr(tc, 'sample') else False,
+                                "hidden": tc.hidden if hasattr(tc, 'hidden') else False
+                            })
+                    
+                    problems_data.append({
+                        "index": problem.index,
+                        "title": problem.title,
+                        "statement": problem.statement,
+                        "time_limit_seconds": problem.time_limit_seconds,
+                        "memory_limit_mb": problem.memory_limit_mb,
+                        "tags": problem.tags if problem.tags else [],
+                        "difficulty": problem.difficulty if hasattr(problem, 'difficulty') else '',
+                        "tutorial": problem.tutorial if hasattr(problem, 'tutorial') else '',
+                        "points": problem.points if hasattr(problem, 'points') else 0,
+                        "test_cases": test_cases_data
+                    })
+            
             contest_data.append({
                 "id": str(contest.id),
                 "title": contest.title,
@@ -450,6 +479,7 @@ class AdminContestsView(APIView):
                 "submission_count": submission_count,
                 "announcement_count": announcement_count,
                 "problem_count": problem_count,
+                "problems": problems_data,
                 "testers": contest.testers,
                 "editorial_published": contest.editorial_published,
                 "require_screen_recording": contest.require_screen_recording,

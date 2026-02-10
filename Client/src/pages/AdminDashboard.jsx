@@ -43,6 +43,7 @@ const AdminDashboard = () => {
   const [banReason, setBanReason] = useState('Violation of terms of service');
   const [expandedBlogIds, setExpandedBlogIds] = useState([]);
   const [expandedSubmissionIds, setExpandedSubmissionIds] = useState([]);
+  const [expandedContestIds, setExpandedContestIds] = useState([]);
   const navigate = useNavigate();
 
   // Check if user is admin
@@ -267,6 +268,12 @@ const AdminDashboard = () => {
   const toggleSubmissionExpand = (submissionId) => {
     setExpandedSubmissionIds(prev => 
       prev.includes(submissionId) ? prev.filter(id => id !== submissionId) : [...prev, submissionId]
+    );
+  };
+
+  const toggleContestExpand = (contestId) => {
+    setExpandedContestIds(prev => 
+      prev.includes(contestId) ? prev.filter(id => id !== contestId) : [...prev, contestId]
     );
   };
 
@@ -736,39 +743,281 @@ const AdminDashboard = () => {
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stats</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {filteredContests.map((contest) => (
-                              <tr key={contest.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{contest.title}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contest.type}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  {typeof contest.created_by === 'string' ? contest.created_by : contest.created_by?.name || 'Unknown'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                    contest.status === 'upcoming' 
-                                      ? 'bg-blue-100 text-blue-800' 
-                                      : contest.status === 'ongoing' 
-                                        ? 'bg-green-100 text-green-800' 
-                                        : 'bg-gray-100 text-gray-800'
-                                  }`}>
-                                    {contest.status}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                  <button
-                                    onClick={() => handleDeleteContest(contest.id)}
-                                    className="text-red-600 hover:text-red-900 flex items-center gap-1"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                  </button>
-                                </td>
-                              </tr>
+                              <React.Fragment key={contest.id}>
+                                <tr className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => toggleContestExpand(contest.id)}
+                                        className="text-blue-600 hover:text-blue-800"
+                                      >
+                                        {expandedContestIds.includes(contest.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                      </button>
+                                      <span>{contest.title}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span className="px-2 py-1 bg-gray-100 rounded text-xs">{contest.type || 'N/A'}</span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <div>
+                                      <div className="font-medium">
+                                        {typeof contest.created_by === 'string' ? contest.created_by : contest.created_by?.name || 'Unknown'}
+                                      </div>
+                                      {contest.created_by?.email && (
+                                        <div className="text-xs text-gray-400">{contest.created_by.email}</div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <div className="flex flex-col gap-1">
+                                      {contest.problem_count !== undefined && (
+                                        <span className="text-xs bg-purple-100 px-2 py-1 rounded">{contest.problem_count} problems</span>
+                                      )}
+                                      {contest.registration_count !== undefined && (
+                                        <span className="text-xs bg-blue-100 px-2 py-1 rounded">{contest.registration_count} registered</span>
+                                      )}
+                                      {contest.submission_count !== undefined && (
+                                        <span className="text-xs bg-green-100 px-2 py-1 rounded">{contest.submission_count} submissions</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                      contest.status === 'upcoming' 
+                                        ? 'bg-blue-100 text-blue-800' 
+                                        : contest.status === 'live' 
+                                          ? 'bg-green-100 text-green-800' 
+                                          : contest.status === 'past'
+                                            ? 'bg-gray-100 text-gray-800'
+                                            : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                      {contest.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button
+                                      onClick={() => handleDeleteContest(contest.id)}
+                                      className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Delete
+                                    </button>
+                                  </td>
+                                </tr>
+                                {expandedContestIds.includes(contest.id) && (
+                                  <tr>
+                                    <td colSpan="6" className="px-6 py-4 bg-gray-50">
+                                      <div className="space-y-4">
+                                        {/* Contest Details */}
+                                        <div className="grid grid-cols-2 gap-4 p-4 bg-white rounded border">
+                                          <div>
+                                            <h4 className="font-semibold text-sm text-gray-700 mb-1">Start Time:</h4>
+                                            <span className="text-sm">{contest.start_time ? new Date(contest.start_time).toLocaleString() : 'Not set'}</span>
+                                          </div>
+                                          <div>
+                                            <h4 className="font-semibold text-sm text-gray-700 mb-1">Duration:</h4>
+                                            <span className="text-sm">{contest.duration ? `${contest.duration} hours` : 'Not set'}</span>
+                                          </div>
+                                          <div>
+                                            <h4 className="font-semibold text-sm text-gray-700 mb-1">Platform:</h4>
+                                            <span className="text-sm">{contest.platform || 'N/A'}</span>
+                                          </div>
+                                          <div>
+                                            <h4 className="font-semibold text-sm text-gray-700 mb-1">Visibility:</h4>
+                                            <span className="text-sm">{contest.visibility || 'public'}</span>
+                                          </div>
+                                          {contest.description && (
+                                            <div className="col-span-2">
+                                              <h4 className="font-semibold text-sm text-gray-700 mb-1">Description:</h4>
+                                              <p className="text-sm text-gray-600">{contest.description}</p>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Contest Settings */}
+                                        <div className="p-4 bg-white rounded border">
+                                          <h4 className="font-semibold text-sm text-gray-700 mb-2">Settings:</h4>
+                                          <div className="flex flex-wrap gap-2">
+                                            {contest.registration_required && (
+                                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Registration Required</span>
+                                            )}
+                                            {contest.require_screen_recording && (
+                                              <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">Screen Recording</span>
+                                            )}
+                                            {contest.leaderboard_public && (
+                                              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">Public Leaderboard</span>
+                                            )}
+                                            {contest.allow_practice && (
+                                              <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">Practice Allowed</span>
+                                            )}
+                                            {contest.rating_changes && (
+                                              <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">Rating Changes</span>
+                                            )}
+                                            {contest.editorial_published && (
+                                              <span className="px-2 py-1 bg-indigo-100 text-indigo-800 text-xs rounded">Editorial Published</span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {/* Testers */}
+                                        {contest.testers && contest.testers.length > 0 && (
+                                          <div className="p-4 bg-white rounded border">
+                                            <h4 className="font-semibold text-sm text-gray-700 mb-2">Testers ({contest.testers.length}):</h4>
+                                            <div className="flex flex-wrap gap-2">
+                                              {contest.testers.map((tester, idx) => (
+                                                <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">{tester}</span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Problems Section */}
+                                        <div>
+                                          <h4 className="font-semibold text-sm text-gray-700 mb-3">Problems ({contest.problem_count || 0}):</h4>
+                                          {contest.problems && contest.problems.length > 0 ? (
+                                            <div className="space-y-3">
+                                              {contest.problems.map((problem, idx) => (
+                                                <div key={idx} className="p-4 bg-white rounded border hover:border-blue-300 transition-colors">
+                                                  <div className="flex items-start justify-between mb-2">
+                                                    <div className="flex items-center gap-3">
+                                                      <span className="px-3 py-1 bg-blue-600 text-white font-bold rounded">{problem.index}</span>
+                                                      <div>
+                                                        <h5 className="font-semibold text-gray-900">{problem.title}</h5>
+                                                        <div className="flex gap-2 mt-1">
+                                                          <span className={`px-2 py-0.5 text-xs rounded ${
+                                                            problem.difficulty === 'Easy' 
+                                                              ? 'bg-green-100 text-green-800' 
+                                                              : problem.difficulty === 'Medium' 
+                                                                ? 'bg-yellow-100 text-yellow-800' 
+                                                                : 'bg-red-100 text-red-800'
+                                                          }`}>
+                                                            {problem.difficulty || 'N/A'}
+                                                          </span>
+                                                          <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
+                                                            Time: {problem.time_limit_seconds || 1}s
+                                                          </span>
+                                                          <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
+                                                            Memory: {problem.memory_limit_mb || 256}MB
+                                                          </span>
+                                                          {problem.points > 0 && (
+                                                            <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
+                                                              {problem.points} points
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                  
+                                                  {problem.statement && (
+                                                    <div className="mt-3">
+                                                      <h6 className="text-xs font-semibold text-gray-700 mb-1">Statement:</h6>
+                                                      <div className="p-2 bg-gray-50 rounded text-xs text-gray-700 max-h-32 overflow-y-auto">
+                                                        {problem.statement.length > 300 
+                                                          ? problem.statement.substring(0, 300) + '...' 
+                                                          : problem.statement}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+                                                  {problem.tags && problem.tags.length > 0 && (
+                                                    <div className="mt-2">
+                                                      <h6 className="text-xs font-semibold text-gray-700 mb-1">Tags:</h6>
+                                                      <div className="flex flex-wrap gap-1">
+                                                        {problem.tags.map((tag, tagIdx) => (
+                                                          <span key={tagIdx} className="px-2 py-0.5 bg-cyan-100 text-cyan-800 text-xs rounded">{tag}</span>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+                                                  {problem.test_cases && problem.test_cases.length > 0 && (
+                                                    <div className="mt-3">
+                                                      <h6 className="text-xs font-semibold text-gray-700 mb-2">
+                                                        Test Cases: {problem.test_cases.length} total
+                                                        {problem.test_cases.filter(tc => tc.sample).length > 0 && (
+                                                          <span className="ml-2 text-green-600">({problem.test_cases.filter(tc => tc.sample).length} sample)</span>
+                                                        )}
+                                                        {problem.test_cases.filter(tc => tc.hidden).length > 0 && (
+                                                          <span className="ml-2 text-gray-600">({problem.test_cases.filter(tc => tc.hidden).length} hidden)</span>
+                                                        )}
+                                                      </h6>
+                                                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                                                        {problem.test_cases.map((testCase, tcIdx) => (
+                                                          <div key={tcIdx} className={`p-3 rounded border ${
+                                                            testCase.sample 
+                                                              ? 'bg-green-50 border-green-200' 
+                                                              : testCase.hidden 
+                                                                ? 'bg-gray-50 border-gray-200'
+                                                                : 'bg-blue-50 border-blue-200'
+                                                          }`}>
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                              <span className="text-xs font-semibold text-gray-700">Test Case #{tcIdx + 1}</span>
+                                                              {testCase.sample && (
+                                                                <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">Sample</span>
+                                                              )}
+                                                              {testCase.hidden && (
+                                                                <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded">Hidden</span>
+                                                              )}
+                                                              {testCase.difficulty && (
+                                                                <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded">{testCase.difficulty}</span>
+                                                              )}
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                              <div>
+                                                                <div className="text-xs font-semibold text-gray-600 mb-1">Input:</div>
+                                                                <pre className="text-xs p-2 bg-white rounded border font-mono whitespace-pre-wrap break-words">{testCase.input || 'N/A'}</pre>
+                                                              </div>
+                                                              <div>
+                                                                <div className="text-xs font-semibold text-gray-600 mb-1">Expected Output:</div>
+                                                                <pre className="text-xs p-2 bg-white rounded border font-mono whitespace-pre-wrap break-words">{testCase.output || 'N/A'}</pre>
+                                                              </div>
+                                                            </div>
+                                                            {testCase.explanation && (
+                                                              <div className="mt-2">
+                                                                <div className="text-xs font-semibold text-gray-600 mb-1">Explanation:</div>
+                                                                <p className="text-xs text-gray-700 p-2 bg-white rounded border">{testCase.explanation}</p>
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="p-4 bg-white rounded border text-center text-gray-500 text-sm">
+                                              No problems added yet
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Announcements Count */}
+                                        {contest.announcement_count > 0 && (
+                                          <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+                                            <div className="flex items-center gap-2">
+                                              <AlertCircle className="w-4 h-4 text-yellow-600" />
+                                              <span className="text-sm text-yellow-800">
+                                                {contest.announcement_count} announcement(s) for this contest
+                                              </span>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
                             ))}
                           </tbody>
                         </table>
