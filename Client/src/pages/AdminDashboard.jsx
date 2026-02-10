@@ -9,8 +9,8 @@ import {
   FileCode,
   LogOut,
   Trash2,
-  Eye,
-  EyeOff,
+  ChevronDown,
+  ChevronUp,
   Search,
   RefreshCw,
   Shield,
@@ -749,7 +749,7 @@ const AdminDashboard = () => {
                                         onClick={() => toggleBlogExpand(blog.id)}
                                         className="text-blue-900 hover:text-blue-950"
                                       >
-                                        {expandedBlogIds.includes(blog.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        {expandedBlogIds.includes(blog.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                       </button>
                                       <span>{blog.title}</span>
                                     </div>
@@ -862,7 +862,7 @@ const AdminDashboard = () => {
                                         onClick={() => toggleContestExpand(contest.id)}
                                         className="text-blue-900 hover:text-blue-950"
                                       >
-                                        {expandedContestIds.includes(contest.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        {expandedContestIds.includes(contest.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                       </button>
                                       <span>{contest.title}</span>
                                     </div>
@@ -1153,7 +1153,7 @@ const AdminDashboard = () => {
                                           onClick={() => toggleProblemExpand(problemKey)}
                                           className="text-blue-900 hover:text-blue-950"
                                         >
-                                          {expandedProblemIds.includes(problemKey) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                          {expandedProblemIds.includes(problemKey) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                         </button>
                                         <div>
                                           <div className="flex items-center gap-2">
@@ -1342,7 +1342,7 @@ const AdminDashboard = () => {
                                         onClick={() => toggleSubmissionExpand(submission.id)}
                                         className="text-blue-900 hover:text-blue-950"
                                       >
-                                        {expandedSubmissionIds.includes(submission.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        {expandedSubmissionIds.includes(submission.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                       </button>
                                       <div>
                                         <div>{typeof submission.user === 'string' ? submission.user : submission.user?.name || 'Unknown'}</div>
