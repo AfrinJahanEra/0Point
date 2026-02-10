@@ -20,8 +20,154 @@ const Community = () => {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedBlogs, setExpandedBlogs] = useState(new Set());
+  const [blogComments, setBlogComments] = useState({});
+  const [newComments, setNewComments] = useState({});
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [blogVotes, setBlogVotes] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const blogsPerPage = 5;
+
+  // Comment Item Component
+  const CommentItem = ({ comment, blogId, depth = 0 }) => {
+    const formatDate = (dateString) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    };
+
+    const getRatingColor = (rating) => {
+      if (!rating || rating < 0) return 'text-gray-600';
+      if (rating < 1200) return 'text-gray-700';
+      if (rating < 1400) return 'text-green-600';
+      if (rating < 1600) return 'text-cyan-600';
+      if (rating < 1900) return 'text-blue-600';
+      if (rating < 2100) return 'text-purple-600';
+      if (rating < 2400) return 'text-orange-500';
+      return 'text-red-600';
+    };
+
+    const canDelete = user && (user.id === comment.author.id);
+
+    return (
+      <div className={`${depth > 0 ? 'ml-6 mt-2' : 'mt-3'} border-l-2 border-gray-200 pl-3`}>
+        <div className="flex items-start gap-2">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-xs font-medium ${getRatingColor(comment.author.rating)}`}>
+                {comment.author.name}
+              </span>
+              <span className="text-xs text-gray-500">{formatDate(comment.created_at)}</span>
+              {canDelete && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDeleteComment(blogId, comment.id);
+                  }}
+                  className="text-xs text-red-600 hover:text-red-800"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-gray-800 mb-2">{comment.content}</p>
+            
+            <div className="flex items-center gap-3">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCommentVote(blogId, comment.id, 'upvote');
+                }}
+                className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600"
+              >
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                </svg>
+                {comment.upvotes || 0}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCommentVote(blogId, comment.id, 'downvote');
+                }}
+                className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600"
+              >
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                </svg>
+                {comment.downvotes || 0}
+              </button>
+              {user && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setReplyingTo(comment.id);
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                >
+                  Reply
+                </button>
+              )}
+            </div>
+
+            {replyingTo === comment.id && (
+              <div className="mt-2">
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Write a reply..."
+                  className="w-full p-2 border border-gray-300 rounded text-xs resize-y"
+                  rows={2}
+                />
+                <div className="mt-1 flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setReplyingTo(null);
+                      setReplyText('');
+                    }}
+                    className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleComment(blogId, replyText, comment.id);
+                    }}
+                    disabled={!replyText.trim()}
+                    className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Reply
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {comment.replies && comment.replies.length > 0 && (
+              <div className="mt-2">
+                {comment.replies.map((reply) => (
+                  <CommentItem key={reply.id} comment={reply} blogId={blogId} depth={depth + 1} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   useEffect(() => {
     fetchAllPublishedBlogs();
@@ -75,7 +221,9 @@ const Community = () => {
     return 'bg-red-100';
   };
 
-  const toggleExpand = (blogId) => {
+  const toggleExpand = async (blogId) => {
+    const wasExpanded = expandedBlogs.has(blogId);
+    
     setExpandedBlogs(prev => {
       const newSet = new Set(prev);
       if (newSet.has(blogId)) {
@@ -85,6 +233,108 @@ const Community = () => {
       }
       return newSet;
     });
+
+    // Fetch comments and votes when expanding for the first time
+    if (!wasExpanded && !blogComments[blogId]) {
+      await fetchBlogComments(blogId);
+      await fetchBlogVotes(blogId);
+    }
+  };
+
+  const fetchBlogComments = async (blogId) => {
+    try {
+      const response = await api.get(`/blog/${blogId}/comments/`);
+      setBlogComments(prev => ({ ...prev, [blogId]: response.data }));
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      toast.error('Failed to load comments');
+    }
+  };
+
+  const fetchBlogVotes = async (blogId) => {
+    try {
+      const response = await api.get(`/blog/${blogId}/votes/`);
+      setBlogVotes(prev => ({ ...prev, [blogId]: response.data }));
+    } catch (error) {
+      console.error('Error fetching votes:', error);
+    }
+  };
+
+  const handleVote = async (blogId, voteType) => {
+    if (!user) {
+      toast.error('Please login to vote');
+      return;
+    }
+
+    try {
+      await api.post(`/blog/${blogId}/vote/`, { vote_type: voteType });
+      await fetchBlogVotes(blogId);
+      toast.success(`Blog ${voteType}d!`);
+    } catch (error) {
+      console.error('Error voting:', error);
+      toast.error('Failed to vote');
+    }
+  };
+
+  const handleComment = async (blogId, content, parentCommentId = null) => {
+    if (!user) {
+      toast.error('Please login to comment');
+      return;
+    }
+
+    if (!content.trim()) {
+      toast.error('Comment cannot be empty');
+      return;
+    }
+
+    try {
+      const commentData = {
+        content: content.trim(),
+        ...(parentCommentId && { parent_comment_id: parentCommentId })
+      };
+
+      await api.post(`/blog/${blogId}/comments/create/`, commentData);
+      await fetchBlogComments(blogId);
+      setNewComments(prev => ({ ...prev, [blogId]: '' }));
+      setReplyText('');
+      setReplyingTo(null);
+      toast.success('Comment posted!');
+    } catch (error) {
+      console.error('Error posting comment:', error);
+      toast.error('Failed to post comment');
+    }
+  };
+
+  const handleDeleteComment = async (blogId, commentId) => {
+    if (!user) {
+      toast.error('Please login to delete comments');
+      return;
+    }
+
+    try {
+      await api.delete(`/blog/comments/${commentId}/delete/`);
+      await fetchBlogComments(blogId);
+      toast.success('Comment deleted');
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      toast.error('Failed to delete comment');
+    }
+  };
+
+  const handleCommentVote = async (blogId, commentId, voteType) => {
+    if (!user) {
+      toast.error('Please login to vote');
+      return;
+    }
+
+    try {
+      await api.post(`/blog/comments/${commentId}/vote/`, { vote_type: voteType });
+      await fetchBlogComments(blogId);
+      toast.success('Vote recorded!');
+    } catch (error) {
+      console.error('Error voting on comment:', error);
+      toast.error('Failed to vote');
+    }
   };
 
   // Markdown components for rendering
@@ -316,24 +566,108 @@ const Community = () => {
                           </>
                         )}
                       </button>
-                    </div>
-                    
-                    {/* Footer */}
-                    <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between rounded-b-lg">
-                      <Link
-                        to={`/blog/${blog.id}`}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
-                      >
-                        View Full Blog
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </Link>
-                      
-                      {blog.co_authors && blog.co_authors.length > 0 && (
-                        <div className="text-xs text-gray-500">
-                          {blog.co_authors.length} co-author{blog.co_authors.length > 1 ? 's' : ''}
-                        </div>
+
+                      {/* Voting and Comment Section - Show when expanded */}
+                      {isExpanded && (
+                        <>
+                          {/* Vote Buttons */}
+                          <div className="mt-4 pt-3 border-t border-gray-200">
+                            <div className="flex items-center gap-3 mb-4">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleVote(blog.id, 'upvote');
+                                }}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
+                                  blogVotes[blog.id]?.user_vote === 'upvote'
+                                    ? 'bg-green-50 text-green-700'
+                                    : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                              >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                                </svg>
+                                <span className="text-sm font-medium">{blogVotes[blog.id]?.upvotes || blog.upvotes || 0}</span>
+                              </button>
+                              
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleVote(blog.id, 'downvote');
+                                }}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
+                                  blogVotes[blog.id]?.user_vote === 'downvote'
+                                    ? 'bg-red-50 text-red-700'
+                                    : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                              >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                                </svg>
+                                <span className="text-sm font-medium">{blogVotes[blog.id]?.downvotes || blog.downvotes || 0}</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Comments Section */}
+                          <div className="mt-4 border-t border-gray-200 pt-4">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                              Comments ({blogComments[blog.id]?.length || 0})
+                            </h3>
+
+                            {/* New Comment Form */}
+                            {user ? (
+                              <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
+                                <textarea
+                                  value={newComments[blog.id] || ''}
+                                  onChange={(e) => {
+                                    setNewComments(prev => ({ ...prev, [blog.id]: e.target.value }));
+                                  }}
+                                  placeholder="Write a comment..."
+                                  className="w-full p-2 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-y"
+                                  rows={3}
+                                />
+                                <div className="mt-2 flex justify-end">
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleComment(blog.id, newComments[blog.id] || '');
+                                    }}
+                                    disabled={!(newComments[blog.id] || '').trim()}
+                                    className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Post Comment
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mb-4 p-3 bg-gray-50 rounded text-center text-xs border border-gray-200">
+                                <p className="text-gray-600">
+                                  <Link to="/login" className="text-blue-600 hover:text-blue-800">
+                                    Login
+                                  </Link>{' '}
+                                  to comment
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Comments List */}
+                            <div className="space-y-2">
+                              {blogComments[blog.id] && blogComments[blog.id].length > 0 ? (
+                                blogComments[blog.id].map((comment) => (
+                                  <CommentItem key={comment.id} comment={comment} blogId={blog.id} />
+                                ))
+                              ) : (
+                                <div className="text-center py-4 text-gray-500 text-xs">
+                                  <p>No comments yet. Be the first!</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </>
                       )}
                     </div>
                   </article>

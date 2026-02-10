@@ -645,7 +645,11 @@ const handleCommentVote = async (commentId, voteType) => {
                 <div className="flex items-center gap-3">
                   {/* Thumbs Up */}
                   <button
-                    onClick={() => handleVote('upvote')}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleVote('upvote');
+                    }}
                     className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
                       votes.user_vote === 'upvote' 
                         ? 'bg-green-50 text-green-700' 
@@ -661,7 +665,11 @@ const handleCommentVote = async (commentId, voteType) => {
 
                   {/* Thumbs Down */}
                   <button
-                    onClick={() => handleVote('downvote')}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleVote('downvote');
+                    }}
                     className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
                       votes.user_vote === 'downvote' 
                         ? 'bg-red-50 text-red-700' 

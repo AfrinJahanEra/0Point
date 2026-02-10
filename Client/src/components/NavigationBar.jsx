@@ -11,8 +11,10 @@ const NavigationBar = () => {
 
   const getActiveTab = () => {
     if (currentPath === '/submissions') return 'submissions';
-    if (currentPath === '/blog') return 'blog';
-    if (currentPath === '/contest-history') return 'contests'; // ← new
+    if (currentPath === '/blog' || currentPath.startsWith('/blog/')) return 'blog';
+    if (currentPath === '/contest-history') return 'contests';
+    if (currentPath === '/create-blog') return 'blog';
+    if (currentPath === '/dashboard') return 'dashboard';
     return 'dashboard';
   };
 
