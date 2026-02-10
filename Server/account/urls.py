@@ -6,12 +6,14 @@ from .views import (
     AddPlatformProfileView,
     ContestHistoryView,
     ExternalSubmissionView,
-    TagStatsView
+    TagStatsView,
+    UpdateProfileView
 )
 
 urlpatterns = [
     path("signup/", SignupView.as_view(), name="signup"),
     path("login/", LoginView.as_view(), name="login"),
+    path("profile/update/", UpdateProfileView.as_view(), name="update_profile"),
     path("profile/<str:user_id>/", UserProfileView.as_view(), name="user_profile"),
     path("profile/", UserProfileView.as_view(), name="current_user_profile"),
     path("platform/add/", AddPlatformProfileView.as_view(), name="add_platform"),

@@ -21,6 +21,7 @@ const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState(null);
   const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
   const [isCreateLinkModalOpen, setIsCreateLinkModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
@@ -48,6 +49,28 @@ const Header = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Fetch profile photo when user changes
+  useEffect(() => {
+    const fetchProfilePhoto = async () => {
+      if (user) {
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/account/profile/`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setProfilePhoto(data.profile_photo);
+          }
+        } catch (error) {
+          console.error('Error fetching profile photo:', error);
+        }
+      }
+    };
+    fetchProfilePhoto();
+  }, [user, user?.name]); // Re-fetch when user changes
 
   const handleLogout = () => {
     logout();
@@ -217,7 +240,7 @@ const Header = () => {
             <Link to="/dashboard" className="flex items-center gap-2 text-gray-900 
               hover:text-blue-800 transition-all duration-300 transform hover:scale-105">
               <BarChart2 className="w-5 h-5" />
-              <span className="font-medium">{user ? user.name : 'era97'}</span>
+              <span className="font-medium">{user ? user.name : 'Dashboard'}</span>
             </Link>
 
             <div className="relative" ref={profileRef}>
@@ -231,22 +254,49 @@ const Header = () => {
                     isProfileOpen ? 'ring-2 ring-blue-500 ring-offset-2 scale-110' : ''
                   }`}
               >
-                {user?.avatar ? (
-                  <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                {profilePhoto ? (
+                  <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-4 h-4" />
                 )}
               </button>
 
               {isProfileOpen && (
-                <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-md 
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg 
                   border border-gray-200 py-2 z-50">
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 text-xs text-gray-700 
+                  {/* User Info Section */}
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold overflow-hidden">
+                        {profilePhoto ? (
+                          <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{user?.name?.charAt(0)?.toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Menu Items */}
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsProfileOpen(false)}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 
                       hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
                   >
-                    <LogOut className="w-3 h-3" />
+                    <User className="w-4 h-4" />
+                    Edit Profile
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 
+                      hover:bg-red-50 hover:text-red-700 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
                     Logout
                   </button>
                 </div>

@@ -175,6 +175,8 @@ class UserProfileView(APIView):
                 "contests_count": user.contests_count,
                 "rating": user.rating,
                 "badge": user.badge,
+                "profile_photo": user.profile_photo,
+                "total_submissions": user.get_total_submissions(),
                 "platform_profiles": [],
                 "created_at": user.created_at.isoformat() if user.created_at else None
             }
@@ -507,3 +509,60 @@ class TagStatsView(APIView):
             })
         except Exception as e:
             return Response({"error": str(e)}, status=400)
+
+
+class UpdateProfileView(APIView):
+    """Update user profile including name, department, year, and profile photo"""
+    
+    def put(self, request):
+        # Get current user from token
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return Response({"error": "Unauthorized"}, status=401)
+        
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get('user_id')
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+        
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+        
+        # Update allowed fields
+        if 'name' in request.data:
+            user.name = request.data['name']
+        if 'department' in request.data:
+            user.department = request.data['department']
+        if 'year' in request.data:
+            user.year = request.data['year']
+        if 'profile_photo' in request.data:
+            user.profile_photo = request.data['profile_photo']
+        
+        user.save()
+        
+        # Update token user data
+        updated_payload = {
+            "user_id": str(user.id),
+            "email": user.email,
+            "role": user.role,
+            "name": user.name
+        }
+        
+        updated_token = jwt.encode(updated_payload, settings.SECRET_KEY, algorithm="HS256")
+        
+        return Response({
+            "message": "Profile updated successfully",
+            "token": updated_token,
+            "user": {
+                "id": str(user.id),
+                "name": user.name,
+                "email": user.email,
+                "department": user.department,
+                "year": user.year,
+                "profile_photo": user.profile_photo,
+                "role": user.role
+            }
+        })

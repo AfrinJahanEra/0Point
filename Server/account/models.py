@@ -74,6 +74,9 @@ class Account(Document):
     year = StringField(null=True)
     department = StringField(null=True)
     
+    # Profile photo
+    profile_photo = StringField(null=True)  # URL or base64 string
+    
     # Coding platform profiles
     platform_profiles = ListField(EmbeddedDocumentField(PlatformProfile), default=list)
     
@@ -174,6 +177,11 @@ class Account(Document):
         if not self.platform_profiles:
             return 0
         return max(profile.max_rating for profile in self.platform_profiles)
+    
+    def get_total_submissions(self):
+        """Get total submissions count from submissions collection"""
+        from submission.models import Submission
+        return Submission.objects(user=self).count()
 
 
 class UserTagStats(Document):
