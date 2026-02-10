@@ -5,7 +5,7 @@ class AuthService {
   // Login user
   async login(email, password) {
     try {
-      const response = await api.post('/auth/login/', {
+      const response = await api.post('/account/login/', {
         email,
         password
       });
@@ -40,7 +40,7 @@ class AuthService {
         requestData.secret_password = secretPassword;
       }
       
-      const response = await api.post('/auth/signup/', requestData);
+      const response = await api.post('/account/signup/', requestData);
       
       return response.data;
     } catch (error) {

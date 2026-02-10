@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     'testcontest',
     'crossPlatform',
     'blog',
-    'chatapp',
+    'Chatapp',
 ]
 
 MIDDLEWARE = [

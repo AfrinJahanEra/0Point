@@ -27,12 +27,6 @@ const Dashboard = () => {
   const [cfTagStats, setCfTagStats] = useState({});
   const [cfTagLoading, setCfTagLoading] = useState(true);
 
-  // Contest history states
-  const [contestHistory, setContestHistory] = useState([]);
-  const [contestPage, setContestPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalContests, setTotalContests] = useState(0);
-
   // const [calendarData, setCalendarData] = useState({});
   // const [calendarLoading, setCalendarLoading] = useState(true);
 
@@ -82,9 +76,9 @@ const Dashboard = () => {
     }
     try {
       const resp = await api.get('/account/tag-stats/');  // ← update endpoint if changed
-      setCfTagStats(resp.data.tags || {});
+      setCfTagStats(resp.data.tag_stats || {});
     } catch (err) {
-      console.error('Failed to load tag stats:', err);
+      console.error('Failed to load CF tag stats:', err);
     } finally {
       setCfTagLoading(false);
     }
@@ -100,7 +94,7 @@ const Dashboard = () => {
 
   const fetchContestPage = async (page = 1) => {
     try {
-      const resp = await api.get(`/account/contest-history/?page=${page}&page_size=${pageSize}&platform=all`);
+      const resp = await api.get(`/account/contest-history/?page=${page}&page_size=${pageSize}`);
       setContestHistory(resp.data.contests || []);
       setContestPage(resp.data.page || page);
       setTotalPages(resp.data.total_pages || 1);
@@ -421,7 +415,7 @@ const Dashboard = () => {
                   <div className="flex items-center gap-2 mb-4">
                     <PieIcon className="w-5 h-5 text-indigo-600" />
                     <h2 className="text-lg font-semibold text-gray-900">
-                      Solved Problems by Tag
+                      Codeforces Solved Problems by Tag
                     </h2>
                   </div>
 
@@ -429,7 +423,7 @@ const Dashboard = () => {
                     {cfTagLoading ? (
                       <div className="text-center py-12">
                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading tag distribution...</p>
+                        <p className="text-gray-600">Loading Codeforces tag distribution...</p>
                       </div>
                     ) : (
                       <CfTagDonutChart

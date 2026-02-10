@@ -75,7 +75,7 @@ const Submissions = () => {
         return;
       }
 
-      const res = await api.get('/account/external-submissions/');
+      const res = await api.get('/account/external-submissions/?platform=all');
       const externalSubs = res.data.submissions || [];
 
       setAllSubmissions(externalSubs);

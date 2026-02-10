@@ -6,7 +6,7 @@ from django.conf.urls.static import static
 from django.views.static import serve
 
 urlpatterns = [
-    path("auth/", include("account.urls")),
+    path("account/", include("account.urls")),
     path("admin-panel/", include("admin.urls")),
     path("", include("contest.urls")),
     path("", include("problem.urls")), 
@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/ide/', include('ide.urls')),
     path("", include("crossPlatform.urls")),
     path("blog/", include("blog.urls")),
+    path("", include("Chatapp.urls")),
 ]
 
 # Serve media files during development
