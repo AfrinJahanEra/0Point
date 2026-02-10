@@ -1898,22 +1898,22 @@ const CreateContest = () => {
 
       {/* Prediction Result Modal */}
       {showPredictionModal && predictionResult && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-fadeIn">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+            <div className="bg-blue-900 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-blue-800 rounded-lg flex items-center justify-center">
                   <Settings className="w-6 h-6 text-white" />
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-lg">AI Prediction Result</h3>
-                  <p className="text-purple-100 text-xs">Powered by {predictionResult.model_name}</p>
+                  <p className="text-blue-200 text-xs">Powered by {predictionResult.model_name}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowPredictionModal(false)}
-                className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-1 transition-colors"
+                className="text-white hover:bg-blue-800 rounded-lg p-1 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1939,7 +1939,7 @@ const CreateContest = () => {
                         key={i}
                         className={`w-2 h-2 rounded-full ${
                           i < Math.round(predictionResult.confidence * 5)
-                            ? 'bg-gradient-to-r from-purple-600 to-blue-600'
+                            ? 'bg-blue-600'
                             : 'bg-gray-200'
                         }`}
                       />
@@ -1968,7 +1968,11 @@ const CreateContest = () => {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                         <div
-                          className={`h-full bg-gradient-to-r from-${color}-400 to-${color}-600 transition-all duration-500 ease-out`}
+                          className={`h-full ${
+                            level === 'Easy' ? 'bg-green-600' :
+                            level === 'Medium' ? 'bg-yellow-600' :
+                            'bg-red-600'
+                          } transition-all duration-500 ease-out`}
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
@@ -1991,7 +1995,7 @@ const CreateContest = () => {
             <div className="bg-gray-50 px-6 py-4 flex justify-end">
               <button
                 onClick={() => setShowPredictionModal(false)}
-                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                className="px-6 py-2 bg-blue-900 text-white rounded-lg font-semibold hover:bg-blue-800 transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 Got it!
               </button>
