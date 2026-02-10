@@ -88,6 +88,21 @@ const Chatbot = () => {
     }
   };
 
+  /* ---------------- Handle input keydown for Shift+Enter (multiline) and Enter (submit) ---------------- */
+  const handleInputKeyDown = (e) => {
+    if (e.key === "Enter") {
+      if (e.shiftKey) {
+        // Shift+Enter: allow newline
+        e.preventDefault();
+        setInputText((prev) => prev + "\n");
+      } else {
+        // Enter: submit
+        e.preventDefault();
+        handleSendMessage(e);
+      }
+    }
+  };
+
   /* ---------------- Send Message ---------------- */
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -116,6 +131,7 @@ const Chatbot = () => {
         body: JSON.stringify({
           message: userMessage.text,
           chat_id: chatId,
+          current_url: window.location.href,
         }),
       });
 
@@ -299,11 +315,13 @@ const Chatbot = () => {
                   onSubmit={handleSendMessage}
                   className="p-3 flex gap-2 border-t"
                 >
-                  <input
+                  <textarea
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    className="flex-1 border rounded-lg px-3 py-2 text-sm"
-                    placeholder="Ask something about coding…"
+                    onKeyDown={handleInputKeyDown}
+                    className="flex-1 border rounded-lg px-3 py-2 text-sm resize-none"
+                    placeholder="Ask something..."
+                    rows={3}
                   />
                   <button
                     type="submit"
