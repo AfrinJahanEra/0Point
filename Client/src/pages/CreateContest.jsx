@@ -93,6 +93,7 @@ const CreateContest = () => {
   const [testInvites, setTestInvites] = useState('');
   const [publishErrors, setPublishErrors] = useState({});
   const [isRunning, setIsRunning] = useState(false);
+  const [predictingDifficulty, setPredictingDifficulty] = useState(false);
 
   const customComponents = {
     h1: ({ children }) => (
@@ -517,6 +518,69 @@ const CreateContest = () => {
   const handleSettingChange = (field, value) => {
     setPublishSettings(prev => ({ ...prev, [field]: value }));
     if (publishErrors[field]) setPublishErrors(prev => ({ ...prev, [field]: '' }));
+  };
+
+  const predictDifficulty = async (problemId) => {
+    try {
+      setPredictingDifficulty(true);
+      
+      const problem = problems.find(p => p.id === problemId);
+      if (!problem) {
+        alert('Problem not found');
+        return;
+      }
+
+      // Validate required fields
+      if (!problem.statement || problem.statement.trim() === '') {
+        alert('Please write a problem statement first');
+        return;
+      }
+
+      // Prepare API request
+      const requestData = {
+        statement: problem.statement,
+        tags: problem.tags || [],
+        test_cases: (problem.testCases || []).map(tc => ({
+          input: tc.input,
+          output: tc.output
+        })),
+        title: problem.title || 'Untitled'
+      };
+
+      // Call prediction API
+      const response = await fetch(`${import.meta.env.VITE_API_BASE}/api/difficulty-prediction/predict/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.prediction) {
+        // Update problem difficulty with prediction
+        handleProblemChange(problemId, 'difficulty', data.prediction.difficulty);
+        
+        // Show confidence feedback
+        const confidence = (data.prediction.confidence * 100).toFixed(1);
+        alert(
+          `Predicted Difficulty: ${data.prediction.difficulty}\n` +
+          `Confidence: ${confidence}%\n\n` +
+          `Probabilities:\n` +
+          `  Easy: ${(data.prediction.probabilities.Easy * 100).toFixed(1)}%\n` +
+          `  Medium: ${(data.prediction.probabilities.Medium * 100).toFixed(1)}%\n` +
+          `  Hard: ${(data.prediction.probabilities.Hard * 100).toFixed(1)}%`
+        );
+      } else {
+        alert('Failed to predict difficulty: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error predicting difficulty:', error);
+      alert('Failed to predict difficulty. Please ensure the ML model is trained.');
+    } finally {
+      setPredictingDifficulty(false);
+    }
   };
 
   const handleAddTesters = () => {
@@ -1241,9 +1305,30 @@ const CreateContest = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Difficulty
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Difficulty
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => predictDifficulty(currentProblem.id)}
+                        disabled={predictingDifficulty}
+                        className="px-2 py-0.5 text-xs font-medium text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        title="Predict difficulty using AI"
+                      >
+                        {predictingDifficulty ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Predicting...
+                          </>
+                        ) : (
+                          <>
+                            <Settings className="w-3 h-3" />
+                            Auto Predict
+                          </>
+                        )}
+                      </button>
+                    </div>
                     <select
                       value={currentProblem.difficulty || 'Medium'}
                       onChange={(e) => handleProblemChange(currentProblem.id, 'difficulty', e.target.value)}
