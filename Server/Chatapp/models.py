@@ -40,6 +40,7 @@ class ChatMessage(Document):
     content = StringField(required=True)
 
     created_at = DateTimeField(default=datetime.utcnow)
+    url = StringField()
 
     def to_dict(self):
         return {
