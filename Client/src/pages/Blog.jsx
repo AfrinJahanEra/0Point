@@ -18,8 +18,10 @@ const Blog = () => {
   const [showSearch, setShowSearch] = useState(false);
 
   useEffect(() => {
-    fetchBlogs();
-  }, [filter]);
+    if (user) {
+      fetchBlogs();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -30,10 +32,15 @@ const Blog = () => {
   const fetchBlogs = async () => {
     try {
       setLoading(true);
-      let endpoint = '/blog/published/';
-      if (filter === 'recent') endpoint += '?ordering=-published_at';
-      if (filter === 'popular') endpoint += '?ordering=-upvotes';
       
+      if (!user) {
+        setBlogs([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch only the current user's published blogs
+      const endpoint = '/blog/user-published/';
       const response = await api.get(endpoint);
       setBlogs(response.data);
     } catch (error) {
@@ -107,6 +114,24 @@ const Blog = () => {
   );
 
   const currentBlogs = activeTab === 'published' ? filteredBlogs : filteredDrafts;
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-[1920px] mx-auto px-4 py-6">
+          <div className="text-center py-12">
+            <p className="text-gray-500 mb-4">Please log in to manage your blogs.</p>
+            <Link
+              to="/login"
+              className="text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Go to Login →
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading && activeTab === 'published') {
     return (

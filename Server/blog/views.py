@@ -155,6 +155,22 @@ def list_user_drafts(request):
         print(f"Error in list_user_drafts: {e}")  # Debug print
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@api_view(['GET'])
+def list_user_published_blogs(request):
+    """List user's published blogs"""
+    user = get_user_from_request(request)
+    if not user:
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        blogs = Blog.objects(author=user, is_published=True).order_by('-published_at')
+        print(f"Found {blogs.count()} published blogs for user {user.name}")  # Debug print
+        blog_data = [blog.to_dict() for blog in blogs]
+        return Response(blog_data, status=status.HTTP_200_OK)
+    except Exception as e:
+        print(f"Error in list_user_published_blogs: {e}")  # Debug print
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['POST'])
 def create_test_blog(request):
     """Create a test blog for debugging"""
