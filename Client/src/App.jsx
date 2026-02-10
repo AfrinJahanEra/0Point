@@ -38,8 +38,7 @@ import TestContestLeaderboard  from './pages/TestContestLeaderboard';
 import TestContestSubmission from './pages/TestContestSubmission';
 import BlogDetail from './pages/BlogDetail';
 import Recording from './pages/Recording';
-import AppLayout from './components/AppLayout';
-import ContestHistory from './pages/ContestHistory';
+import AdminDashboard from './pages/AdminDashboard';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -137,7 +136,6 @@ function App() {
             } />
            
             {/* Visualizer and InterviewSession take full screen without Header and Footer */}
-            <Route path="/" element={<AppLayout />}>
             <Route path="/visualizer" element={<Visualizer />} />
             <Route path="/interview-room/:sessionId" element={<InterviewSession />} />  {/* Updated dynamic route */}
            
@@ -304,19 +302,18 @@ function App() {
                 <Submissions />
               </NavLayout>
             } />
-
-            <Route path="/contest-history" element={
-              <NavLayout>
-                <ContestHistory />
-              </NavLayout>
-            } />
            
             <Route path="/interview" element={
               <NavLayout>
                 <Interview />
               </NavLayout>
             } />
-            </Route>
+            
+            <Route path="/admin" element={
+              <FullScreenLayout>
+                <AdminDashboard />
+              </FullScreenLayout>
+            } />
           </Routes>
         </div>
       </Router>
