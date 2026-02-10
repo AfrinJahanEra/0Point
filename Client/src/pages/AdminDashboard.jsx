@@ -300,14 +300,38 @@ const AdminDashboard = () => {
     const container = activityChartRef.current;
     const width = container.clientWidth;
     const height = 400;
-    const margin = { top: 20, right: 120, bottom: 60, left: 60 };
+    const margin = { top: 30, right: 140, bottom: 70, left: 70 };
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
 
     const svg = d3.select(container)
       .append('svg')
       .attr('width', width)
-      .attr('height', height);
+      .attr('height', height)
+      .style('background', 'linear-gradient(to bottom, #f8fafc, #ffffff)');
+
+    // Add subtle shadow filter
+    const defs = svg.append('defs');
+    const filter = defs.append('filter')
+      .attr('id', 'shadow')
+      .attr('height', '130%');
+    
+    filter.append('feGaussianBlur')
+      .attr('in', 'SourceAlpha')
+      .attr('stdDeviation', 3);
+    
+    filter.append('feOffset')
+      .attr('dx', 0)
+      .attr('dy', 2);
+    
+    filter.append('feComponentTransfer')
+      .append('feFuncA')
+      .attr('type', 'linear')
+      .attr('slope', 0.3);
+    
+    const feMerge = filter.append('feMerge');
+    feMerge.append('feMergeNode');
+    feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
 
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
@@ -325,8 +349,23 @@ const AdminDashboard = () => {
       .range([0, chartWidth]);
 
     const y = d3.scaleLinear()
-      .domain([0, d3.max(data, d => Math.max(d.users, d.submissions, d.contests * 20, d.blogs * 10))])
+      .domain([0, d3.max(data, d => Math.max(d.users, d.submissions, d.contests * 20, d.blogs * 10)) * 1.1])
       .range([chartHeight, 0]);
+
+    // Add gradient definitions
+    const gradient1 = defs.append('linearGradient')
+      .attr('id', 'gradient-users')
+      .attr('x1', '0%').attr('y1', '0%')
+      .attr('x2', '0%').attr('y2', '100%');
+    gradient1.append('stop').attr('offset', '0%').attr('stop-color', '#1e3a8a').attr('stop-opacity', 0.8);
+    gradient1.append('stop').attr('offset', '100%').attr('stop-color', '#1e3a8a').attr('stop-opacity', 0.1);
+
+    const gradient2 = defs.append('linearGradient')
+      .attr('id', 'gradient-submissions')
+      .attr('x1', '0%').attr('y1', '0%')
+      .attr('x2', '0%').attr('y2', '100%');
+    gradient2.append('stop').attr('offset', '0%').attr('stop-color', '#3b82f6').attr('stop-opacity', 0.6);
+    gradient2.append('stop').attr('offset', '100%').attr('stop-color', '#3b82f6').attr('stop-opacity', 0.05);
 
     // Line generators
     const lineUsers = d3.line()
@@ -349,50 +388,101 @@ const AdminDashboard = () => {
       .y(d => y(d.blogs * 10))
       .curve(d3.curveMonotoneX);
 
-    // Add grid lines
+    // Area generators for gradient fills
+    const areaUsers = d3.area()
+      .x(d => x(d.date))
+      .y0(chartHeight)
+      .y1(d => y(d.users))
+      .curve(d3.curveMonotoneX);
+
+    const areaSubmissions = d3.area()
+      .x(d => x(d.date))
+      .y0(chartHeight)
+      .y1(d => y(d.submissions))
+      .curve(d3.curveMonotoneX);
+
+    // Add grid lines with styling
     g.append('g')
       .attr('class', 'grid')
-      .attr('opacity', 0.1)
+      .attr('opacity', 0.15)
       .call(d3.axisLeft(y)
+        .ticks(6)
         .tickSize(-chartWidth)
         .tickFormat('')
-      );
+      )
+      .selectAll('line')
+      .style('stroke', '#64748b')
+      .style('stroke-dasharray', '2,2');
 
-    // Add axes
-    g.append('g')
+    // Add axes with enhanced styling
+    const xAxis = g.append('g')
       .attr('transform', `translate(0,${chartHeight})`)
       .call(d3.axisBottom(x)
         .ticks(7)
         .tickFormat(d3.timeFormat('%b %d')))
-      .selectAll('text')
+      .style('font-family', 'Inter, system-ui, sans-serif');
+    
+    xAxis.selectAll('text')
       .style('text-anchor', 'end')
       .attr('dx', '-.8em')
       .attr('dy', '.15em')
       .attr('transform', 'rotate(-45)')
-      .style('font-size', '12px')
-      .style('fill', '#6b7280');
+      .style('font-size', '11px')
+      .style('font-weight', '500')
+      .style('fill', '#475569');
+    
+    xAxis.select('.domain')
+      .style('stroke', '#cbd5e1')
+      .style('stroke-width', '1.5px');
 
-    g.append('g')
+    const yAxis = g.append('g')
       .call(d3.axisLeft(y).ticks(6))
-      .selectAll('text')
-      .style('font-size', '12px')
-      .style('fill', '#6b7280');
+      .style('font-family', 'Inter, system-ui, sans-serif');
+    
+    yAxis.selectAll('text')
+      .style('font-size', '11px')
+      .style('font-weight', '500')
+      .style('fill', '#475569');
+    
+    yAxis.select('.domain')
+      .style('stroke', '#cbd5e1')
+      .style('stroke-width', '1.5px');
 
-    // Add lines with animations
+    // Add gradient areas
+    g.append('path')
+      .datum(data)
+      .attr('fill', 'url(#gradient-users)')
+      .attr('d', areaUsers)
+      .style('opacity', 0)
+      .transition()
+      .duration(1500)
+      .style('opacity', 1);
+
+    g.append('path')
+      .datum(data)
+      .attr('fill', 'url(#gradient-submissions)')
+      .attr('d', areaSubmissions)
+      .style('opacity', 0)
+      .transition()
+      .duration(1500)
+      .delay(200)
+      .style('opacity', 1);
+
     const colors = {
       users: '#1e3a8a',
       submissions: '#3b82f6',
-      contests: '#6b7280',
+      contests: '#64748b',
       blogs: '#60a5fa'
     };
 
-    // Users line
+    // Users line with glow effect
     const pathUsers = g.append('path')
       .datum(data)
       .attr('fill', 'none')
       .attr('stroke', colors.users)
-      .attr('stroke-width', 3)
-      .attr('d', lineUsers);
+      .attr('stroke-width', 3.5)
+      .attr('d', lineUsers)
+      .style('filter', 'drop-shadow(0 0 4px rgba(30, 58, 138, 0.5))');
 
     const totalLength1 = pathUsers.node().getTotalLength();
     pathUsers
@@ -400,15 +490,34 @@ const AdminDashboard = () => {
       .attr('stroke-dashoffset', totalLength1)
       .transition()
       .duration(2000)
+      .ease(d3.easeQuadInOut)
       .attr('stroke-dashoffset', 0);
+
+    // Add dots for users
+    g.selectAll('.dot-users')
+      .data(data)
+      .enter().append('circle')
+      .attr('class', 'dot-users')
+      .attr('cx', d => x(d.date))
+      .attr('cy', d => y(d.users))
+      .attr('r', 0)
+      .attr('fill', colors.users)
+      .attr('stroke', 'white')
+      .attr('stroke-width', 2)
+      .style('filter', 'url(#shadow)')
+      .transition()
+      .duration(500)
+      .delay((d, i) => 2000 + i * 30)
+      .attr('r', 4);
 
     // Submissions line
     const pathSubmissions = g.append('path')
       .datum(data)
       .attr('fill', 'none')
       .attr('stroke', colors.submissions)
-      .attr('stroke-width', 2.5)
-      .attr('d', lineSubmissions);
+      .attr('stroke-width', 3)
+      .attr('d', lineSubmissions)
+      .style('filter', 'drop-shadow(0 0 3px rgba(59, 130, 246, 0.4))');
 
     const totalLength2 = pathSubmissions.node().getTotalLength();
     pathSubmissions
@@ -417,6 +526,7 @@ const AdminDashboard = () => {
       .transition()
       .duration(2000)
       .delay(200)
+      .ease(d3.easeQuadInOut)
       .attr('stroke-dashoffset', 0);
 
     // Contests line
@@ -424,7 +534,8 @@ const AdminDashboard = () => {
       .datum(data)
       .attr('fill', 'none')
       .attr('stroke', colors.contests)
-      .attr('stroke-width', 2)
+      .attr('stroke-width', 2.5)
+      .attr('stroke-dasharray', '5,5')
       .attr('d', lineContests);
 
     const totalLength3 = pathContests.node().getTotalLength();
@@ -434,14 +545,18 @@ const AdminDashboard = () => {
       .transition()
       .duration(2000)
       .delay(400)
-      .attr('stroke-dashoffset', 0);
+      .ease(d3.easeQuadInOut)
+      .attr('stroke-dashoffset', 0)
+      .on('end', function() {
+        d3.select(this).attr('stroke-dasharray', '5,5');
+      });
 
     // Blogs line
     const pathBlogs = g.append('path')
       .datum(data)
       .attr('fill', 'none')
       .attr('stroke', colors.blogs)
-      .attr('stroke-width', 2)
+      .attr('stroke-width', 2.5)
       .attr('d', lineBlogs);
 
     const totalLength4 = pathBlogs.node().getTotalLength();
@@ -451,39 +566,74 @@ const AdminDashboard = () => {
       .transition()
       .duration(2000)
       .delay(600)
+      .ease(d3.easeQuadInOut)
       .attr('stroke-dashoffset', 0);
 
-    // Add legend
+    // Enhanced legend with better styling
     const legend = svg.append('g')
-      .attr('transform', `translate(${width - margin.right + 10}, ${margin.top})`);
+      .attr('transform', `translate(${width - margin.right + 15}, ${margin.top + 10})`);
 
     const legendData = [
-      { label: 'New Users', color: colors.users },
-      { label: 'Submissions', color: colors.submissions },
-      { label: 'Contests', color: colors.contests },
-      { label: 'Blogs', color: colors.blogs }
+      { label: 'New Users', color: colors.users, style: 'solid' },
+      { label: 'Submissions', color: colors.submissions, style: 'solid' },
+      { label: 'Contests', color: colors.contests, style: 'dashed' },
+      { label: 'Blogs', color: colors.blogs, style: 'solid' }
     ];
 
     legendData.forEach((item, i) => {
       const legendRow = legend.append('g')
-        .attr('transform', `translate(0, ${i * 25})`);
+        .attr('transform', `translate(0, ${i * 32})`);
+
+      // Background for each legend item
+      legendRow.append('rect')
+        .attr('x', -5)
+        .attr('y', 0)
+        .attr('width', 110)
+        .attr('height', 26)
+        .attr('rx', 4)
+        .attr('fill', i % 2 === 0 ? '#f8fafc' : 'white')
+        .attr('stroke', '#e2e8f0')
+        .attr('stroke-width', 1);
 
       legendRow.append('line')
-        .attr('x1', 0)
-        .attr('x2', 20)
-        .attr('y1', 10)
-        .attr('y2', 10)
+        .attr('x1', 5)
+        .attr('x2', 25)
+        .attr('y1', 13)
+        .attr('y2', 13)
         .attr('stroke', item.color)
-        .attr('stroke-width', 2);
+        .attr('stroke-width', 3)
+        .attr('stroke-dasharray', item.style === 'dashed' ? '4,4' : 'none');
+
+      if (item.style === 'solid' && item.label === 'New Users') {
+        legendRow.append('circle')
+          .attr('cx', 15)
+          .attr('cy', 13)
+          .attr('r', 3.5)
+          .attr('fill', item.color)
+          .attr('stroke', 'white')
+          .attr('stroke-width', 1.5);
+      }
 
       legendRow.append('text')
-        .attr('x', 25)
-        .attr('y', 10)
+        .attr('x', 35)
+        .attr('y', 13)
         .attr('dy', '0.35em')
         .style('font-size', '12px')
-        .style('fill', '#4b5563')
+        .style('font-weight', '500')
+        .style('font-family', 'Inter, system-ui, sans-serif')
+        .style('fill', '#334155')
         .text(item.label);
     });
+
+    // Add title on the chart
+    svg.append('text')
+      .attr('x', margin.left)
+      .attr('y', 20)
+      .style('font-size', '13px')
+      .style('font-weight', '600')
+      .style('fill', '#64748b')
+      .style('font-family', 'Inter, system-ui, sans-serif')
+      .text('Last 30 Days');
   };
 
   const filteredUsers = users.filter(user => 
@@ -833,8 +983,18 @@ const AdminDashboard = () => {
                     
                     {/* Activity Graph */}
                     <div className="mt-8">
-                      <h3 className="text-xl font-bold text-gray-900 mb-4">Platform Activity Overview</h3>
-                      <div className="bg-white border border-blue-200 rounded-lg p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900">Platform Activity Overview</h3>
+                          <p className="text-sm text-gray-500 mt-1">Real-time insights into platform engagement</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="px-3 py-1 bg-blue-50 rounded-lg">
+                            <span className="text-xs font-semibold text-blue-900">Live Data</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-gradient-to-br from-white to-blue-50 border-2 border-blue-200 rounded-xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
                         <div ref={activityChartRef} className="w-full" style={{ height: '400px' }}></div>
                       </div>
                     </div>
