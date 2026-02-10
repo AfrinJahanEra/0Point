@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -17,6 +17,7 @@ import {
   ShieldOff,
   AlertCircle
 } from 'lucide-react';
+import * as d3 from 'd3';
 import api from '../utils/api';
 
 const AdminDashboard = () => {
@@ -45,6 +46,8 @@ const AdminDashboard = () => {
   const [expandedSubmissionIds, setExpandedSubmissionIds] = useState([]);
   const [expandedContestIds, setExpandedContestIds] = useState([]);
   const [expandedProblemIds, setExpandedProblemIds] = useState([]);
+  const activityChartRef = useRef(null);
+  const [activityData, setActivityData] = useState([]);
   const navigate = useNavigate();
 
   // Check if user is admin
@@ -266,6 +269,223 @@ const AdminDashboard = () => {
     }
   };
 
+  // Generate mock activity data for the last 30 days
+  const generateActivityData = () => {
+    const data = [];
+    const today = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      
+      data.push({
+        date: date.toISOString().split('T')[0],
+        users: Math.floor(Math.random() * 50) + (i < 10 ? 30 : 10),
+        submissions: Math.floor(Math.random() * 100) + (i < 10 ? 80 : 30),
+        contests: Math.floor(Math.random() * 5) + (i < 7 ? 3 : 0),
+        blogs: Math.floor(Math.random() * 10) + (i < 15 ? 5 : 2)
+      });
+    }
+    
+    setActivityData(data);
+  };
+
+  // Render activity chart with D3.js
+  const renderActivityChart = () => {
+    if (!activityChartRef.current || activityData.length === 0) return;
+
+    // Clear previous chart
+    d3.select(activityChartRef.current).selectAll('*').remove();
+
+    const container = activityChartRef.current;
+    const width = container.clientWidth;
+    const height = 400;
+    const margin = { top: 20, right: 120, bottom: 60, left: 60 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+
+    const svg = d3.select(container)
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height);
+
+    const g = svg.append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    // Parse dates
+    const parseDate = d3.timeParse('%Y-%m-%d');
+    const data = activityData.map(d => ({
+      ...d,
+      date: parseDate(d.date)
+    }));
+
+    // Scales
+    const x = d3.scaleTime()
+      .domain(d3.extent(data, d => d.date))
+      .range([0, chartWidth]);
+
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(data, d => Math.max(d.users, d.submissions, d.contests * 20, d.blogs * 10))])
+      .range([chartHeight, 0]);
+
+    // Line generators
+    const lineUsers = d3.line()
+      .x(d => x(d.date))
+      .y(d => y(d.users))
+      .curve(d3.curveMonotoneX);
+
+    const lineSubmissions = d3.line()
+      .x(d => x(d.date))
+      .y(d => y(d.submissions))
+      .curve(d3.curveMonotoneX);
+
+    const lineContests = d3.line()
+      .x(d => x(d.date))
+      .y(d => y(d.contests * 20))
+      .curve(d3.curveMonotoneX);
+
+    const lineBlogs = d3.line()
+      .x(d => x(d.date))
+      .y(d => y(d.blogs * 10))
+      .curve(d3.curveMonotoneX);
+
+    // Add grid lines
+    g.append('g')
+      .attr('class', 'grid')
+      .attr('opacity', 0.1)
+      .call(d3.axisLeft(y)
+        .tickSize(-chartWidth)
+        .tickFormat('')
+      );
+
+    // Add axes
+    g.append('g')
+      .attr('transform', `translate(0,${chartHeight})`)
+      .call(d3.axisBottom(x)
+        .ticks(7)
+        .tickFormat(d3.timeFormat('%b %d')))
+      .selectAll('text')
+      .style('text-anchor', 'end')
+      .attr('dx', '-.8em')
+      .attr('dy', '.15em')
+      .attr('transform', 'rotate(-45)')
+      .style('font-size', '12px')
+      .style('fill', '#6b7280');
+
+    g.append('g')
+      .call(d3.axisLeft(y).ticks(6))
+      .selectAll('text')
+      .style('font-size', '12px')
+      .style('fill', '#6b7280');
+
+    // Add lines with animations
+    const colors = {
+      users: '#1e3a8a',
+      submissions: '#3b82f6',
+      contests: '#6b7280',
+      blogs: '#60a5fa'
+    };
+
+    // Users line
+    const pathUsers = g.append('path')
+      .datum(data)
+      .attr('fill', 'none')
+      .attr('stroke', colors.users)
+      .attr('stroke-width', 3)
+      .attr('d', lineUsers);
+
+    const totalLength1 = pathUsers.node().getTotalLength();
+    pathUsers
+      .attr('stroke-dasharray', totalLength1 + ' ' + totalLength1)
+      .attr('stroke-dashoffset', totalLength1)
+      .transition()
+      .duration(2000)
+      .attr('stroke-dashoffset', 0);
+
+    // Submissions line
+    const pathSubmissions = g.append('path')
+      .datum(data)
+      .attr('fill', 'none')
+      .attr('stroke', colors.submissions)
+      .attr('stroke-width', 2.5)
+      .attr('d', lineSubmissions);
+
+    const totalLength2 = pathSubmissions.node().getTotalLength();
+    pathSubmissions
+      .attr('stroke-dasharray', totalLength2 + ' ' + totalLength2)
+      .attr('stroke-dashoffset', totalLength2)
+      .transition()
+      .duration(2000)
+      .delay(200)
+      .attr('stroke-dashoffset', 0);
+
+    // Contests line
+    const pathContests = g.append('path')
+      .datum(data)
+      .attr('fill', 'none')
+      .attr('stroke', colors.contests)
+      .attr('stroke-width', 2)
+      .attr('d', lineContests);
+
+    const totalLength3 = pathContests.node().getTotalLength();
+    pathContests
+      .attr('stroke-dasharray', totalLength3 + ' ' + totalLength3)
+      .attr('stroke-dashoffset', totalLength3)
+      .transition()
+      .duration(2000)
+      .delay(400)
+      .attr('stroke-dashoffset', 0);
+
+    // Blogs line
+    const pathBlogs = g.append('path')
+      .datum(data)
+      .attr('fill', 'none')
+      .attr('stroke', colors.blogs)
+      .attr('stroke-width', 2)
+      .attr('d', lineBlogs);
+
+    const totalLength4 = pathBlogs.node().getTotalLength();
+    pathBlogs
+      .attr('stroke-dasharray', totalLength4 + ' ' + totalLength4)
+      .attr('stroke-dashoffset', totalLength4)
+      .transition()
+      .duration(2000)
+      .delay(600)
+      .attr('stroke-dashoffset', 0);
+
+    // Add legend
+    const legend = svg.append('g')
+      .attr('transform', `translate(${width - margin.right + 10}, ${margin.top})`);
+
+    const legendData = [
+      { label: 'New Users', color: colors.users },
+      { label: 'Submissions', color: colors.submissions },
+      { label: 'Contests', color: colors.contests },
+      { label: 'Blogs', color: colors.blogs }
+    ];
+
+    legendData.forEach((item, i) => {
+      const legendRow = legend.append('g')
+        .attr('transform', `translate(0, ${i * 25})`);
+
+      legendRow.append('line')
+        .attr('x1', 0)
+        .attr('x2', 20)
+        .attr('y1', 10)
+        .attr('y2', 10)
+        .attr('stroke', item.color)
+        .attr('stroke-width', 2);
+
+      legendRow.append('text')
+        .attr('x', 25)
+        .attr('y', 10)
+        .attr('dy', '0.35em')
+        .style('font-size', '12px')
+        .style('fill', '#4b5563')
+        .text(item.label);
+    });
+  };
+
   const filteredUsers = users.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -326,6 +546,25 @@ const AdminDashboard = () => {
     localStorage.removeItem('user');
     navigate('/login');
   };
+
+  // Generate activity data on component mount
+  useEffect(() => {
+    generateActivityData();
+  }, []);
+
+  // Render chart when data changes or window resizes
+  useEffect(() => {
+    if (activityData.length > 0 && activeTab === 'dashboard') {
+      renderActivityChart();
+      
+      const handleResize = () => {
+        renderActivityChart();
+      };
+      
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, [activityData, activeTab]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -512,7 +751,7 @@ const AdminDashboard = () => {
                       </button>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                       <div className="p-5 rounded-lg hover:bg-gray-50 transition-colors">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
@@ -589,6 +828,14 @@ const AdminDashboard = () => {
                             <FileCode className="w-7 h-7 text-blue-900" />
                           </div>
                         </div>
+                      </div>
+                    </div>
+                    
+                    {/* Activity Graph */}
+                    <div className="mt-8">
+                      <h3 className="text-xl font-bold text-gray-900 mb-4">Platform Activity Overview</h3>
+                      <div className="bg-white border border-blue-200 rounded-lg p-6">
+                        <div ref={activityChartRef} className="w-full" style={{ height: '400px' }}></div>
                       </div>
                     </div>
                   </div>
