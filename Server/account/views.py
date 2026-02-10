@@ -4,11 +4,24 @@ from rest_framework import status
 from django.conf import settings
 import jwt
 import hashlib
-from datetime import datetime  # Add this import
+import threading
+from datetime import datetime
 
-from .models import Account, BannedAccount, IPAddress, DeviceFingerprint
-from .serializers import SignupSerializer, LoginSerializer
+from .models import Account, BannedAccount, IPAddress, DeviceFingerprint, UserTagStats
+from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
 from admin.secret import ADMIN_SECRET_PASSWORD
+from .platforms import (
+    fetch_platform_rating,
+    fetch_codeforces_contests,
+    fetch_atcoder_contests,
+    fetch_leetcode_contests,
+    fetch_codechef_contests
+)
+from .platforms.codeforces import fetch_submissions as fetch_cf_submissions
+from .platforms.leetcode import fetch_submissions as fetch_leetcode_submissions
+from .platforms.codechef import fetch_submissions as fetch_codechef_submissions
+from .platforms.atcoder import fetch_submissions as fetch_atcoder_submissions
+from .tag_analysis import get_tag_stats
 
 
 class SignupView(APIView):
@@ -124,3 +137,298 @@ class LoginView(APIView):
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
         return Response({"token": token, "user": payload})
+
+
+class UserProfileView(APIView):
+    """Get user profile with all coding platform data"""
+    
+    def get(self, request, user_id=None):
+        """Get user profile by ID or current user"""
+        if user_id is None:
+            # Get current user from token
+            if not request.user or not hasattr(request.user, 'id'):
+                auth_header = request.headers.get('Authorization', '')
+                if auth_header.startswith('Bearer '):
+                    token = auth_header[7:]
+                    try:
+                        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+                        user_id = payload.get('user_id')
+                    except:
+                        return Response({"error": "Invalid token"}, status=401)
+                else:
+                    return Response({"error": "Unauthorized"}, status=401)
+        
+        try:
+            user = Account.objects(id=user_id, is_deleted=False).first()
+            if not user:
+                return Response({"error": "User not found"}, status=404)
+            
+            profile_data = {
+                "id": str(user.id),
+                "name": user.name,
+                "email": user.email,
+                "department": user.department,
+                "year": user.year,
+                "total_score": user.total_score,
+                "global_rank": user.global_rank,
+                "problems_solved": user.problems_solved,
+                "contests_count": user.contests_count,
+                "rating": user.rating,
+                "badge": user.badge,
+                "platform_profiles": [],
+                "created_at": user.created_at.isoformat() if user.created_at else None
+            }
+            
+            # Serialize platform profiles
+            for profile in user.platform_profiles:
+                profile_data["platform_profiles"].append({
+                    "platform": profile.platform,
+                    "handle": profile.handle,
+                    "current_rating": profile.current_rating,
+                    "max_rating": profile.max_rating,
+                    "min_rating": profile.min_rating,
+                    "contests_count": profile.contests_count,
+                    "rank": profile.rank,
+                    "badge": profile.badge,
+                    "last_updated": profile.last_updated.isoformat() if profile.last_updated else None,
+                    "rating_history": profile.rating_history
+                })
+            
+            return Response(profile_data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class AddPlatformProfileView(APIView):
+    """Add or update coding platform profile"""
+    
+    def post(self, request):
+        serializer = AddPlatformSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        
+        # Get current user
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return Response({"error": "Unauthorized"}, status=401)
+        
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get('user_id')
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+        
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+        
+        platform = serializer.validated_data.get('platform')
+        handle = serializer.validated_data.get('handle')
+        
+        # Fetch rating data from the platform with a cross-platform timeout
+        try:
+            result = {"data": None, "error": None}
+
+            def _fetch():
+                try:
+                    result['data'] = fetch_platform_rating(platform, handle)
+                except Exception as ex:
+                    result['error'] = ex
+
+            th = threading.Thread(target=_fetch, daemon=True)
+            th.start()
+
+            # wait up to 45 seconds for the fetch to complete
+            th.join(timeout=45)
+
+            if th.is_alive():
+                return Response({
+                    "error": "Request to platform API took too long. Please try again in a moment."
+                }, status=408)
+
+            if result['error']:
+                return Response({"error": str(result['error'])}, status=400)
+
+            rating_data = result['data'] or {}
+
+            user.add_or_update_platform(
+                platform,
+                handle,
+                rating_data.get('current_rating', 0),
+                rating_data.get('max_rating', 0),
+                rating_data.get('min_rating', 0),
+                rating_data.get('contests_count', 0),
+                rating_data.get('rank'),
+                rating_data.get('badge'),
+                rating_data.get('rating_history', [])
+            )
+
+            # Reset tag stats for full re-fetch
+            UserTagStats.objects(user_id=str(user.id)).delete()
+           
+            return Response({
+                "message": "Platform profile added successfully",
+                "platform": platform,
+                "handle": handle,
+                "rating": rating_data.get('current_rating', 0)
+            }, status=201)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class ContestHistoryView(APIView):
+    """Get contest history from various platforms"""
+    
+    def get(self, request, user_id=None):
+        if user_id is None:
+            # Get current user from token
+            auth_header = request.headers.get('Authorization', '')
+            if auth_header.startswith('Bearer '):
+                token = auth_header[7:]
+                try:
+                    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+                    user_id = payload.get('user_id')
+                except:
+                    return Response({"error": "Invalid token"}, status=401)
+            else:
+                return Response({"error": "Unauthorized"}, status=401)
+        
+        try:
+            user = Account.objects(id=user_id, is_deleted=False).first()
+            if not user:
+                return Response({"error": "User not found"}, status=404)
+            
+            platform = request.GET.get('platform')
+            if not platform:
+                return Response({"error": "Platform parameter required"}, status=400)
+            
+            profile = user.get_platform_profile(platform)
+            if not profile:
+                return Response({"error": f"No {platform} profile found"}, status=404)
+            
+            # Check cache first
+            cache = user.get_contest_cache(platform, profile.handle)
+            if cache and cache.last_fetched:
+                # Return cached data if fresh (less than 1 hour old)
+                from datetime import timedelta
+                if datetime.utcnow() - cache.last_fetched < timedelta(hours=1):
+                    return Response({
+                        "platform": platform,
+                        "handle": profile.handle,
+                        "contests": cache.contests,
+                        "cached": True,
+                        "last_updated": cache.last_fetched.isoformat()
+                    })
+            
+            # Fetch fresh data
+            contests = []
+            if platform == "codeforces":
+                contests = fetch_codeforces_contests(profile.handle)
+            elif platform == "atcoder":
+                contests = fetch_atcoder_contests(profile.handle)
+            elif platform == "leetcode":
+                contests = fetch_leetcode_contests(profile.handle)
+            elif platform == "codechef":
+                contests = fetch_codechef_contests(profile.handle)
+            
+            # Update cache
+            user.update_contest_cache(platform, profile.handle, contests)
+            
+            return Response({
+                "platform": platform,
+                "handle": profile.handle,
+                "contests": contests,
+                "cached": False
+            })
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class ExternalSubmissionView(APIView):
+    """Get external platform submissions"""
+    
+    def get(self, request):
+        # Get current user from token
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return Response({"error": "Unauthorized"}, status=401)
+        
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get('user_id')
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+        
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+        
+        platform = request.GET.get('platform')
+        limit = int(request.GET.get('limit', 100))
+        
+        if not platform:
+            return Response({"error": "Platform parameter required"}, status=400)
+        
+        profile = user.get_platform_profile(platform)
+        if not profile:
+            return Response({"error": f"No {platform} profile found"}, status=404)
+        
+        try:
+            submissions = []
+            if platform == "codeforces":
+                submissions = fetch_cf_submissions(profile.handle, limit)
+            elif platform == "leetcode":
+                submissions = fetch_leetcode_submissions(profile.handle, limit)
+            elif platform == "codechef":
+                submissions = fetch_codechef_submissions(profile.handle, limit)
+            elif platform == "atcoder":
+                submissions = fetch_atcoder_submissions(profile.handle, limit)
+            
+            return Response({
+                "platform": platform,
+                "handle": profile.handle,
+                "submissions": submissions,
+                "count": len(submissions)
+            })
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class TagStatsView(APIView):
+    """Get user's tag statistics from external platforms"""
+    
+    def get(self, request):
+        # Get current user from token
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return Response({"error": "Unauthorized"}, status=401)
+        
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get('user_id')
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+        
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+        
+        # Check if user has any platform profiles
+        if not user.platform_profiles:
+            return Response({"error": "No platform profiles found. Please add a platform first."}, status=404)
+        
+        try:
+            # Get tag statistics (uses caching internally)
+            tag_stats = get_tag_stats(user)
+            
+            return Response({
+                "user_id": str(user.id),
+                "tags": tag_stats,
+                "total_tags": len(tag_stats),
+                "total_problems": sum(tag_stats.values())
+            })
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
