@@ -28,9 +28,13 @@ const Login = () => {
     setError('');
     
     try {
-      await login(formData.email, formData.password);
-      // Redirect to contests page after successful login
-      navigate('/contests');
+      const user = await login(formData.email, formData.password);
+      // Redirect based on user role
+      if (user.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/contests");
+      }
     } catch (err) {
       setError(err);
     } finally {

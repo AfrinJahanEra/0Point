@@ -9,6 +9,8 @@ const Register = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    role: 'user',
+    secretPassword: '',
     year: '',
     department: ''
   });
@@ -50,8 +52,10 @@ const Register = () => {
         formData.name,
         formData.email,
         formData.password,
+        formData.role,
         formData.year || null,
-        formData.department || null
+        formData.department || null,
+        formData.secretPassword || null
       );
       
       // Show success message and redirect to login
@@ -124,6 +128,27 @@ const Register = () => {
               />
             </div>
             <div>
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
+                Role
+              </label>
+              <select
+                id="role"
+                name="role"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm rounded-md"
+                value={formData.role}
+                onChange={handleChange}
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin (requires secret password)</option>
+              </select>
+              {formData.role === "admin" && (
+                <p className="mt-1 text-sm text-amber-600">
+                  Note: Admin registration requires secret password verification
+                </p>
+              )}
+            </div>
+            <div>
               <label htmlFor="year" className="sr-only">
                 Year (Optional)
               </label>
@@ -151,6 +176,25 @@ const Register = () => {
                 onChange={handleChange}
               />
             </div>
+            {formData.role === "admin" && (
+              <div>
+                <label htmlFor="secret-password" className="sr-only">
+                  Admin Secret Password
+                </label>
+                <input
+                  id="secret-password"
+                  name="secretPassword"
+                  type="password"
+                  required={formData.role === "admin"}
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm rounded-md"
+                  placeholder="Admin Secret Password"
+                  onChange={handleChange}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Contact administrator for secret password
+                </p>
+              </div>
+            )}
             <div className="relative">
               <label htmlFor="password" className="sr-only">
                 Password
