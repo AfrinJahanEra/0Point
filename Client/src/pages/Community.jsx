@@ -234,10 +234,14 @@ const Community = () => {
       return newSet;
     });
 
-    // Fetch comments and votes when expanding for the first time
-    if (!wasExpanded && !blogComments[blogId]) {
-      await fetchBlogComments(blogId);
-      await fetchBlogVotes(blogId);
+    // Fetch comments and votes when expanding (only if not already fetched)
+    if (!wasExpanded) {
+      if (!blogComments[blogId]) {
+        await fetchBlogComments(blogId);
+      }
+      if (!blogVotes[blogId]) {
+        await fetchBlogVotes(blogId);
+      }
     }
   };
 
@@ -254,9 +258,11 @@ const Community = () => {
   const fetchBlogVotes = async (blogId) => {
     try {
       const response = await api.get(`/blog/${blogId}/votes/`);
+      console.log(`Votes for blog ${blogId}:`, response.data);
       setBlogVotes(prev => ({ ...prev, [blogId]: response.data }));
     } catch (error) {
       console.error('Error fetching votes:', error);
+      toast.error('Failed to load votes');
     }
   };
 
@@ -266,9 +272,34 @@ const Community = () => {
       return;
     }
 
+    console.log(`Voting ${voteType} on blog ${blogId}`);
+
     try {
-      await api.post(`/blog/${blogId}/vote/`, { vote_type: voteType });
-      await fetchBlogVotes(blogId);
+      const response = await api.post(`/blog/${blogId}/vote/`, { vote_type: voteType });
+      console.log('Vote response:', response.data);
+      
+      // Fetch updated votes for this blog
+      const votesResponse = await api.get(`/blog/${blogId}/votes/`);
+      console.log(`Updated votes for blog ${blogId}:`, votesResponse.data);
+      
+      // Update blogVotes state
+      setBlogVotes(prev => ({ ...prev, [blogId]: votesResponse.data }));
+      
+      // Update the blog in the main blogs list with new vote counts
+      setBlogs(prevBlogs => 
+        prevBlogs.map(blog => {
+          if (blog.id === blogId) {
+            return {
+              ...blog,
+              upvotes: votesResponse.data.upvotes,
+              downvotes: votesResponse.data.downvotes,
+              score: votesResponse.data.score
+            };
+          }
+          return blog;
+        })
+      );
+      
       toast.success(`Blog ${voteType}d!`);
     } catch (error) {
       console.error('Error voting:', error);
@@ -485,20 +516,36 @@ const Community = () => {
                           </div>
                         </div>
                         
-                        {/* Vote Stats */}
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-1">
+                        {/* Vote Stats - Clickable */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleVote(blog.id, 'upvote');
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-green-50 transition-colors"
+                            title="Like this blog"
+                          >
                             <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
                             </svg>
                             <span className="text-sm font-medium text-gray-900">{blog.upvotes || 0}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleVote(blog.id, 'downvote');
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                            title="Dislike this blog"
+                          >
                             <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
                             </svg>
                             <span className="text-sm font-medium text-gray-900">{blog.downvotes || 0}</span>
-                          </div>
+                          </button>
                         </div>
                       </div>
                       
