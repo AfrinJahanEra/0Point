@@ -54,7 +54,7 @@ const CfTagDonutChart = ({ tagStats = {}, username = "user" }) => {
   if (data.length === 0) {
     return (
       <div className="text-center py-10 text-gray-500 text-sm">
-        No solved problems with tags found on Codeforces yet.
+        No solved problems with tags found yet. Start solving problems on Codeforces or LeetCode!
       </div>
     );
   }

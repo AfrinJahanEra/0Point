@@ -205,6 +205,7 @@ class AddPlatformProfileView(APIView):
     def post(self, request):
         serializer = AddPlatformSerializer(data=request.data)
         if not serializer.is_valid():
+            print(f"Serializer validation failed: {serializer.errors}")
             return Response(serializer.errors, status=400)
         
         # Get current user
@@ -248,6 +249,7 @@ class AddPlatformProfileView(APIView):
                 }, status=408)
 
             if result['error']:
+                print(f"Platform fetch error for {platform}/{handle}: {result['error']}")
                 return Response({"error": str(result['error'])}, status=400)
 
             rating_data = result['data'] or {}
@@ -302,6 +304,53 @@ class ContestHistoryView(APIView):
             platform = request.GET.get('platform')
             if not platform:
                 return Response({"error": "Platform parameter required"}, status=400)
+            
+            # Handle 'all' platform - fetch from all platforms
+            if platform == 'all':
+                all_contests = []
+                for profile in user.platform_profiles:
+                    # Check cache first
+                    cache = user.get_contest_cache(profile.platform, profile.handle)
+                    if cache and cache.last_fetched:
+                        from datetime import timedelta
+                        if datetime.utcnow() - cache.last_fetched < timedelta(hours=1):
+                            all_contests.extend(cache.contests)
+                            continue
+                    
+                    # Fetch fresh data
+                    try:
+                        contests = []
+                        if profile.platform == "codeforces":
+                            contests = fetch_codeforces_contests(profile.handle)
+                        elif profile.platform == "atcoder":
+                            contests = fetch_atcoder_contests(profile.handle)
+                        elif profile.platform == "leetcode":
+                            contests = fetch_leetcode_contests(profile.handle)
+                        elif profile.platform == "codechef":
+                            contests = fetch_codechef_contests(profile.handle)
+                        
+                        # Update cache
+                        user.update_contest_cache(profile.platform, profile.handle, contests)
+                        all_contests.extend(contests)
+                    except Exception as e:
+                        print(f"Error fetching contests for {profile.platform}/{profile.handle}: {e}")
+                        continue
+                
+                return Response({
+                    "platform": "all",
+                    "contests": all_contests,
+                    "cached": False
+                })
+            
+            # Handle 'internal' platform - this should fetch from your internal contest system
+            if platform == 'internal':
+                # TODO: Implement internal contest history fetching
+                return Response({
+                    "platform": "internal",
+                    "contests": [],
+                    "cached": False,
+                    "message": "Internal contest history not yet implemented"
+                })
             
             profile = user.get_platform_profile(platform)
             if not profile:
@@ -370,6 +419,32 @@ class ExternalSubmissionView(APIView):
         
         if not platform:
             return Response({"error": "Platform parameter required"}, status=400)
+        
+        # Handle 'all' platform - fetch from all platforms
+        if platform == 'all':
+            all_submissions = []
+            for profile in user.platform_profiles:
+                try:
+                    submissions = []
+                    if profile.platform == "codeforces":
+                        submissions = fetch_cf_submissions(profile.handle, limit)
+                    elif profile.platform == "leetcode":
+                        submissions = fetch_leetcode_submissions(profile.handle, limit)
+                    elif profile.platform == "codechef":
+                        submissions = fetch_codechef_submissions(profile.handle, limit)
+                    elif profile.platform == "atcoder":
+                        submissions = fetch_atcoder_submissions(profile.handle, limit)
+                    
+                    all_submissions.extend(submissions)
+                except Exception as e:
+                    print(f"Error fetching submissions for {profile.platform}/{profile.handle}: {e}")
+                    continue
+            
+            return Response({
+                "platform": "all",
+                "submissions": all_submissions,
+                "count": len(all_submissions)
+            })
         
         profile = user.get_platform_profile(platform)
         if not profile:
