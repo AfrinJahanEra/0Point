@@ -695,22 +695,22 @@ const AdminDashboard = () => {
                               <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                   <div className="flex items-center gap-2">
-                                    <ShieldOff className="w-4 h-4 text-red-600" />
+                                    <ShieldOff className="w-4 h-4 text-gray-700" />
                                     {user.email}
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{user.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                  <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded">
                                     {user.reason}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                   <div className="flex flex-col gap-1">
-                                    <span className="text-xs bg-red-100 px-2 py-1 rounded">
+                                    <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
                                       {user.ip_addresses?.length || 0} IPs blocked
                                     </span>
-                                    <span className="text-xs bg-red-100 px-2 py-1 rounded">
+                                    <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
                                       {user.device_fingerprints_count || 0} Devices blocked
                                     </span>
                                   </div>
@@ -798,17 +798,17 @@ const AdminDashboard = () => {
                                 </tr>
                                 {expandedBlogIds.includes(blog.id) && (
                                   <tr>
-                                    <td colSpan="6" className="px-6 py-4 bg-gray-50">
+                                    <td colSpan="6" className="px-6 py-4 bg-blue-50">
                                       <div className="space-y-3">
                                         <div>
-                                          <h4 className="font-semibold text-sm text-gray-900 mb-2">Content:</h4>
-                                          <div className="p-3 bg-white rounded border border-gray-200 text-sm text-gray-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
+                                          <h4 className="font-bold text-sm text-blue-900 mb-2">Content:</h4>
+                                          <div className="p-4 bg-white rounded border border-blue-200 text-sm text-gray-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
                                             {blog.full_content || blog.content_preview || 'No content available'}
                                           </div>
                                         </div>
                                         {blog.tags && blog.tags.length > 0 && (
                                           <div>
-                                            <h4 className="font-semibold text-sm text-gray-900 mb-2">Tags:</h4>
+                                            <h4 className="font-bold text-sm text-blue-900 mb-2">Tags:</h4>
                                             <div className="flex flex-wrap gap-2">
                                               {blog.tags.map((tag, idx) => (
                                                 <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-900 text-xs rounded">{tag}</span>
@@ -818,7 +818,7 @@ const AdminDashboard = () => {
                                         )}
                                         {blog.co_authors && blog.co_authors.length > 0 && (
                                           <div>
-                                            <h4 className="font-semibold text-sm text-gray-900 mb-2">Co-Authors:</h4>
+                                            <h4 className="font-bold text-sm text-blue-900 mb-2">Co-Authors:</h4>
                                             <div className="flex flex-wrap gap-2">
                                               {blog.co_authors.map((coAuthor, idx) => (
                                                 <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
@@ -918,63 +918,63 @@ const AdminDashboard = () => {
                                 </tr>
                                 {expandedContestIds.includes(contest.id) && (
                                   <tr>
-                                    <td colSpan="6" className="px-6 py-4 bg-gray-50">
+                                    <td colSpan="6" className="px-6 py-4 bg-blue-50">
                                       <div className="space-y-4">
                                         {/* Contest Details */}
-                                        <div className="grid grid-cols-2 gap-4 p-4 bg-white rounded border border-gray-200">
+                                        <div className="grid grid-cols-2 gap-4 p-4 bg-white rounded border border-blue-200">
                                           <div>
-                                            <h4 className="font-semibold text-sm text-gray-900 mb-1">Start Time:</h4>
-                                            <span className="text-sm">{contest.start_time ? new Date(contest.start_time).toLocaleString() : 'Not set'}</span>
+                                            <h4 className="font-bold text-sm text-blue-900 mb-1">Start Time:</h4>
+                                            <span className="text-sm text-gray-700">{contest.start_time ? new Date(contest.start_time).toLocaleString() : 'Not set'}</span>
                                           </div>
                                           <div>
-                                            <h4 className="font-semibold text-sm text-gray-700 mb-1">Duration:</h4>
-                                            <span className="text-sm">{contest.duration ? `${contest.duration} hours` : 'Not set'}</span>
+                                            <h4 className="font-bold text-sm text-blue-900 mb-1">Duration:</h4>
+                                            <span className="text-sm text-gray-700">{contest.duration ? `${contest.duration} hours` : 'Not set'}</span>
                                           </div>
                                           <div>
-                                            <h4 className="font-semibold text-sm text-gray-700 mb-1">Platform:</h4>
-                                            <span className="text-sm">{contest.platform || 'N/A'}</span>
+                                            <h4 className="font-bold text-sm text-blue-900 mb-1">Platform:</h4>
+                                            <span className="text-sm text-gray-700">{contest.platform || 'N/A'}</span>
                                           </div>
                                           <div>
-                                            <h4 className="font-semibold text-sm text-gray-700 mb-1">Visibility:</h4>
-                                            <span className="text-sm">{contest.visibility || 'public'}</span>
+                                            <h4 className="font-bold text-sm text-blue-900 mb-1">Visibility:</h4>
+                                            <span className="text-sm text-gray-700">{contest.visibility || 'public'}</span>
                                           </div>
                                           {contest.description && (
                                             <div className="col-span-2">
-                                              <h4 className="font-semibold text-sm text-gray-700 mb-1">Description:</h4>
-                                              <p className="text-sm text-gray-600">{contest.description}</p>
+                                              <h4 className="font-bold text-sm text-blue-900 mb-1">Description:</h4>
+                                              <p className="text-sm text-gray-700">{contest.description}</p>
                                             </div>
                                           )}
                                         </div>
 
                                         {/* Contest Settings */}
-                                        <div className="p-4 bg-white rounded border">
-                                          <h4 className="font-semibold text-sm text-gray-700 mb-2">Settings:</h4>
+                                        <div className="p-4 bg-white rounded border border-blue-200">
+                                          <h4 className="font-bold text-sm text-blue-900 mb-2">Settings:</h4>
                                           <div className="flex flex-wrap gap-2">
                                             {contest.registration_required && (
-                                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Registration Required</span>
+                                              <span className="px-2 py-1 bg-blue-100 text-blue-900 text-xs rounded">Registration Required</span>
                                             )}
                                             {contest.require_screen_recording && (
-                                              <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">Screen Recording</span>
+                                              <span className="px-2 py-1 bg-blue-100 text-blue-900 text-xs rounded">Screen Recording</span>
                                             )}
                                             {contest.leaderboard_public && (
-                                              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">Public Leaderboard</span>
+                                              <span className="px-2 py-1 bg-blue-900 text-white text-xs rounded">Public Leaderboard</span>
                                             )}
                                             {contest.allow_practice && (
-                                              <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">Practice Allowed</span>
+                                              <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">Practice Allowed</span>
                                             )}
                                             {contest.rating_changes && (
-                                              <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">Rating Changes</span>
+                                              <span className="px-2 py-1 bg-blue-900 text-white text-xs rounded">Rating Changes</span>
                                             )}
                                             {contest.editorial_published && (
-                                              <span className="px-2 py-1 bg-indigo-100 text-indigo-800 text-xs rounded">Editorial Published</span>
+                                              <span className="px-2 py-1 bg-blue-100 text-blue-900 text-xs rounded">Editorial Published</span>
                                             )}
                                           </div>
                                         </div>
 
                                         {/* Testers */}
                                         {contest.testers && contest.testers.length > 0 && (
-                                          <div className="p-4 bg-white rounded border">
-                                            <h4 className="font-semibold text-sm text-gray-700 mb-2">Testers ({contest.testers.length}):</h4>
+                                          <div className="p-4 bg-white rounded border border-blue-200">
+                                            <h4 className="font-bold text-sm text-blue-900 mb-2">Testers ({contest.testers.length}):</h4>
                                             <div className="flex flex-wrap gap-2">
                                               {contest.testers.map((tester, idx) => (
                                                 <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">{tester}</span>
@@ -985,23 +985,23 @@ const AdminDashboard = () => {
 
                                         {/* Problems Section */}
                                         <div>
-                                          <h4 className="font-semibold text-sm text-gray-700 mb-3">Problems ({contest.problem_count || 0}):</h4>
+                                          <h4 className="font-bold text-sm text-blue-900 mb-3">Problems ({contest.problem_count || 0}):</h4>
                                           {contest.problems && contest.problems.length > 0 ? (
                                             <div className="space-y-3">
                                               {contest.problems.map((problem, idx) => (
-                                                <div key={idx} className="p-4 bg-white rounded border hover:border-blue-300 transition-colors">
+                                                <div key={idx} className="p-4 bg-white rounded border border-blue-200 hover:border-blue-900 transition-colors">
                                                   <div className="flex items-start justify-between mb-2">
                                                     <div className="flex items-center gap-3">
-                                                      <span className="px-3 py-1 bg-blue-600 text-white font-bold rounded">{problem.index}</span>
+                                                      <span className="px-3 py-1 bg-blue-900 text-white font-bold rounded">{problem.index}</span>
                                                       <div>
-                                                        <h5 className="font-semibold text-gray-900">{problem.title}</h5>
+                                                        <h5 className="font-bold text-gray-900">{problem.title}</h5>
                                                         <div className="flex gap-2 mt-1">
                                                           <span className={`px-2 py-0.5 text-xs rounded ${
                                                             problem.difficulty === 'Easy' 
-                                                              ? 'bg-green-100 text-green-800' 
+                                                              ? 'bg-blue-100 text-blue-900' 
                                                               : problem.difficulty === 'Medium' 
-                                                                ? 'bg-yellow-100 text-yellow-800' 
-                                                                : 'bg-red-100 text-red-800'
+                                                                ? 'bg-gray-600 text-white' 
+                                                                : 'bg-gray-800 text-white'
                                                           }`}>
                                                             {problem.difficulty || 'N/A'}
                                                           </span>
@@ -1012,7 +1012,7 @@ const AdminDashboard = () => {
                                                             Memory: {problem.memory_limit_mb || 256}MB
                                                           </span>
                                                           {problem.points > 0 && (
-                                                            <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
+                                                            <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-900 rounded">
                                                               {problem.points} points
                                                             </span>
                                                           )}
@@ -1037,7 +1037,7 @@ const AdminDashboard = () => {
                                                       <h6 className="text-xs font-semibold text-gray-700 mb-1">Tags:</h6>
                                                       <div className="flex flex-wrap gap-1">
                                                         {problem.tags.map((tag, tagIdx) => (
-                                                          <span key={tagIdx} className="px-2 py-0.5 bg-cyan-100 text-cyan-800 text-xs rounded">{tag}</span>
+                                                          <span key={tagIdx} className="px-2 py-0.5 bg-blue-100 text-blue-900 text-xs rounded">{tag}</span>
                                                         ))}
                                                       </div>
                                                     </div>
@@ -1058,7 +1058,7 @@ const AdminDashboard = () => {
                                                         {problem.test_cases.map((testCase, tcIdx) => (
                                                           <div key={tcIdx} className={`p-3 rounded border ${
                                                             testCase.sample 
-                                                              ? 'bg-green-50 border-green-200' 
+                                                              ? 'bg-blue-50 border-blue-200'
                                                               : testCase.hidden 
                                                                 ? 'bg-gray-50 border-gray-200'
                                                                 : 'bg-blue-50 border-blue-200'
@@ -1066,13 +1066,13 @@ const AdminDashboard = () => {
                                                             <div className="flex items-center gap-2 mb-2">
                                                               <span className="text-xs font-semibold text-gray-700">Test Case #{tcIdx + 1}</span>
                                                               {testCase.sample && (
-                                                                <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">Sample</span>
+                                                                <span className="px-2 py-0.5 bg-blue-100 text-blue-900 text-xs rounded">Sample</span>
                                                               )}
                                                               {testCase.hidden && (
                                                                 <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded">Hidden</span>
                                                               )}
                                                               {testCase.difficulty && (
-                                                                <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded">{testCase.difficulty}</span>
+                                                                <span className="px-2 py-0.5 bg-blue-100 text-blue-900 text-xs rounded">{testCase.difficulty}</span>
                                                               )}
                                                             </div>
                                                             <div className="grid grid-cols-2 gap-2">
@@ -1108,7 +1108,7 @@ const AdminDashboard = () => {
 
                                         {/* Announcements Count */}
                                         {contest.announcement_count > 0 && (
-                                          <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+                                          <div className="p-3 bg-blue-50 rounded border border-blue-200">
                                             <div className="flex items-center gap-2">
                                               <AlertCircle className="w-4 h-4 text-yellow-600" />
                                               <span className="text-sm text-yellow-800">
@@ -1203,7 +1203,7 @@ const AdminDashboard = () => {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                       <span className={`px-2 py-1 rounded text-xs ${
                                         problem.contest_status === 'live' 
-                                          ? 'bg-green-100 text-green-800'
+                                          ? 'bg-blue-900 text-white'
                                           : problem.contest_status === 'upcoming'
                                             ? 'bg-blue-100 text-blue-800'
                                             : 'bg-gray-100 text-gray-800'
@@ -1232,7 +1232,7 @@ const AdminDashboard = () => {
                                               <h4 className="font-semibold text-sm text-gray-700 mb-2">Tags:</h4>
                                               <div className="flex flex-wrap gap-2">
                                                 {problem.tags.map((tag, idx) => (
-                                                  <span key={idx} className="px-2 py-1 bg-cyan-100 text-cyan-800 text-xs rounded">{tag}</span>
+                                                  <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-900 text-xs rounded">{tag}</span>
                                                 ))}
                                               </div>
                                             </div>
@@ -1242,7 +1242,7 @@ const AdminDashboard = () => {
                                           {problem.points > 0 && (
                                             <div>
                                               <h4 className="font-semibold text-sm text-gray-700 mb-2">Points:</h4>
-                                              <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded font-semibold">{problem.points}</span>
+                                              <span className="px-3 py-1 bg-blue-100 text-blue-900 text-sm rounded font-semibold">{problem.points}</span>
                                             </div>
                                           )}
 
@@ -1254,7 +1254,7 @@ const AdminDashboard = () => {
                                                 {problem.test_cases.map((testCase, tcIdx) => (
                                                   <div key={tcIdx} className={`p-3 rounded border ${
                                                     testCase.sample 
-                                                      ? 'bg-green-50 border-green-200' 
+                                                      ? 'bg-blue-50 border-blue-200'
                                                       : testCase.hidden 
                                                         ? 'bg-gray-50 border-gray-200'
                                                         : 'bg-blue-50 border-blue-200'
@@ -1262,13 +1262,13 @@ const AdminDashboard = () => {
                                                     <div className="flex items-center gap-2 mb-2">
                                                       <span className="text-xs font-semibold text-gray-700">Test Case #{tcIdx + 1}</span>
                                                       {testCase.sample && (
-                                                        <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">Sample</span>
+                                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-900 text-xs rounded">Sample</span>
                                                       )}
                                                       {testCase.hidden && (
                                                         <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded">Hidden</span>
                                                       )}
                                                       {testCase.difficulty && (
-                                                        <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded">{testCase.difficulty}</span>
+                                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-900 text-xs rounded">{testCase.difficulty}</span>
                                                       )}
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-2">
@@ -1368,24 +1368,24 @@ const AdminDashboard = () => {
                                       (submission.verdict || submission.status) === 'AC' 
                                         ? 'bg-blue-900 text-white' 
                                         : (submission.verdict || submission.status) === 'WA' 
-                                          ? 'bg-red-100 text-red-800' 
-                                          : 'bg-yellow-100 text-yellow-800'
+                                          ? 'bg-gray-100 text-gray-800' 
+                                          : 'bg-gray-100 text-gray-800'
                                     }`}>
                                       {submission.verdict || submission.status}
                                     </span>
                                     {submission.passed_test_cases !== undefined && submission.total_test_cases !== undefined && (
-                                      <div className="text-xs text-gray-500 mt-1">
+                                      <div className="text-xs text-gray-700 mt-1">
                                         {submission.passed_test_cases}/{submission.total_test_cases} tests
                                       </div>
                                     )}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                     {new Date(submission.submitted_at).toLocaleString()}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                                     <button
                                       onClick={() => handleDeleteSubmission(submission.id)}
-                                      className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                                      className="text-blue-900 hover:text-blue-950 font-medium flex items-center gap-1 transition-colors"
                                     >
                                       <Trash2 className="w-4 h-4" />
                                       Delete
@@ -1394,38 +1394,38 @@ const AdminDashboard = () => {
                                 </tr>
                                 {expandedSubmissionIds.includes(submission.id) && (
                                   <tr>
-                                    <td colSpan="6" className="px-6 py-4 bg-gray-50">
+                                    <td colSpan="6" className="px-6 py-4 bg-blue-50">
                                       <div className="space-y-3">
                                         <div>
-                                          <h4 className="font-semibold text-sm text-gray-700 mb-2">Code:</h4>
-                                          <pre className="p-3 bg-gray-900 text-green-400 rounded text-xs overflow-x-auto max-h-96">
+                                          <h4 className="font-bold text-sm text-blue-900 mb-2">Code:</h4>
+                                          <pre className="p-4 bg-gray-900 text-gray-100 rounded text-xs overflow-x-auto max-h-96 border border-blue-200">
                                             <code>{submission.full_code || submission.code_preview || submission.code || 'No code available'}</code>
                                           </pre>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                           {submission.execution_time !== undefined && (
                                             <div>
-                                              <h4 className="font-semibold text-sm text-gray-700 mb-1">Execution Time:</h4>
-                                              <span className="text-sm">{submission.execution_time} ms</span>
+                                              <h4 className="font-bold text-sm text-blue-900 mb-1">Execution Time:</h4>
+                                              <span className="text-sm text-gray-700">{submission.execution_time} ms</span>
                                             </div>
                                           )}
                                           {submission.memory !== undefined && (
                                             <div>
-                                              <h4 className="font-semibold text-sm text-gray-700 mb-1">Memory:</h4>
-                                              <span className="text-sm">{submission.memory} KB</span>
+                                              <h4 className="font-bold text-sm text-blue-900 mb-1">Memory:</h4>
+                                              <span className="text-sm text-gray-700">{submission.memory} KB</span>
                                             </div>
                                           )}
                                         </div>
                                         {submission.error_message && (
                                           <div>
-                                            <h4 className="font-semibold text-sm text-red-700 mb-2">Error Message:</h4>
-                                            <pre className="p-3 bg-red-50 text-red-800 rounded text-xs overflow-x-auto">{submission.error_message}</pre>
+                                            <h4 className="font-bold text-sm text-blue-900 mb-2">Error Message:</h4>
+                                            <pre className="p-3 bg-gray-100 text-gray-800 rounded text-xs overflow-x-auto border border-blue-200">{submission.error_message}</pre>
                                           </div>
                                         )}
                                         {submission.compile_output && (
                                           <div>
-                                            <h4 className="font-semibold text-sm text-gray-700 mb-2">Compile Output:</h4>
-                                            <pre className="p-3 bg-yellow-50 text-yellow-800 rounded text-xs overflow-x-auto">{submission.compile_output}</pre>
+                                            <h4 className="font-bold text-sm text-blue-900 mb-2">Compile Output:</h4>
+                                            <pre className="p-3 bg-blue-50 text-gray-800 rounded text-xs overflow-x-auto border border-blue-200">{submission.compile_output}</pre>
                                           </div>
                                         )}
                                         {submission.contest && (
