@@ -1,22 +1,26 @@
+// Client/src/components/NavigationBar.jsx
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
 
 const NavigationBar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useApp();
   const currentPath = location.pathname;
 
   const getActiveTab = () => {
     if (currentPath === '/submissions') return 'submissions';
     if (currentPath === '/blog') return 'blog';
-    return 'era97'; 
+    if (currentPath === '/contest-history') return 'contests'; // ← new
+    return 'dashboard';
   };
 
   const activeTab = getActiveTab();
 
   const handleTabChange = (tab) => {
     switch (tab) {
-      case 'era97':
+      case 'dashboard':
         navigate('/dashboard');
         break;
       case 'submissions':
@@ -25,24 +29,30 @@ const NavigationBar = () => {
       case 'blog':
         navigate('/blog');
         break;
+      case 'contests':               // ← new
+        navigate('/contest-history');
+        break;
       default:
         navigate('/dashboard');
     }
   };
 
+  const userName = user?.name || 'User';
+
   return (
     <div className="mb-4 px-10">
       <div className="flex space-x-10">
         <button
-          onClick={() => handleTabChange('era97')}
+          onClick={() => handleTabChange('dashboard')}
           className={`pb-2 text-sm font-medium ${
-            activeTab === 'era97'
+            activeTab === 'dashboard'
               ? 'text-blue-800 border-b-2 border-blue-800'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          era97
+          {userName}
         </button>
+
         <button
           onClick={() => handleTabChange('submissions')}
           className={`pb-2 text-sm font-medium ${
@@ -53,6 +63,7 @@ const NavigationBar = () => {
         >
           Submissions
         </button>
+
         <button
           onClick={() => handleTabChange('blog')}
           className={`pb-2 text-sm font-medium ${
@@ -62,6 +73,18 @@ const NavigationBar = () => {
           }`}
         >
           Blogs
+        </button>
+
+        {/* New: Contests tab */}
+        <button
+          onClick={() => handleTabChange('contests')}
+          className={`pb-2 text-sm font-medium ${
+            activeTab === 'contests'
+              ? 'text-blue-800 border-b-2 border-blue-800'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Contests
         </button>
       </div>
     </div>

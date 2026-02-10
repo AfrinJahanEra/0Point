@@ -6,7 +6,11 @@ from django.conf.urls.static import static
 from django.views.static import serve
 urlpatterns = [
     path("auth/", include("account.urls")),
+    path("account/", include("account.urls")),
     path("", include("contest.urls")),
+    path("", include("submission.urls")),
+    path("", include("problem.urls")), 
+    path("", include("testcase.urls")),
     path("", include("leaderboard.urls")),
     path("", include("announcement.urls")),
     path('admin/', admin.site.urls),
