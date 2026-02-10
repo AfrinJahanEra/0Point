@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'crossPlatform',
     'blog',
     'Chatapp',
+    'difficulty_prediction',
 ]
 
 MIDDLEWARE = [

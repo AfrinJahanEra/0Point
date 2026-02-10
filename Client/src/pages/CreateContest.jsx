@@ -93,6 +93,9 @@ const CreateContest = () => {
   const [testInvites, setTestInvites] = useState('');
   const [publishErrors, setPublishErrors] = useState({});
   const [isRunning, setIsRunning] = useState(false);
+  const [predictingDifficulty, setPredictingDifficulty] = useState(false);
+  const [predictionResult, setPredictionResult] = useState(null);
+  const [showPredictionModal, setShowPredictionModal] = useState(false);
 
   const customComponents = {
     h1: ({ children }) => (
@@ -517,6 +520,62 @@ const CreateContest = () => {
   const handleSettingChange = (field, value) => {
     setPublishSettings(prev => ({ ...prev, [field]: value }));
     if (publishErrors[field]) setPublishErrors(prev => ({ ...prev, [field]: '' }));
+  };
+
+  const predictDifficulty = async (problemId) => {
+    try {
+      setPredictingDifficulty(true);
+      
+      const problem = problems.find(p => p.id === problemId);
+      if (!problem) {
+        alert('Problem not found');
+        return;
+      }
+
+      // Validate required fields
+      if (!problem.statement || problem.statement.trim() === '') {
+        alert('Please write a problem statement first');
+        return;
+      }
+
+      // Prepare API request
+      const requestData = {
+        statement: problem.statement,
+        tags: problem.tags || [],
+        test_cases: (problem.testCases || []).map(tc => ({
+          input: tc.input,
+          output: tc.output
+        })),
+        title: problem.title || 'Untitled'
+      };
+
+      // Call prediction API
+      const response = await fetch(`${import.meta.env.VITE_API_BASE}/api/difficulty-prediction/predict/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.prediction) {
+        // Update problem difficulty with prediction
+        handleProblemChange(problemId, 'difficulty', data.prediction.difficulty);
+        
+        // Show beautiful modal
+        setPredictionResult(data.prediction);
+        setShowPredictionModal(true);
+      } else {
+        alert('Failed to predict difficulty: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error predicting difficulty:', error);
+      alert('Failed to predict difficulty. Please ensure the ML model is trained.');
+    } finally {
+      setPredictingDifficulty(false);
+    }
   };
 
   const handleAddTesters = () => {
@@ -1241,9 +1300,30 @@ const CreateContest = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Difficulty
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Difficulty
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => predictDifficulty(currentProblem.id)}
+                        disabled={predictingDifficulty}
+                        className="px-2 py-0.5 text-xs font-medium text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        title="Predict difficulty using AI"
+                      >
+                        {predictingDifficulty ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Predicting...
+                          </>
+                        ) : (
+                          <>
+                            <Settings className="w-3 h-3" />
+                            Auto Predict
+                          </>
+                        )}
+                      </button>
+                    </div>
                     <select
                       value={currentProblem.difficulty || 'Medium'}
                       onChange={(e) => handleProblemChange(currentProblem.id, 'difficulty', e.target.value)}
@@ -1815,6 +1895,114 @@ const CreateContest = () => {
           </div>
         </div>
       </div>
+
+      {/* Prediction Result Modal */}
+      {showPredictionModal && predictionResult && (
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-fadeIn">
+            {/* Header */}
+            <div className="bg-blue-900 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-800 rounded-lg flex items-center justify-center">
+                  <Settings className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">AI Prediction Result</h3>
+                  <p className="text-blue-200 text-xs">Powered by {predictionResult.model_name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPredictionModal(false)}
+                className="text-white hover:bg-blue-800 rounded-lg p-1 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Predicted Difficulty */}
+              <div className="text-center">
+                <p className="text-gray-600 text-sm mb-2">Predicted Difficulty</p>
+                <div className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-2xl ${
+                  predictionResult.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
+                  predictionResult.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-red-100 text-red-700'
+                }`}>
+                  <CheckCircle2 className="w-6 h-6" />
+                  {predictionResult.difficulty}
+                </div>
+                <div className="mt-3 flex items-center justify-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-2 h-2 rounded-full ${
+                          i < Math.round(predictionResult.confidence * 5)
+                            ? 'bg-blue-600'
+                            : 'bg-gray-200'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-gray-700 font-semibold text-sm">
+                    {(predictionResult.confidence * 100).toFixed(1)}% Confidence
+                  </span>
+                </div>
+              </div>
+
+              {/* Probability Breakdown */}
+              <div className="space-y-3">
+                <p className="text-gray-700 font-semibold text-sm">Probability Breakdown</p>
+                
+                {['Easy', 'Medium', 'Hard'].map((level) => {
+                  const probability = predictionResult.probabilities[level];
+                  const percentage = (probability * 100).toFixed(1);
+                  const color = level === 'Easy' ? 'green' : level === 'Medium' ? 'yellow' : 'red';
+                  
+                  return (
+                    <div key={level} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-gray-700">{level}</span>
+                        <span className="font-semibold text-gray-900">{percentage}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-full ${
+                            level === 'Easy' ? 'bg-green-600' :
+                            level === 'Medium' ? 'bg-yellow-600' :
+                            'bg-red-600'
+                          } transition-all duration-500 ease-out`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-blue-800">
+                  <p className="font-semibold mb-1">Difficulty has been automatically set</p>
+                  <p className="text-blue-700">You can still manually change it from the dropdown if needed.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-gray-50 px-6 py-4 flex justify-end">
+              <button
+                onClick={() => setShowPredictionModal(false)}
+                className="px-6 py-2 bg-blue-900 text-white rounded-lg font-semibold hover:bg-blue-800 transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,0 +1,48 @@
+{
+  "model_name": "Gradient Boosting",
+  "timestamp": "20260210_172934",
+  "model_path": "C:\\Users\\afrin\\OneDrive\\Desktop 1\\zeropoint\\Server\\difficulty_prediction\\trained_models\\difficulty_model_20260210_172934.pkl",
+  "metrics": {
+    "accuracy": 0.6583159359777314,
+    "precision": 0.63989784299347,
+    "recall": 0.6583159359777314,
+    "f1_score": 0.6469535655456344,
+    "confusion_matrix": [
+      [
+        313,
+        84,
+        55
+      ],
+      [
+        98,
+        94,
+        138
+      ],
+      [
+        34,
+        82,
+        539
+      ]
+    ],
+    "model_name": "Gradient Boosting"
+  },
+  "feature_names": [
+    "statement_length",
+    "statement_word_count",
+    "statement_avg_word_length",
+    "has_mathematical_notation",
+    "complexity_indicators",
+    "num_tags",
+    "has_dp",
+    "has_graph",
+    "has_greedy",
+    "has_math",
+    "has_implementation",
+    "has_data_structures",
+    "solution_length",
+    "solution_lines",
+    "num_loops",
+    "num_conditions",
+    "has_recursion"
+  ]
+}

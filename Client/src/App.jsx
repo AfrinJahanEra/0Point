@@ -19,6 +19,7 @@ import Leaderboard from './pages/Leaderboard';
 import Blog from './pages/Blog';
 import Community from './pages/Community';
 import Dashboard from './pages/Dashboard';
+import Profile from './pages/Profile';
 import CreateBlog from './pages/CreateBlog';
 import Submissions from './pages/Submissions';
 import Interview from './pages/Interview';  // Updated import
@@ -279,6 +280,12 @@ function App() {
               <NavLayout>
                 <Blog />
               </NavLayout>
+            } />
+           
+            <Route path="/profile" element={
+              <Layout>
+                <Profile />
+              </Layout>
             } />
 
             <Route path="/blog/:id" element={

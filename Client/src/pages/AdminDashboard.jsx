@@ -803,6 +803,26 @@ const AdminDashboard = () => {
                 </li>
                 <li>
                   <button
+                    onClick={() => handleTabChange('user_reports')}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
+                      activeTab === 'user_reports'
+                        ? 'bg-red-800 text-white' 
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="w-5 h-5" />
+                      <span className="font-medium">Reports</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'user_reports' ? 'bg-white/20' : 'bg-red-100 text-red-700'
+                    }`}>
+                      0
+                    </span>
+                  </button>
+                </li>
+                <li>
+                  <button
                     onClick={() => handleTabChange('blogs')}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'blogs' 
@@ -1001,11 +1021,11 @@ const AdminDashboard = () => {
                   </div>
                 )}
 
-                {(activeTab === 'users' || activeTab === 'banned_users' || activeTab === 'blogs' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions') && (
+                {(activeTab === 'users' || activeTab === 'banned_users' || activeTab === 'user_reports' || activeTab === 'blogs' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions') && (
                   <div>
                     <div className="flex justify-between items-center mb-6">
                       <h2 className="text-2xl font-bold text-gray-900 capitalize">
-                        {activeTab === 'banned_users' ? 'Banned Accounts' : activeTab}
+                        {activeTab === 'banned_users' ? 'Banned Accounts' : activeTab === 'user_reports' ? 'User Reports' : activeTab}
                       </h2>
                       <div className="flex items-center gap-4">
                         <div className="relative">
@@ -1130,6 +1150,22 @@ const AdminDashboard = () => {
                             ))}
                           </tbody>
                         </table>
+                      </div>
+                    )}
+
+                    {activeTab === 'user_reports' && (
+                      <div className="text-center py-20">
+                        <div className="inline-block p-8 bg-gray-50 rounded-2xl">
+                          <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                          <h3 className="text-2xl font-bold text-gray-700 mb-2">User Reports - Coming Soon</h3>
+                          <p className="text-gray-500 max-w-md mx-auto">
+                            Report functionality is currently under development. This feature will allow users to report inappropriate behavior and admins to review and take action.
+                          </p>
+                          <div className="mt-6 inline-flex items-center gap-2 text-sm text-blue-600">
+                            <span className="animate-pulse">●</span>
+                            Feature in development
+                          </div>
+                        </div>
                       </div>
                     )}
 

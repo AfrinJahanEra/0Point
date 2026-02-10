@@ -55,7 +55,7 @@ const Dashboard = () => {
     if (user) {
       fetchUserData();
     }
-  }, [user]);
+  }, [user, user?.name]); // Re-fetch when user or user name changes
 
   const fetchUserData = async () => {
     try {
@@ -227,8 +227,12 @@ const Dashboard = () => {
             <div className="bg-white rounded-lg shadow-sm p-5 sticky top-4">
               {/* User Avatar */}
               <div className="text-center mb-5">
-                <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold">
-                  {user?.name?.charAt(0)?.toUpperCase()}
+                <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
+                  {userProfile?.profile_photo ? (
+                    <img src={userProfile.profile_photo} alt={user?.name} className="w-full h-full object-cover" />
+                  ) : (
+                    user?.name?.charAt(0)?.toUpperCase()
+                  )}
                 </div>
                 <h2 className="text-xl font-bold text-gray-900">{user?.name}</h2>
                 {userProfile?.department && (
@@ -256,6 +260,10 @@ const Dashboard = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-xs">Contests</span>
                   <span className="text-lg font-bold text-orange-600">{userProfile?.contests_count || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-xs">Total Submissions</span>
+                  <span className="text-lg font-bold text-indigo-600">{userProfile?.total_submissions || 0}</span>
                 </div>
               </div>
 

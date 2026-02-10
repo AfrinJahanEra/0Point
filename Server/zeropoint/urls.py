@@ -23,6 +23,7 @@ urlpatterns = [
     path("", include("crossPlatform.urls")),
     path("blog/", include("blog.urls")),
     path("", include("Chatapp.urls")),
+    path('api/difficulty-prediction/', include('difficulty_prediction.urls')),
 ]
 
 # Serve media files during development
