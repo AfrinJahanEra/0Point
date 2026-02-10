@@ -22,12 +22,13 @@ import api from '../utils/api';
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState({
-    users: 0,
-    banned_users: 0,
-    blogs: 0,
-    contests: 0,
-    problems: 0,
-    submissions: 0
+    users: { total: 0, admins: 0, banned: 0, new_this_week: 0, new_today: 0 },
+    blogs: { published: 0, drafts: 0, comments: 0, votes: 0, new_this_week: 0 },
+    contests: { total: 0, live: 0, upcoming: 0, test_contests: 0, virtual_contests: 0 },
+    problems: { total: 0 },
+    submissions: { total: 0, accepted: 0, acceptance_rate: 0, test_submissions: 0, virtual_submissions: 0, code_executions: 0, this_week: 0, today: 0 },
+    announcements: 0,
+    tutorials: 0
   });
   const [users, setUsers] = useState([]);
   const [bannedUsers, setBannedUsers] = useState([]);
@@ -40,6 +41,8 @@ const AdminDashboard = () => {
   const [showBanModal, setShowBanModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [banReason, setBanReason] = useState('Violation of terms of service');
+  const [expandedBlogIds, setExpandedBlogIds] = useState([]);
+  const [expandedSubmissionIds, setExpandedSubmissionIds] = useState([]);
   const navigate = useNavigate();
 
   // Check if user is admin
@@ -112,7 +115,9 @@ const AdminDashboard = () => {
   const loadSubmissions = async () => {
     try {
       const response = await api.get('/admin-panel/submissions/');
-      setSubmissions(response.data);
+      // Handle both old format (array) and new format (object with submissions array)
+      const submissionsData = Array.isArray(response.data) ? response.data : response.data.submissions;
+      setSubmissions(submissionsData || []);
     } catch (error) {
       console.error('Error loading submissions:', error);
     }
@@ -162,8 +167,11 @@ const AdminDashboard = () => {
       setUsers(users.filter(user => user.id !== selectedUser.id));
       setStats(prev => ({
         ...prev,
-        users: prev.users - 1,
-        banned_users: prev.banned_users + 1
+        users: {
+          ...prev.users,
+          total: prev.users.total - 1,
+          banned: prev.users.banned + 1
+        }
       }));
       alert('User permanently banned and blocked from registration');
       setShowBanModal(false);
@@ -233,12 +241,12 @@ const AdminDashboard = () => {
 
   const filteredBlogs = blogs.filter(blog => 
     blog.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    blog.author.toLowerCase().includes(searchTerm.toLowerCase())
+    (typeof blog.author === 'string' ? blog.author : blog.author?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredContests = contests.filter(contest => 
     contest.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contest.created_by.toLowerCase().includes(searchTerm.toLowerCase())
+    (typeof contest.created_by === 'string' ? contest.created_by : contest.created_by?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredProblems = problems.filter(problem => 
@@ -246,9 +254,21 @@ const AdminDashboard = () => {
   );
 
   const filteredSubmissions = submissions.filter(submission => 
-    submission.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    submission.problem.toLowerCase().includes(searchTerm.toLowerCase())
+    (typeof submission.user === 'string' ? submission.user : submission.user?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (submission.problem_title || submission.problem || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const toggleBlogExpand = (blogId) => {
+    setExpandedBlogIds(prev => 
+      prev.includes(blogId) ? prev.filter(id => id !== blogId) : [...prev, blogId]
+    );
+  };
+
+  const toggleSubmissionExpand = (submissionId) => {
+    setExpandedSubmissionIds(prev => 
+      prev.includes(submissionId) ? prev.filter(id => id !== submissionId) : [...prev, submissionId]
+    );
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -305,7 +325,7 @@ const AdminDashboard = () => {
                     }`}
                   >
                     <Users className="w-5 h-5" />
-                    Users ({stats.users})
+                    Users ({stats.users.total})
                   </button>
                 </li>
                 <li>
@@ -318,7 +338,7 @@ const AdminDashboard = () => {
                     }`}
                   >
                     <ShieldOff className="w-5 h-5" />
-                    Banned Accounts ({stats.banned_users})
+                    Banned Accounts ({stats.users.banned})
                   </button>
                 </li>
                 <li>
@@ -331,7 +351,7 @@ const AdminDashboard = () => {
                     }`}
                   >
                     <FileText className="w-5 h-5" />
-                    Blogs ({stats.blogs})
+                    Blogs ({stats.blogs.published})
                   </button>
                 </li>
                 <li>
@@ -344,7 +364,7 @@ const AdminDashboard = () => {
                     }`}
                   >
                     <Trophy className="w-5 h-5" />
-                    Contests ({stats.contests})
+                    Contests ({stats.contests.total})
                   </button>
                 </li>
                 <li>
@@ -357,7 +377,7 @@ const AdminDashboard = () => {
                     }`}
                   >
                     <Code className="w-5 h-5" />
-                    Problems ({stats.problems})
+                    Problems ({stats.problems.total})
                   </button>
                 </li>
                 <li>
@@ -370,7 +390,7 @@ const AdminDashboard = () => {
                     }`}
                   >
                     <FileCode className="w-5 h-5" />
-                    Submissions ({stats.submissions})
+                    Submissions ({stats.submissions.total})
                   </button>
                 </li>
               </ul>
@@ -399,8 +419,9 @@ const AdminDashboard = () => {
                         <div className="flex items-center">
                           <Users className="w-8 h-8 text-blue-600 mr-3" />
                           <div>
-                            <p className="text-2xl font-bold text-blue-900">{stats.users}</p>
+                            <p className="text-2xl font-bold text-blue-900">{stats.users.total}</p>
                             <p className="text-blue-700">Active Users</p>
+                            <p className="text-xs text-blue-600 mt-1">+{stats.users.new_today} today</p>
                           </div>
                         </div>
                       </div>
@@ -409,8 +430,9 @@ const AdminDashboard = () => {
                         <div className="flex items-center">
                           <ShieldOff className="w-8 h-8 text-red-600 mr-3" />
                           <div>
-                            <p className="text-2xl font-bold text-red-900">{stats.banned_users}</p>
+                            <p className="text-2xl font-bold text-red-900">{stats.users.banned}</p>
                             <p className="text-red-700">Banned Users</p>
+                            <p className="text-xs text-red-600 mt-1">{stats.users.admins} admins</p>
                           </div>
                         </div>
                       </div>
@@ -419,8 +441,9 @@ const AdminDashboard = () => {
                         <div className="flex items-center">
                           <FileText className="w-8 h-8 text-green-600 mr-3" />
                           <div>
-                            <p className="text-2xl font-bold text-green-900">{stats.blogs}</p>
-                            <p className="text-green-700">Total Blogs</p>
+                            <p className="text-2xl font-bold text-green-900">{stats.blogs.published}</p>
+                            <p className="text-green-700">Published Blogs</p>
+                            <p className="text-xs text-green-600 mt-1">{stats.blogs.comments} comments</p>
                           </div>
                         </div>
                       </div>
@@ -429,8 +452,9 @@ const AdminDashboard = () => {
                         <div className="flex items-center">
                           <Trophy className="w-8 h-8 text-purple-600 mr-3" />
                           <div>
-                            <p className="text-2xl font-bold text-purple-900">{stats.contests}</p>
+                            <p className="text-2xl font-bold text-purple-900">{stats.contests.total}</p>
                             <p className="text-purple-700">Total Contests</p>
+                            <p className="text-xs text-purple-600 mt-1">{stats.contests.live} live now</p>
                           </div>
                         </div>
                       </div>
@@ -439,7 +463,7 @@ const AdminDashboard = () => {
                         <div className="flex items-center">
                           <Code className="w-8 h-8 text-amber-600 mr-3" />
                           <div>
-                            <p className="text-2xl font-bold text-amber-900">{stats.problems}</p>
+                            <p className="text-2xl font-bold text-amber-900">{stats.problems.total}</p>
                             <p className="text-amber-700">Total Problems</p>
                           </div>
                         </div>
@@ -449,8 +473,9 @@ const AdminDashboard = () => {
                         <div className="flex items-center">
                           <FileCode className="w-8 h-8 text-cyan-600 mr-3" />
                           <div>
-                            <p className="text-2xl font-bold text-cyan-900">{stats.submissions}</p>
+                            <p className="text-2xl font-bold text-cyan-900">{stats.submissions.total}</p>
                             <p className="text-cyan-700">Total Submissions</p>
+                            <p className="text-xs text-cyan-600 mt-1">{stats.submissions.acceptance_rate}% AC</p>
                           </div>
                         </div>
                       </div>
@@ -597,6 +622,7 @@ const AdminDashboard = () => {
                             <tr>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stats</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -604,31 +630,98 @@ const AdminDashboard = () => {
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {filteredBlogs.map((blog) => (
-                              <tr key={blog.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{blog.title}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{blog.author}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                    blog.is_published 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : 'bg-yellow-100 text-yellow-800'
-                                  }`}>
-                                    {blog.is_published ? 'Published' : 'Draft'}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  {new Date(blog.created_at).toLocaleDateString()}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                  <button
-                                    onClick={() => handleDeleteBlog(blog.id)}
-                                    className="text-red-600 hover:text-red-900 flex items-center gap-1"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                  </button>
-                                </td>
-                              </tr>
+                              <React.Fragment key={blog.id}>
+                                <tr className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => toggleBlogExpand(blog.id)}
+                                        className="text-blue-600 hover:text-blue-800"
+                                      >
+                                        {expandedBlogIds.includes(blog.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                      </button>
+                                      <span>{blog.title}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <div>
+                                      <div className="font-medium">
+                                        {typeof blog.author === 'string' ? blog.author : blog.author?.name || 'Unknown'}
+                                      </div>
+                                      {blog.author?.email && (
+                                        <div className="text-xs text-gray-400">{blog.author.email}</div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <div className="flex flex-col gap-1">
+                                      {blog.comment_count !== undefined && (
+                                        <span className="text-xs bg-blue-100 px-2 py-1 rounded">{blog.comment_count} comments</span>
+                                      )}
+                                      {blog.upvotes !== undefined && (
+                                        <span className="text-xs bg-green-100 px-2 py-1 rounded">{blog.upvotes} upvotes</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                      blog.is_published 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                      {blog.is_published ? 'Published' : 'Draft'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {new Date(blog.created_at).toLocaleDateString()}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button
+                                      onClick={() => handleDeleteBlog(blog.id)}
+                                      className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Delete
+                                    </button>
+                                  </td>
+                                </tr>
+                                {expandedBlogIds.includes(blog.id) && (
+                                  <tr>
+                                    <td colSpan="6" className="px-6 py-4 bg-gray-50">
+                                      <div className="space-y-3">
+                                        <div>
+                                          <h4 className="font-semibold text-sm text-gray-700 mb-2">Content:</h4>
+                                          <div className="p-3 bg-white rounded border text-sm text-gray-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
+                                            {blog.full_content || blog.content_preview || 'No content available'}
+                                          </div>
+                                        </div>
+                                        {blog.tags && blog.tags.length > 0 && (
+                                          <div>
+                                            <h4 className="font-semibold text-sm text-gray-700 mb-2">Tags:</h4>
+                                            <div className="flex flex-wrap gap-2">
+                                              {blog.tags.map((tag, idx) => (
+                                                <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">{tag}</span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        {blog.co_authors && blog.co_authors.length > 0 && (
+                                          <div>
+                                            <h4 className="font-semibold text-sm text-gray-700 mb-2">Co-Authors:</h4>
+                                            <div className="flex flex-wrap gap-2">
+                                              {blog.co_authors.map((coAuthor, idx) => (
+                                                <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                                                  {coAuthor.name} ({coAuthor.email})
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
                             ))}
                           </tbody>
                         </table>
@@ -652,7 +745,9 @@ const AdminDashboard = () => {
                               <tr key={contest.id}>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{contest.title}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contest.type}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contest.created_by}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {typeof contest.created_by === 'string' ? contest.created_by : contest.created_by?.name || 'Unknown'}
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                     contest.status === 'upcoming' 
@@ -742,34 +837,113 @@ const AdminDashboard = () => {
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {filteredSubmissions.map((submission) => (
-                              <tr key={submission.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{submission.user}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{submission.problem}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{submission.language}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                    submission.status === 'AC' 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : submission.status === 'WA' 
-                                        ? 'bg-red-100 text-red-800' 
-                                        : 'bg-yellow-100 text-yellow-800'
-                                  }`}>
-                                    {submission.status}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  {new Date(submission.submitted_at).toLocaleString()}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                  <button
-                                    onClick={() => handleDeleteSubmission(submission.id)}
-                                    className="text-red-600 hover:text-red-900 flex items-center gap-1"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                  </button>
-                                </td>
-                              </tr>
+                              <React.Fragment key={submission.id}>
+                                <tr className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => toggleSubmissionExpand(submission.id)}
+                                        className="text-blue-600 hover:text-blue-800"
+                                      >
+                                        {expandedSubmissionIds.includes(submission.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                      </button>
+                                      <div>
+                                        <div>{typeof submission.user === 'string' ? submission.user : submission.user?.name || 'Unknown'}</div>
+                                        {submission.user?.email && (
+                                          <div className="text-xs text-gray-400">{submission.user.email}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-gray-500">
+                                    <div>
+                                      <div className="font-medium">{submission.problem_title || submission.problem || 'Unknown'}</div>
+                                      {submission.problem_index && (
+                                        <div className="text-xs text-gray-400">Problem {submission.problem_index}</div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">{submission.language}</span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                      (submission.verdict || submission.status) === 'AC' 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : (submission.verdict || submission.status) === 'WA' 
+                                          ? 'bg-red-100 text-red-800' 
+                                          : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                      {submission.verdict || submission.status}
+                                    </span>
+                                    {submission.passed_test_cases !== undefined && submission.total_test_cases !== undefined && (
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        {submission.passed_test_cases}/{submission.total_test_cases} tests
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {new Date(submission.submitted_at).toLocaleString()}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button
+                                      onClick={() => handleDeleteSubmission(submission.id)}
+                                      className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Delete
+                                    </button>
+                                  </td>
+                                </tr>
+                                {expandedSubmissionIds.includes(submission.id) && (
+                                  <tr>
+                                    <td colSpan="6" className="px-6 py-4 bg-gray-50">
+                                      <div className="space-y-3">
+                                        <div>
+                                          <h4 className="font-semibold text-sm text-gray-700 mb-2">Code:</h4>
+                                          <pre className="p-3 bg-gray-900 text-green-400 rounded text-xs overflow-x-auto max-h-96">
+                                            <code>{submission.full_code || submission.code_preview || submission.code || 'No code available'}</code>
+                                          </pre>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                          {submission.execution_time !== undefined && (
+                                            <div>
+                                              <h4 className="font-semibold text-sm text-gray-700 mb-1">Execution Time:</h4>
+                                              <span className="text-sm">{submission.execution_time} ms</span>
+                                            </div>
+                                          )}
+                                          {submission.memory !== undefined && (
+                                            <div>
+                                              <h4 className="font-semibold text-sm text-gray-700 mb-1">Memory:</h4>
+                                              <span className="text-sm">{submission.memory} KB</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                        {submission.error_message && (
+                                          <div>
+                                            <h4 className="font-semibold text-sm text-red-700 mb-2">Error Message:</h4>
+                                            <pre className="p-3 bg-red-50 text-red-800 rounded text-xs overflow-x-auto">{submission.error_message}</pre>
+                                          </div>
+                                        )}
+                                        {submission.compile_output && (
+                                          <div>
+                                            <h4 className="font-semibold text-sm text-gray-700 mb-2">Compile Output:</h4>
+                                            <pre className="p-3 bg-yellow-50 text-yellow-800 rounded text-xs overflow-x-auto">{submission.compile_output}</pre>
+                                          </div>
+                                        )}
+                                        {submission.contest && (
+                                          <div>
+                                            <h4 className="font-semibold text-sm text-gray-700 mb-2">Contest:</h4>
+                                            <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+                                              {submission.contest.title || 'Unknown'}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
                             ))}
                           </tbody>
                         </table>

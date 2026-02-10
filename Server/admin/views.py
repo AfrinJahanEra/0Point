@@ -4,14 +4,19 @@ from rest_framework import status
 from django.conf import settings
 import jwt
 import hashlib
-from datetime import datetime  # Add this import
+from datetime import datetime, timedelta
 
 from .secret import ADMIN_SECRET_PASSWORD
 from account.models import Account, BannedAccount, IPAddress, DeviceFingerprint
 from contest.models import Contest
-from blog.models import Blog
+from blog.models import Blog, BlogComment, BlogVote, BlogCommentVote
 from problem.models import Problem
 from submission.models import Submission
+from announcement.models import Announcement
+from testcontest.models import TestContest, TestContestSubmission
+from virtual.models import VirtualContest, VirtualContestSubmission
+from tutorial.models import Tutorial
+from compiler.models import CodeSubmission
 
 
 class AdminLoginView(APIView):
@@ -54,22 +59,87 @@ class AdminLoginView(APIView):
 
 class AdminDashboardView(APIView):
     def get(self, request):
-        # Get counts for dashboard
+        # Get comprehensive counts for dashboard
         user_count = Account.objects(is_deleted=False).count()
+        admin_count = Account.objects(is_deleted=False, role='admin').count()
         banned_count = BannedAccount.objects.count()
+        
+        # Blog stats
         blog_count = Blog.objects(is_draft=False).count()
+        draft_blog_count = Blog.objects(is_draft=True).count()
+        blog_comment_count = BlogComment.objects(is_deleted=False).count()
+        blog_vote_count = BlogVote.objects.count()
+        
+        # Contest stats
         contest_count = Contest.objects.count()
+        live_contest_count = Contest.objects(status='live').count()
+        upcoming_contest_count = Contest.objects(status='upcoming').count()
+        test_contest_count = TestContest.objects.count()
+        virtual_contest_count = VirtualContest.objects.count()
+        
+        # Problem stats
         problem_count = Problem.objects.count()
+        
+        # Submission stats
         submission_count = Submission.objects.count()
+        ac_submission_count = Submission.objects(verdict='AC').count()
+        test_submission_count = TestContestSubmission.objects.count()
+        virtual_submission_count = VirtualContestSubmission.objects.count()
+        code_execution_count = CodeSubmission.objects.count()
+        
+        # Announcement and Tutorial stats
+        announcement_count = Announcement.objects.count()
+        tutorial_count = Tutorial.objects.count()
+        
+        # Recent activity stats (last 7 days)
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        new_users_week = Account.objects(is_deleted=False, created_at__gte=week_ago).count()
+        new_blogs_week = Blog.objects(created_at__gte=week_ago).count()
+        submissions_week = Submission.objects(submitted_at__gte=week_ago).count()
+        
+        # Activity trends (last 24 hours)
+        day_ago = datetime.utcnow() - timedelta(days=1)
+        submissions_today = Submission.objects(submitted_at__gte=day_ago).count()
+        new_users_today = Account.objects(is_deleted=False, created_at__gte=day_ago).count()
         
         return Response({
             "stats": {
-                "users": user_count,
-                "banned_users": banned_count,
-                "blogs": blog_count,
-                "contests": contest_count,
-                "problems": problem_count,
-                "submissions": submission_count
+                "users": {
+                    "total": user_count,
+                    "admins": admin_count,
+                    "banned": banned_count,
+                    "new_this_week": new_users_week,
+                    "new_today": new_users_today
+                },
+                "blogs": {
+                    "published": blog_count,
+                    "drafts": draft_blog_count,
+                    "comments": blog_comment_count,
+                    "votes": blog_vote_count,
+                    "new_this_week": new_blogs_week
+                },
+                "contests": {
+                    "total": contest_count,
+                    "live": live_contest_count,
+                    "upcoming": upcoming_contest_count,
+                    "test_contests": test_contest_count,
+                    "virtual_contests": virtual_contest_count
+                },
+                "problems": {
+                    "total": problem_count
+                },
+                "submissions": {
+                    "total": submission_count,
+                    "accepted": ac_submission_count,
+                    "acceptance_rate": round((ac_submission_count / submission_count * 100) if submission_count > 0 else 0, 2),
+                    "test_submissions": test_submission_count,
+                    "virtual_submissions": virtual_submission_count,
+                    "code_executions": code_execution_count,
+                    "this_week": submissions_week,
+                    "today": submissions_today
+                },
+                "announcements": announcement_count,
+                "tutorials": tutorial_count
             }
         })
 
@@ -235,19 +305,66 @@ class AdminBannedAccountsView(APIView):
 
 class AdminBlogsView(APIView):
     def get(self, request):
-        blogs = Blog.objects(is_draft=False).order_by("-created_at")
-        blog_data = []
+        # Get query params for filtering
+        status_filter = request.GET.get('status', 'all')  # all, published, draft
+        search = request.GET.get('search', '')
         
+        # Build query
+        query = {}
+        if status_filter == 'published':
+            query['is_draft'] = False
+            query['is_published'] = True
+        elif status_filter == 'draft':
+            query['is_draft'] = True
+        
+        # Apply search if provided
+        if search:
+            from mongoengine.queryset.visitor import Q
+            blogs = Blog.objects(Q(**query) & (Q(title__icontains=search) | Q(tags__icontains=search))).order_by("-created_at")
+        else:
+            blogs = Blog.objects(**query).order_by("-created_at")
+        
+        blog_data = []
         for blog in blogs:
             author = blog.author if blog.author else None
+            
+            # Get comment count
+            comment_count = BlogComment.objects(blog=blog, is_deleted=False).count()
+            
+            # Get vote counts
+            upvote_count = BlogVote.objects(blog=blog, vote_type='upvote').count()
+            downvote_count = BlogVote.objects(blog=blog, vote_type='downvote').count()
+            
             blog_data.append({
                 "id": str(blog.id),
                 "title": blog.title,
-                "author": author.name if author else "Unknown",
-                "author_email": author.email if author else "Unknown",
+                "content_preview": blog.content[:200] + "..." if len(blog.content) > 200 else blog.content,
+                "full_content": blog.content,
+                "tags": blog.tags,
+                "author": {
+                    "id": str(author.id) if author else None,
+                    "name": author.name if author else "Unknown",
+                    "email": author.email if author else "Unknown",
+                    "role": author.role if author else "Unknown",
+                    "rating": getattr(author, 'rating', 0) if author else 0,
+                    "badge": getattr(author, 'badge', 'none') if author else 'none'
+                },
+                "co_authors": [
+                    {
+                        "id": str(co_author.id),
+                        "name": co_author.name,
+                        "email": co_author.email
+                    } for co_author in (blog.co_authors or [])
+                ],
                 "created_at": blog.created_at,
+                "updated_at": blog.updated_at,
+                "published_at": blog.published_at,
                 "is_published": blog.is_published,
-                "is_draft": blog.is_draft
+                "is_draft": blog.is_draft,
+                "comment_count": comment_count,
+                "upvotes": upvote_count,
+                "downvotes": downvote_count,
+                "score": upvote_count - downvote_count
             })
         
         return Response(blog_data)
@@ -255,29 +372,90 @@ class AdminBlogsView(APIView):
     def delete(self, request, blog_id):
         try:
             blog = Blog.objects.get(id=blog_id)
-            blog.is_draft = True
-            blog.is_published = False
-            blog.save()
-            return Response({"message": "Blog deleted successfully"})
+            # Option to permanently delete or just unpublish
+            permanent = request.data.get('permanent', False)
+            
+            if permanent:
+                # Delete all comments
+                BlogComment.objects(blog=blog).delete()
+                # Delete all votes
+                BlogVote.objects(blog=blog).delete()
+                # Delete blog
+                blog.delete()
+                return Response({"message": "Blog permanently deleted with all comments and votes"})
+            else:
+                # Just unpublish
+                blog.is_draft = True
+                blog.is_published = False
+                blog.save()
+                return Response({"message": "Blog unpublished successfully"})
         except Blog.DoesNotExist:
             return Response({"error": "Blog not found"}, status=404)
 
 
 class AdminContestsView(APIView):
     def get(self, request):
-        contests = Contest.objects.order_by("-start_time")
+        # Get query params for filtering
+        status_filter = request.GET.get('status', 'all')
+        search = request.GET.get('search', '')
+        
+        # Build query
+        query = {}
+        if status_filter != 'all':
+            query['status'] = status_filter
+        
+        # Apply search
+        if search:
+            from mongoengine.queryset.visitor import Q
+            contests = Contest.objects(Q(**query) & Q(title__icontains=search)).order_by("-start_time")
+        else:
+            contests = Contest.objects(**query).order_by("-start_time")
+        
         contest_data = []
         
         for contest in contests:
             creator = contest.created_by if contest.created_by else None
+            
+            # Get registration count
+            from contest.models import ContestRegistration
+            registration_count = ContestRegistration.objects(contest=contest).count()
+            
+            # Get submission count
+            submission_count = Submission.objects(contest=contest).count()
+            
+            # Get announcement count
+            announcement_count = Announcement.objects(contest=contest).count()
+            
+            # Get problem count
+            problem_count = len(contest.problems) if contest.problems else 0
+            
             contest_data.append({
                 "id": str(contest.id),
                 "title": contest.title,
+                "description": contest.description,
                 "type": contest.type,
-                "created_by": creator.name if creator else "Unknown",
+                "platform": contest.platform,
+                "status": contest.status,
+                "visibility": contest.visibility,
+                "created_by": {
+                    "id": str(creator.id) if creator else None,
+                    "name": creator.name if creator else "Unknown",
+                    "email": creator.email if creator else "Unknown"
+                },
                 "start_time": contest.start_time,
                 "duration": contest.duration,
-                "status": contest.status
+                "test_start_time": contest.test_start_time,
+                "registration_required": contest.registration_required,
+                "registration_count": registration_count,
+                "submission_count": submission_count,
+                "announcement_count": announcement_count,
+                "problem_count": problem_count,
+                "testers": contest.testers,
+                "editorial_published": contest.editorial_published,
+                "require_screen_recording": contest.require_screen_recording,
+                "leaderboard_public": contest.leaderboard_public,
+                "allow_practice": contest.allow_practice,
+                "rating_changes": contest.rating_changes
             })
         
         return Response(contest_data)
@@ -322,28 +500,363 @@ class AdminProblemsView(APIView):
 
 class AdminSubmissionsView(APIView):
     def get(self, request):
-        submissions = Submission.objects.order_by("-submitted_at")
+        # Get query params for filtering
+        verdict_filter = request.GET.get('verdict', 'all')  # all, AC, WA, TLE, etc.
+        language_filter = request.GET.get('language', 'all')
+        search_user = request.GET.get('user', '')
+        limit = int(request.GET.get('limit', 100))
+        
+        # Build query
+        query = {}
+        if verdict_filter != 'all':
+            query['verdict'] = verdict_filter
+        if language_filter != 'all':
+            query['language'] = language_filter
+        
+        # Apply user search
+        if search_user:
+            from mongoengine.queryset.visitor import Q
+            users = Account.objects(Q(name__icontains=search_user) | Q(email__icontains=search_user))
+            user_ids = [user.id for user in users]
+            if user_ids:
+                query['user__in'] = user_ids
+        
+        submissions = Submission.objects(**query).order_by("-submitted_at")[:limit]
         submission_data = []
         
         for submission in submissions:
             user = submission.user if submission.user else None
+            contest = submission.contest if submission.contest else None
             
             submission_data.append({
                 "id": str(submission.id),
-                "user": user.name if user else "Unknown",
-                "problem": submission.problem_title if submission.problem_title else "Unknown",
+                "user": {
+                    "id": str(user.id) if user else None,
+                    "name": user.name if user else "Unknown",
+                    "email": user.email if user else "Unknown",
+                    "rating": getattr(user, 'rating', 0) if user else 0,
+                    "badge": getattr(user, 'badge', 'none') if user else 'none'
+                },
+                "contest": {
+                    "id": str(contest.id) if contest else None,
+                    "title": contest.title if contest else "Unknown",
+                    "type": contest.type if contest else None
+                },
+                "problem_index": submission.problem_index,
+                "problem_code": submission.problem_code,
+                "problem_title": submission.problem_title if submission.problem_title else "Unknown",
                 "language": submission.language,
-                "status": submission.verdict,
-                "submitted_at": submission.submitted_at
+                "verdict": submission.verdict,
+                "execution_time": submission.execution_time,
+                "memory": submission.memory,
+                "passed_test_cases": submission.passed_test_cases,
+                "total_test_cases": submission.total_test_cases,
+                "failed_test_case": submission.failed_test_case,
+                "code_preview": submission.code[:150] + "..." if len(submission.code) > 150 else submission.code,
+                "full_code": submission.code,
+                "error_message": submission.error_message,
+                "compile_output": submission.compile_output,
+                "submitted_at": submission.submitted_at,
+                "judged_at": submission.judged_at,
+                "contest_time": submission.contest_time
             })
         
-        return Response(submission_data)
+        return Response({
+            "submissions": submission_data,
+            "total": Submission.objects(**query).count(),
+            "showing": len(submission_data)
+        })
     
     def delete(self, request, submission_id):
         try:
             submission = Submission.objects.get(id=submission_id)
-            submission.verdict = "DELETED"
-            submission.save()
-            return Response({"message": "Submission deleted successfully"})
+            permanent = request.data.get('permanent', False)
+            
+            if permanent:
+                submission.delete()
+                return Response({"message": "Submission permanently deleted"})
+            else:
+                submission.verdict = "DELETED"
+                submission.save()
+                return Response({"message": "Submission marked as deleted"})
         except Submission.DoesNotExist:
             return Response({"error": "Submission not found"}, status=404)
+
+
+class AdminAnnouncementsView(APIView):
+    """Admin view for managing all announcements"""
+    def get(self, request):
+        # Get query params
+        contest_id = request.GET.get('contest_id', '')
+        is_important = request.GET.get('important', '')
+        
+        # Build query
+        query = {}
+        if contest_id:
+            try:
+                contest = Contest.objects.get(id=contest_id)
+                query['contest'] = contest
+            except Contest.DoesNotExist:
+                pass
+        
+        if is_important == 'true':
+            query['is_important'] = True
+        
+        announcements = Announcement.objects(**query).order_by("-created_at")
+        announcement_data = []
+        
+        for announcement in announcements:
+            contest = announcement.contest if announcement.contest else None
+            author = announcement.author if announcement.author else None
+            
+            announcement_data.append({
+                "id": str(announcement.id),
+                "contest": {
+                    "id": str(contest.id) if contest else None,
+                    "title": contest.title if contest else "Unknown",
+                    "type": contest.type if contest else None
+                },
+                "author": {
+                    "id": str(author.id) if author else None,
+                    "name": author.name if author else "Unknown",
+                    "email": author.email if author else "Unknown"
+                },
+                "text": announcement.text,
+                "problem_index": announcement.problem_index,
+                "is_important": announcement.is_important,
+                "is_pinned": announcement.is_pinned,
+                "type": announcement.type,
+                "created_at": announcement.created_at,
+                "updated_at": announcement.updated_at if hasattr(announcement, 'updated_at') else None
+            })
+        
+        return Response(announcement_data)
+    
+    def delete(self, request, announcement_id):
+        try:
+            announcement = Announcement.objects.get(id=announcement_id)
+            announcement.delete()
+            return Response({"message": "Announcement deleted successfully"})
+        except Announcement.DoesNotExist:
+            return Response({"error": "Announcement not found"}, status=404)
+
+
+class AdminTutorialsView(APIView):
+    """Admin view for managing all tutorials"""
+    def get(self, request):
+        contest_id = request.GET.get('contest_id', '')
+        
+        # Build query
+        query = {}
+        if contest_id:
+            try:
+                contest = Contest.objects.get(id=contest_id)
+                query['contest'] = contest
+            except Contest.DoesNotExist:
+                pass
+        
+        tutorials = Tutorial.objects(**query).order_by("-created_at")
+        tutorial_data = []
+        
+        for tutorial in tutorials:
+            contest = tutorial.contest if tutorial.contest else None
+            creator = tutorial.created_by if tutorial.created_by else None
+            
+            tutorial_data.append({
+                "id": str(tutorial.id),
+                "contest": {
+                    "id": str(contest.id) if contest else None,
+                    "title": contest.title if contest else "Unknown"
+                },
+                "problem_index": tutorial.problem_index,
+                "content_preview": tutorial.content[:200] + "..." if len(tutorial.content) > 200 else tutorial.content,
+                "full_content": tutorial.content,
+                "created_by": {
+                    "id": str(creator.id) if creator else None,
+                    "name": creator.name if creator else "Unknown",
+                    "email": creator.email if creator else "Unknown"
+                },
+                "created_at": tutorial.created_at,
+                "updated_at": tutorial.updated_at,
+                "version": tutorial.version
+            })
+        
+        return Response(tutorial_data)
+    
+    def delete(self, request, tutorial_id):
+        try:
+            tutorial = Tutorial.objects.get(id=tutorial_id)
+            tutorial.delete()
+            return Response({"message": "Tutorial deleted successfully"})
+        except Tutorial.DoesNotExist:
+            return Response({"error": "Tutorial not found"}, status=404)
+
+
+class AdminTestContestsView(APIView):
+    """Admin view for managing test contests"""
+    def get(self, request):
+        test_contests = TestContest.objects.order_by("-created_at")
+        test_contest_data = []
+        
+        for tc in test_contests:
+            original_contest = tc.original_contest if tc.original_contest else None
+            creator = tc.created_by if tc.created_by else None
+            
+            # Get submission count
+            tc_submission_count = TestContestSubmission.objects(test_contest=tc).count()
+            
+            test_contest_data.append({
+                "id": str(tc.id),
+                "title": tc.title,
+                "original_contest": {
+                    "id": str(original_contest.id) if original_contest else None,
+                    "title": original_contest.title if original_contest else "Unknown"
+                },
+                "status": tc.status,
+                "test_start_time": tc.test_start_time,
+                "duration": tc.duration,
+                "testers": tc.testers,
+                "tester_count": len(tc.testers) if tc.testers else 0,
+                "submission_count": tc_submission_count,
+                "problem_count": len(tc.problems) if tc.problems else 0,
+                "created_by": {
+                    "id": str(creator.id) if creator else None,
+                    "name": creator.name if creator else "Unknown"
+                },
+                "created_at": tc.created_at
+            })
+        
+        return Response(test_contest_data)
+    
+    def delete(self, request, test_contest_id):
+        try:
+            test_contest = TestContest.objects.get(id=test_contest_id)
+            # Delete all submissions
+            TestContestSubmission.objects(test_contest=test_contest).delete()
+            # Delete test contest
+            test_contest.delete()
+            return Response({"message": "Test contest and all submissions deleted successfully"})
+        except TestContest.DoesNotExist:
+            return Response({"error": "Test contest not found"}, status=404)
+
+
+class AdminVirtualContestsView(APIView):
+    """Admin view for managing virtual contests"""
+    def get(self, request):
+        virtual_contests = VirtualContest.objects.order_by("-virtual_start_time")
+        virtual_contest_data = []
+        
+        for vc in virtual_contests:
+            original_contest = vc.contest if vc.contest else None
+            user = vc.user if vc.user else None
+            
+            # Get submission count
+            vc_submission_count = VirtualContestSubmission.objects(virtual_contest=vc).count()
+            
+            virtual_contest_data.append({
+                "id": str(vc.id),
+                "user": {
+                    "id": str(user.id) if user else None,
+                    "name": user.name if user else "Unknown",
+                    "email": user.email if user else "Unknown"
+                },
+                "contest": {
+                    "id": str(original_contest.id) if original_contest else None,
+                    "title": original_contest.title if original_contest else "Unknown"
+                },
+                "virtual_start_time": vc.virtual_start_time,
+                "virtual_end_time": vc.virtual_end_time,
+                "status": vc.status,
+                "submission_count": vc_submission_count,
+                "completed_at": vc.completed_at if hasattr(vc, 'completed_at') else None
+            })
+        
+        return Response(virtual_contest_data)
+    
+    def delete(self, request, virtual_contest_id):
+        try:
+            virtual_contest = VirtualContest.objects.get(id=virtual_contest_id)
+            # Delete all submissions
+            VirtualContestSubmission.objects(virtual_contest=virtual_contest).delete()
+            # Delete virtual contest
+            virtual_contest.delete()
+            return Response({"message": "Virtual contest and all submissions deleted successfully"})
+        except VirtualContest.DoesNotExist:
+            return Response({"error": "Virtual contest not found"}, status=404)
+
+
+class AdminBlogCommentsView(APIView):
+    """Admin view for managing blog comments"""
+    def get(self, request):
+        blog_id = request.GET.get('blog_id', '')
+        include_deleted = request.GET.get('include_deleted', 'false')
+        
+        # Build query
+        query = {}
+        if blog_id:
+            try:
+                blog = Blog.objects.get(id=blog_id)
+                query['blog'] = blog
+            except Blog.DoesNotExist:
+                pass
+        
+        if include_deleted != 'true':
+            query['is_deleted'] = False
+        
+        comments = BlogComment.objects(**query).order_by("-created_at")
+        comment_data = []
+        
+        for comment in comments:
+            blog = comment.blog if comment.blog else None
+            author = comment.author if comment.author else None
+            
+            # Get vote counts
+            upvote_count = BlogCommentVote.objects(comment=comment, vote_type='upvote').count()
+            downvote_count = BlogCommentVote.objects(comment=comment, vote_type='downvote').count()
+            
+            comment_data.append({
+                "id": str(comment.id),
+                "blog": {
+                    "id": str(blog.id) if blog else None,
+                    "title": blog.title if blog else "Unknown"
+                },
+                "author": {
+                    "id": str(author.id) if author else None,
+                    "name": author.name if author else "Unknown",
+                    "email": author.email if author else "Unknown"
+                },
+                "content": comment.content,
+                "parent_comment_id": str(comment.parent_comment.id) if comment.parent_comment else None,
+                "reply_count": len(comment.replies) if comment.replies else 0,
+                "is_deleted": comment.is_deleted,
+                "created_at": comment.created_at,
+                "updated_at": comment.updated_at,
+                "upvotes": upvote_count,
+                "downvotes": downvote_count,
+                "score": upvote_count - downvote_count
+            })
+        
+        return Response(comment_data)
+    
+    def delete(self, request, comment_id):
+        try:
+            comment = BlogComment.objects.get(id=comment_id)
+            permanent = request.data.get('permanent', False)
+            
+            if permanent:
+                # Delete all votes for this comment
+                BlogCommentVote.objects(comment=comment).delete()
+                # Delete all replies
+                for reply in comment.replies:
+                    BlogCommentVote.objects(comment=reply).delete()
+                    reply.delete()
+                # Delete comment
+                comment.delete()
+                return Response({"message": "Comment permanently deleted with all votes and replies"})
+            else:
+                # Soft delete
+                comment.is_deleted = True
+                comment.save()
+                return Response({"message": "Comment marked as deleted"})
+        except BlogComment.DoesNotExist:
+            return Response({"error": "Comment not found"}, status=404)
