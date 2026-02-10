@@ -30,12 +30,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'account',
     'contest',
-    'problem',
-    'testcase',
     'submission',
     'leaderboard',
     'announcement',
-    'tutorial',
     'executor',
     'mock_interview',
     'videoconference',
@@ -50,6 +47,7 @@ INSTALLED_APPS = [
     'testcontest',
     'crossPlatform',
     'blog',
+    'chatapp',
 ]
 
 MIDDLEWARE = [
