@@ -44,6 +44,7 @@ const AdminDashboard = () => {
   const [expandedBlogIds, setExpandedBlogIds] = useState([]);
   const [expandedSubmissionIds, setExpandedSubmissionIds] = useState([]);
   const [expandedContestIds, setExpandedContestIds] = useState([]);
+  const [expandedProblemIds, setExpandedProblemIds] = useState([]);
   const navigate = useNavigate();
 
   // Check if user is admin
@@ -60,7 +61,23 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
       const response = await api.get('/admin-panel/dashboard/');
-      setStats(response.data.stats);
+      
+      // Get actual problem count from contests
+      const contestsResponse = await api.get('/admin-panel/contests/');
+      let totalProblems = 0;
+      contestsResponse.data.forEach(contest => {
+        if (contest.problems && contest.problems.length > 0) {
+          totalProblems += contest.problems.length;
+        }
+      });
+      
+      setStats({
+        ...response.data.stats,
+        problems: {
+          ...response.data.stats.problems,
+          total: totalProblems
+        }
+      });
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -106,8 +123,27 @@ const AdminDashboard = () => {
 
   const loadProblems = async () => {
     try {
-      const response = await api.get('/admin-panel/problems/');
-      setProblems(response.data);
+      // Fetch all contests to get their problems
+      const response = await api.get('/admin-panel/contests/');
+      const contests = response.data;
+      
+      // Aggregate all problems from all contests
+      const allProblems = [];
+      contests.forEach(contest => {
+        if (contest.problems && contest.problems.length > 0) {
+          contest.problems.forEach(problem => {
+            allProblems.push({
+              ...problem,
+              contest_id: contest.id,
+              contest_title: contest.title,
+              contest_type: contest.type,
+              contest_status: contest.status
+            });
+          });
+        }
+      });
+      
+      setProblems(allProblems);
     } catch (error) {
       console.error('Error loading problems:', error);
     }
@@ -251,7 +287,9 @@ const AdminDashboard = () => {
   );
 
   const filteredProblems = problems.filter(problem => 
-    problem.title.toLowerCase().includes(searchTerm.toLowerCase())
+    problem.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (problem.contest_title && problem.contest_title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (problem.index && problem.index.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const filteredSubmissions = submissions.filter(submission => 
@@ -274,6 +312,12 @@ const AdminDashboard = () => {
   const toggleContestExpand = (contestId) => {
     setExpandedContestIds(prev => 
       prev.includes(contestId) ? prev.filter(id => id !== contestId) : [...prev, contestId]
+    );
+  };
+
+  const toggleProblemExpand = (problemKey) => {
+    setExpandedProblemIds(prev => 
+      prev.includes(problemKey) ? prev.filter(id => id !== problemKey) : [...prev, problemKey]
     );
   };
 
@@ -1029,45 +1073,189 @@ const AdminDashboard = () => {
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Problem</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contest</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Difficulty</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Limit</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Limits</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Cases</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredProblems.map((problem) => (
-                              <tr key={problem.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{problem.title}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                    problem.difficulty === 'Easy' 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : problem.difficulty === 'Medium' 
-                                        ? 'bg-yellow-100 text-yellow-800' 
-                                        : 'bg-red-100 text-red-800'
-                                  }`}>
-                                    {problem.difficulty}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{problem.time_limit}s</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  {new Date(problem.created_at).toLocaleDateString()}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                  <button
-                                    onClick={() => handleDeleteProblem(problem.id)}
-                                    className="text-red-600 hover:text-red-900 flex items-center gap-1"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
+                            {filteredProblems.map((problem) => {
+                              const problemKey = `${problem.contest_id}-${problem.index}`;
+                              return (
+                                <React.Fragment key={problemKey}>
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => toggleProblemExpand(problemKey)}
+                                          className="text-blue-600 hover:text-blue-800"
+                                        >
+                                          {expandedProblemIds.includes(problemKey) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                        <div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="px-2 py-1 bg-blue-600 text-white font-bold rounded text-xs">{problem.index}</span>
+                                            <span>{problem.title}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      <div>
+                                        <div className="font-medium">{problem.contest_title || 'N/A'}</div>
+                                        <div className="text-xs text-gray-400">{problem.contest_type || ''}</div>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                        problem.difficulty === 'Easy' 
+                                          ? 'bg-green-100 text-green-800' 
+                                          : problem.difficulty === 'Medium' 
+                                            ? 'bg-yellow-100 text-yellow-800' 
+                                            : problem.difficulty === 'Hard'
+                                              ? 'bg-red-100 text-red-800'
+                                              : 'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {problem.difficulty || 'N/A'}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-xs">Time: {problem.time_limit_seconds || 1}s</span>
+                                        <span className="text-xs">Memory: {problem.memory_limit_mb || 256}MB</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                          {problem.test_cases ? problem.test_cases.length : 0} total
+                                        </span>
+                                        {problem.test_cases && problem.test_cases.filter(tc => tc.sample).length > 0 && (
+                                          <span className="text-xs bg-green-100 px-2 py-1 rounded">
+                                            {problem.test_cases.filter(tc => tc.sample).length} sample
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                      <span className={`px-2 py-1 rounded text-xs ${
+                                        problem.contest_status === 'live' 
+                                          ? 'bg-green-100 text-green-800'
+                                          : problem.contest_status === 'upcoming'
+                                            ? 'bg-blue-100 text-blue-800'
+                                            : 'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {problem.contest_status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                  {expandedProblemIds.includes(problemKey) && (
+                                    <tr>
+                                      <td colSpan="6" className="px-6 py-4 bg-gray-50">
+                                        <div className="space-y-4">
+                                          {/* Problem Statement */}
+                                          {problem.statement && (
+                                            <div>
+                                              <h4 className="font-semibold text-sm text-gray-700 mb-2">Problem Statement:</h4>
+                                              <div className="p-3 bg-white rounded border text-sm text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">
+                                                {problem.statement}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Tags */}
+                                          {problem.tags && problem.tags.length > 0 && (
+                                            <div>
+                                              <h4 className="font-semibold text-sm text-gray-700 mb-2">Tags:</h4>
+                                              <div className="flex flex-wrap gap-2">
+                                                {problem.tags.map((tag, idx) => (
+                                                  <span key={idx} className="px-2 py-1 bg-cyan-100 text-cyan-800 text-xs rounded">{tag}</span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Points */}
+                                          {problem.points > 0 && (
+                                            <div>
+                                              <h4 className="font-semibold text-sm text-gray-700 mb-2">Points:</h4>
+                                              <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded font-semibold">{problem.points}</span>
+                                            </div>
+                                          )}
+
+                                          {/* Test Cases */}
+                                          {problem.test_cases && problem.test_cases.length > 0 && (
+                                            <div>
+                                              <h4 className="font-semibold text-sm text-gray-700 mb-2">Test Cases:</h4>
+                                              <div className="space-y-2 max-h-96 overflow-y-auto">
+                                                {problem.test_cases.map((testCase, tcIdx) => (
+                                                  <div key={tcIdx} className={`p-3 rounded border ${
+                                                    testCase.sample 
+                                                      ? 'bg-green-50 border-green-200' 
+                                                      : testCase.hidden 
+                                                        ? 'bg-gray-50 border-gray-200'
+                                                        : 'bg-blue-50 border-blue-200'
+                                                  }`}>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                      <span className="text-xs font-semibold text-gray-700">Test Case #{tcIdx + 1}</span>
+                                                      {testCase.sample && (
+                                                        <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">Sample</span>
+                                                      )}
+                                                      {testCase.hidden && (
+                                                        <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded">Hidden</span>
+                                                      )}
+                                                      {testCase.difficulty && (
+                                                        <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded">{testCase.difficulty}</span>
+                                                      )}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                      <div>
+                                                        <div className="text-xs font-semibold text-gray-600 mb-1">Input:</div>
+                                                        <pre className="text-xs p-2 bg-white rounded border font-mono whitespace-pre-wrap break-words">{testCase.input || 'N/A'}</pre>
+                                                      </div>
+                                                      <div>
+                                                        <div className="text-xs font-semibold text-gray-600 mb-1">Expected Output:</div>
+                                                        <pre className="text-xs p-2 bg-white rounded border font-mono whitespace-pre-wrap break-words">{testCase.output || 'N/A'}</pre>
+                                                      </div>
+                                                    </div>
+                                                    {testCase.explanation && (
+                                                      <div className="mt-2">
+                                                        <div className="text-xs font-semibold text-gray-600 mb-1">Explanation:</div>
+                                                        <p className="text-xs text-gray-700 p-2 bg-white rounded border">{testCase.explanation}</p>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Tutorial */}
+                                          {problem.tutorial && (
+                                            <div>
+                                              <h4 className="font-semibold text-sm text-gray-700 mb-2">Tutorial:</h4>
+                                              <div className="p-3 bg-white rounded border text-sm text-gray-700 whitespace-pre-wrap">
+                                                {problem.tutorial}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
                           </tbody>
                         </table>
+                        {filteredProblems.length === 0 && (
+                          <div className="text-center py-8 text-gray-500">
+                            No problems found
+                          </div>
+                        )}
                       </div>
                     )}
 
