@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/ide/', include('ide.urls')),
     path("", include("crossPlatform.urls")),
     path("blog/", include("blog.urls")),
+    path("", include("Chatapp.urls")),
 ]
 
 # Serve media files during development

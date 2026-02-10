@@ -40,6 +40,7 @@ import BlogDetail from './pages/BlogDetail';
 import Recording from './pages/Recording';
 import AdminDashboard from './pages/AdminDashboard';
 import ContestHistory from './pages/ContestHistory';
+import ChatBot from './components/ChatBot';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -322,6 +323,7 @@ function App() {
               </FullScreenLayout>
             } />
           </Routes>
+          <ChatBot />
         </div>
       </Router>
     </AppProvider>
