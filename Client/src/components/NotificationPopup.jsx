@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, X, Check } from 'lucide-react';
+import { Bell, X, Check, Trash2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 
@@ -8,24 +8,60 @@ const NotificationPopup = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [previousUnreadCount, setPreviousUnreadCount] = useState(0);
   const popupRef = useRef(null);
 
-  const fetchNotifications = async () => {
-    setLoading(true);
+  const playNotificationSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (error) {
+      console.error('Error playing notification sound:', error);
+    }
+  };
+
+  const fetchNotifications = async (isInitialLoad = false) => {
+    if (isInitialLoad) {
+      setLoading(true);
+    }
     try {
       const response = await api.get('/notification/');
       setNotifications(response.data.notifications);
-      setUnreadCount(response.data.unread_count);
+      const newUnreadCount = response.data.unread_count;
+      
+      // Play sound only if there are NEW notifications (not on initial load)
+      if (!isInitialLoad && newUnreadCount > previousUnreadCount && previousUnreadCount >= 0) {
+        playNotificationSound();
+      }
+      
+      setUnreadCount(newUnreadCount);
+      setPreviousUnreadCount(newUnreadCount);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
+    fetchNotifications(true);
+    // Check for new notifications every 5 seconds for real-time feel
+    const interval = setInterval(() => fetchNotifications(false), 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -83,15 +119,16 @@ const NotificationPopup = () => {
   };
 
   const getNotificationIcon = (type) => {
+    const iconClass = "w-5 h-5";
     switch (type) {
       case 'blog_deleted':
-        return '🗑️';
+        return <Trash2 className={`${iconClass} text-red-600`} />;
       case 'report_approved':
-        return '✅';
+        return <CheckCircle className={`${iconClass} text-green-600`} />;
       case 'report_rejected':
-        return '❌';
+        return <XCircle className={`${iconClass} text-red-600`} />;
       default:
-        return '📢';
+        return <AlertCircle className={`${iconClass} text-blue-600`} />;
     }
   };
 
@@ -145,7 +182,7 @@ const NotificationPopup = () => {
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="text-2xl flex-shrink-0">
+                      <div className="flex-shrink-0 mt-1">
                         {getNotificationIcon(notification.type)}
                       </div>
                       <div className="flex-1 min-w-0">
