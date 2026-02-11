@@ -1,13 +1,15 @@
 // Client/src/components/NavigationBar.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import api from '../utils/api';
 
 const NavigationBar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useApp();
   const currentPath = location.pathname;
+  const [userProfile, setUserProfile] = useState(null);
 
   const getActiveTab = () => {
     if (currentPath === '/submissions') return 'submissions';
@@ -19,6 +21,21 @@ const NavigationBar = () => {
   };
 
   const activeTab = getActiveTab();
+
+  // Fetch user profile to get platform ranks
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (user) {
+        try {
+          const response = await api.get('/account/profile/');
+          setUserProfile(response.data);
+        } catch (error) {
+          console.error('Error fetching profile:', error);
+        }
+      }
+    };
+    fetchProfile();
+  }, [user]);
 
   const handleTabChange = (tab) => {
     switch (tab) {
@@ -40,6 +57,35 @@ const NavigationBar = () => {
   };
 
   const userName = user?.name || 'User';
+  
+  // Get the best rank from all platforms (prioritize Codeforces)
+  const getUserRankDisplay = () => {
+    if (!userProfile?.platform_profiles || userProfile.platform_profiles.length === 0) {
+      return null;
+    }
+    
+    // Prioritize Codeforces rank
+    const cfProfile = userProfile.platform_profiles.find(p => p.platform === 'codeforces');
+    if (cfProfile?.rank) {
+      return cfProfile.rank;
+    }
+    
+    // Then try CodeChef badge
+    const ccProfile = userProfile.platform_profiles.find(p => p.platform === 'codechef');
+    if (ccProfile?.badge) {
+      return ccProfile.badge;
+    }
+    
+    // Then any other rank
+    const profileWithRank = userProfile.platform_profiles.find(p => p.rank);
+    if (profileWithRank?.rank) {
+      return profileWithRank.rank;
+    }
+    
+    return null;
+  };
+
+  const rankDisplay = getUserRankDisplay();
 
   return (
     <div className="mb-4 px-10">
@@ -53,6 +99,9 @@ const NavigationBar = () => {
           }`}
         >
           {userName}
+          {rankDisplay && (
+            <span className="ml-2 text-gray-400">| {rankDisplay}</span>
+          )}
         </button>
 
         <button

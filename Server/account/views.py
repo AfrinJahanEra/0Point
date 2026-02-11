@@ -132,6 +132,7 @@ class LoginView(APIView):
             "user_id": str(user.id),
             "email": user.email,
             "role": user.role,
+            "name": user.name,
         }
 
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
@@ -256,6 +257,11 @@ class AddPlatformProfileView(APIView):
 
             rating_data = result['data'] or {}
 
+            # Convert rank to string if it's a number (LeetCode returns integers)
+            rank_value = rating_data.get('rank')
+            if rank_value is not None and not isinstance(rank_value, str):
+                rank_value = str(rank_value)
+
             user.add_or_update_platform(
                 platform,
                 handle,
@@ -263,7 +269,7 @@ class AddPlatformProfileView(APIView):
                 rating_data.get('max_rating', 0),
                 rating_data.get('min_rating', 0),
                 rating_data.get('contests_count', 0),
-                rating_data.get('rank'),
+                rank_value,
                 rating_data.get('badge'),
                 rating_data.get('rating_history', [])
             )
@@ -427,6 +433,7 @@ class ExternalSubmissionView(APIView):
             all_submissions = []
             for profile in user.platform_profiles:
                 try:
+                    print(f"Fetching submissions for {profile.platform}/{profile.handle}...")
                     submissions = []
                     if profile.platform == "codeforces":
                         submissions = fetch_cf_submissions(profile.handle, limit)
@@ -437,11 +444,13 @@ class ExternalSubmissionView(APIView):
                     elif profile.platform == "atcoder":
                         submissions = fetch_atcoder_submissions(profile.handle, limit)
                     
+                    print(f"✓ Fetched {len(submissions)} submissions from {profile.platform}")
                     all_submissions.extend(submissions)
                 except Exception as e:
-                    print(f"Error fetching submissions for {profile.platform}/{profile.handle}: {e}")
+                    print(f"✗ Error fetching submissions for {profile.platform}/{profile.handle}: {e}")
                     continue
             
+            print(f"Total submissions fetched: {len(all_submissions)}")
             return Response({
                 "platform": "all",
                 "submissions": all_submissions,

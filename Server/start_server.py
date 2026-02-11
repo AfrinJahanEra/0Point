@@ -1,5 +1,7 @@
 import os
 import sys
+import signal
+import subprocess
 from django.core.management import execute_from_command_line
 from django.conf import settings
 from daphne.cli import CommandLineInterface
@@ -14,8 +16,33 @@ def main():
     # Run Django setup
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'zeropoint.settings')
     
-    # Start Daphne server with correct binding
-    os.system(f'daphne -b {bind_address} -p {port} zeropoint.asgi:application')
+    print(f"Starting Daphne server on {bind_address}:{port}")
+    print("Press Ctrl+C to stop the server")
+    
+    # Start Daphne server with subprocess for better control
+    process = None
+    try:
+        # Use subprocess instead of os.system for better control
+        process = subprocess.Popen(
+            ['daphne', '-b', bind_address, '-p', str(port), 'zeropoint.asgi:application'],
+            stdout=sys.stdout,
+            stderr=sys.stderr
+        )
+        
+        # Wait for the process to complete
+        process.wait()
+        
+    except KeyboardInterrupt:
+        print("\n\nShutting down server gracefully...")
+        if process:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                print("Force killing server...")
+                process.kill()
+        print("Server stopped.")
+        sys.exit(0)
 
 
 if __name__ == '__main__':

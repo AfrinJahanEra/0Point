@@ -44,13 +44,22 @@ def fetch_rating(handle):
     try:
         session = create_session()
 
+        print(f"Fetching LeetCode profile for: {handle}")
+        
         # -------- basic profile --------
-        profile_res = session.get(f"{BASE_URL}/{handle}", timeout=50)
-        if profile_res.status_code != 200:
-            raise Exception("LeetCode user not found")
+        try:
+            profile_res = session.get(f"{BASE_URL}/{handle}", timeout=50)
+            if profile_res.status_code != 200:
+                raise Exception(f"LeetCode user not found (status: {profile_res.status_code})")
+        except requests.exceptions.Timeout:
+            raise Exception("LeetCode API timeout - the service might be slow. Please try again later.")
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"LeetCode API connection error: {str(e)}")
 
         profile = profile_res.json()
         profile_name = profile.get("username") or profile.get("userSlug") or handle
+        
+        print(f"✓ LeetCode profile found: {profile_name}")
 
         # -------- contest summary --------
         contest_res = session.get(f"{BASE_URL}/{handle}/contest", timeout=50)

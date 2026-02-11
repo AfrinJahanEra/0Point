@@ -83,7 +83,10 @@ const NotificationPopup = () => {
       setUnreadCount(newUnreadCount);
       setPreviousUnreadCount(newUnreadCount);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      // Silently fail during server shutdown or network errors
+      if (error.code !== 'ERR_NETWORK' && error.response?.status !== 500) {
+        console.error('Error fetching notifications:', error);
+      }
     } finally {
       if (isInitialLoad) {
         setLoading(false);
@@ -92,10 +95,27 @@ const NotificationPopup = () => {
   };
 
   useEffect(() => {
+    let isComponentMounted = true;
+    let intervalId;
+
+    // Fetch initial notifications
     fetchNotifications(true);
-    // Check for new notifications every 5 seconds for real-time feel
-    const interval = setInterval(() => fetchNotifications(false), 5000);
-    return () => clearInterval(interval);
+    
+    // Set up polling interval
+    intervalId = setInterval(() => {
+      // Only fetch if component is still mounted and not during page unload
+      if (isComponentMounted && document.visibilityState === 'visible') {
+        fetchNotifications(false);
+      }
+    }, 5000);
+
+    // Cleanup function
+    return () => {
+      isComponentMounted = false;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [previousUnreadCount]); // Add dependency to track changes
 
   useEffect(() => {
