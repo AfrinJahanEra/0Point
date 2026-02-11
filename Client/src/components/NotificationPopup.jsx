@@ -9,11 +9,34 @@ const NotificationPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previousUnreadCount, setPreviousUnreadCount] = useState(0);
+  const [userHasInteracted, setUserHasInteracted] = useState(false);
   const popupRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const fallbackAudioRef = useRef(null);
 
-  const playNotificationSound = () => {
+  // Base64-encoded notification sound (short beep)
+  const notificationSoundDataUri = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSl+zPLTgjMGHnC/8OKZSgwPVqzn7LBhGgU7ltzy0IEsBSZ8yPLaizsIGGS56+mmWBELTKXh8bllHAU2kdb0yXkqBSh+yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfyzH0rBSh+zPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8bZjHAY4kdfy0IEsBSZ8yPLaizsIGWi48+mjUxEMTqPh8Q==";
+
+  const playNotificationSound = async () => {
+    // Don't play sound until user has interacted
+    if (!userHasInteracted) {
+      console.log('Waiting for user interaction before playing sound');
+      return;
+    }
+
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      // Try Web Audio API first
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      
+      const audioContext = audioContextRef.current;
+      
+      // Resume context if suspended (required by some browsers)
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -29,7 +52,17 @@ const NotificationPopup = () => {
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
     } catch (error) {
-      console.error('Error playing notification sound:', error);
+      console.log('Web Audio API failed, trying fallback:', error);
+      // Fallback to HTML5 Audio
+      try {
+        if (!fallbackAudioRef.current) {
+          fallbackAudioRef.current = new Audio(notificationSoundDataUri);
+          fallbackAudioRef.current.volume = 0.3;
+        }
+        await fallbackAudioRef.current.play();
+      } catch (fallbackError) {
+        console.error('Both audio methods failed:', fallbackError);
+      }
     }
   };
 
@@ -63,7 +96,7 @@ const NotificationPopup = () => {
     // Check for new notifications every 5 seconds for real-time feel
     const interval = setInterval(() => fetchNotifications(false), 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [previousUnreadCount]); // Add dependency to track changes
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -74,6 +107,28 @@ const NotificationPopup = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Track user interaction for autoplay policy compliance
+  useEffect(() => {
+    const markUserInteraction = () => {
+      if (!userHasInteracted) {
+        setUserHasInteracted(true);
+        console.log('User interaction detected - sound enabled');
+      }
+    };
+
+    // Listen for any user interaction
+    const events = ['click', 'keydown', 'touchstart'];
+    events.forEach(event => {
+      document.addEventListener(event, markUserInteraction, { once: true });
+    });
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, markUserInteraction);
+      });
+    };
+  }, [userHasInteracted]);
 
   const markAsRead = async (notificationId) => {
     try {

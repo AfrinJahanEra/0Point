@@ -641,17 +641,12 @@ class AdminAnnouncementsView(APIView):
             
             announcement_data.append({
                 "id": str(announcement.id),
-                "contest": {
-                    "id": str(contest.id) if contest else None,
-                    "title": contest.title if contest else "Unknown",
-                    "type": contest.type if contest else None
-                },
-                "author": {
-                    "id": str(author.id) if author else None,
-                    "name": author.name if author else "Unknown",
-                    "email": author.email if author else "Unknown"
-                },
+                "contest_id": str(contest.id) if contest else None,
+                "contest_title": contest.title if contest else None,
+                "contest_type": contest.type if contest else None,
+                "author": author.name if author else "Unknown",
                 "text": announcement.text,
+                "topic": announcement.topic if hasattr(announcement, 'topic') and announcement.topic else None,
                 "problem_index": announcement.problem_index,
                 "is_important": announcement.is_important,
                 "is_pinned": announcement.is_pinned,

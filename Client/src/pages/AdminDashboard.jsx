@@ -15,7 +15,14 @@ import {
   RefreshCw,
   Shield,
   ShieldOff,
-  AlertCircle
+  AlertCircle,
+  Megaphone,
+  Eye,
+  EyeOff,
+  List,
+  ListOrdered,
+  Link as LinkIcon,
+  Smile
 } from 'lucide-react';
 import * as d3 from 'd3';
 import api from '../utils/api';
@@ -39,6 +46,7 @@ const AdminDashboard = () => {
   const [contests, setContests] = useState([]);
   const [problems, setProblems] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [blogReports, setBlogReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,6 +60,14 @@ const AdminDashboard = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
   const [adminNote, setAdminNote] = useState('');
+  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
+  const [announcementText, setAnnouncementText] = useState('');
+  const [announcementTopic, setAnnouncementTopic] = useState('');
+  const [announcementType, setAnnouncementType] = useState('info');
+  const [isImportant, setIsImportant] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const textareaRef = useRef(null);
   const activityChartRef = useRef(null);
   const [activityData, setActivityData] = useState([]);
   const navigate = useNavigate();
@@ -179,6 +195,15 @@ const AdminDashboard = () => {
     }
   };
 
+  const loadAnnouncements = async () => {
+    try {
+      const response = await api.get('/admin-panel/announcements/');
+      setAnnouncements(response.data || []);
+    } catch (error) {
+      console.error('Error loading announcements:', error);
+    }
+  };
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     switch (tab) {
@@ -202,6 +227,9 @@ const AdminDashboard = () => {
         break;
       case 'submissions':
         loadSubmissions();
+        break;
+      case 'announcements':
+        loadAnnouncements();
         break;
       default:
         loadDashboardData();
@@ -943,6 +971,26 @@ const AdminDashboard = () => {
                     </span>
                   </button>
                 </li>
+                <li>
+                  <button
+                    onClick={() => handleTabChange('announcements')}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
+                      activeTab === 'announcements' 
+                        ? 'bg-blue-900 text-white' 
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Megaphone className="w-5 h-5" />
+                      <span className="font-medium">Announcements</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'announcements' ? 'bg-white/20' : 'bg-blue-100 text-blue-900'
+                    }`}>
+                      {stats.announcements}
+                    </span>
+                  </button>
+                </li>
               </ul>
             </nav>
           </div>
@@ -1063,7 +1111,7 @@ const AdminDashboard = () => {
                   </div>
                 )}
 
-                {(activeTab === 'users' || activeTab === 'banned_users' || activeTab === 'user_reports' || activeTab === 'blogs' || activeTab === 'reports' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions') && (
+                {(activeTab === 'users' || activeTab === 'banned_users' || activeTab === 'user_reports' || activeTab === 'blogs' || activeTab === 'reports' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions' || activeTab === 'announcements') && (
                   <div>
                     <div className="flex justify-between items-center mb-6">
                       <h2 className="text-2xl font-bold text-gray-900 capitalize">
@@ -2074,6 +2122,499 @@ const AdminDashboard = () => {
                             ))}
                           </tbody>
                         </table>
+                      </div>
+                    )}
+
+                    {activeTab === 'announcements' && (
+                      <div className="space-y-6">
+                        {/* Create Announcement Button */}
+                        <div className="flex justify-between items-center">
+                          <button
+                            onClick={() => {
+                              setShowAnnouncementForm(!showAnnouncementForm);
+                              if (!showAnnouncementForm) {
+                                setAnnouncementText('');
+                                setAnnouncementTopic('');
+                                setAnnouncementType('info');
+                                setIsImportant(false);
+                              }
+                            }}
+                            className="px-4 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-950 transition-colors flex items-center gap-2"
+                          >
+                            <Megaphone className="w-4 h-4" />
+                            {showAnnouncementForm ? 'Cancel' : 'Create New Announcement'}
+                          </button>
+                        </div>
+
+                        {/* Advanced Announcement Form */}
+                        {showAnnouncementForm && (
+                          <div className="bg-white border border-gray-200 rounded-lg shadow-lg">
+                            <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                              <h3 className="text-lg font-semibold text-gray-900">Create New Announcement</h3>
+                              <button
+                                onClick={() => setShowPreview(!showPreview)}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                              >
+                                {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                {showPreview ? 'Edit' : 'Preview'}
+                              </button>
+                            </div>
+                            
+                            <div className="p-6 space-y-4">
+                              {/* Editor and Preview Split View */}
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {/* Editor Side */}
+                                <div className={showPreview ? 'hidden lg:block' : ''}>
+                                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                                    Announcement Text
+                                  </label>
+                                  
+                                  {/* Advanced Formatting Toolbar */}
+                                  <div className="flex flex-wrap gap-1.5 mb-3 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 shadow-sm">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const textarea = document.getElementById('announcement-textarea');
+                                      const start = textarea.selectionStart;
+                                      const end = textarea.selectionEnd;
+                                      const selectedText = announcementText.substring(start, end);
+                                      const newText = announcementText.substring(0, start) + `**${selectedText}**` + announcementText.substring(end);
+                                      setAnnouncementText(newText);
+                                      setTimeout(() => {
+                                        textarea.focus();
+                                        textarea.setSelectionRange(start + 2, end + 2);
+                                      }, 0);
+                                    }}
+                                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 font-bold text-sm"
+                                    title="Bold"
+                                  >
+                                    B
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const textarea = document.getElementById('announcement-textarea');
+                                      const start = textarea.selectionStart;
+                                      const end = textarea.selectionEnd;
+                                      const selectedText = announcementText.substring(start, end);
+                                      const newText = announcementText.substring(0, start) + `*${selectedText}*` + announcementText.substring(end);
+                                      setAnnouncementText(newText);
+                                      setTimeout(() => {
+                                        textarea.focus();
+                                        textarea.setSelectionRange(start + 1, end + 1);
+                                      }, 0);
+                                    }}
+                                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 italic text-sm"
+                                    title="Italic"
+                                  >
+                                    I
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const textarea = document.getElementById('announcement-textarea');
+                                      const start = textarea.selectionStart;
+                                      const selectedText = announcementText.substring(start, start);
+                                      setAnnouncementText(announcementText.substring(0, start) + '# ' + announcementText.substring(start));
+                                      setTimeout(() => {
+                                        textarea.focus();
+                                        textarea.setSelectionRange(start + 2, start + 2);
+                                      }, 0);
+                                    }}
+                                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-semibold"
+                                    title="Large Text"
+                                  >
+                                    H1
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const textarea = document.getElementById('announcement-textarea');
+                                      const start = textarea.selectionStart;
+                                      setAnnouncementText(announcementText.substring(0, start) + '## ' + announcementText.substring(start));
+                                      setTimeout(() => {
+                                        textarea.focus();
+                                        textarea.setSelectionRange(start + 3, start + 3);
+                                      }, 0);
+                                    }}
+                                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm"
+                                    title="Medium Text"
+                                  >
+                                    H2
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const textarea = document.getElementById('announcement-textarea');
+                                      const start = textarea.selectionStart;
+                                      const end = textarea.selectionEnd;
+                                      const selectedText = announcementText.substring(start, end);
+                                      const newText = announcementText.substring(0, start) + `~~${selectedText}~~` + announcementText.substring(end);
+                                      setAnnouncementText(newText);
+                                      setTimeout(() => {
+                                        textarea.focus();
+                                        textarea.setSelectionRange(start + 2, end + 2);
+                                      }, 0);
+                                    }}
+                                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm line-through"
+                                    title="Strikethrough"
+                                  >
+                                    S
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const textarea = document.getElementById('announcement-textarea');
+                                      const start = textarea.selectionStart;
+                                      const end = textarea.selectionEnd;
+                                      const selectedText = announcementText.substring(start, end);
+                                      const newText = announcementText.substring(0, start) + `\`${selectedText}\`` + announcementText.substring(end);
+                                      setAnnouncementText(newText);
+                                      setTimeout(() => {
+                                        textarea.focus();
+                                        textarea.setSelectionRange(start + 1, end + 1);
+                                      }, 0);
+                                    }}
+                                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-mono"
+                                    title="Code"
+                                  >
+                                    {'</>'}
+                                  </button>
+                                  <div className="border-l border-gray-300 mx-1"></div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const textarea = document.getElementById('announcement-textarea');
+                                      const start = textarea.selectionStart;
+                                      setAnnouncementText(announcementText.substring(0, start) + '- ' + announcementText.substring(start));
+                                      setTimeout(() => {
+                                        textarea.focus();
+                                        textarea.setSelectionRange(start + 2, start + 2);
+                                      }, 0);
+                                    }}
+                                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm"
+                                    title="Bullet List"
+                                  >
+                                    <List className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const textarea = document.getElementById('announcement-textarea');
+                                      const start = textarea.selectionStart;
+                                      setAnnouncementText(announcementText.substring(0, start) + '1. ' + announcementText.substring(start));
+                                      setTimeout(() => {
+                                        textarea.focus();
+                                        textarea.setSelectionRange(start + 3, start + 3);
+                                      }, 0);
+                                    }}
+                                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm"
+                                    title="Numbered List"
+                                  >
+                                    <ListOrdered className="w-4 h-4" />
+                                  </button>
+                                  <div className="border-l border-gray-300 mx-1"></div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm relative"
+                                    title="Emoji Picker"
+                                  >
+                                    <Smile className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                {/* Emoji Picker Dropdown */}
+                                {showEmojiPicker && (
+                                  <div className="absolute z-10 mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg">
+                                    <div className="grid grid-cols-8 gap-2">
+                                      {['😊', '😂', '❤️', '👍', '🎉', '🔥', '✨', '💯', '👏', '🚀', '💪', '🎯', '⚡', '🌟', '💡', '✅', '❌', '⚠️', '📢', '🎊', '🏆', '⭐', '💎', '🔔'].map(emoji => (
+                                        <button
+                                          key={emoji}
+                                          type="button"
+                                          onClick={() => {
+                                            const textarea = document.getElementById('announcement-textarea');
+                                            const start = textarea.selectionStart;
+                                            setAnnouncementText(announcementText.substring(0, start) + emoji + announcementText.substring(start));
+                                            setShowEmojiPicker(false);
+                                            setTimeout(() => textarea.focus(), 0);
+                                          }}
+                                          className="text-xl hover:bg-gray-100 rounded p-1 transition-colors"
+                                        >
+                                          {emoji}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <textarea
+                                  id="announcement-textarea"
+                                  ref={textareaRef}
+                                  value={announcementText}
+                                  onChange={(e) => setAnnouncementText(e.target.value)}
+                                  placeholder="Write your announcement here... Use **bold**, *italic*, # for large text"
+                                  className="w-full h-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-blue-900 resize-none font-mono text-sm"
+                                />
+                                <p className="text-xs text-gray-500 mt-2">
+                                  Supports markdown formatting and emojis
+                                </p>
+                              </div>
+
+                              {/* Preview Side */}
+                              <div className={!showPreview ? 'hidden lg:block' : ''}>
+                                <label className="block text-sm font-medium text-gray-700 mb-3">
+                                  Live Preview
+                                </label>
+                                <div className="h-64 px-4 py-3 border-2 border-gray-200 rounded-lg bg-gray-50 overflow-y-auto">
+                                  {announcementText ? (
+                                    <div className="prose prose-sm max-w-none">
+                                      {announcementText.split('\n').map((line, lineIdx) => {
+                                        if (!line.trim()) return <br key={lineIdx} />;
+                                        
+                                        // Handle lists
+                                        if (line.trim().startsWith('- ')) {
+                                          return (
+                                            <ul key={lineIdx} className="list-disc list-inside my-2">
+                                              <li className="text-gray-800">{line.substring(line.indexOf('-') + 1).trim()}</li>
+                                            </ul>
+                                          );
+                                        }
+                                        if (line.trim().match(/^\d+\.\s/)) {
+                                          const text = line.substring(line.indexOf('.') + 1).trim();
+                                          return (
+                                            <ol key={lineIdx} className="list-decimal list-inside my-2">
+                                              <li className="text-gray-800">{text}</li>
+                                            </ol>
+                                          );
+                                        }
+                                        
+                                        // Handle inline formatting
+                                        const parts = line.split(/(\*\*.*?\*\*|\*.*?\*|~~.*?~~|`.*?`|#+ .*)/g);
+                                        return (
+                                          <div key={lineIdx} className="my-1">
+                                            {parts.map((part, idx) => {
+                                              if (part.startsWith('**') && part.endsWith('**')) {
+                                                return <strong key={idx} className="text-gray-900 font-bold">{part.slice(2, -2)}</strong>;
+                                              } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+                                                return <em key={idx} className="text-gray-800 italic">{part.slice(1, -1)}</em>;
+                                              } else if (part.startsWith('~~') && part.endsWith('~~')) {
+                                                return <del key={idx} className="text-gray-600 line-through">{part.slice(2, -2)}</del>;
+                                              } else if (part.startsWith('`') && part.endsWith('`')) {
+                                                return <code key={idx} className="px-1.5 py-0.5 bg-gray-200 text-red-600 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
+                                              } else if (part.startsWith('#')) {
+                                                const level = part.match(/^#+/)[0].length;
+                                                const text = part.replace(/^#+\s*/, '');
+                                                if (level === 1) {
+                                                  return <h1 key={idx} className="text-2xl font-bold text-gray-900 my-3">{text}</h1>;
+                                                } else if (level === 2) {
+                                                  return <h2 key={idx} className="text-xl font-semibold text-gray-900 my-2">{text}</h2>;
+                                                } else {
+                                                  return <h3 key={idx} className="text-lg font-medium text-gray-900 my-1.5">{text}</h3>;
+                                                }
+                                              }
+                                              return <span key={idx} className="text-gray-800">{part}</span>;
+                                            })}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <p className="text-gray-400 italic text-center pt-24">Your formatted announcement will appear here...</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Topic and Type Selection */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Topic Field */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Topic (Optional)
+                                </label>
+                                <input
+                                  type="text"
+                                  value={announcementTopic}
+                                  onChange={(e) => setAnnouncementTopic(e.target.value)}
+                                  placeholder="e.g., Platform Update, Contest Rules, Maintenance"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-blue-900"
+                                />
+                              </div>
+
+                              {/* Type Selection */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Type
+                                </label>
+                                <select
+                                  value={announcementType}
+                                  onChange={(e) => setAnnouncementType(e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 focus:border-blue-900"
+                                >
+                                  <option value="info">Info</option>
+                                  <option value="warning">Warning</option>
+                                  <option value="important">Important</option>
+                                  <option value="update">Update</option>
+                                </select>
+                              </div>
+
+                              {/* Important Checkbox */}
+                              <div className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  id="is-important"
+                                  checked={isImportant}
+                                  onChange={(e) => setIsImportant(e.target.checked)}
+                                  className="w-4 h-4 text-blue-900 border-gray-300 rounded focus:ring-blue-900"
+                                />
+                                <label htmlFor="is-important" className="ml-2 text-sm text-gray-700">
+                                  Mark as important announcement
+                                </label>
+                              </div>
+                            </div>
+
+                            {/* Submit Buttons */}
+                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowAnnouncementForm(false);
+                                    setAnnouncementText('');
+                                    setAnnouncementTopic('');
+                                    setAnnouncementType('info');
+                                    setIsImportant(false);
+                                  }}
+                                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!announcementText.trim()) {
+                                      toast.error('Please enter announcement text');
+                                      return;
+                                    }
+                                    
+                                    try {
+                                      await api.post('/announcements/', {
+                                        text: announcementText,
+                                        topic: announcementTopic,
+                                        type: announcementType,
+                                        is_important: isImportant
+                                      });
+                                      
+                                      toast.success('Announcement created successfully');
+                                      setShowAnnouncementForm(false);
+                                      setAnnouncementText('');
+                                      setAnnouncementTopic('');
+                                      setAnnouncementType('info');
+                                      setIsImportant(false);
+                                      loadAnnouncements();
+                                    } catch (error) {
+                                      console.error('Error creating announcement:', error);
+                                      toast.error('Failed to create announcement');
+                                    }
+                                  }}
+                                  className="px-4 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-950"
+                                >
+                                  Create Announcement
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Announcements List */}
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Text</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Topic</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Author</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Created</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white">
+                              {announcements.map((announcement) => (
+                                <tr key={announcement.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                  <td className="px-6 py-4 text-sm text-gray-700 max-w-md">
+                                    <div className="prose prose-sm max-w-none">
+                                      {announcement.text.split(/(\*\*.*?\*\*|\*.*?\*|#+ .*?\n)/g).map((part, idx) => {
+                                        if (part.startsWith('**') && part.endsWith('**')) {
+                                          return <strong key={idx}>{part.slice(2, -2)}</strong>;
+                                        } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+                                          return <em key={idx}>{part.slice(1, -1)}</em>;
+                                        } else if (part.startsWith('#')) {
+                                          const level = part.match(/^#+/)[0].length;
+                                          const text = part.replace(/^#+\s*/, '').replace(/\n$/, '');
+                                          return level === 1 ? (
+                                            <span key={idx} className="text-lg font-bold">{text}</span>
+                                          ) : (
+                                            <span key={idx} className="text-base font-semibold">{text}</span>
+                                          );
+                                        }
+                                        return <span key={idx}>{part}</span>;
+                                      })}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                    {announcement.topic || '-'}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className={`px-2 py-1 text-xs font-medium rounded ${
+                                      announcement.type === 'important' 
+                                        ? 'bg-red-100 text-red-900'
+                                        : announcement.type === 'warning'
+                                        ? 'bg-yellow-100 text-yellow-900'
+                                        : announcement.type === 'update'
+                                        ? 'bg-green-100 text-green-900'
+                                        : 'bg-blue-100 text-blue-900'
+                                    }`}>
+                                      {announcement.type}
+                                    </span>
+                                    {announcement.is_important && (
+                                      <span className="ml-2 text-xs text-red-600">!</span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                    {announcement.author || 'Admin'}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                    {announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : '-'}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    <button
+                                      onClick={async () => {
+                                        if (!window.confirm('Are you sure you want to delete this announcement?')) return;
+                                        try {
+                                          await api.delete(`/admin-panel/announcements/${announcement.id}/`);
+                                          toast.success('Announcement deleted');
+                                          loadAnnouncements();
+                                        } catch (error) {
+                                          console.error('Error deleting announcement:', error);
+                                          toast.error('Failed to delete announcement');
+                                        }
+                                      }}
+                                      className="text-red-600 hover:text-red-900"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {announcements.length === 0 && (
+                            <div className="text-center py-8 text-gray-500">
+                              No announcements found. Create one to get started!
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

@@ -16,7 +16,7 @@ from account.models import Account
 class AnnouncementCreateAPIView(APIView):
     """
     POST /announcements/
-    Create a new announcement for a contest
+    Create a new announcement for a contest or platform-wide
     """
     def post(self, request):
         user = get_user_from_request(request)
@@ -28,37 +28,46 @@ class AnnouncementCreateAPIView(APIView):
             return Response(serializer.errors, status=400)
         
         data = serializer.validated_data
+        
+        # Get contest if contest_id is provided
+        contest = None
+        contest_id = data.get("contest_id", "").strip()
+        
+        if contest_id:
+            try:
+                contest = Contest.objects.get(id=contest_id)
+            except Contest.DoesNotExist:
+                return Response({"error": "Contest not found"}, status=404)
 
-        try:
-            contest = Contest.objects.get(id=data["contest_id"])
-        except Contest.DoesNotExist:
-            return Response({"error": "Contest not found"}, status=404)
-
-        # Only creator, admin, or authorized testers can post announcements
+        # Permission checks
         can_post = False
         
-        # Check if user is contest creator
-        if contest.created_by and str(contest.created_by.id) == str(user.id):
-            can_post = True
-        # Check if user is admin
-        elif hasattr(user, 'role') and user.role in ["admin", "superadmin"]:
-            can_post = True
-        # Check if user is a tester (for test contests)
-        elif contest.status == "test" and user.email in contest.testers:
-            can_post = True
+        if contest:
+            # Contest-specific announcement - check contest permissions
+            if contest.created_by and str(contest.created_by.id) == str(user.id):
+                can_post = True
+            elif hasattr(user, 'role') and user.role in ["admin", "superadmin"]:
+                can_post = True
+            elif contest.status == "test" and user.email in contest.testers:
+                can_post = True
+        else:
+            # Platform-wide announcement - only admins can create
+            if hasattr(user, 'role') and user.role in ["admin", "superadmin"]:
+                can_post = True
         
         if not can_post:
-            return Response({"error": "Permission denied. Only contest creator, admin, or testers can post announcements."}, status=403)
+            return Response({"error": "Permission denied. Only admins can create platform-wide announcements."}, status=403)
 
         # Create announcement
         announcement = Announcement(
             contest=contest,
             author=user,
             text=data["text"].strip(),
+            topic=data.get("topic", "").strip() if data.get("topic") else None,
             problem_index=data.get("problem_index", "").strip().upper() if data.get("problem_index") else None,
             is_important=data.get("is_important", False),
             is_pinned=data.get("is_pinned", False),
-            type=data.get("type", "info")  # info, warning, important, update
+            type=data.get("type", "info")
         )
 
         try:
