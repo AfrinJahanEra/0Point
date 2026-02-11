@@ -24,6 +24,7 @@ import {
   Link as LinkIcon,
   Smile
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import * as d3 from 'd3';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -1335,8 +1336,10 @@ const AdminDashboard = () => {
                                       <div className="space-y-3">
                                         <div>
                                           <h4 className="font-bold text-sm text-blue-900 mb-2">Content:</h4>
-                                          <div className="p-4 bg-white rounded border border-blue-200 text-sm text-gray-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
-                                            {blog.full_content || blog.content_preview || 'No content available'}
+                                          <div className="p-4 bg-white rounded border border-blue-200 text-sm text-gray-700 max-h-96 overflow-y-auto prose prose-sm max-w-none">
+                                            <ReactMarkdown>
+                                              {blog.full_content || blog.content_preview || 'No content available'}
+                                            </ReactMarkdown>
                                           </div>
                                         </div>
                                         {blog.tags && blog.tags.length > 0 && (
