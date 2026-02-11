@@ -48,7 +48,7 @@ class ChatMessage(Document):
             "chat_id": str(self.chat.id),
             "role": self.role,
             "content": self.content,
-            "url": self.url
+            "url": self.url if hasattr(self, "url") else None,
             "created_at": self.created_at.isoformat(),
         }
 
