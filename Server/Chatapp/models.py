@@ -48,6 +48,7 @@ class ChatMessage(Document):
             "chat_id": str(self.chat.id),
             "role": self.role,
             "content": self.content,
+            "url": self.url
             "created_at": self.created_at.isoformat(),
         }
 
