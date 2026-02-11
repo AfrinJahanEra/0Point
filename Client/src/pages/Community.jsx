@@ -522,7 +522,7 @@ const Community = () => {
                         {/* Vote Stats and Report Button */}
                         <div className="flex items-center gap-3">
                           {/* Report Button */}
-                          {user && user.id !== blog.author?.id && (
+                          {user && (
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
