@@ -23,6 +23,7 @@ import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [reportFilter, setReportFilter] = useState('blog');
   const [stats, setStats] = useState({
     users: { total: 0, admins: 0, banned: 0, new_this_week: 0, new_today: 0 },
     blogs: { published: 0, drafts: 0, comments: 0, votes: 0, new_this_week: 0 },
@@ -190,7 +191,7 @@ const AdminDashboard = () => {
       case 'blogs':
         loadBlogs();
         break;
-      case 'blog_reports':
+      case 'reports':
         loadBlogReports();
         break;
       case 'contests':
@@ -884,19 +885,19 @@ const AdminDashboard = () => {
                 </li>
                 <li>
                   <button
-                    onClick={() => handleTabChange('blog_reports')}
+                    onClick={() => handleTabChange('reports')}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
-                      activeTab === 'blog_reports' 
+                      activeTab === 'reports' 
                         ? 'bg-orange-600 text-white' 
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <AlertCircle className="w-5 h-5" />
-                      <span className="font-medium">Blog Reports</span>
+                      <span className="font-medium">Reports</span>
                     </div>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      activeTab === 'blog_reports' ? 'bg-white/20' : 'bg-orange-100 text-orange-700'
+                      activeTab === 'reports' ? 'bg-white/20' : 'bg-orange-100 text-orange-700'
                     }`}>
                       {blogReports.filter(r => r.status === 'pending').length}
                     </span>
@@ -1082,7 +1083,7 @@ const AdminDashboard = () => {
                   </div>
                 )}
 
-                {(activeTab === 'users' || activeTab === 'banned_users' || activeTab === 'user_reports' || activeTab === 'blogs' || activeTab === 'blog_reports' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions') && (
+                {(activeTab === 'users' || activeTab === 'banned_users' || activeTab === 'user_reports' || activeTab === 'blogs' || activeTab === 'reports' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions') && (
                   <div>
                     <div className="flex justify-between items-center mb-6">
                       <h2 className="text-2xl font-bold text-gray-900 capitalize">
@@ -1343,89 +1344,148 @@ const AdminDashboard = () => {
                       </div>
                     )}
 
-                    {activeTab === 'blog_reports' && (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                          <thead>
-                            <tr className="border-b border-gray-200">
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Blog</th>
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Reporter</th>
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Reason</th>
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white">
-                            {blogReports.length === 0 ? (
-                              <tr>
-                                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
-                                  No blog reports found
-                                </td>
-                              </tr>
-                            ) : (
-                              blogReports.map((report) => (
-                                <tr key={report.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                  <td className="px-6 py-4 text-sm text-gray-900">
-                                    <div>
-                                      <div className="font-medium">{report.blog?.title || 'Deleted Blog'}</div>
-                                      <div className="text-xs text-gray-500">
-                                        by {report.blog?.author?.name || 'Unknown'}
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                    <div>
-                                      <div className="font-medium">{report.reporter?.name}</div>
-                                      <div className="text-xs text-gray-500">{report.reporter?.email}</div>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 text-sm text-gray-700">
-                                    <div className="max-w-xs truncate" title={report.reason}>
-                                      {report.reason}
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                      report.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                      report.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                      'bg-red-100 text-red-800'
-                                    }`}>
-                                      {report.status}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {new Date(report.created_at).toLocaleDateString()}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                    {report.status === 'pending' ? (
-                                      <button
-                                        onClick={() => {
-                                          setSelectedReport(report);
-                                          setShowReviewModal(true);
-                                        }}
-                                        className="text-blue-600 hover:text-blue-900 font-medium"
-                                      >
-                                        Review
-                                      </button>
-                                    ) : (
-                                      <div>
-                                        <div className="text-xs text-gray-500">
-                                          Reviewed by {report.reviewed_by?.name}
+                    {activeTab === 'reports' && (
+                      <div>
+                        {/* Filter Buttons */}
+                        <div className="mb-6 flex gap-2">
+                          <button
+                            onClick={() => setReportFilter('blog')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                              reportFilter === 'blog'
+                                ? 'bg-orange-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            Blog Reports
+                          </button>
+                          <button
+                            onClick={() => setReportFilter('user')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                              reportFilter === 'user'
+                                ? 'bg-orange-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                            disabled
+                          >
+                            User Reports <span className="text-xs ml-1">(Coming Soon)</span>
+                          </button>
+                          <button
+                            onClick={() => setReportFilter('submission')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                              reportFilter === 'submission'
+                                ? 'bg-orange-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                            disabled
+                          >
+                            Submission Reports <span className="text-xs ml-1">(Coming Soon)</span>
+                          </button>
+                        </div>
+
+                        {/* Blog Reports */}
+                        {reportFilter === 'blog' && (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                              <thead>
+                                <tr className="border-b border-gray-200">
+                                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Blog</th>
+                                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Reporter</th>
+                                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Reason</th>
+                                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white">
+                                {blogReports.length === 0 ? (
+                                  <tr>
+                                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                                      No blog reports found
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  blogReports.map((report) => (
+                                    <tr key={report.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                      <td className="px-6 py-4 text-sm text-gray-900">
+                                        <div>
+                                          <div className="font-medium">{report.blog?.title || 'Deleted Blog'}</div>
+                                          <div className="text-xs text-gray-500">
+                                            by {report.blog?.author?.name || 'Unknown'}
+                                          </div>
                                         </div>
-                                        {report.admin_note && (
-                                          <div className="text-xs text-gray-600 mt-1">
-                                            Note: {report.admin_note}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        <div>
+                                          <div className="font-medium">{report.reporter?.name}</div>
+                                          <div className="text-xs text-gray-500">{report.reporter?.email}</div>
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4 text-sm text-gray-700">
+                                        <div className="max-w-xs truncate" title={report.reason}>
+                                          {report.reason}
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                          report.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                          report.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                          'bg-red-100 text-red-800'
+                                        }`}>
+                                          {report.status}
+                                        </span>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {new Date(report.created_at).toLocaleDateString()}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        {report.status === 'pending' ? (
+                                          <button
+                                            onClick={() => {
+                                              setSelectedReport(report);
+                                              setShowReviewModal(true);
+                                            }}
+                                            className="text-blue-600 hover:text-blue-900 font-medium"
+                                          >
+                                            Review
+                                          </button>
+                                        ) : (
+                                          <div>
+                                            <div className="text-xs text-gray-500">
+                                              Reviewed by {report.reviewed_by?.name}
+                                            </div>
+                                            {report.admin_note && (
+                                              <div className="text-xs text-gray-600 mt-1">
+                                                Note: {report.admin_note}
+                                              </div>
+                                            )}
                                           </div>
                                         )}
-                                      </div>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* User Reports - Coming Soon */}
+                        {reportFilter === 'user' && (
+                          <div className="text-center py-12">
+                            <AlertCircle className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                            <h3 className="text-lg font-semibold text-gray-700 mb-2">User Reports Coming Soon</h3>
+                            <p className="text-gray-500">This feature will be implemented later</p>
+                          </div>
+                        )}
+
+                        {/* Submission Reports - Coming Soon */}
+                        {reportFilter === 'submission' && (
+                          <div className="text-center py-12">
+                            <AlertCircle className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                            <h3 className="text-lg font-semibold text-gray-700 mb-2">Submission Reports Coming Soon</h3>
+                            <p className="text-gray-500">This feature will be implemented later</p>
+                          </div>
+                        )}
                       </div>
                     )}
 
