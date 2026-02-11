@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
+from django.core.mail import send_mail
 import jwt
 import hashlib
 from datetime import datetime, timedelta
@@ -17,6 +18,49 @@ from testcontest.models import TestContest, TestContestSubmission
 from virtual.models import VirtualContest, VirtualContestSubmission
 from tutorial.models import Tutorial
 from compiler.models import CodeSubmission
+
+
+def send_ban_notification_email(user_email, user_name, ban_reason):
+    """Send professional email notification to banned user"""
+    subject = 'Account Suspension Notice - 0Point Platform'
+    
+    message = f"""Dear {user_name},
+
+We are writing to inform you that your account on the 0Point platform has been permanently suspended.
+
+Reason for Suspension:
+{ban_reason}
+
+As a result of this action:
+- Your account has been permanently deactivated
+- You will no longer be able to access the platform
+- All associated data has been removed from our active systems
+
+This decision was made after careful review and is in accordance with our Terms of Service and Community Guidelines. Account suspensions are permanent and cannot be appealed.
+
+If you believe this action was taken in error or have questions regarding our policies, please contact our support team at support@0point.com.
+
+Thank you for your understanding.
+
+Best regards,
+The 0Point Administration Team
+
+---
+This is an automated message. Please do not reply to this email.
+"""
+    
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.EMAIL_HOST_USER,
+            recipient_list=[user_email],
+            fail_silently=False,
+        )
+        return True
+    except Exception as e:
+        print(f"Failed to send ban notification email: {str(e)}")
+        return False
 
 
 class AdminLoginView(APIView):
@@ -227,6 +271,13 @@ class AdminUsersView(APIView):
             # Get ban reason from request
             ban_reason = request.data.get('ban_reason', 'Violation of terms of service')
             
+            # Send email notification BEFORE deleting user
+            email_sent = send_ban_notification_email(
+                user_email=user.email,
+                user_name=user.name,
+                ban_reason=ban_reason
+            )
+            
             # Get all IP addresses
             all_ips = []
             if hasattr(user, 'ip_addresses'):
@@ -259,10 +310,11 @@ class AdminUsersView(APIView):
             banned_account.save()
             
             # Permanently delete the user
-            user.delete()  # This permanently removes from MongoDB
+            user.delete()
             
             return Response({
                 "message": "User permanently banned and deleted",
+                "email_notification_sent": email_sent,
                 "details": {
                     "email": user.email,
                     "reason": ban_reason,
