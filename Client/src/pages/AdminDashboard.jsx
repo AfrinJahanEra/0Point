@@ -2158,8 +2158,8 @@ const AdminDashboard = () => {
       
       {/* Review Report Modal */}
       {showReviewModal && selectedReport && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-          <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+        <div className="fixed inset-0 bg-transparent overflow-y-auto h-full w-full flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="relative bg-white bg-opacity-95 rounded-lg shadow-xl max-w-2xl w-full mx-4 backdrop-blur-md">
             <div className="p-6">
               <h3 className="text-xl font-bold text-gray-900 mb-4">Review Blog Report</h3>
               

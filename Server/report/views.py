@@ -98,11 +98,21 @@ def get_all_reports(request):
     
     try:
         reports = BlogReport.objects().order_by('-created_at')
-        reports_data = [report.to_dict() for report in reports]
+        reports_data = []
+        
+        for report in reports:
+            try:
+                reports_data.append(report.to_dict())
+            except Exception as e:
+                print(f"Error serializing report {report.id}: {str(e)}")
+                continue
         
         return Response(reports_data, status=status.HTTP_200_OK)
         
     except Exception as e:
+        print(f"Error in get_all_reports: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
