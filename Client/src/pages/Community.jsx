@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
+import ReportBlogModal from '../components/ReportBlogModal';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkBreaks from 'remark-breaks';
@@ -26,6 +27,8 @@ const Community = () => {
   const [replyText, setReplyText] = useState('');
   const [blogVotes, setBlogVotes] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportingBlog, setReportingBlog] = useState(null);
   const blogsPerPage = 5;
 
   // Comment Item Component
@@ -516,36 +519,55 @@ const Community = () => {
                           </div>
                         </div>
                         
-                        {/* Vote Stats - Clickable */}
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleVote(blog.id, 'upvote');
-                            }}
-                            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-green-50 transition-colors"
-                            title="Like this blog"
-                          >
-                            <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                            </svg>
-                            <span className="text-sm font-medium text-gray-900">{blog.upvotes || 0}</span>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleVote(blog.id, 'downvote');
-                            }}
-                            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-red-50 transition-colors"
-                            title="Dislike this blog"
-                          >
-                            <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                            </svg>
-                            <span className="text-sm font-medium text-gray-900">{blog.downvotes || 0}</span>
-                          </button>
+                        {/* Vote Stats and Report Button */}
+                        <div className="flex items-center gap-3">
+                          {/* Report Button */}
+                          {user && user.id !== blog.author?.id && (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setReportingBlog(blog);
+                                setIsReportModalOpen(true);
+                              }}
+                              className="text-xs text-red-600 hover:text-red-800 font-medium border border-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                              title="Report this blog"
+                            >
+                              Report
+                            </button>
+                          )}
+                          
+                          {/* Vote Stats - Clickable */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleVote(blog.id, 'upvote');
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 rounded hover:bg-green-50 transition-colors"
+                              title="Like this blog"
+                            >
+                              <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                              </svg>
+                              <span className="text-sm font-medium text-gray-900">{blog.upvotes || 0}</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleVote(blog.id, 'downvote');
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                              title="Dislike this blog"
+                            >
+                              <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                              </svg>
+                              <span className="text-sm font-medium text-gray-900">{blog.downvotes || 0}</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                       
@@ -810,6 +832,16 @@ const Community = () => {
           </div>
         </div>
       </div>
+      
+      <ReportBlogModal 
+        isOpen={isReportModalOpen}
+        onClose={() => {
+          setIsReportModalOpen(false);
+          setReportingBlog(null);
+        }}
+        blogId={reportingBlog?.id}
+        blogTitle={reportingBlog?.title}
+      />
     </div>
   );
 };

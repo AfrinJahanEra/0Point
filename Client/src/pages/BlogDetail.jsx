@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
+import ReportBlogModal from '../components/ReportBlogModal';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkBreaks from 'remark-breaks';
@@ -207,6 +208,7 @@ const BlogDetail = () => {
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyText, setReplyText] = useState('');
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   useEffect(() => {
     fetchBlog();
@@ -609,6 +611,15 @@ const handleCommentVote = async (commentId, voteType) => {
                       </div>
                     </div>
                   </div>
+                  
+                  {user && user.id !== blog.author.id && (
+                    <button
+                      onClick={() => setIsReportModalOpen(true)}
+                      className="px-3 py-1 text-xs font-medium text-red-600 border border-red-600 rounded hover:bg-red-50 transition-colors"
+                    >
+                      Report
+                    </button>
+                  )}
                 </div>
 
                 {/* Tags - Updated with same bg as code block, black text, and rounded */}
@@ -771,6 +782,13 @@ const handleCommentVote = async (commentId, voteType) => {
           </div>
         </div>
       </div>
+      
+      <ReportBlogModal 
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        blogId={id}
+        blogTitle={blog?.title}
+      />
     </div>
   );
 };

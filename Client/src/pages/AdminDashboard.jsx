@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import * as d3 from 'd3';
 import api from '../utils/api';
+import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -37,6 +38,7 @@ const AdminDashboard = () => {
   const [contests, setContests] = useState([]);
   const [problems, setProblems] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [blogReports, setBlogReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showBanModal, setShowBanModal] = useState(false);
@@ -46,6 +48,9 @@ const AdminDashboard = () => {
   const [expandedSubmissionIds, setExpandedSubmissionIds] = useState([]);
   const [expandedContestIds, setExpandedContestIds] = useState([]);
   const [expandedProblemIds, setExpandedProblemIds] = useState([]);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [adminNote, setAdminNote] = useState('');
   const activityChartRef = useRef(null);
   const [activityData, setActivityData] = useState([]);
   const navigate = useNavigate();
@@ -114,6 +119,16 @@ const AdminDashboard = () => {
       console.error('Error loading blogs:', error);
     }
   };
+  
+  const loadBlogReports = async () => {
+    try {
+      const response = await api.get('/report/all/');
+      setBlogReports(response.data);
+    } catch (error) {
+      console.error('Error loading blog reports:', error);
+      toast.error('Failed to load blog reports');
+    }
+  };
 
   const loadContests = async () => {
     try {
@@ -175,6 +190,9 @@ const AdminDashboard = () => {
       case 'blogs':
         loadBlogs();
         break;
+      case 'blog_reports':
+        loadBlogReports();
+        break;
       case 'contests':
         loadContests();
         break;
@@ -230,6 +248,29 @@ const AdminDashboard = () => {
       alert('Blog deleted successfully');
     } catch (error) {
       alert('Error deleting blog: ' + (error.response?.data?.error || error.message));
+    }
+  };
+  
+  const handleReviewReport = async (action) => {
+    if (!selectedReport) return;
+    
+    try {
+      await api.post(`/report/${selectedReport.id}/review/`, {
+        action: action,
+        admin_note: adminNote
+      });
+      
+      toast.success(`Report ${action === 'approve' ? 'approved' : 'rejected'} successfully`);
+      setShowReviewModal(false);
+      setSelectedReport(null);
+      setAdminNote('');
+      loadBlogReports();
+      if (action === 'approve') {
+        loadBlogs();
+      }
+    } catch (error) {
+      console.error('Error reviewing report:', error);
+      toast.error('Failed to review report');
     }
   };
 
@@ -843,6 +884,26 @@ const AdminDashboard = () => {
                 </li>
                 <li>
                   <button
+                    onClick={() => handleTabChange('blog_reports')}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
+                      activeTab === 'blog_reports' 
+                        ? 'bg-orange-600 text-white' 
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="w-5 h-5" />
+                      <span className="font-medium">Blog Reports</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'blog_reports' ? 'bg-white/20' : 'bg-orange-100 text-orange-700'
+                    }`}>
+                      {blogReports.filter(r => r.status === 'pending').length}
+                    </span>
+                  </button>
+                </li>
+                <li>
+                  <button
                     onClick={() => handleTabChange('contests')}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'contests' 
@@ -1021,7 +1082,7 @@ const AdminDashboard = () => {
                   </div>
                 )}
 
-                {(activeTab === 'users' || activeTab === 'banned_users' || activeTab === 'user_reports' || activeTab === 'blogs' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions') && (
+                {(activeTab === 'users' || activeTab === 'banned_users' || activeTab === 'user_reports' || activeTab === 'blogs' || activeTab === 'blog_reports' || activeTab === 'contests' || activeTab === 'problems' || activeTab === 'submissions') && (
                   <div>
                     <div className="flex justify-between items-center mb-6">
                       <h2 className="text-2xl font-bold text-gray-900 capitalize">
@@ -1277,6 +1338,92 @@ const AdminDashboard = () => {
                                 )}
                               </React.Fragment>
                             ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {activeTab === 'blog_reports' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Blog</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Reporter</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Reason</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white">
+                            {blogReports.length === 0 ? (
+                              <tr>
+                                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                                  No blog reports found
+                                </td>
+                              </tr>
+                            ) : (
+                              blogReports.map((report) => (
+                                <tr key={report.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                  <td className="px-6 py-4 text-sm text-gray-900">
+                                    <div>
+                                      <div className="font-medium">{report.blog?.title || 'Deleted Blog'}</div>
+                                      <div className="text-xs text-gray-500">
+                                        by {report.blog?.author?.name || 'Unknown'}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                    <div>
+                                      <div className="font-medium">{report.reporter?.name}</div>
+                                      <div className="text-xs text-gray-500">{report.reporter?.email}</div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-gray-700">
+                                    <div className="max-w-xs truncate" title={report.reason}>
+                                      {report.reason}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                      report.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                      report.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                      'bg-red-100 text-red-800'
+                                    }`}>
+                                      {report.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {new Date(report.created_at).toLocaleDateString()}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    {report.status === 'pending' ? (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedReport(report);
+                                          setShowReviewModal(true);
+                                        }}
+                                        className="text-blue-600 hover:text-blue-900 font-medium"
+                                      >
+                                        Review
+                                      </button>
+                                    ) : (
+                                      <div>
+                                        <div className="text-xs text-gray-500">
+                                          Reviewed by {report.reviewed_by?.name}
+                                        </div>
+                                        {report.admin_note && (
+                                          <div className="text-xs text-gray-600 mt-1">
+                                            Note: {report.admin_note}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
                           </tbody>
                         </table>
                       </div>
@@ -1962,6 +2109,80 @@ const AdminDashboard = () => {
                 >
                   <ShieldOff className="w-4 h-4" />
                   Ban Permanently
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Review Report Modal */}
+      {showReviewModal && selectedReport && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Review Blog Report</h3>
+              
+              <div className="space-y-4 mb-6">
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">Blog:</p>
+                  <p className="font-medium">{selectedReport.blog?.title || 'Deleted Blog'}</p>
+                  <p className="text-sm text-gray-500">by {selectedReport.blog?.author?.name}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">Reporter:</p>
+                  <p>{selectedReport.reporter?.name} ({selectedReport.reporter?.email})</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">Reason:</p>
+                  <p className="text-gray-900">{selectedReport.reason}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">Reported on:</p>
+                  <p className="text-gray-600">{new Date(selectedReport.created_at).toLocaleString()}</p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Admin Note (Optional)
+                  </label>
+                  <textarea
+                    value={adminNote}
+                    onChange={(e) => setAdminNote(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                    rows="3"
+                    placeholder="Add a note about this decision..."
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{adminNote.length}/500 characters</p>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowReviewModal(false);
+                    setSelectedReport(null);
+                    setAdminNote('');
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleReviewReport('reject')}
+                  className="px-4 py-2 text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 rounded-md"
+                >
+                  Reject Report
+                </button>
+                <button
+                  onClick={() => handleReviewReport('approve')}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md"
+                >
+                  Approve & Delete Blog
                 </button>
               </div>
             </div>
