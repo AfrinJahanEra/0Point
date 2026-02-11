@@ -18,7 +18,7 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 SYSTEM_PROMPT = """
 You are an AI assistant specialized strictly in Computer Science and programming.
 
-You may answer questions related to:
+Scope:
 - Programming languages
 - Software development
 - Web development
@@ -144,3 +144,4 @@ def delete_chat(request, chat_id):
     chat.delete()
 
     return JsonResponse({"message": "Chat deleted successfully"})
+
