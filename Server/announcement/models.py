@@ -5,15 +5,16 @@ from contest.models import Contest
 from account.models import Account
 
 class Announcement(Document):
-    contest = ReferenceField(Contest, required=True)
+    contest = ReferenceField(Contest, required=False)
     author = ReferenceField(Account, required=True)
     text = StringField(required=True)
+    topic = StringField(max_length=200)
     problem_index = StringField()
     is_important = BooleanField(default=False)
     is_pinned = BooleanField(default=False)
-    type = StringField(default="info")  # info, warning, important, update
+    type = StringField(default="info")
     created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField()  # ADD THIS FIELD - it can be optional
+    updated_at = DateTimeField()
     
     meta = {
         'collection': 'announcements',
@@ -21,7 +22,7 @@ class Announcement(Document):
             'contest',
             'author',
             'created_at',
-            'updated_at'  # ADD THIS
+            'updated_at'
         ]
     }
     
@@ -35,42 +36,14 @@ class Announcement(Document):
     def to_dict(self):
         return {
             "id": str(self.id),
-            "contest_id": str(self.contest.id),
+            "contest_id": str(self.contest.id) if self.contest else None,
+            "contest_title": self.contest.title if self.contest else None,
             "text": self.text,
+            "topic": self.topic if self.topic else None,
             "problem_index": self.problem_index,
             "author": self.author.name if self.author else self.author.email if self.author else "Unknown",
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if hasattr(self, 'updated_at') and self.updated_at else None,  # ADD THIS
-            "is_important": self.is_important,
-            "is_pinned": self.is_pinned,
-            "type": self.type
-        }
-    contest = ReferenceField(Contest, required=True)
-    author = ReferenceField(Account, required=True)
-    text = StringField(required=True)
-    problem_index = StringField()
-    is_important = BooleanField(default=False)
-    is_pinned = BooleanField(default=False)
-    type = StringField(default="info")  # info, warning, important, update
-    created_at = DateTimeField(default=datetime.utcnow)
-    
-    meta = {
-        'collection': 'announcements',
-        'indexes': [
-            'contest',
-            'author',
-            'created_at'
-        ]
-    }
-    
-    def to_dict(self):
-        return {
-            "id": str(self.id),
-            "contest_id": str(self.contest.id),
-            "text": self.text,
-            "problem_index": self.problem_index,
-            "author": self.author.name if self.author else self.author.email if self.author else "Unknown",
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if hasattr(self, 'updated_at') and self.updated_at else None,
             "is_important": self.is_important,
             "is_pinned": self.is_pinned,
             "type": self.type

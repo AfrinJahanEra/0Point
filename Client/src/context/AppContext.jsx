@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/authService';
+import api from '../utils/api';
 
 const AppContext = createContext();
 
@@ -11,11 +12,31 @@ export const AppProvider = ({ children }) => {
 
   // Check if user is already logged in on app start
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (currentUser && authService.isLoggedIn()) {
-      setUser(currentUser);
-    }
-    setLoading(false);
+    const initializeUser = async () => {
+      const currentUser = authService.getCurrentUser();
+      if (currentUser && authService.isLoggedIn()) {
+        // If user doesn't have name, fetch it from profile API
+        if (!currentUser.name) {
+          try {
+            const response = await api.get('/account/profile/');
+            const updatedUser = {
+              ...currentUser,
+              name: response.data.name
+            };
+            setUser(updatedUser);
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+          } catch (error) {
+            console.error('Error fetching user profile:', error);
+            setUser(currentUser);
+          }
+        } else {
+          setUser(currentUser);
+        }
+      }
+      setLoading(false);
+    };
+    
+    initializeUser();
   }, []);
 
   const login = async (email, password) => {

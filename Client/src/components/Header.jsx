@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Code2, LogOut, User, BarChart2, Video, Users, Copy, Send } from 'lucide-react';
+import NotificationPopup from './NotificationPopup';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
@@ -242,6 +243,8 @@ const Header = () => {
               <BarChart2 className="w-5 h-5" />
               <span className="font-medium">{user ? user.name : 'Dashboard'}</span>
             </Link>
+            
+            {user && <NotificationPopup />}
 
             <div className="relative" ref={profileRef}>
               <button

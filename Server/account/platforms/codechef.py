@@ -199,76 +199,98 @@ def parse_cc_time(title):
 
 
 def fetch_submissions(handle, limit=21):
+    """
+    Fetch recent submissions from CodeChef
+    """
     submissions = []
     page = 0
 
-    while True:
-        url = f"https://www.codechef.com/recent/user?page={page}&user_handle={handle}"
+    try:
+        while True:
+            url = f"https://www.codechef.com/recent/user?page={page}&user_handle={handle}"
+            
+            try:
+                resp = requests.get(url, headers=HEADERS, timeout=50)
+                resp.raise_for_status()
+            except requests.exceptions.RequestException as e:
+                print(f"CodeChef API request failed: {e}")
+                break
 
-        resp = requests.get(url, headers=HEADERS, timeout=50)
-        resp.raise_for_status()
+            try:
+                data = resp.json()
+            except ValueError as e:
+                print(f"CodeChef API returned invalid JSON: {e}")
+                break
+                
+            html = data.get("content", "")
 
-        data = resp.json()
-        html = data.get("content", "")
+            if not html:
+                break  # no more pages
 
-        if not html:
-            break  # no more pages
+            soup = BeautifulSoup(html, "lxml")
+            rows = soup.select("table.dataTable tbody tr")
 
-        soup = BeautifulSoup(html, "lxml")
-        rows = soup.select("table.dataTable tbody tr")
+            if not rows:
+                break  # reached last page
 
-        if not rows:
-            break  # reached last page
+            for row in rows:
+                if len(submissions) >= limit:
+                    return submissions
 
-        for row in rows:
-            if len(submissions) >= limit:
-                return submissions
+                cols = row.find_all("td")
+                if len(cols) < 5:
+                    continue
 
-            cols = row.find_all("td")
-            if len(cols) < 5:
-                continue
+                try:
+                    # ---- Time ----
+                    time_td = cols[0]
+                    time_title = time_td.get("title")
+                    submitted_at = parse_cc_time(time_title)
 
-            # ---- Time ----
-            time_td = cols[0]
-            time_title = time_td.get("title")
-            submitted_at = parse_cc_time(time_title)
+                    # ---- Problem ----
+                    prob_td = cols[1]
+                    prob_code = prob_td.get_text(strip=True)
+                    prob_link_tag = prob_td.find("a")
+                    prob_link = prob_link_tag["href"] if prob_link_tag and prob_link_tag.get("href") else ""
 
-            # ---- Problem ----
-            prob_td = cols[1]
-            prob_code = prob_td.get_text(strip=True)
-            prob_link = prob_td.find("a")["href"]
+                    # ---- Verdict ----
+                    verdict_td = cols[2]
+                    verdict_span = verdict_td.find("span", title=True)
+                    verdict = verdict_span["title"].upper() if verdict_span else "UNKNOWN"
 
-            # ---- Verdict ----
-            verdict_td = cols[2]
-            verdict_span = verdict_td.find("span", title=True)
-            verdict = verdict_span["title"].upper() if verdict_span else "UNKNOWN"
+                    # ---- Language ----
+                    language = cols[3].get_text(strip=True)
 
-            # ---- Language ----
-            language = cols[3].get_text(strip=True)
+                    # ---- Submission ----
+                    sol_td = cols[4]
+                    sol_link_tag = sol_td.find("a")
+                    sol_link = sol_link_tag["href"] if sol_link_tag and sol_link_tag.get("href") else ""
+                    submission_id = sol_link.split("/")[-1] if sol_link else "unknown"
 
-            # ---- Submission ----
-            sol_td = cols[4]
-            sol_link = sol_td.find("a")["href"]
-            submission_id = sol_link.split("/")[-1]
+                    submissions.append({
+                        "platform": "codechef",
+                        "submission_id": submission_id,
+                        "submitted_at": submitted_at,
+                        "verdict": verdict,
+                        "language": language,
+                        "execution_time": None,
+                        "memory": None,
 
-            submissions.append({
-                "platform": "codechef",
-                "submission_id": submission_id,
-                "submitted_at": submitted_at,
-                "verdict": verdict,
-                "language": language,
-                "execution_time": None,
-                "memory": None,
+                        "problem": {
+                            "name": prob_code,
+                            "url": f"https://www.codechef.com{prob_link}" if prob_link else "",
+                            "tags": []
+                        },
 
-                "problem": {
-                    "name": prob_code,
-                    "url": f"https://www.codechef.com{prob_link}",
-                    "tags": []
-                },
+                        "submission_url": f"https://www.codechef.com{sol_link}" if sol_link else ""
+                    })
+                except Exception as e:
+                    print(f"Error parsing CodeChef submission row: {e}")
+                    continue
 
-                "submission_url": f"https://www.codechef.com{sol_link}"
-            })
+            page += 1  # 👉 NEXT PAGE
 
-        page += 1  # 👉 NEXT PAGE
-
+    except Exception as e:
+        print(f"Error fetching CodeChef submissions for {handle}: {e}")
+        
     return submissions

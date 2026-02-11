@@ -110,24 +110,37 @@ def fetch_contests(handle: str):
 # -----------------------------
 # Fetch submissions
 # -----------------------------
-def fetch_submissions(handle: str):
+def fetch_submissions(handle: str, limit: int = 100):
+    """
+    Fetch recent submissions from AtCoder
+    Uses kenkoooo's AtCoder API
+    """
     submissions = []
     try:
         # Fetch from last 5 years to limit results (adjust as needed)
         import time
         from_second = int(time.time()) - (60 * 60 * 24 * 365 * 5)
         url = SUBMISSIONS_URL.format(handle=handle, from_second=from_second)
+        
+        print(f"Fetching AtCoder submissions for: {handle}")
         resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        
         if resp.status_code != 200:
+            print(f"AtCoder API returned status {resp.status_code}")
             return submissions
+            
         data = resp.json()
         if not isinstance(data, list):
+            print("AtCoder API returned non-list data")
             return submissions
+        
+        print(f"Fetched {len(data)} total submissions from AtCoder API")
         
         # Get problem title map
         problem_map = get_problem_map()
         
-        for sub in data:
+        # Limit the number of submissions
+        for sub in data[:limit]:
             contest_id = sub.get('contest_id', '')
             problem_id = sub.get('problem_id', '')
             problem_title = problem_map.get(problem_id, problem_id)  # Fallback to ID if title not found
@@ -140,16 +153,19 @@ def fetch_submissions(handle: str):
                 "problem": {
                     "name": problem_title,
                     "url": f"https://atcoder.jp/contests/{contest_id}/tasks/{problem_id}",
+                    "tags": []
                 },
                 "problem_code": problem_id,
                 "problem_title": problem_title,
                 "verdict": sub.get('result', ''),
                 "submitted_at": datetime.fromtimestamp(sub.get('epoch_second', 0)).isoformat(),
                 "language": sub.get('language', ''),
-                "execution_time": f"{sub.get('execution_time', 0)} ms",
-                "memory": "",  # No memory info in API
-                "tags": [],    # No tags in API
+                "execution_time": f"{sub.get('execution_time', 0)} ms" if sub.get('execution_time') else None,
+                "memory": None,  # No memory info in API
             })
-    except Exception:
-        pass
+            
+        print(f"✓ Returning {len(submissions)} AtCoder submissions")
+    except Exception as e:
+        print(f"✗ Error fetching AtCoder submissions: {e}")
+        
     return submissions

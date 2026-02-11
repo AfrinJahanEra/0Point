@@ -24,6 +24,8 @@ urlpatterns = [
     path("blog/", include("blog.urls")),
     path("", include("Chatapp.urls")),
     path('api/difficulty-prediction/', include('difficulty_prediction.urls')),
+    path('report/', include('report.urls')),
+    path('notification/', include('notification.urls')),
 ]
 
 # Serve media files during development

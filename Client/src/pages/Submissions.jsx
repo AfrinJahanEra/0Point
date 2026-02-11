@@ -75,13 +75,30 @@ const Submissions = () => {
         return;
       }
 
+      console.log('Fetching submissions from all platforms...');
       const res = await api.get('/account/external-submissions/?platform=all');
       const externalSubs = res.data.submissions || [];
+      
+      console.log(`Fetched ${externalSubs.length} submissions from external platforms`);
+      
+      // Log which platforms have submissions
+      const platformCounts = {};
+      externalSubs.forEach(sub => {
+        const platform = sub.platform || 'unknown';
+        platformCounts[platform] = (platformCounts[platform] || 0) + 1;
+      });
+      console.log('Submissions by platform:', platformCounts);
 
       setAllSubmissions(externalSubs);
+      
+      // Show info message if no submissions found
+      if (externalSubs.length === 0) {
+        setError('No submissions found. Add your handles for Codeforces, LeetCode, CodeChef, or AtCoder in your profile to see submissions.');
+      }
     } catch (err) {
-      console.error(err);
-      setError('Failed to load submissions');
+      console.error('Error fetching submissions:', err);
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to load submissions';
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
