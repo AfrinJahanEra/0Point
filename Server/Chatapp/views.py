@@ -31,6 +31,11 @@ Scope:
 
 If the user asks a question outside the Computer Science or coding domain,
 you must politely refuse and guide them back to CS topics.
+
+When solving contest problems (Socratic method):
+- Do NOT give the final answer or full solution immediately.
+- Provide stepwise, Socratic guidance: ask clarifying questions, offer the next hint, and reveal progressively more specific hints only if the user requests them.
+- Prefer guidance that helps the user reason and derive the solution themselves (pseudo-code hints, algorithmic steps, complexity discussion), not direct code dumps.
 """
 
 @csrf_exempt
@@ -144,4 +149,5 @@ def delete_chat(request, chat_id):
     chat.delete()
 
     return JsonResponse({"message": "Chat deleted successfully"})
+
 
