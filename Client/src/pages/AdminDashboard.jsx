@@ -845,26 +845,6 @@ const AdminDashboard = () => {
                 </li>
                 <li>
                   <button
-                    onClick={() => handleTabChange('user_reports')}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
-                      activeTab === 'user_reports'
-                        ? 'bg-red-800 text-white' 
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <AlertCircle className="w-5 h-5" />
-                      <span className="font-medium">Reports</span>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      activeTab === 'user_reports' ? 'bg-white/20' : 'bg-red-100 text-red-700'
-                    }`}>
-                      0
-                    </span>
-                  </button>
-                </li>
-                <li>
-                  <button
                     onClick={() => handleTabChange('blogs')}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'blogs' 
@@ -888,7 +868,7 @@ const AdminDashboard = () => {
                     onClick={() => handleTabChange('reports')}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                       activeTab === 'reports' 
-                        ? 'bg-orange-600 text-white' 
+                        ? 'bg-red-800 text-white' 
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
@@ -897,7 +877,7 @@ const AdminDashboard = () => {
                       <span className="font-medium">Reports</span>
                     </div>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      activeTab === 'reports' ? 'bg-white/20' : 'bg-orange-100 text-orange-700'
+                      activeTab === 'reports' ? 'bg-white/20' : 'bg-red-100 text-red-700'
                     }`}>
                       {blogReports.filter(r => r.status === 'pending').length}
                     </span>
@@ -1352,7 +1332,7 @@ const AdminDashboard = () => {
                             onClick={() => setReportFilter('blog')}
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                               reportFilter === 'blog'
-                                ? 'bg-orange-600 text-white'
+                                ? 'bg-red-800 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                           >
@@ -1362,7 +1342,7 @@ const AdminDashboard = () => {
                             onClick={() => setReportFilter('user')}
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                               reportFilter === 'user'
-                                ? 'bg-orange-600 text-white'
+                                ? 'bg-red-800 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                             disabled
@@ -1373,7 +1353,7 @@ const AdminDashboard = () => {
                             onClick={() => setReportFilter('submission')}
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                               reportFilter === 'submission'
-                                ? 'bg-orange-600 text-white'
+                                ? 'bg-red-800 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                             disabled
