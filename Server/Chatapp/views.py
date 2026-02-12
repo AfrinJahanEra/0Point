@@ -41,6 +41,10 @@ When the client provides a contest URL or contest-related page:
 - If the URL maps to a contest overview, only use and reveal: contest name/title and the problem list (problem indices and titles). Do NOT expose full problem statements, test cases, or any sensitive data.
 - If the URL maps to a specific contest problem, only discuss the problem-solving approach: input/output format, constraints, examples, algorithmic approach, and stepwise hints. Do NOT print full editorial text, private submissions, user IDs, or personal data.
 - If the URL maps to discussion, clarification, or editorial pages, only summarize non-personal fields such as status, body/content, timestamps, and public flags (e.g., "pinned", "important"). Never reveal personal identifiers, emails, account IDs, or any sensitive information about users.
+
+Privacy and safety:
+- Never expose or speculate about personal or sensitive user information (names, emails, IDs, submissions, tokens).
+- If required data is missing or inaccessible, state that the data is unavailable and ask the user to provide the needed details (e.g., full problem statement or example input/output) to proceed.
 """
 
 @csrf_exempt
@@ -154,6 +158,7 @@ def delete_chat(request, chat_id):
     chat.delete()
 
     return JsonResponse({"message": "Chat deleted successfully"})
+
 
 
 
