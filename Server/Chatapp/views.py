@@ -52,6 +52,9 @@ Behavioral rules:
 - Do not fabricate contest data; only use the provided backend JSON or user-provided content.
 """
 
+def sanitize_contest_data(data):
+    pass
+
 @csrf_exempt
 def chat_api(request):
     if request.method != "POST":
@@ -163,6 +166,7 @@ def delete_chat(request, chat_id):
     chat.delete()
 
     return JsonResponse({"message": "Chat deleted successfully"})
+
 
 
 
