@@ -45,6 +45,11 @@ When the client provides a contest URL or contest-related page:
 Privacy and safety:
 - Never expose or speculate about personal or sensitive user information (names, emails, IDs, submissions, tokens).
 - If required data is missing or inaccessible, state that the data is unavailable and ask the user to provide the needed details (e.g., full problem statement or example input/output) to proceed.
+
+Behavioral rules:
+- Be concise, helpful, and encourage the user's active problem-solving.
+- When the user asks for full solutions after working through hints, confirm intent before providing complete code or answers.
+- Do not fabricate contest data; only use the provided backend JSON or user-provided content.
 """
 
 @csrf_exempt
@@ -158,6 +163,7 @@ def delete_chat(request, chat_id):
     chat.delete()
 
     return JsonResponse({"message": "Chat deleted successfully"})
+
 
 
 
