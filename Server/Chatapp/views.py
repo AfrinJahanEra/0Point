@@ -53,6 +53,9 @@ Behavioral rules:
 """
 
 def sanitize_contest_data(data):
+    if not isinstance(data, dict):
+        return data
+        
     pass
 
 @csrf_exempt
@@ -166,6 +169,7 @@ def delete_chat(request, chat_id):
     chat.delete()
 
     return JsonResponse({"message": "Chat deleted successfully"})
+
 
 
 
