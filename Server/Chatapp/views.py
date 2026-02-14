@@ -65,6 +65,15 @@ def sanitize_contest_data(data):
             continue
         if key.lower() in sensitive_keys:
             continue
+        if isinstance(value, dict):
+            result[key] = sanitize_contest_data(value)
+        elif isinstance(value, list):
+            result[key] = [
+                sanitize_contest_data(item) if isinstance(item, dict) else item
+                for item in value
+            ]
+        else:
+            result[key] = value
     return result
 
 @csrf_exempt
@@ -178,6 +187,7 @@ def delete_chat(request, chat_id):
     chat.delete()
 
     return JsonResponse({"message": "Chat deleted successfully"})
+
 
 
 
