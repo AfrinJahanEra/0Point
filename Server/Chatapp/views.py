@@ -60,7 +60,12 @@ def sanitize_contest_data(data):
     sensitive_keys = ["email", "password", "token", "id", "phone", "address", "ssn", "bank_account", "credit_card"]
 
     result = {}
-    pass
+    for key, value in data.items():
+        if key in user_fields:
+            continue
+        if key.lower() in sensitive_keys:
+            continue
+    return result
 
 @csrf_exempt
 def chat_api(request):
@@ -173,6 +178,7 @@ def delete_chat(request, chat_id):
     chat.delete()
 
     return JsonResponse({"message": "Chat deleted successfully"})
+
 
 
 
