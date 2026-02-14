@@ -76,6 +76,7 @@ def sanitize_contest_data(data):
             result[key] = value
     return result
 
+
 @csrf_exempt
 def chat_api(request):
     if request.method != "POST":
@@ -85,6 +86,8 @@ def chat_api(request):
         data = json.loads(request.body)
         user_text = data.get("message", "").strip()
         chat_id = data.get("chat_id")
+        # Accept current page URL from client (either `current_url` or `url`)
+        current_url = data.get("current_url") or data.get("url")
 
         if not user_text:
             return JsonResponse({"error": "Empty message"}, status=400)
@@ -104,21 +107,89 @@ def chat_api(request):
                 title=user_text[:40]
             ).save()
 
-        # Save user message
+        # Save user message (with optional current URL)
         ChatMessage(
             chat=chat,
             role="user",
-            content=user_text
+            content=user_text,
+            url=current_url
         ).save()
+
+        # If client provided a current URL, try to fetch its data.
+        # If the URL looks like a contest route (SPA path), call the backend contest API
+        # so we get structured JSON rather than the frontend HTML.
+        from urllib.parse import urlparse
+
+        page_data_str = None
+        if current_url:
+            try:
+                parsed = urlparse(current_url)
+                path = parsed.path or "/"
+
+                # Build backend base URL from incoming request (this server)
+                scheme = request.scheme
+                host = request.get_host()
+                backend_base = f"{scheme}://{host}"
+
+                headers = {}
+                auth = request.META.get("HTTP_AUTHORIZATION")
+                if auth:
+                    headers["Authorization"] = auth
+
+                # If the path looks like a contest frontend route, call the corresponding
+                # backend API under this Django server (which exposes /contests/... endpoints)
+                if path.startswith("/contests/"):
+                    # Prefer the backend API path (same path) which returns JSON
+                    backend_url = backend_base + path
+                    # Ensure trailing slash for Django endpoints
+                    if not backend_url.endswith("/"):
+                        backend_url = backend_url + "/"
+
+                    resp = requests.get(backend_url, headers=headers, timeout=6)
+                    ctype = resp.headers.get("Content-Type", "")
+                    if "application/json" in ctype:
+                        page_json = resp.json()
+                        # Sanitize sensitive data before including in chatbot context
+                        page_json = sanitize_contest_data(page_json)
+                        page_data_str = json.dumps(page_json, default=str, indent=2)
+                    else:
+                        # Fallback to text (shortened)
+                        page_data_str = resp.text[:4000]
+                else:
+                    # Not a contest SPA route — attempt to fetch the URL directly
+                    resp = requests.get(current_url, headers=headers, timeout=5)
+                    ctype = resp.headers.get("Content-Type", "")
+                    if "application/json" in ctype:
+                        try:
+                            page_json = resp.json()
+                            # Sanitize sensitive data before including in chatbot context
+                            page_json = sanitize_contest_data(page_json)
+                            page_data_str = json.dumps(page_json, default=str, indent=2)
+                        except Exception:
+                            page_data_str = resp.text[:4000]
+                    else:
+                        page_data_str = resp.text[:4000]
+            except Exception as e:
+                page_data_str = f"Failed to fetch page data: {str(e)}"
 
         # Build Gemini context
         messages = [{"role": "user", "parts": [SYSTEM_PROMPT]}]
 
         history = ChatMessage.objects(chat=chat).order_by("created_at")
         for msg in history:
+            parts = [msg.content]
+            if getattr(msg, "url", None):
+                parts.append(f"[page_url: {msg.url}]")
             messages.append({
                 "role": "user" if msg.role == "user" else "model",
-                "parts": [msg.content]
+                "parts": parts
+            })
+
+        # Add the fetched page data into the prompt context so the model can use it
+        if page_data_str:
+            messages.append({
+                "role": "user",
+                "parts": [f"Page data fetched from {current_url}: {page_data_str}"]
             })
 
         model = genai.GenerativeModel("gemini-2.5-flash")
@@ -134,7 +205,9 @@ def chat_api(request):
 
         return JsonResponse({
             "chat_id": str(chat.id),
-            "reply": ai_reply
+            "reply": ai_reply,
+            "current_url": current_url,
+            "page_data": page_data_str,
         })
 
     except Exception as e:
@@ -187,6 +260,7 @@ def delete_chat(request, chat_id):
     chat.delete()
 
     return JsonResponse({"message": "Chat deleted successfully"})
+
 
 
 
