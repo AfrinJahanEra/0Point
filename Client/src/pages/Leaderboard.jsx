@@ -1,6 +1,22 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import Sidebar from '../components/Sidebar';
+import React, { useState } from 'react';
+import { 
+  Trophy, 
+  User, 
+  TrendingUp, 
+  TrendingDown, 
+  Minus,
+  Medal,
+  Star,
+  Award,
+  Crown,
+  Target,
+  Zap,
+  Flame,
+  Filter,
+  Search,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 
 const Leaderboard = () => {
 
