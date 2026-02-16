@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'blog',
     'Chatapp',
     'difficulty_prediction',
+    'public_leaderboard',
 ]
 
 MIDDLEWARE = [
@@ -248,5 +249,6 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 JD_CLIENT_ID = os.getenv('JD_CLIENT_ID')
 JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET')
 JD_API_URL = os.getenv('JD_API_URL', 'https://api.jdoodle.com/v1/execute')
+
 
 
