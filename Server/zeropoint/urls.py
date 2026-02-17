@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/difficulty-prediction/', include('difficulty_prediction.urls')),
     path('report/', include('report.urls')),
     path('notification/', include('notification.urls')),
+    path('', include('public_leaderboard.urls')),
 ]
 
 # Serve media files during development
@@ -38,3 +39,4 @@ if settings.DEBUG:
         }),
 
     ]
+
