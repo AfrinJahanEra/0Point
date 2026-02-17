@@ -5,3 +5,6 @@ from rest_framework import status
 from account.models import Account
 from contest.models import ContestRegistration
 from .serializers import LeaderboardSerializer
+
+class GlobalLeaderboardView(APIView):
+  pass
