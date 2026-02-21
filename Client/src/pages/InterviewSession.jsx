@@ -507,12 +507,30 @@ const InterviewSession = () => {
           }
           else if (data.type === 'offer') {
             try {
-              console.log('Received offer, creating answer...');
+              console.log('Received offer, current state:', pc.current?.signalingState);
               if (!pc.current) {
                 console.error('PeerConnection not initialized');
                 return;
               }
+              
+              // Handle glare: if we're also trying to send an offer (have-local-offer state)
+              // The candidate (non-interviewer) should be "polite" and accept incoming offers
+              // The interviewer should be "impolite" and ignore incoming offers when they have pending offers
+              const isPolite = role !== 'interviewer';
+              const offerCollision = pc.current.signalingState !== 'stable';
+              
+              if (offerCollision) {
+                if (!isPolite) {
+                  console.log('Ignoring offer due to collision (impolite peer)');
+                  return;
+                }
+                // Polite peer: rollback our offer and accept the incoming one
+                console.log('Rolling back local offer to accept incoming (polite peer)');
+                await pc.current.setLocalDescription({ type: 'rollback' });
+              }
+              
               await pc.current.setRemoteDescription(new RTCSessionDescription(data.offer));
+              console.log('Remote offer set, creating answer...');
               const answer = await pc.current.createAnswer();
               await pc.current.setLocalDescription(answer);
               if (ws.current?.readyState === WebSocket.OPEN) {
@@ -524,9 +542,14 @@ const InterviewSession = () => {
             }
           } else if (data.type === 'answer') {
             try {
-              console.log('Received answer, setting remote description...');
+              console.log('Received answer, current state:', pc.current?.signalingState);
               if (!pc.current) {
                 console.error('PeerConnection not initialized');
+                return;
+              }
+              // Only set remote description if we're expecting an answer
+              if (pc.current.signalingState !== 'have-local-offer') {
+                console.log('Ignoring answer - not in have-local-offer state');
                 return;
               }
               await pc.current.setRemoteDescription(new RTCSessionDescription(data.answer));
@@ -561,25 +584,34 @@ const InterviewSession = () => {
         };
         
         // Handle ICE connection state changes
+        let iceRestartInProgress = false;
         peerConnection.oniceconnectionstatechange = () => {
           console.log('ICE connection state:', peerConnection.iceConnectionState);
           if (peerConnection.iceConnectionState === 'connected') {
             console.log('ICE connection established!');
             setPeerConnectionStatus('connected');
-          } else if (peerConnection.iceConnectionState === 'failed') {
+            iceRestartInProgress = false;
+          } else if (peerConnection.iceConnectionState === 'failed' && !iceRestartInProgress) {
             console.warn('ICE connection failed, attempting ICE restart...');
-            // Attempt ICE restart
-            if (role === 'interviewer' && ws.current?.readyState === WebSocket.OPEN) {
+            // Only interviewer initiates ICE restart to avoid conflicts
+            if (role === 'interviewer' && ws.current?.readyState === WebSocket.OPEN && peerConnection.signalingState === 'stable') {
+              iceRestartInProgress = true;
               setTimeout(async () => {
                 try {
+                  if (peerConnection.signalingState !== 'stable') {
+                    console.log('Cannot restart ICE - not in stable state');
+                    iceRestartInProgress = false;
+                    return;
+                  }
                   const offer = await peerConnection.createOffer({ iceRestart: true });
                   await peerConnection.setLocalDescription(offer);
                   ws.current.send(JSON.stringify({ type: 'offer', offer: offer }));
                   console.log('ICE restart offer sent');
                 } catch (e) {
                   console.error('ICE restart failed:', e);
+                  iceRestartInProgress = false;
                 }
-              }, 1000);
+              }, 2000);
             }
           } else if (peerConnection.iceConnectionState === 'disconnected') {
             console.warn('ICE connection disconnected, waiting for reconnection...');
@@ -591,16 +623,11 @@ const InterviewSession = () => {
           console.log('PeerConnection state:', peerConnection.connectionState);
           setPeerConnectionStatus(peerConnection.connectionState);
           
-          // Handle connection failures
-          if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
-            console.warn('Peer connection failed, attempting reconnect...');
-            setTimeout(() => {
-              if (ws.current?.readyState === WebSocket.OPEN) {
-                createAndSendOffer();
-              }
-            }, 2000);
-          } else if (peerConnection.connectionState === 'connected') {
+          // Only log state changes, let oniceconnectionstatechange handle restarts
+          if (peerConnection.connectionState === 'connected') {
             console.log('Peer connection established successfully!');
+          } else if (peerConnection.connectionState === 'failed') {
+            console.warn('Peer connection failed');
           }
         };
 
