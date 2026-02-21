@@ -188,8 +188,12 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
 ]
 
+# Also allow all origins for now (can be removed once verified working)
+CORS_ALLOW_ALL_ORIGINS = True
+
 # Allow all CORS headers and methods
 CORS_ALLOW_CREDENTIALS = True
+CORS_PREFLIGHT_MAX_AGE = 86400  # Cache preflight for 24 hours
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
