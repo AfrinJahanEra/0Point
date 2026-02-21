@@ -29,7 +29,8 @@ const InterviewSession = () => {
   
   // Backend URL configuration
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-    (role === 'interviewer' ? 'interviewer@example.com' : 'candidate@example.com');
+  // WebSocket URL - convert http(s) to ws(s)
+  const wsUrl = backendUrl.replace(/^http/, 'ws');
 
   // Video refs
   const localVideoRef = useRef(null);
@@ -140,7 +141,7 @@ const InterviewSession = () => {
 
     try {
       console.log('Uploading PDF:', file.name, 'size:', file.size);
-      const res = await fetch(`/api/pdf/upload/session/${sessionId}/`, {
+      const res = await fetch(`${backendUrl}/api/pdf/upload/session/${sessionId}/`, {
         method: 'POST',
         body: formData,
       });
@@ -160,26 +161,35 @@ const InterviewSession = () => {
       console.error('PDF upload failed:', err);
       alert(`Failed to upload PDF: ${err.message}`);
     }
-  }, [sessionId]);
+  }, [sessionId, email, backendUrl]);
 
   const createAndSendOffer = useCallback(async () => {
-    if (!pc.current || pc.current.signalingState !== 'stable') {
-      console.log('PeerConnection not ready for offer');
+    if (!pc.current) {
+      console.log('PeerConnection not initialized');
+      return;
+    }
+    if (pc.current.signalingState !== 'stable') {
+      console.log('PeerConnection not ready for offer, state:', pc.current.signalingState);
+      return;
+    }
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.log('WebSocket not ready');
       return;
     }
     
     try {
       console.log('Creating offer...');
-      const offer = await pc.current.createOffer();
+      const offer = await pc.current.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
       await pc.current.setLocalDescription(offer);
       
-      if (ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({
-          type: 'offer',
-          offer: pc.current.localDescription
-        }));
-        console.log('Offer sent to remote participant');
-      }
+      ws.current.send(JSON.stringify({
+        type: 'offer',
+        offer: pc.current.localDescription
+      }));
+      console.log('Offer sent to remote participant');
     } catch (err) {
       console.error('Failed to create offer:', err);
     }
@@ -187,7 +197,7 @@ const InterviewSession = () => {
 
   const fetchLatestPDF = useCallback(async () => {
     try {
-      const res = await fetch(`/api/pdf/upload/session/${sessionId}/`);
+      const res = await fetch(`${backendUrl}/api/pdf/upload/session/${sessionId}/`);
       const contentType = res.headers.get('content-type');
       if (!res.ok || !contentType?.includes('application/json')) {
         throw new Error('Invalid API response');
@@ -200,11 +210,30 @@ const InterviewSession = () => {
     } catch (err) {
       console.warn('PDF fetch failed:', err.message);
     }
-  }, [sessionId]);
+  }, [sessionId, backendUrl]);
+
+  // PDF polling fallback when WebSocket is not connected
+  const pdfPollIntervalRef = useRef(null);
+  
+  useEffect(() => {
+    // Start PDF polling as fallback (every 5 seconds)
+    pdfPollIntervalRef.current = setInterval(() => {
+      // Only poll if video WebSocket is not connected
+      if (ws.current?.readyState !== WebSocket.OPEN) {
+        fetchLatestPDF();
+      }
+    }, 5000);
+    
+    return () => {
+      if (pdfPollIntervalRef.current) {
+        clearInterval(pdfPollIntervalRef.current);
+      }
+    };
+  }, [fetchLatestPDF]);
 
 
   const initCodeSync = useCallback(() => {
-    const codeSocket = new WebSocket(`ws://localhost:8000/ws/code/${sessionId}/`);
+    const codeSocket = new WebSocket(`${wsUrl}/ws/code/${sessionId}/`);
     codeWs.current = codeSocket;
 
     codeSocket.onopen = () => {
@@ -240,7 +269,7 @@ const InterviewSession = () => {
     return () => {
       codeSocket.close();
     };
-  }, [sessionId]);
+  }, [sessionId, wsUrl]);
 
 
   const debouncedSync = useRef(null);
@@ -349,7 +378,13 @@ const InterviewSession = () => {
         console.log('Media devices successfully initialized');
 
         const peerConnection = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' }
+          ]
         });
         pc.current = peerConnection;
         
@@ -363,34 +398,56 @@ const InterviewSession = () => {
 
 
 
-        const websocket = new WebSocket(`ws://localhost:8000/ws/video/${sessionId}/?role=${role}&email=${encodeURIComponent(email)}`);
+        const websocket = new WebSocket(`${wsUrl}/ws/video/${sessionId}/?role=${role}&email=${encodeURIComponent(email)}`);
         ws.current = websocket;
+        
+        // Track reconnection attempts
+        let videoWsReconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
 
         websocket.onopen = () => {
           console.log(`WebSocket connected as ${role} (${email})`);
           setVideoConnectionStatus('connected');
+          videoWsReconnectAttempts = 0; // Reset on successful connection
           
           // Wait a moment for participant list to sync
           setTimeout(() => {
             const participantCount = Object.keys(connectedParticipantsRef.current).length;
             console.log(`Current participants: ${participantCount}`);
             
-            // If we're the only one, wait for others
-            // If both are here, initiate connection
-            if (participantCount >= 2) {
-              // Both participants present - initiate connection
-              console.log('Both participants detected, initiating connection...');
+            // Only interviewer initiates the offer to avoid race conditions
+            if (participantCount >= 2 && role === 'interviewer') {
+              console.log('Both participants detected, interviewer initiating connection...');
               setTimeout(() => {
                 createAndSendOffer();
               }, 500);
+            } else if (participantCount >= 2 && role === 'client') {
+              console.log('Both participants detected, waiting for offer from interviewer...');
             }
           }, 1000);
         };
 
-        websocket.onclose = () => {
-          console.log('Video WebSocket disconnected');
+        websocket.onclose = (event) => {
+          console.log('Video WebSocket disconnected, code:', event.code);
           setVideoConnectionStatus('disconnected');
-          // Optional: auto-reconnect
+          
+          // Auto-reconnect with exponential backoff
+          if (videoWsReconnectAttempts < maxReconnectAttempts && !cleanupScheduled) {
+            const delay = Math.min(1000 * Math.pow(2, videoWsReconnectAttempts), 10000);
+            console.log(`Video WS reconnecting in ${delay}ms (attempt ${videoWsReconnectAttempts + 1})`);
+            videoWsReconnectAttempts++;
+            setTimeout(() => {
+              if (!cleanupScheduled) {
+                const newWs = new WebSocket(`${wsUrl}/ws/video/${sessionId}/?role=${role}&email=${encodeURIComponent(email)}`);
+                ws.current = newWs;
+                // Reattach handlers
+                newWs.onopen = websocket.onopen;
+                newWs.onclose = websocket.onclose;
+                newWs.onerror = websocket.onerror;
+                newWs.onmessage = websocket.onmessage;
+              }
+            }, delay);
+          }
         };
 
         websocket.onerror = (e) => {
@@ -425,9 +482,9 @@ const InterviewSession = () => {
             
             setParticipants(data.participants);
             
-            // When a new participant joins and we're already connected
-            if (data.count === 2 && pc.current?.signalingState === 'stable') {
-              console.log('New participant joined, initiating connection...');
+            // When a new participant joins, only interviewer initiates connection
+            if (data.count === 2 && role === 'interviewer' && pc.current?.signalingState === 'stable') {
+              console.log('New participant joined, interviewer initiating connection...');
               setTimeout(() => {
                 createAndSendOffer();
               }, 500);
@@ -435,23 +492,38 @@ const InterviewSession = () => {
           }
           else if (data.type === 'offer') {
             try {
-              await peerConnection.setRemoteDescription(data.offer);
-              const answer = await peerConnection.createAnswer();
-              await peerConnection.setLocalDescription(answer);
-              websocket.send(JSON.stringify({ type: 'answer', answer: peerConnection.localDescription }));
+              console.log('Received offer, creating answer...');
+              if (!pc.current) {
+                console.error('PeerConnection not initialized');
+                return;
+              }
+              await pc.current.setRemoteDescription(new RTCSessionDescription(data.offer));
+              const answer = await pc.current.createAnswer();
+              await pc.current.setLocalDescription(answer);
+              if (ws.current?.readyState === WebSocket.OPEN) {
+                ws.current.send(JSON.stringify({ type: 'answer', answer: pc.current.localDescription }));
+                console.log('Answer sent');
+              }
             } catch (err) {
               console.error('Error handling offer:', err);
             }
           } else if (data.type === 'answer') {
             try {
-              await peerConnection.setRemoteDescription(data.answer);
+              console.log('Received answer, setting remote description...');
+              if (!pc.current) {
+                console.error('PeerConnection not initialized');
+                return;
+              }
+              await pc.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+              console.log('Remote description set successfully');
             } catch (err) {
               console.error('Error handling answer:', err);
             }
           } else if (data.type === 'ice_candidate') {
             try {
-              if (data.ice_candidate) {
-                await peerConnection.addIceCandidate(data.ice_candidate);
+              if (data.ice_candidate && pc.current) {
+                console.log('Adding ICE candidate...');
+                await pc.current.addIceCandidate(new RTCIceCandidate(data.ice_candidate));
               }
             } catch (err) {
               console.error('Error adding ICE candidate:', err);
@@ -461,9 +533,9 @@ const InterviewSession = () => {
 
         peerConnection.onicecandidate = (e) => {
           try {
-            if (e.candidate && websocket.readyState === WebSocket.OPEN) {
-              console.log('Sending ICE candidate');
-              websocket.send(JSON.stringify({
+            if (e.candidate && ws.current?.readyState === WebSocket.OPEN) {
+              console.log('Sending ICE candidate:', e.candidate.candidate.substring(0, 50) + '...');
+              ws.current.send(JSON.stringify({
                 type: 'ice_candidate',
                 ice_candidate: e.candidate
               }));
@@ -491,7 +563,7 @@ const InterviewSession = () => {
           if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
             console.warn('Peer connection failed, attempting reconnect...');
             setTimeout(() => {
-              if (websocket.readyState === WebSocket.OPEN) {
+              if (ws.current?.readyState === WebSocket.OPEN) {
                 createAndSendOffer();
               }
             }, 2000);
@@ -504,48 +576,31 @@ const InterviewSession = () => {
           console.log('Signaling state:', peerConnection.signalingState);
         };
         
-        // Log track events
+        // Handle remote tracks
         peerConnection.ontrack = (event) => {
-          console.log('Received remote track:', event.track.kind);
+          console.log('Received remote track:', event.track.kind, 'streams:', event.streams.length);
           
-          if (event.track.kind === 'video') {
-            // Use a timeout to ensure the video element is ready
-            setTimeout(() => {
-              if (remoteVideoRef.current) {
-                // Check if the stream is different from current stream to avoid flickering
-                if (remoteVideoRef.current.srcObject !== event.streams[0]) {
-                  remoteVideoRef.current.srcObject = event.streams[0];
-                  console.log('Remote video stream set');
-                  
-                  // Ensure the video plays automatically
-                  if (remoteVideoRef.current.readyState >= 1) {
-                    remoteVideoRef.current.play().catch(e => {
-                      console.warn('Auto-play prevented for remote video:', e);
-                    });
-                  } else {
-                    // Wait for the video element to be ready
-                    remoteVideoRef.current.onloadedmetadata = () => {
-                      remoteVideoRef.current.play().catch(e => {
-                        console.warn('Auto-play prevented for remote video after metadata load:', e);
-                      });
-                    };
-                  }
-                }
+          if (event.streams && event.streams[0]) {
+            const remoteStream = event.streams[0];
+            
+            if (remoteVideoRef.current) {
+              // Always set the stream for both audio and video
+              if (remoteVideoRef.current.srcObject !== remoteStream) {
+                console.log('Setting remote stream to video element');
+                remoteVideoRef.current.srcObject = remoteStream;
+                
+                // Play the video
+                remoteVideoRef.current.play().catch(e => {
+                  console.warn('Auto-play prevented:', e);
+                  // Add click-to-play fallback
+                  remoteVideoRef.current.muted = true;
+                  remoteVideoRef.current.play().catch(() => {});
+                });
               }
-            }, 0);
+            }
           }
         };
         
-        // Add local tracks to peer connection
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => {
-            console.log('Adding local track:', track.kind);
-            peerConnection.addTrack(track, streamRef.current);
-          });
-        }
-
-
-
       } catch (err) {
         console.error('Media/init failed:', err);
         
@@ -663,7 +718,7 @@ const InterviewSession = () => {
         remoteVideoRef.current.load(); // Reset the video element
       }
     };
-  }, [sessionId, role, email, checkPermissions, fetchLatestPDF, initCodeSync]);
+  }, [sessionId, role, email, wsUrl, checkPermissions, fetchLatestPDF, initCodeSync]);
 
 
   const toggleVideo = async () => {
@@ -1071,6 +1126,7 @@ const InterviewSession = () => {
             placeholder="// Start coding here..."
           />
           <SyntaxHighlighter
+            key={`${language}-${code.length}`}
             language={language}
             style={atomOneDark}
             customStyle={{

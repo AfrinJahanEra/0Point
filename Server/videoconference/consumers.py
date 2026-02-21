@@ -19,32 +19,43 @@ class VideoConsumer(AsyncWebsocketConsumer):
         self.role = params.get('role', [None])[0]
         self.email = params.get('email', [None])[0]
 
-        print(f"🔌 {self.role} joining PDF group: pdf_{self.session_id}")  # 🔴 ADD DEBUG LOG
+        print(f"[VideoConsumer] Connection attempt - Session: {self.session_id}, Role: {self.role}, Email: {self.email}")
 
         if self.role not in ['interviewer', 'client']:
+            print(f"[VideoConsumer] REJECTED: Invalid role '{self.role}'")
             await self.close()
             return
 
+        # Try to find existing session, or create a placeholder for ad-hoc sessions
         try:
             session = await sync_to_async(VideoSession.objects.get)(id=uuid.UUID(self.session_id))
             if not self.email:
                 self.email = session.interviewer_email if self.role == 'interviewer' else session.candidate_email
-        except (VideoSession.DoesNotExist, ValueError):
+            print(f"[VideoConsumer] Session found: {session.id}")
+        except VideoSession.DoesNotExist:
+            # Allow connection for ad-hoc sessions (session will be created when needed)
+            print(f"[VideoConsumer] Session {self.session_id} not found, allowing ad-hoc connection")
+            # Don't reject - allow WebSocket connection for real-time features
+        except ValueError as e:
+            print(f"[VideoConsumer] REJECTED: Invalid session ID format: {e}")
             await self.close()
             return
 
         if self.session_id not in connected:
             connected[self.session_id] = {}
 
+        # Allow reconnection by removing stale connection
         if self.role in connected[self.session_id]:
-            await self.close()
-            return
+            print(f"[VideoConsumer] Replacing existing {self.role} connection")
+            # Don't reject, just replace the old connection
 
         connected[self.session_id][self.role] = {'email': self.email}
 
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.channel_layer.group_add(self.pdf_group_name, self.channel_name)
         await self.accept()
+        
+        print(f"[VideoConsumer] ACCEPTED: {self.role} connected to session {self.session_id}")
 
         await self.broadcast_participant_list()
 
