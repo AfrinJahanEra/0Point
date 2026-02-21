@@ -17,3 +17,9 @@ gunicorn>=20.1.0
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
 google-generativeai>=0.3.0
+
+# ML dependencies for difficulty prediction
+numpy>=1.26.0
+scikit-learn>=1.3.0
+pandas>=2.1.0
+joblib>=1.3.0
