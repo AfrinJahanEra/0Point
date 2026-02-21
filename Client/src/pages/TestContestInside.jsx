@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 import { 
   Calendar, Clock, Users, School, Play, Code2, 
   History, Trophy, MessageSquare, Download, Flag,
@@ -135,7 +136,7 @@ const TestContestInside = () => {
     
     try {
       const contestRes = await axios.get(
-        `http://localhost:8000/test-contests/${testContestId}/`, 
+        `${BACKEND_URL}/test-contests/${testContestId}/`,
         { headers: getHeaders() }
       );
       
@@ -149,7 +150,7 @@ const TestContestInside = () => {
       let problemsList = [];
       try {
         const problemsRes = await axios.get(
-          `http://localhost:8000/test-contests/${testContestId}/problems/`, 
+          `${BACKEND_URL}/test-contests/${testContestId}/problems/`,
           { headers: getHeaders() }
         );
         
@@ -272,7 +273,7 @@ const TestContestInside = () => {
   const handleRegister = async () => {
     try {
       const response = await axios.post(
-        `http://localhost:8000/test-contests/${testContestId}/register/`,
+        `${BACKEND_URL}/test-contests/${testContestId}/register/`,
         {},
         { headers: getHeaders() }
       );

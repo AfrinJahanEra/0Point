@@ -1,6 +1,7 @@
 // components/ScreenRecorder.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 
 const ScreenRecorder = ({ contestId, userId, contestStatus, onRecordingComplete }) => {
   const [recording, setRecording] = useState(() => window.__recordingActive || false);
@@ -67,7 +68,7 @@ useEffect(() => {
 const checkRecordingRequirements = async () => {
   try {
     const res = await axios.get(
-      `http://localhost:8000/contests/${contestId}/recording/status/`,
+      `${BACKEND_URL}/contests/${contestId}/recording/status/`,
       { headers: { Authorization: `Bearer ${TOKEN}` } }
     );
 
@@ -119,7 +120,7 @@ useEffect(() => {
 const syncRecordingStatus = async () => {
   try {
     const res = await axios.get(
-      `http://localhost:8000/contests/${contestId}/recording/status/`,
+      `${BACKEND_URL}/contests/${contestId}/recording/status/`,
       { headers: { Authorization: `Bearer ${TOKEN}` } }
     );
     
@@ -164,7 +165,7 @@ const syncRecordingStatus = async () => {
     if (recordingIdRef.current) {
       try {
         await axios.post(
-          `http://localhost:8000/contests/${contestId}/recording/${recordingIdRef.current}/stop/`,
+          `${BACKEND_URL}/contests/${contestId}/recording/${recordingIdRef.current}/stop/`,
           {},
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
@@ -186,7 +187,7 @@ const syncRecordingStatus = async () => {
       setError(null);
 
       const res = await axios.post(
-        `http://localhost:8000/contests/${contestId}/recording/start/`,
+        `${BACKEND_URL}/contests/${contestId}/recording/start/`,
         {},
         { headers: { Authorization: `Bearer ${TOKEN}` } }
       );
@@ -264,7 +265,7 @@ const syncRecordingStatus = async () => {
       form.append('video', blob, `recording-${contestId}-${userId}.webm`);
 
       const res = await axios.post(
-        `http://localhost:8000/contests/${contestId}/recording/${recordingIdRef.current}/upload/`,
+        `${BACKEND_URL}/contests/${contestId}/recording/${recordingIdRef.current}/upload/`,
         form,
         {
           headers: {

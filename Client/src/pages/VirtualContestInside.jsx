@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 import { 
   Calendar, Clock, Users, School, Play, Code2, 
   History, Trophy, MessageSquare, Download, Flag,
@@ -99,7 +100,7 @@ const VirtualContestInside = () => {
     try {
       // 1. Fetch virtual contest details
       const virtualContestRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/virtual/${virtualContestId}/`, 
+        `${BACKEND_URL}/contests/${contestId}/virtual/${virtualContestId}/`,
         { headers: getHeaders() }
       );
       
@@ -116,7 +117,7 @@ const VirtualContestInside = () => {
       // 2. Fetch problems for the virtual contest
       try {
         const problemsRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/virtual/${virtualContestId}/problems/`, 
+          `${BACKEND_URL}/contests/${contestId}/virtual/${virtualContestId}/problems/`,
           { headers: getHeaders() }
         );
         
@@ -164,7 +165,7 @@ const VirtualContestInside = () => {
       // 3. Fetch original contest details
       try {
         const originalContestRes = await axios.get(
-          `http://localhost:8000/contests/${originalContestId}/`, 
+          `${BACKEND_URL}/contests/${originalContestId}/`,
           { headers: getHeaders() }
         );
         
@@ -261,7 +262,7 @@ const VirtualContestInside = () => {
     if (window.confirm('Are you sure you want to restart this virtual contest? Your current progress will be lost.')) {
       try {
         const response = await axios.post(
-          `http://localhost:8000/contests/${contestId}/virtual-start/`,
+          `${BACKEND_URL}/contests/${contestId}/virtual-start/`,
           { 
             contest_id: virtualContestData.original_contest_id 
           },

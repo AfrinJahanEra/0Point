@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 
 const VirtualProblem = () => {
   const { contestId, virtualContestId, problemIndex } = useParams();
@@ -153,7 +154,7 @@ const VirtualProblem = () => {
       try {
         // 1. Fetch virtual contest details
         const virtualContestRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/virtual/${virtualContestId}/`,
+          `${BACKEND_URL}/contests/${contestId}/virtual/${virtualContestId}/`,
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
         
@@ -171,7 +172,7 @@ const VirtualProblem = () => {
         
         // 2. Fetch virtual contest problems
         const problemsRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/virtual/${virtualContestId}/problems/`,
+          `${BACKEND_URL}/contests/${contestId}/virtual/${virtualContestId}/problems/`,
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
         
@@ -200,7 +201,7 @@ const VirtualProblem = () => {
         if (problemToFetch) {
           try {
             const problemRes = await axios.get(
-              `http://localhost:8000/contests/${contestId}/virtual/${virtualContestId}/problems/${problemToFetch}/`,
+              `${BACKEND_URL}/contests/${contestId}/virtual/${virtualContestId}/problems/${problemToFetch}/`,
               { headers: { Authorization: `Bearer ${TOKEN}` } }
             );
             
@@ -221,7 +222,7 @@ const VirtualProblem = () => {
             if (originalContestData?.id) {
               try {
                 const fallbackRes = await axios.get(
-                  `http://localhost:8000/contests/${originalContestData.id}/problems/${problemToFetch}/`,
+                  `${BACKEND_URL}/contests/${originalContestData.id}/problems/${problemToFetch}/`,
                   { headers: { Authorization: `Bearer ${TOKEN}` } }
                 );
                 
@@ -338,7 +339,7 @@ const VirtualProblem = () => {
   const refreshVirtualProblemStatus = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:8000/contests/${contestId}/virtual/${virtualContestId}/problems/`,
+        `${BACKEND_URL}/contests/${contestId}/virtual/${virtualContestId}/problems/`,
         { headers: { Authorization: `Bearer ${TOKEN}` } }
       );
       if (response.data.problems) {
@@ -378,7 +379,7 @@ const VirtualProblem = () => {
       });
       
       const response = await axios.post(
-        `http://localhost:8000/contests/${originalContestData?.id || contestId}/problems/${problemData?.problem_index || problemIndex}/run/`,
+        `${BACKEND_URL}/contests/${originalContestData?.id || contestId}/problems/${problemData?.problem_index || problemIndex}/run/`,
         runData,
         { 
           headers: { 
@@ -454,7 +455,7 @@ const VirtualProblem = () => {
       });
       
       const response = await axios.post(
-        `http://localhost:8000/contests/${contestId}/virtual/${virtualContestId}/submit/`,
+        `${BACKEND_URL}/contests/${contestId}/virtual/${virtualContestId}/submit/`,
         submitData,
         { 
           headers: { 

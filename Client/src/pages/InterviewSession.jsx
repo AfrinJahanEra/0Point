@@ -1,6 +1,7 @@
 // src/pages/InterviewSession.jsx
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import { BACKEND_URL, WS_URL } from '../utils/api';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { FaVideo, FaVideoSlash, FaMicrophone, FaMicrophoneSlash } from 'react-icons/fa';
 import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python';
@@ -27,10 +28,9 @@ const InterviewSession = () => {
   const email = searchParams.get('email') ||
     (role === 'interviewer' ? 'interviewer@example.com' : 'candidate@example.com');
   
-  // Backend URL configuration
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-  // WebSocket URL - convert http(s) to ws(s)
-  const wsUrl = backendUrl.replace(/^http/, 'ws');
+  // Backend URL configuration (from centralized api.js)
+  const backendUrl = BACKEND_URL;
+  const wsUrl = WS_URL;
 
   // Video refs
   const localVideoRef = useRef(null);

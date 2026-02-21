@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 
 const TestContestProblemDetail = () => {
   const { testContestId, problemIndex } = useParams();
@@ -154,7 +155,7 @@ const TestContestProblemDetail = () => {
       try {
         // Fetch problems list
         const problemsRes = await axios.get(
-          `http://localhost:8000/test-contests/${testContestId}/problems/`,
+          `${BACKEND_URL}/test-contests/${testContestId}/problems/`,
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
         
@@ -175,7 +176,7 @@ const TestContestProblemDetail = () => {
         // Fetch specific problem
         if (problemToFetch) {
           const problemRes = await axios.get(
-            `http://localhost:8000/test-contests/${testContestId}/problems/${problemToFetch}/`,
+            `${BACKEND_URL}/test-contests/${testContestId}/problems/${problemToFetch}/`,
             { headers: { Authorization: `Bearer ${TOKEN}` } }
           );
           
@@ -186,7 +187,7 @@ const TestContestProblemDetail = () => {
 
         // Fetch problem stats if available
         const statsRes = await axios.get(
-          `http://localhost:8000/test-contests/${testContestId}/problems/${problemToFetch}/stats/`,
+          `${BACKEND_URL}/test-contests/${testContestId}/problems/${problemToFetch}/stats/`,
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         ).catch(() => null); // Optional endpoint
         
@@ -277,7 +278,7 @@ const TestContestProblemDetail = () => {
       });
 
       const response = await axios.post(
-        `http://localhost:8000/test-contests/${testContestId}/problems/${problemData?.problem_index || problemIndex}/run/`,
+        `${BACKEND_URL}/test-contests/${testContestId}/problems/${problemData?.problem_index || problemIndex}/run/`,
         runData,
         { 
           headers: { 
@@ -353,7 +354,7 @@ const TestContestProblemDetail = () => {
       });
 
       const response = await axios.post(
-        `http://localhost:8000/test-contests/${testContestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
+        `${BACKEND_URL}/test-contests/${testContestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
         submitData,
         { 
           headers: { 

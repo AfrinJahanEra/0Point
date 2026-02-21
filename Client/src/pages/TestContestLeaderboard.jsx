@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 import { 
   Trophy, 
   TrendingUp, 
@@ -38,7 +39,7 @@ const TestContestLeaderboard = () => {
         setLoading(true);
         
         const response = await axios.get(
-          `http://localhost:8000/test-contests/${testContestId}/standings/`,
+          `${BACKEND_URL}/test-contests/${testContestId}/standings/`,
           { 
             headers: { 
               'Authorization': `Bearer ${TOKEN}`

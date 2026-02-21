@@ -4,6 +4,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import hljs from "highlight.js";
+import { BACKEND_URL } from "../utils/api";
 
 import "highlight.js/styles/github-dark.css";
 import "katex/dist/katex.min.css";
@@ -53,7 +54,7 @@ const Chatbot = () => {
 
   const fetchChatSessions = async () => {
     try {
-      const res = await fetch("http://localhost:8000/chat/sessions/", {
+      const res = await fetch(`${BACKEND_URL}/chat/sessions/`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const data = await res.json();
@@ -67,7 +68,7 @@ const Chatbot = () => {
   const loadChatMessages = async (chat) => {
     try {
       const res = await fetch(
-        `http://localhost:8000/chat/sessions/${chat.id}/messages/`,
+        `${BACKEND_URL}/chat/sessions/${chat.id}/messages/`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
@@ -122,7 +123,7 @@ const Chatbot = () => {
     setIsTyping(true);
 
     try {
-      const res = await fetch("http://localhost:8000/chat/", {
+      const res = await fetch(`${BACKEND_URL}/chat/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -170,7 +171,7 @@ const Chatbot = () => {
   const handleClearChat = async () => {
     if (!activeChat) return;
     try {
-      await fetch(`http://localhost:8000/chat/sessions/${activeChat.id}/delete/`, {
+      await fetch(`${BACKEND_URL}/chat/sessions/${activeChat.id}/delete/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });

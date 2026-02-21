@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, Users, Trophy, ArrowLeft, ExternalLink, UserPlus } from 'lucide-react';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 
 const ExternalContestDetail = () => {
   const { contestId } = useParams();
@@ -33,7 +34,7 @@ const ExternalContestDetail = () => {
         
         // Fetch external contest details
         const response = await axios.get(
-          `http://localhost:8000/external/contests/?platform=${platform}`, 
+          `${BACKEND_URL}/external/contests/?platform=${platform}`,
           {
             headers: { Authorization: `Bearer ${TOKEN}` }
           }

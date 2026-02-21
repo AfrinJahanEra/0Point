@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BACKEND_URL } from '../utils/api';
 
 const Interview = () => {
   const [interviewerEmail, setInterviewerEmail] = useState('');
@@ -7,7 +8,7 @@ const Interview = () => {
 
   const handleCreate = async () => {
     try {
-      const response = await fetch('http://localhost:8000/mock-interview/create-session/', {
+      const response = await fetch(`${BACKEND_URL}/mock-interview/create-session/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
