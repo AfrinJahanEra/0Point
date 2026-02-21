@@ -188,8 +188,10 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
 ]
 
-# Also allow all origins for now (can be removed once verified working)
-CORS_ALLOW_ALL_ORIGINS = True
+# Allow any vercel.app subdomain
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.vercel\.app$",
+]
 
 # Allow all CORS headers and methods
 CORS_ALLOW_CREDENTIALS = True
