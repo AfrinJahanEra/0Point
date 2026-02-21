@@ -19,6 +19,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+# Fix for Python 3.13 async shutdown issues
+os.environ.setdefault('ASGI_THREADS', '1')
+
 INSTALLED_APPS = [
     'daphne',
     'django.contrib.admin',
