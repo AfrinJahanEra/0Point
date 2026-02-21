@@ -7,7 +7,7 @@ import hashlib
 import threading
 from datetime import datetime
 
-from .models import Account, IPAddress, DeviceFingerprint, UserTagStats
+from .models import Account, IPAddress, DeviceFingerprint, UserTagStats, BannedAccount
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
 from admin.secret import ADMIN_SECRET_PASSWORD
 from .platforms import (

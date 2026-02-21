@@ -22,6 +22,12 @@ ALLOWED_HOSTS = ['*']
 # Fix for Python 3.13 async shutdown issues
 os.environ.setdefault('ASGI_THREADS', '1')
 
+# Suppress Python 3.13 shutdown warnings for async tasks
+import warnings
+import asyncio
+warnings.filterwarnings('ignore', message='.*was never awaited.*')
+warnings.filterwarnings('ignore', message='.*coroutine.*was never awaited.*')
+
 INSTALLED_APPS = [
     'daphne',
     'django.contrib.admin',
