@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BACKEND_URL } from '../utils/api';
 import { 
   CheckCircle2, 
   Clock,
@@ -54,8 +55,7 @@ const MySubmissions = () => {
         }
         
         const queryString = params.toString();
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const url = `${apiUrl}/contests/${contestId}/submissions/${queryString ? `?${queryString}` : ''}`;
+        const url = `${BACKEND_URL}/contests/${contestId}/submissions/${queryString ? `?${queryString}` : ''}`;
         
         const headers = {
           'Content-Type': 'application/json',

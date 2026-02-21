@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { BACKEND_URL } from '../utils/api';
 import { 
   MessageSquare,
   ChevronUp,
@@ -21,7 +22,7 @@ import {
   EyeOff
 } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = BACKEND_URL;
 
 const ContestClarification = () => {
   const { contestId } = useParams();

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { BACKEND_URL, WS_URL } from '../utils/api';
 import { 
   Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, 
   AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, 
@@ -18,7 +19,7 @@ const Contests = () => {
   const navigate = useNavigate();
   
   // Backend URL configuration
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+  const backendUrl = BACKEND_URL;
   
   // Get URL parameters
   const [searchParams, setSearchParams] = useSearchParams();
@@ -164,7 +165,7 @@ const Contests = () => {
     let ws;
     
     try {
-      ws = new WebSocket("ws://localhost:8000/ws/contest/global/");
+      ws = new WebSocket(`${WS_URL}/ws/contest/global/`);
       
       ws.onopen = () => {
         console.log('✅ [WebSocket] Connected to real-time contest updates');

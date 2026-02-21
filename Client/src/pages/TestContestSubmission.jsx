@@ -1,5 +1,6 @@
 // TestContestSubmission.jsx - COMPACT VERSION
 import React, { useState, useEffect } from 'react';
+import { BACKEND_URL } from '../utils/api';
 import { 
   CheckCircle2, 
   Clock,
@@ -57,8 +58,7 @@ const TestContestSubmission = () => {
         }
         
         const queryString = params.toString();
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const url = `${apiUrl}/test-contests/${testContestId}/submissions/${queryString ? `?${queryString}` : ''}`;
+        const url = `${BACKEND_URL}/test-contests/${testContestId}/submissions/${queryString ? `?${queryString}` : ''}`;
         
         const headers = {
           'Content-Type': 'application/json',

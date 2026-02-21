@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { BACKEND_URL } from '../utils/api';
 import { 
   ArrowLeft, 
   FileText, 
@@ -23,7 +24,7 @@ const RegisterNow = () => {
   useEffect(() => {
     const fetchContest = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/contests/${contestId}/`);
+        const res = await fetch(`${BACKEND_URL}/contests/${contestId}/`);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const data = await res.json();
         setContestData(data);
@@ -43,7 +44,7 @@ const RegisterNow = () => {
     setIsRegistering(true);
 
     try {
-      const res = await fetch(`http://localhost:8000/contests/${contestId}/register/`, {
+      const res = await fetch(`${BACKEND_URL}/contests/${contestId}/register/`, {
         method: 'POST',
         headers: { 
         "Content-Type": "application/json",

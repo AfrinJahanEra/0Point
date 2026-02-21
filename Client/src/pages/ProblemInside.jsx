@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 
 const ProblemInside = () => {
   const { contestId, problemIndex } = useParams();
@@ -155,7 +156,7 @@ const ProblemInside = () => {
       try {
         // Fetch problems list
         const problemsRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/problems/`,
+          `${BACKEND_URL}/contests/${contestId}/problems/`,
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         );
         
@@ -176,7 +177,7 @@ const ProblemInside = () => {
         // Fetch specific problem
         if (problemToFetch) {
           const problemRes = await axios.get(
-            `http://localhost:8000/contests/${contestId}/problems/${problemToFetch}/`,
+            `${BACKEND_URL}/contests/${contestId}/problems/${problemToFetch}/`,
             { headers: { Authorization: `Bearer ${TOKEN}` } }
           );
           
@@ -187,7 +188,7 @@ const ProblemInside = () => {
 
         // Fetch problem stats if available
         const statsRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/problems/${problemToFetch}/stats/`,
+          `${BACKEND_URL}/contests/${contestId}/problems/${problemToFetch}/stats/`,
           { headers: { Authorization: `Bearer ${TOKEN}` } }
         ).catch(() => null);
         
@@ -330,7 +331,7 @@ const ProblemInside = () => {
       });
 
       const response = await axios.post(
-        `http://localhost:8000/contests/${contestId}/problems/${problemData?.problem_index || problemIndex}/run/`,
+        `${BACKEND_URL}/contests/${contestId}/problems/${problemData?.problem_index || problemIndex}/run/`,
         runData,
         { 
           headers: { 
@@ -414,7 +415,7 @@ const ProblemInside = () => {
       });
 
       const response = await axios.post(
-        `http://localhost:8000/contests/${contestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
+        `${BACKEND_URL}/contests/${contestId}/problems/${problemData?.problem_index || problemIndex}/execute/`,
         submitData,
         { 
           headers: { 
@@ -471,7 +472,7 @@ const ProblemInside = () => {
   const fetchUserProblemStatus = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:8000/contests/${contestId}/problems/status/`,
+        `${BACKEND_URL}/contests/${contestId}/problems/status/`,
         { headers: { Authorization: `Bearer ${TOKEN}` } }
       );
       setUserStatus(response.data.problem_statuses || {});

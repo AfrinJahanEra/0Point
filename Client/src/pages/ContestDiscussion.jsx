@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { BACKEND_URL } from '../utils/api';
 import { 
   MessageSquare,
   ChevronUp,
@@ -29,7 +30,7 @@ import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = BACKEND_URL;
 
 const ContestDiscussion = () => {
   const { contestId } = useParams();

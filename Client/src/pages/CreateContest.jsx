@@ -46,6 +46,7 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
+import { BACKEND_URL } from '../utils/api';
 
 const CreateContest = () => {
   const navigate = useNavigate();
@@ -199,7 +200,7 @@ const CreateContest = () => {
             throw new Error('Authentication required');
           }
           
-          const response = await fetch(`http://localhost:8000/contests/${contestId}/`, {
+          const response = await fetch(`${BACKEND_URL}/contests/${contestId}/`, {
             headers: { 
               "Authorization": `Bearer ${token}`
             }
@@ -218,7 +219,7 @@ const CreateContest = () => {
             platform: contestData.platform || 'IUT'
           });
           
-          const problemsResponse = await fetch(`http://localhost:8000/contests/${contestId}/problems/`, {
+          const problemsResponse = await fetch(`${BACKEND_URL}/contests/${contestId}/problems/`, {
             headers: { 
               "Authorization": `Bearer ${localStorage.getItem('token')}`
             }
@@ -231,7 +232,7 @@ const CreateContest = () => {
               const formattedProblems = await Promise.all(
                 problemsData.problems.map(async (problem, index) => {
                   const problemDetailResponse = await fetch(
-                    `http://localhost:8000/contests/${contestId}/problems/${problem.code}/`,
+                    `${BACKEND_URL}/contests/${contestId}/problems/${problem.code}/`,
                     {
                       headers: { 
                         "Authorization": `Bearer ${localStorage.getItem('token')}`
@@ -457,11 +458,11 @@ const CreateContest = () => {
     };
 
     try {
-      let url = "http://localhost:8000/contests/create-full/";
+      let url = `${BACKEND_URL}/contests/create-full/`;
       let method = "POST";
       
       if (editMode && contestId) {
-        url = `http://localhost:8000/contests/${contestId}/update/`;
+        url = `${BACKEND_URL}/contests/${contestId}/update/`;
         method = "PATCH";
       }
 
@@ -662,7 +663,7 @@ const CreateContest = () => {
         duration: parseFloat(contestData.duration) || 3.0
       };
 
-      url = `http://localhost:8000/contests/${contestId}/publish-test/`;
+      url = `${BACKEND_URL}/contests/${contestId}/publish-test/`;
       method = "POST";
       
       try {
@@ -732,7 +733,7 @@ const CreateContest = () => {
           payload.testStartTime = publishSettings.testStartTime + ":00Z";
         }
         
-        url = `http://localhost:8000/contests/${contestId}/publish/`;
+        url = `${BACKEND_URL}/contests/${contestId}/publish/`;
         method = "POST";
       } else {
         payload = {
@@ -760,7 +761,7 @@ const CreateContest = () => {
           payload.type = "test";
         }
 
-        url = "http://localhost:8000/contests/create-full/";
+        url = `${BACKEND_URL}/contests/create-full/`;
         method = "POST";
       }
 
@@ -855,7 +856,7 @@ const CreateContest = () => {
       }
       
       const response = await fetch(
-        `http://localhost:8000/contests/${contestId}/problems/${currentProblem.problemIndex}/run/`,
+        `${BACKEND_URL}/contests/${contestId}/problems/${currentProblem.problemIndex}/run/`,
         {
           method: 'POST',
           headers: {

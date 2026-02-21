@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 import { 
   BookOpen, 
   ChevronLeft, 
@@ -122,7 +123,7 @@ const ContestEditorial = () => {
       
       try {
         const editorialRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/editorial/`,
+          `${BACKEND_URL}/contests/${contestId}/editorial/`,
           { headers: getHeaders() }
         );
         
@@ -135,7 +136,7 @@ const ContestEditorial = () => {
           .map(async (problem) => {
             try {
               const tutorialRes = await axios.get(
-                `http://localhost:8000/contests/${contestId}/problems/${problem.index}/tutorial/`,
+                `${BACKEND_URL}/contests/${contestId}/problems/${problem.index}/tutorial/`,
                 { headers: getHeaders() }
               );
               

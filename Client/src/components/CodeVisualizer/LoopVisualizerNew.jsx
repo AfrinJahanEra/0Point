@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { BACKEND_URL } from '../../utils/api';
 
 const LoopVisualizer = () => {
   const [uploadedCode, setUploadedCode] = useState('');
@@ -67,10 +68,9 @@ const LoopVisualizer = () => {
     setIsProcessing(true);
 
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
       const language = getLanguageFromExtension(fileName);
       
-      const response = await fetch(`${backendUrl}/api/executor/execute/`, {
+      const response = await fetch(`${BACKEND_URL}/api/executor/execute/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

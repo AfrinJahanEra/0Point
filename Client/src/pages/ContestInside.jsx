@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import ScreenRecorder from '../components/ScreenRecorder';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 import { 
   Calendar, Clock, Users, School, Play, Code2, 
   History, Trophy, MessageSquare, Download, Flag,
@@ -118,7 +119,7 @@ const ContestInside = () => {
     
     try {
       const contestRes = await axios.get(
-        `http://localhost:8000/contests/${contestId}/`, 
+        `${BACKEND_URL}/contests/${contestId}/`,
         { headers: getHeaders() }
       );
       
@@ -132,7 +133,7 @@ const ContestInside = () => {
       let problemsList = [];
       try {
         const problemsRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/problems/`, 
+          `${BACKEND_URL}/contests/${contestId}/problems/`,
           { headers: getHeaders() }
         );
         
@@ -152,7 +153,7 @@ const ContestInside = () => {
 
       try {
         const announcementsRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/announcements/`,
+          `${BACKEND_URL}/contests/${contestId}/announcements/`,
           { headers: getHeaders() }
         );
         
@@ -165,7 +166,7 @@ const ContestInside = () => {
 
       try {
         const statusRes = await axios.get(
-          `http://localhost:8000/contests/${contestId}/problems/status/`,
+          `${BACKEND_URL}/contests/${contestId}/problems/status/`,
           { headers: getHeaders() }
         );
         
@@ -222,7 +223,7 @@ const ContestInside = () => {
 
       try {
         const virtualResponse = await axios.get(
-          'http://localhost:8000/my-virtual/',
+          `${BACKEND_URL}/my-virtual/`,
           { headers: getHeaders() }
         );
         
@@ -268,7 +269,7 @@ const ContestInside = () => {
   const checkRecordingRequirements = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:8000/contests/${contestId}/recording/status/`,
+        `${BACKEND_URL}/contests/${contestId}/recording/status/`,
         { headers: getHeaders() }
       );
       
@@ -328,7 +329,7 @@ const ContestInside = () => {
   const handleRegister = async () => {
     try {
       const response = await axios.post(
-        `http://localhost:8000/contests/${contestId}/register/`,
+        `${BACKEND_URL}/contests/${contestId}/register/`,
         {},
         { headers: getHeaders() }
       );
@@ -346,7 +347,7 @@ const ContestInside = () => {
   const handleStartVirtualContest = async () => {
     try {
       const response = await axios.post(
-        `http://localhost:8000/contests/${contestId}/virtual-start/`,
+        `${BACKEND_URL}/contests/${contestId}/virtual-start/`,
         { contest_id: contestId },
         { headers: getHeaders() }
       );
@@ -369,7 +370,7 @@ const ContestInside = () => {
 
     try {
       const response = await axios.post(
-        `http://localhost:8000/announcements/create/`,
+        `${BACKEND_URL}/announcements/create/`,
         { 
           contest_id: contestId,
           text: newAnnouncement 

@@ -1,6 +1,7 @@
 // Recording.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 import { 
   Search, Filter, Calendar, User, Video, 
   Clock, Download, Eye, Play, Pause,
@@ -60,10 +61,10 @@ const Recordings = () => {
       let url;
       if (userId) {
         // User-specific recordings (if still needed for direct navigation)
-        url = `http://localhost:8000/contests/${contestId}/recordings/user/${userId}/`;
+        url = `${BACKEND_URL}/contests/${contestId}/recordings/user/${userId}/`;
       } else {
         // All recordings
-        url = `http://localhost:8000/contests/${contestId}/recordings/?${params}`;
+        url = `${BACKEND_URL}/contests/${contestId}/recordings/?${params}`;
       }
 
       const response = await axios.get(url, { headers: getHeaders() });

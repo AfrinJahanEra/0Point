@@ -4,8 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Code2, LogOut, User, BarChart2, Video, Users, Copy, Send } from 'lucide-react';
 import NotificationPopup from './NotificationPopup';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+import { BACKEND_URL } from '../utils/api';
 
 const extractEmailFromLink = (link, param) => {
   try {
@@ -56,7 +55,7 @@ const Header = () => {
     const fetchProfilePhoto = async () => {
       if (user) {
         try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/account/profile/`, {
+          const response = await fetch(`${BACKEND_URL}/account/profile/`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }

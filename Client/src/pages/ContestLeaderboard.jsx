@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/api';
 import { 
   Trophy, 
   User, 
@@ -38,7 +39,7 @@ const ContestLeaderboard = () => {
         setLoading(true);
         
         const response = await axios.get(
-          `http://localhost:8000/contests/${contestId}/leaderboard/`,
+          `${BACKEND_URL}/contests/${contestId}/leaderboard/`,
           { 
             headers: { 
               'Authorization': `Bearer ${TOKEN}`
