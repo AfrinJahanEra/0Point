@@ -26,21 +26,29 @@ class CreateSession(APIView):
         interviewer_link = base_url + '?role=interviewer'
         candidate_link = base_url + '?role=client'
 
-        send_mail(
-            'Interview Invitation - Interviewer',
-            f'Join the interview here: {interviewer_link}',
-            settings.DEFAULT_FROM_EMAIL,
-            [interviewer_email]
-        )
-        send_mail(
-            'Interview Invitation - Candidate',
-            f'Join the interview here: {candidate_link}',
-            settings.DEFAULT_FROM_EMAIL,
-            [candidate_email]
-        )
+        # Try to send emails, but don't crash if email fails
+        email_sent = False
+        try:
+            if settings.EMAIL_HOST_USER and settings.DEFAULT_FROM_EMAIL:
+                send_mail(
+                    'Interview Invitation - Interviewer',
+                    f'Join the interview here: {interviewer_link}',
+                    settings.DEFAULT_FROM_EMAIL,
+                    [interviewer_email]
+                )
+                send_mail(
+                    'Interview Invitation - Candidate',
+                    f'Join the interview here: {candidate_link}',
+                    settings.DEFAULT_FROM_EMAIL,
+                    [candidate_email]
+                )
+                email_sent = True
+        except Exception as e:
+            print(f"Email sending failed: {e}")
 
         return Response({
             'session_id': str(session.id),
             'interviewer_link': interviewer_link,
-            'candidate_link': candidate_link
+            'candidate_link': candidate_link,
+            'email_sent': email_sent
         }, status=201)
