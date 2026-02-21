@@ -134,38 +134,32 @@ connect_to_mongo()
 
 ASGI_APPLICATION = "zeropoint.asgi.application"
 
-# For development, using in-memory channel layer
-# For production with Redis, uncomment the Redis configuration below
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer"
-    },
-}
+# Redis Configuration for Django Channels
+if os.getenv('DJANGO_ENV') == 'production':
+    REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379')
+else:
+    REDIS_URL = 'redis://127.0.0.1:6379'
 
-# Production Redis configuration (uncomment when Redis is available):
-# CHANNEL_LAYERS = {
-#     "default": {
-#         "BACKEND": "channels_redis.core.RedisChannelLayer",
-#         "CONFIG": {
-#             "hosts": [("127.0.0.1", 6379)],
-#         },
-#     },
-# }
-
-# if os.getenv('DJANGO_ENV') == 'production':
-#     REDIS_URL = os.getenv('REDIS_URL') 
-# else:
-#     REDIS_URL = 'redis://127.0.0.1:6379' 
-
-
-# CHANNEL_LAYERS = {
-#     'default': {
-#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#         'CONFIG': {
-#             'hosts': [REDIS_URL],
-#         },
-#     },
-# }
+# Channel Layers Configuration
+if os.getenv('REDIS_URL'):
+    # Production: Use Redis for real-time features (WebSocket support)
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [REDIS_URL],
+            },
+        },
+    }
+    print(f"Using Redis Channel Layer: {REDIS_URL}")
+else:
+    # Development: Use in-memory channel layer
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer"
+        },
+    }
+    print("Using InMemory Channel Layer")
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
