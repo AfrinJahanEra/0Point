@@ -28,27 +28,39 @@ class CreateSession(APIView):
 
         # Try to send emails, but don't crash if email fails
         email_sent = False
+        email_error = None
         try:
+            print(f"Email config - HOST_USER: {settings.EMAIL_HOST_USER}, FROM: {settings.DEFAULT_FROM_EMAIL}")
             if settings.EMAIL_HOST_USER and settings.DEFAULT_FROM_EMAIL:
+                print(f"Sending email to interviewer: {interviewer_email}")
                 send_mail(
                     'Interview Invitation - Interviewer',
-                    f'Join the interview here: {interviewer_link}',
+                    f'You have been invited to conduct an interview.\n\nJoin here: {interviewer_link}',
                     settings.DEFAULT_FROM_EMAIL,
-                    [interviewer_email]
+                    [interviewer_email],
+                    fail_silently=False
                 )
+                print(f"Sending email to candidate: {candidate_email}")
                 send_mail(
                     'Interview Invitation - Candidate',
-                    f'Join the interview here: {candidate_link}',
+                    f'You have been invited to an interview.\n\nJoin here: {candidate_link}',
                     settings.DEFAULT_FROM_EMAIL,
-                    [candidate_email]
+                    [candidate_email],
+                    fail_silently=False
                 )
                 email_sent = True
+                print("Emails sent successfully")
+            else:
+                email_error = "Email not configured (missing EMAIL_HOST_USER or DEFAULT_FROM_EMAIL)"
+                print(email_error)
         except Exception as e:
+            email_error = str(e)
             print(f"Email sending failed: {e}")
 
         return Response({
             'session_id': str(session.id),
             'interviewer_link': interviewer_link,
             'candidate_link': candidate_link,
-            'email_sent': email_sent
+            'email_sent': email_sent,
+            'email_error': email_error
         }, status=201)
