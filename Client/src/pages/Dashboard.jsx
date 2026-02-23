@@ -11,6 +11,7 @@ import CfTagDonutChart from '../components/CfTagDonutChart';
 import { PieChart as PieIcon } from 'lucide-react';
 import LeetcodeHeatmap from '../components/LeetcodeHeatmap';
 import CodechefHeatmap from '../components/CodechefHeatmap';
+import AtcoderHeatmap from '../components/AtcoderHeatmap';
 const Dashboard = () => {
   const { user } = useApp();
   const navigate = useNavigate();
@@ -171,6 +172,7 @@ const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
   }
   const hasLeetCode = userProfile?.platform_profiles?.some(p => p.platform === 'leetcode');
   const hasCodeChef = userProfile?.platform_profiles?.some(p => p.platform === 'codechef');
+  const hasAtCoder = userProfile?.platform_profiles?.some(p => p.platform === 'atcoder');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -359,36 +361,42 @@ const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
                     <RatingChart platformProfiles={userProfile.platform_profiles} />
                   </div>
                 )}
-          {/* ← Heatmap Section (replace your old one with this) */}
-                {(hasLeetCode || hasCodeChef) && (
-                  <div className="bg-white rounded-lg shadow-sm p-5 mt-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">Submission Heatmap</h3>
-                      <select
-                        value={selectedHeatmap}
-                        onChange={(e) => setSelectedHeatmap(e.target.value)}
-                        className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {hasLeetCode && <option value="leetcode">LeetCode</option>}
-                        {hasCodeChef && <option value="codechef">CodeChef</option>}
-                      </select>
-                    </div>
+          {/* Heatmap Section */}
+{(hasLeetCode || hasCodeChef || hasAtCoder) && (
+  <div className="bg-white rounded-lg shadow-sm p-5 mt-4">
+    <div className="flex items-center justify-between mb-4">
+      <h3 className="text-lg font-semibold text-gray-900">Submission Heatmap</h3>
+      <select
+        value={selectedHeatmap}
+        onChange={(e) => setSelectedHeatmap(e.target.value)}
+        className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        {hasLeetCode  && <option value="leetcode">LeetCode</option>}
+        {hasCodeChef  && <option value="codechef">CodeChef</option>}
+        {hasAtCoder   && <option value="atcoder">AtCoder</option>}
+      </select>
+    </div>
 
-                    <div className={selectedHeatmap === 'leetcode' ? '' : 'hidden'}>
-                      {hasLeetCode && <LeetcodeHeatmap />}
-                    </div>
+    <div className={selectedHeatmap === 'leetcode' ? '' : 'hidden'}>
+      {hasLeetCode && <LeetcodeHeatmap />}
+    </div>
 
-                    <div className={selectedHeatmap === 'codechef' ? '' : 'hidden'}>
-                      {hasCodeChef && <CodechefHeatmap />}
-                    </div>
+    <div className={selectedHeatmap === 'codechef' ? '' : 'hidden'}>
+      {hasCodeChef && <CodechefHeatmap />}
+    </div>
 
-                    {!hasLeetCode && !hasCodeChef && (
-                      <div className="text-center py-8 text-gray-500">
-                        Connect your LeetCode or CodeChef account to see your submission heatmap.
-                      </div>
-                    )}
-                  </div>
-                )}
+    <div className={selectedHeatmap === 'atcoder' ? '' : 'hidden'}>
+      {hasAtCoder && <AtcoderHeatmap />}
+    </div>
+
+    {!hasLeetCode && !hasCodeChef && !hasAtCoder && (
+      <div className="text-center py-8 text-gray-600">
+        Connect LeetCode, CodeChef or AtCoder to see your submission heatmap.
+      </div>
+    )}
+  </div>
+)}
+              
                 {/* In return JSX → after RatingChart section (or wherever you want)*/}
                 <div className="bg-white rounded-lg shadow-sm p-5">
                   <div className="flex items-center gap-2 mb-4">
