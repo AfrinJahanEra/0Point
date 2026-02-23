@@ -77,7 +77,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user.role !== 'admin') {
-      navigate('/contests');
+      navigate('/home');
       return;
     }
     loadDashboardData();

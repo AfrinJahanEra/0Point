@@ -20,7 +20,7 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const navigate = useNavigate();
-  const { register } = useApp();
+  const { register, login } = useApp();
 
   const handleChange = (e) => {
     setFormData({
@@ -48,7 +48,7 @@ const Register = () => {
     }
     
     try {
-      await register(
+      const response = await register(
         formData.name,
         formData.email,
         formData.password,
@@ -58,9 +58,16 @@ const Register = () => {
         formData.secretPassword || null
       );
       
-      // Show success message and redirect to login
-      alert('Account created successfully! Please login.');
-      navigate('/login');
+      // Auto-login after successful registration
+      alert('Account created successfully!');
+      
+      // Login and redirect based on role
+      const user = await login(formData.email, formData.password);
+      if (user.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/home");
+      }
     } catch (err) {
       setError(err);
     } finally {

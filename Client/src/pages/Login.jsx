@@ -33,7 +33,7 @@ const Login = () => {
       if (user.role === "admin") {
         navigate("/admin");
       } else {
-        navigate("/contests");
+        navigate("/home");
       }
     } catch (err) {
       setError(err);
