@@ -1,3 +1,4 @@
+import token
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -7,7 +8,7 @@ from math import ceil
 import requests
 from datetime import datetime
 
-from .calendar import fetch_leetcode_calendar, fetch_leetcode_year_calendar,  process_submission_calendar
+from .calendar import fetch_leetcode_calendar
 
 
 from .models import Account, PlatformSubmissionCache, UserTagStats, PlatformContestCache
@@ -491,44 +492,15 @@ class LeetCodeCalendarView(APIView):
         if not user:
             return Response({"error": "User not found"}, status=404)
 
-        # Find LeetCode profile
-        leetcode_profile = next(
-            (p for p in user.platform_profiles if p.platform == "leetcode"),
-            None
-        )
+        # find leetcode handle
+        profile = user.get_platform_profile("leetcode")
+        if not profile:
+            return Response({"error": "LeetCode not connected"}, status=400)
 
-        if not leetcode_profile or not leetcode_profile.handle:
-            return Response({
-                "error": "No LeetCode handle found",
-                "has_leetcode": False
-            }, status=200)
+        year = request.query_params.get("year")
 
-        handle = leetcode_profile.handle.strip()
-
-        year = request.query_params.get('year')
-        if year:
-            try:
-                year = int(year)
-                data = fetch_leetcode_year_calendar(handle, year)
-            except ValueError:
-                return Response({"error": "Invalid year"}, status=400)
-        else:
-            data = fetch_leetcode_calendar(handle)
-
-        if not data:
-            return Response({
-                "error": "Failed to fetch LeetCode calendar",
-                "has_data": False,
-                "handle": handle
-            }, status=200)
-
-        processed = process_submission_calendar(data)
-
-        return Response({
-            "handle": handle,
-            "activeYears": data.get("activeYears", []),
-            "streak": data.get("streak", 0),
-            "totalActiveDays": data.get("totalActiveDays", 0),
-            "submissionCalendar": processed,
-            "raw": data  # optional - full raw response
-        })
+        try:
+            data = fetch_leetcode_calendar(profile.handle, year)
+            return Response(data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
