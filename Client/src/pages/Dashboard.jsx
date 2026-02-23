@@ -8,7 +8,7 @@ import RatingChart from '../components/RatingChart';
 import toast from 'react-hot-toast';
 import CfTagDonutChart from '../components/CfTagDonutChart';
 import { PieChart as PieIcon } from 'lucide-react';
-//import SubmissionHeatmap from '../components/SubmissionHeatmap';
+import SubmissionHeatmap from '../components/SubmissionHeatmap';
 
 const Dashboard = () => {
   const { user } = useApp();
@@ -26,15 +26,6 @@ const Dashboard = () => {
   const [savingPlatform, setSavingPlatform] = useState(false);
   const [cfTagStats, setCfTagStats] = useState({});
   const [cfTagLoading, setCfTagLoading] = useState(true);
-
-  // Contest history states
-  const [contestHistory, setContestHistory] = useState([]);
-  const [contestPage, setContestPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalContests, setTotalContests] = useState(0);
-
-  // const [calendarData, setCalendarData] = useState({});
-  // const [calendarLoading, setCalendarLoading] = useState(true);
 
   // Platform logo paths - only for platforms without react-icons
   const platformLogos = {
@@ -55,7 +46,7 @@ const Dashboard = () => {
     if (user) {
       fetchUserData();
     }
-  }, [user, user?.name]); // Re-fetch when user or user name changes
+  }, [user]);
 
   const fetchUserData = async () => {
     try {
@@ -65,9 +56,7 @@ const Dashboard = () => {
       // Fetch user profile (api service automatically adds token)
       const profileResponse = await api.get('/account/profile/');
       setUserProfile(profileResponse.data);
-
-      // Fetch first page of contest history
-      fetchContestPage(1);
+      
     } catch (err) {
       console.error('Error fetching user data:', err);
       if (err.response?.status === 401) {
@@ -82,32 +71,13 @@ const Dashboard = () => {
     }
     try {
       const resp = await api.get('/account/tag-stats/');  // ← update endpoint if changed
-      setCfTagStats(resp.data.tags || {});
+      setCfTagStats(resp.data.tag_stats || {});
     } catch (err) {
-      console.error('Failed to load tag stats:', err);
+      console.error('Failed to load CF tag stats:', err);
     } finally {
       setCfTagLoading(false);
     }
-    // try {
-    //   const calResp = await api.get('/account/calendar/');
-    //   setCalendarData(calResp.data.calendar || {});
-    // } catch (err) {
-    //   console.error('Failed to load calendar:', err);
-    // } finally {
-    //   setCalendarLoading(false);
-    // }
-  };
-
-  const fetchContestPage = async (page = 1) => {
-    try {
-      const resp = await api.get(`/account/contest-history/?page=${page}&page_size=${pageSize}&platform=all`);
-      setContestHistory(resp.data.contests || []);
-      setContestPage(resp.data.page || page);
-      setTotalPages(resp.data.total_pages || 1);
-      setTotalContests(resp.data.total_contests || 0);
-    } catch (err) {
-      console.error('Error fetching contest page:', err);
-    }
+  
   };
 
   const handleAddPlatform = async (e) => {
@@ -227,12 +197,8 @@ const Dashboard = () => {
             <div className="bg-white rounded-lg shadow-sm p-5 sticky top-4">
               {/* User Avatar */}
               <div className="text-center mb-5">
-                <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
-                  {userProfile?.profile_photo ? (
-                    <img src={userProfile.profile_photo} alt={user?.name} className="w-full h-full object-cover" />
-                  ) : (
-                    user?.name?.charAt(0)?.toUpperCase()
-                  )}
+                <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold">
+                  {user?.name?.charAt(0)?.toUpperCase()}
                 </div>
                 <h2 className="text-xl font-bold text-gray-900">{user?.name}</h2>
                 {userProfile?.department && (
@@ -260,10 +226,6 @@ const Dashboard = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-xs">Contests</span>
                   <span className="text-lg font-bold text-orange-600">{userProfile?.contests_count || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-xs">Total Submissions</span>
-                  <span className="text-lg font-bold text-indigo-600">{userProfile?.total_submissions || 0}</span>
                 </div>
               </div>
 
@@ -422,6 +384,16 @@ const Dashboard = () => {
                     <RatingChart platformProfiles={userProfile.platform_profiles} />
                   </div>
                 )}
+                {/* ← Add LeetCode Heatmap here */}
+{userProfile?.platform_profiles?.some(p => p.platform === 'leetcode') && (
+  <div className="bg-white rounded-lg shadow-sm p-5 mt-4">
+    <SubmissionHeatmap 
+      leetcodeHandle={
+        userProfile.platform_profiles.find(p => p.platform === 'leetcode')?.handle
+      }
+    />
+  </div>
+)}
 
 
                 {/* In return JSX → after RatingChart section (or wherever you want)*/}
@@ -429,7 +401,7 @@ const Dashboard = () => {
                   <div className="flex items-center gap-2 mb-4">
                     <PieIcon className="w-5 h-5 text-indigo-600" />
                     <h2 className="text-lg font-semibold text-gray-900">
-                      Solved Problems by Tag
+                      Codeforces Solved Problems by Tag
                     </h2>
                   </div>
 
@@ -437,7 +409,7 @@ const Dashboard = () => {
                     {cfTagLoading ? (
                       <div className="text-center py-12">
                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading tag distribution...</p>
+                        <p className="text-gray-600">Loading Codeforces tag distribution...</p>
                       </div>
                     ) : (
                       <CfTagDonutChart
