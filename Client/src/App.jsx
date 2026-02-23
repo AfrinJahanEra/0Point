@@ -88,9 +88,9 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
-// Public Route Component (redirects to contests if already logged in)
+// Public Route Component (redirects based on role if already logged in)
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useApp();
+  const { isAuthenticated, loading, user } = useApp();
   
   if (loading) {
     return (
@@ -103,7 +103,12 @@ const PublicRoute = ({ children }) => {
     );
   }
   
-  return !isAuthenticated ? children : <Navigate to="/contests" />;
+  if (isAuthenticated) {
+    // Redirect based on user role
+    return <Navigate to={user?.role === "admin" ? "/admin" : "/home"} />;
+  }
+  
+  return children;
 };
 function App() {
   return (
