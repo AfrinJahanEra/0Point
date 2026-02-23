@@ -1,69 +1,76 @@
 # Server/account/calendar.py
+
 import requests
 from datetime import datetime
-import json
+from typing import Dict, List, Optional
 
-LC_CALENDAR_API = "https://leetcode-api-pied.vercel.app/user/{}/calendar"
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
+LEETCODE_CALENDAR_API = "https://leetcode-api-pied.vercel.app/user/{handle}/calendar"
+LEETCODE_YEAR_CALENDAR_API = "https://leetcode-api-pied.vercel.app/user/{handle}/calendar?year={year}"
 
-def fetch_leetcode_calendar(username: str):
-    if not username:
-        return {"calendar": {}, "activeYears": []}
 
+def fetch_leetcode_calendar(handle: str) -> Optional[Dict]:
+    """
+    Fetch overall LeetCode submission calendar for a user.
+    Returns data similar to:
+    {
+        "activeYears": [2020, 2021, ...],
+        "streak": 8,
+        "totalActiveDays": 16,
+        "submissionCalendar": {"timestamp": count, ...}
+    }
+    """
     try:
-        url = LC_CALENDAR_API.format(username)
-        resp = requests.get(url, headers=HEADERS, timeout=52)
-        
-        if resp.status_code != 200:
-            print(f"Calendar API {resp.status_code} for {username}")
-            return {"calendar": {}, "activeYears": []}
+        url = LEETCODE_CALENDAR_API.format(handle=handle)
+        response = requests.get(url, timeout=12)
+        response.raise_for_status()
+        data = response.json()
 
-        data = resp.json()
+        if not isinstance(data, dict) or "submissionCalendar" not in data:
+            return None
 
-        # Extract active years
-        active_years = data.get("activeYears", [])
-
-        # Parse submissionCalendar (string or dict)
-        calendar_raw = data.get("submissionCalendar")
-        if not calendar_raw:
-            return {"calendar": {}, "activeYears": active_years}
-
-        if isinstance(calendar_raw, str):
-            try:
-                calendar_data = json.loads(calendar_raw)
-            except json.JSONDecodeError:
-                print("Failed to parse submissionCalendar string")
-                return {"calendar": {}, "activeYears": active_years}
-        else:
-            calendar_data = calendar_raw
-
-        # Convert Unix timestamps to YYYY-MM-DD
-        result = {}
-        for unix_ts_str, count in calendar_data.items():
-            try:
-                unix_ts = int(unix_ts_str)
-                date_str = datetime.fromtimestamp(unix_ts).strftime("%Y-%m-%d")
-                result[date_str] = int(count)
-            except:
-                continue
-
-        return {
-            "calendar": result,
-            "activeYears": sorted(active_years, reverse=True)  # newest first
-        }
-
+        return data
     except Exception as e:
-        print(f"Calendar fetch error for {username}: {e}")
-        return {"calendar": {}, "activeYears": []}
+        print(f"Failed to fetch LeetCode calendar for {handle}: {str(e)}")
+        return None
 
 
-def get_user_calendar(user):
-    lc_profile = next((p for p in user.platform_profiles if p.platform == "leetcode"), None)
-    if not lc_profile or not lc_profile.handle:
-        return {"leetcode": {"calendar": {}, "activeYears": []}}
+def fetch_leetcode_year_calendar(handle: str, year: int) -> Optional[Dict]:
+    """
+    Fetch LeetCode submission calendar for a specific year.
+    Returns similar structure but only for that year.
+    """
+    try:
+        url = LEETCODE_YEAR_CALENDAR_API.format(handle=handle, year=year)
+        response = requests.get(url, timeout=12)
+        response.raise_for_status()
+        data = response.json()
 
-    return {"leetcode": fetch_leetcode_calendar(lc_profile.handle)}
+        if not isinstance(data, dict) or "submissionCalendar" not in data:
+            return None
+
+        return data
+    except Exception as e:
+        print(f"Failed to fetch LeetCode year calendar for {handle} ({year}): {str(e)}")
+        return None
+
+
+def process_submission_calendar(calendar_data: Dict) -> List[Dict]:
+    """
+    Convert timestamp-based calendar to list of {date, count} for frontend heatmap.
+    date format: "YYYY-MM-DD"
+    """
+    if not calendar_data or "submissionCalendar" not in calendar_data:
+        return []
+
+    result = []
+    for timestamp_str, count in calendar_data["submissionCalendar"].items():
+        try:
+            # timestamp is Unix seconds (string key)
+            dt = datetime.fromtimestamp(int(timestamp_str))
+            date_str = dt.strftime("%Y-%m-%d")
+            result.append({"date": date_str, "count": count})
+        except (ValueError, TypeError):
+            continue
+
+    return sorted(result, key=lambda x: x["date"])
