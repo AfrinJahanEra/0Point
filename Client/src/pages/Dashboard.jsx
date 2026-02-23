@@ -1,3 +1,4 @@
+//Client/src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -8,14 +9,12 @@ import RatingChart from '../components/RatingChart';
 import toast from 'react-hot-toast';
 import CfTagDonutChart from '../components/CfTagDonutChart';
 import { PieChart as PieIcon } from 'lucide-react';
-import SubmissionHeatmap from '../components/SubmissionHeatmap';
-
+import LeetcodeHeatmap from '../components/LeetcodeHeatmap';
+import CodechefHeatmap from '../components/CodechefHeatmap';
 const Dashboard = () => {
   const { user } = useApp();
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState(null);
-  
-  const [pageSize] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddPlatform, setShowAddPlatform] = useState(false);
@@ -26,14 +25,13 @@ const Dashboard = () => {
   const [savingPlatform, setSavingPlatform] = useState(false);
   const [cfTagStats, setCfTagStats] = useState({});
   const [cfTagLoading, setCfTagLoading] = useState(true);
-
+const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
   // Platform logo paths - only for platforms without react-icons
   const platformLogos = {
     codeforces: '/src/assets/codeforces-social-preview.png',
     atcoder: '/src/assets/atcoder.png',
     leetcode: '/src/assets/LeetCode_logo.png'
   };
-
   // Fallback logos if image fails to load
   const platformInitials = {
     codeforces: 'CF',
@@ -41,22 +39,19 @@ const Dashboard = () => {
     atcoder: 'A',
     leetcode: 'LC'
   };
-
   useEffect(() => {
     if (user) {
       fetchUserData();
     }
   }, [user]);
-
   const fetchUserData = async () => {
     try {
       setLoading(true);
       setError(null);
-
       // Fetch user profile (api service automatically adds token)
       const profileResponse = await api.get('/account/profile/');
       setUserProfile(profileResponse.data);
-      
+   
     } catch (err) {
       console.error('Error fetching user data:', err);
       if (err.response?.status === 401) {
@@ -70,35 +65,29 @@ const Dashboard = () => {
       setLoading(false);
     }
     try {
-      const resp = await api.get('/account/tag-stats/');  // ← update endpoint if changed
+      const resp = await api.get('/account/tag-stats/'); // ← update endpoint if changed
       setCfTagStats(resp.data.tag_stats || {});
     } catch (err) {
       console.error('Failed to load CF tag stats:', err);
     } finally {
       setCfTagLoading(false);
     }
-  
   };
-
   const handleAddPlatform = async (e) => {
     e.preventDefault();
-
     if (!platformForm.handle.trim()) {
       toast.error('Please enter a handle');
       return;
     }
-
     setSavingPlatform(true);
     try {
       await api.post('/account/platform/add/', {
         platform: platformForm.platform,
         handle: platformForm.handle
       });
-
       toast.success('Platform profile added successfully!');
       setPlatformForm({ platform: 'codeforces', handle: '' });
       setShowAddPlatform(false);
-
       // Refresh user data
       fetchUserData();
     } catch (err) {
@@ -112,16 +101,13 @@ const Dashboard = () => {
       setSavingPlatform(false);
     }
   };
-
   // Platform Icon component with react-icons for CodeChef and images for others
   const PlatformIcon = ({ platform, className = "w-5 h-5" }) => {
     const [imgError, setImgError] = useState(false);
-
     // Use react-icons for CodeChef
     if (platform === 'codechef') {
       return <SiCodechef className={`${className} text-[#5B4638]`} />;
     }
-
     // For other platforms, use images with fallback
     if (imgError || !platformLogos[platform]) {
       return (
@@ -130,7 +116,6 @@ const Dashboard = () => {
         </div>
       );
     }
-
     return (
       <img
         src={platformLogos[platform]}
@@ -140,14 +125,12 @@ const Dashboard = () => {
       />
     );
   };
-
   const platformNames = {
     codeforces: 'Codeforces',
     codechef: 'CodeChef',
     atcoder: 'AtCoder',
     leetcode: 'LeetCode'
   };
-
   // All platforms use the same blue color scheme as Codeforces
   const platformColors = {
     codeforces: {
@@ -175,7 +158,6 @@ const Dashboard = () => {
       badge: 'bg-blue-100 text-blue-800'
     }
   };
-
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -187,6 +169,8 @@ const Dashboard = () => {
       </div>
     );
   }
+  const hasLeetCode = userProfile?.platform_profiles?.some(p => p.platform === 'leetcode');
+  const hasCodeChef = userProfile?.platform_profiles?.some(p => p.platform === 'codechef');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -208,7 +192,6 @@ const Dashboard = () => {
                   <p className="text-xs text-gray-600">{userProfile.year}</p>
                 )}
               </div>
-
               {/* User Stats - More compact */}
               <div className="space-y-3 border-t border-gray-200 pt-5">
                 <div className="flex justify-between items-center">
@@ -228,7 +211,6 @@ const Dashboard = () => {
                   <span className="text-lg font-bold text-orange-600">{userProfile?.contests_count || 0}</span>
                 </div>
               </div>
-
               {/* Edit Profile Button */}
               <button
                 onClick={() => navigate('/profile')}
@@ -239,7 +221,6 @@ const Dashboard = () => {
               </button>
             </div>
           </div>
-
           {/* Main Content */}
           <div className="lg:col-span-9 space-y-4">
             {error && (
@@ -247,7 +228,6 @@ const Dashboard = () => {
                 <p className="text-red-800 text-sm">{error}</p>
               </div>
             )}
-
             {loading ? (
               <div className="text-center py-10">
                 <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-800 mx-auto mb-3"></div>
@@ -270,7 +250,6 @@ const Dashboard = () => {
                       Add Profile
                     </button>
                   </div>
-
                   {/* Add Platform Form - More compact */}
                   {showAddPlatform && (
                     <form onSubmit={handleAddPlatform} className="mb-5 p-3 bg-blue-50 rounded-lg border border-blue-200">
@@ -302,13 +281,11 @@ const Dashboard = () => {
                       </div>
                     </form>
                   )}
-
                   {/* Platform Profiles Grid - More compact */}
                   {userProfile?.platform_profiles && userProfile.platform_profiles.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {userProfile.platform_profiles.map((profile) => {
                         const platformColor = platformColors[profile.platform] || platformColors.codeforces;
-
                         return (
                           <div
                             key={profile.platform}
@@ -332,7 +309,6 @@ const Dashboard = () => {
                                 </div>
                               </div>
                             </div>
-
                             {/* Platform Stats - More compact */}
                             <div className="grid gap-1.5 text-xs">
                               {profile.platform === 'leetcode' ? (
@@ -373,7 +349,6 @@ const Dashboard = () => {
                     </div>
                   )}
                 </div>
-
                 {/* Rating Progress Chart - Placed BEFORE Contest History */}
                 {userProfile?.platform_profiles && userProfile.platform_profiles.length > 0 && (
                   <div className="bg-white rounded-lg shadow-sm p-2">
@@ -384,18 +359,36 @@ const Dashboard = () => {
                     <RatingChart platformProfiles={userProfile.platform_profiles} />
                   </div>
                 )}
-                {/* ← Add LeetCode Heatmap here */}
-{userProfile?.platform_profiles?.some(p => p.platform === 'leetcode') && (
-  <div className="bg-white rounded-lg shadow-sm p-5 mt-4">
-    <SubmissionHeatmap 
-      leetcodeHandle={
-        userProfile.platform_profiles.find(p => p.platform === 'leetcode')?.handle
-      }
-    />
-  </div>
-)}
+          {/* ← Heatmap Section (replace your old one with this) */}
+                {(hasLeetCode || hasCodeChef) && (
+                  <div className="bg-white rounded-lg shadow-sm p-5 mt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Submission Heatmap</h3>
+                      <select
+                        value={selectedHeatmap}
+                        onChange={(e) => setSelectedHeatmap(e.target.value)}
+                        className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {hasLeetCode && <option value="leetcode">LeetCode</option>}
+                        {hasCodeChef && <option value="codechef">CodeChef</option>}
+                      </select>
+                    </div>
 
+                    <div className={selectedHeatmap === 'leetcode' ? '' : 'hidden'}>
+                      {hasLeetCode && <LeetcodeHeatmap />}
+                    </div>
 
+                    <div className={selectedHeatmap === 'codechef' ? '' : 'hidden'}>
+                      {hasCodeChef && <CodechefHeatmap />}
+                    </div>
+
+                    {!hasLeetCode && !hasCodeChef && (
+                      <div className="text-center py-8 text-gray-500">
+                        Connect your LeetCode or CodeChef account to see your submission heatmap.
+                      </div>
+                    )}
+                  </div>
+                )}
                 {/* In return JSX → after RatingChart section (or wherever you want)*/}
                 <div className="bg-white rounded-lg shadow-sm p-5">
                   <div className="flex items-center gap-2 mb-4">
@@ -404,7 +397,6 @@ const Dashboard = () => {
                       Codeforces Solved Problems by Tag
                     </h2>
                   </div>
-
                   <div className="bg-white rounded-xl shadow-sm p-6">
                     {cfTagLoading ? (
                       <div className="text-center py-12">
@@ -414,7 +406,7 @@ const Dashboard = () => {
                     ) : (
                       <CfTagDonutChart
                         tagStats={cfTagStats}
-                        username={user?.name || "user"}  // or fetch handle from profile if you want
+                        username={user?.name || "user"} // or fetch handle from profile if you want
                       />
                     )}
                   </div>
@@ -427,5 +419,4 @@ const Dashboard = () => {
     </div>
   );
 };
-
 export default Dashboard;
