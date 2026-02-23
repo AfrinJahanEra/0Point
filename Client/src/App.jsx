@@ -273,6 +273,8 @@ function App() {
                 <Leaderboard />
               </Layout>
             } />
+
+            <Route path="/account/profile/:user_id/" element={<Profile />} />
            
             <Route path="/community" element={
               <Layout>
