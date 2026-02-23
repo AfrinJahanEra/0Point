@@ -1,160 +1,178 @@
-// src/components/SubmissionHeatmap.jsx
-import React, { useState, useEffect } from 'react';
-import CalendarHeatmap from 'react-calendar-heatmap';
-import 'react-calendar-heatmap/dist/styles.css';
+import React, { useEffect, useState } from 'react';
 import api from '../utils/api';
-import toast from 'react-hot-toast';
+import './heatmap.css';
 
-const SubmissionHeatmap = ({ leetcodeHandle }) => {
-  const [calendarData, setCalendarData] = useState([]);
-  const [activeYears, setActiveYears] = useState([]);
-  const [selectedYear, setSelectedYear] = useState(null);
+const SubmissionHeatmap = () => {
+  const [data, setData] = useState(null);
+  const [year, setYear] = useState('current');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!leetcodeHandle) {
-      setLoading(false);
-      return;
-    }
-
     fetchCalendar();
-  }, [leetcodeHandle, selectedYear]);
+  }, [year]);
 
   const fetchCalendar = async () => {
     setLoading(true);
-    setError(null);
-
     try {
-      let url = '/account/leetcode-calendar/';
-      if (selectedYear) {
-        url += `?year=${selectedYear}`;
-      }
+      const url =
+        year === 'current'
+          ? '/account/leetcode-calendar/'
+          : `/account/leetcode-calendar/?year=${year}`;
 
-      const response = await api.get(url);
-      const data = response.data;
-
-      if (data.has_leetcode === false) {
-        setError("No LeetCode profile found");
-        return;
-      }
-
-      if (data.error) {
-        setError(data.error);
-        return;
-      }
-
-      setCalendarData(data.submissionCalendar || []);
-      setActiveYears(data.activeYears || []);
-
-      // Auto-select latest year if not set
-      if (!selectedYear && data.activeYears?.length > 0) {
-        setSelectedYear(data.activeYears[data.activeYears.length - 1]);
-      }
-
-      toast.success("LeetCode heatmap loaded");
+      const res = await api.get(url);
+      setData(res.data);
     } catch (err) {
-      console.error(err);
-      setError("Failed to load LeetCode heatmap");
-      toast.error("Failed to load LeetCode heatmap");
+      console.error('Calendar fetch error', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleYearChange = (year) => {
-    setSelectedYear(year);
+  const calendar = data?.submissionCalendar || {};
+
+  /* ---------- Normalize data ---------- */
+  const dayMap = {};
+  Object.entries(calendar).forEach(([ts, count]) => {
+    const d = new Date(parseInt(ts) * 1000);
+    const key = d.toISOString().split('T')[0];
+    dayMap[key] = count;
+  });
+
+  const start = new Date(
+    year === 'current'
+      ? new Date().setFullYear(new Date().getFullYear() - 1)
+      : `${year}-01-01`
+  );
+
+  const end =
+    year === 'current'
+      ? new Date()
+      : new Date(`${year}-12-31`);
+
+  /* ---------- Group by month ---------- */
+  const months = {}; // monthIndex -> days[]
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+  const key = d.toISOString().split('T')[0];
+  const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+  if (!months[ym]) {
+    months[ym] = {
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      days: []
+    };
+  }
+
+  months[ym].days.push({
+    date: new Date(d),
+    count: dayMap[key] || 0
+  });
+}
+
+
+  const getLevel = (c) => {
+    if (c === 0) return 0;
+    if (c <= 2) return 1;
+    if (c <= 5) return 2;
+    if (c <= 10) return 3;
+    return 4;
   };
 
-  // Convert data to format expected by react-calendar-heatmap
-  const heatmapValues = calendarData.map(item => ({
-    date: new Date(item.date),
-    count: item.count,
-  }));
+  const allDays = Object.values(months).flatMap(m => m.days);
 
-  const startDate = selectedYear 
-    ? new Date(`${selectedYear}-01-01`)
-    : new Date(new Date().getFullYear() - 1, 0, 1);
-
-  const endDate = selectedYear 
-    ? new Date(`${selectedYear}-12-31`)
-    : new Date();
+  const total = allDays.reduce((a, b) => a + b.count, 0);
+  const activeDays = allDays.filter(d => d.count > 0).length;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <span className="text-orange-500">LeetCode</span> Submission Heatmap
-        </h2>
+    <div className="lc-heatmap-wrapper">
 
-        {activeYears.length > 0 && (
-          <div className="flex gap-2">
-            {activeYears.map(year => (
-              <button
-                key={year}
-                onClick={() => handleYearChange(year)}
-                className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                  selectedYear === year
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {year}
-              </button>
+      {/* HEADER */}
+      <div className="lc-header">
+        <div className="lc-title">
+          <span className="lc-total">{total}</span>
+          submissions in the past one year
+        </div>
+
+        <div className="lc-meta">
+          <span>Total active days: {activeDays}</span>
+          <span>Max streak: {data?.streak || 0}</span>
+
+          <select value={year} onChange={e => setYear(e.target.value)}>
+            <option value="current">Current</option>
+            {data?.activeYears?.map(y => (
+              <option key={y} value={y}>{y}</option>
             ))}
-          </div>
-        )}
+          </select>
+        </div>
       </div>
 
       {loading ? (
-        <div className="h-64 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-        </div>
-      ) : error ? (
-        <div className="h-64 flex items-center justify-center text-red-600 text-sm">
-          {error}
-        </div>
-      ) : calendarData.length === 0 ? (
-        <div className="h-64 flex items-center justify-center text-gray-500 text-sm">
-          No submission data available
-        </div>
+        <div className="lc-loading">Loading heatmap...</div>
       ) : (
-        <div className="overflow-x-auto">
-          <CalendarHeatmap
-            startDate={startDate}
-            endDate={endDate}
-            values={heatmapValues}
-            classForValue={(value) => {
-              if (!value || value.count === 0) return 'color-empty';
-              if (value.count <= 3) return 'color-scale-1';
-              if (value.count <= 7) return 'color-scale-2';
-              if (value.count <= 15) return 'color-scale-3';
-              return 'color-scale-4';
-            }}
-            tooltipDataAttrs={(value) => {
-              if (!value || !value.date) return null;
-              return {
-                'data-tooltip': `${value.count} submissions on ${value.date.toLocaleDateString()}`,
-              };
-            }}
-            showWeekdayLabels={true}
-            gutterSize={4}
-          />
+
+        /* MONTH BLOCKS */
+        <div className="lc-months-container">
+
+          {Object.values(months).map(({ year, month, days }) => {
+
+
+            /* pad start to week alignment */
+            const firstDay = days[0].date.getDay();// 0=Sun
+            const padded = [];
+
+            for (let i = 0; i < firstDay; i++) {
+              padded.push(null); // empty cell
+            }
+
+            days.forEach(d => padded.push(d));
+
+            return (
+             <div key={`${year}-${month}`} className="lc-month-block">
+
+
+                {/* Month label */}
+                <div className="lc-month-title">
+  {new Date(year, month).toLocaleString('default', { month: 'short' })}
+</div>
+
+
+                {/* Month grid */}
+                <div className="lc-month-grid">
+                  {padded.map((d, i) => {
+                    if (!d) {
+                      return <div key={i} className="lc-cell empty" />;
+                    }
+
+                    const lvl = getLevel(d.count);
+
+                    return (
+                      <div
+                        key={i}
+                        className={`lc-cell lvl-${lvl}`}
+                        title={`${d.date.toDateString()} : ${d.count} submissions`}
+                      />
+                    );
+                  })}
+                </div>
+
+              </div>
+            );
+          })}
+
         </div>
       )}
 
-      {/* Color legend */}
-      <div className="mt-4 flex items-center justify-end gap-2 text-xs text-gray-600">
+      {/* LEGEND */}
+      <div className="lc-legend">
         <span>Less</span>
-        <div className="flex gap-1">
-          <div className="w-4 h-4 rounded bg-gray-100"></div>
-          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#ebedf0' }}></div>
-          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#c6e48b' }}></div>
-          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#7bc96f' }}></div>
-          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#196127' }}></div>
-        </div>
+        <div className="lc-cell lvl-0" />
+        <div className="lc-cell lvl-1" />
+        <div className="lc-cell lvl-2" />
+        <div className="lc-cell lvl-3" />
+        <div className="lc-cell lvl-4" />
         <span>More</span>
       </div>
+
     </div>
   );
 };
