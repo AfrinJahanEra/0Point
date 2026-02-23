@@ -30,6 +30,7 @@ class GlobalLeaderboardView(APIView):
             ).count()
 
             leaderboard_data.append({
+                "user_id": str(user.id),
                 "username": user.name,
                 "total_points": user.rating,
                 "department": user.department,
@@ -41,3 +42,4 @@ class GlobalLeaderboardView(APIView):
 
         serializer = LeaderboardSerializer(leaderboard_data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
