@@ -147,10 +147,11 @@ const SubmissionHeatmap = () => {
 
                     return (
                       <div
-                        key={i}
-                        className={`lc-cell lvl-${lvl}`}
-                        title={`${d.date.toDateString()} : ${d.count} submissions`}
-                      />
+  key={i}
+  className={`lc-cell lvl-${lvl}`}
+  title={`${d.date.toDateString()} : ${d.count} submissions`}
+  style={{ cursor: 'pointer' }}
+/>
                     );
                   })}
                 </div>
