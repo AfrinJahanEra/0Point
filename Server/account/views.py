@@ -9,7 +9,7 @@ from math import ceil
 import requests
 from datetime import datetime
 
-from .calendar import  fetch_codechef_calendar, fetch_leetcode_calendar, fetch_atcoder_calendar
+from .calendar import  fetch_codeforces_calendar,fetch_codechef_calendar, fetch_leetcode_calendar, fetch_atcoder_calendar
 
 from .models import Account, PlatformSubmissionCache, UserTagStats, PlatformContestCache
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
@@ -555,6 +555,34 @@ class AtCoderCalendarView(APIView):
         year = request.query_params.get("year")
         try:
             data = fetch_atcoder_calendar(profile.handle, year)
+            return Response(data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+        
+# Server/account/views.py
+class CodeforcesCalendarView(APIView):
+    def get(self, request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return Response({"error": "Unauthorized"}, status=401)
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        profile = user.get_platform_profile("codeforces")
+        if not profile:
+            return Response({"error": "Codeforces not connected"}, status=400)
+
+        year = request.query_params.get("year")
+        try:
+            data = fetch_codeforces_calendar(profile.handle, year)
             return Response(data)
         except Exception as e:
             return Response({"error": str(e)}, status=500)

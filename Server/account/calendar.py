@@ -238,3 +238,111 @@ def fetch_atcoder_calendar(handle, year=None):
             "activeYears": [],
             "error": str(e)
         }
+    
+def fetch_codeforces_calendar(handle, year=None):
+    """
+    Fetch Codeforces submissions using official API.
+    Paginates to get full history, groups by UTC day for heatmap.
+    """
+    base_url = "https://codeforces.com/api/user.status"
+    submissions = []
+    from_idx = 1
+    count_per_page = 10000  # Max allowed by API
+    max_pages = 10  # Safety (100k submissions max — most users have <50k)
+
+    try:
+        while True:
+            params = {
+                "handle": handle,
+                "from": from_idx,
+                "count": count_per_page
+            }
+            resp = requests.get(base_url, params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+
+            if data["status"] != "OK":
+                raise Exception(f"Codeforces API error: {data.get('comment', 'Unknown')}")
+
+            batch = data["result"]
+            if not batch:
+                break
+
+            submissions.extend(batch)
+            logger.debug(f"Fetched {len(batch)} submissions (total now: {len(submissions)})")
+
+            # Next page
+            from_idx += count_per_page
+
+            if len(batch) < count_per_page:
+                break  # Last page
+
+            time.sleep(0.5)  # Rate limit safety
+
+            if len(submissions) > 100000 or from_idx > count_per_page * max_pages:
+                logger.warning(f"Too many submissions for {handle} — stopping early")
+                break
+
+        # Group by UTC day (midnight)
+        daily_counts = Counter()
+        for sub in submissions:
+            # creationTimeSeconds is Unix timestamp (UTC)
+            ts_sec = sub["creationTimeSeconds"]
+            dt = datetime.fromtimestamp(ts_sec, tz=timezone.utc)
+            day_start = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_ts = int(day_start.timestamp())
+            daily_counts[day_ts] += 1
+
+        calendar = {str(ts): count for ts, count in daily_counts.items()}
+
+        # Optional: filter to specific year
+        if year:
+            y = int(year)
+            calendar = {
+                k: v for k, v in calendar.items()
+                if datetime.fromtimestamp(int(k), tz=timezone.utc).year == y
+            }
+
+        # Streak, total, active days, active years (same as others)
+        all_dates = sorted(calendar.keys(), key=int)
+        total = sum(calendar.values())
+        active_days = len(all_dates)
+
+        current_streak = max_streak = 0
+        prev_date = None
+        for ts_str in all_dates:
+            curr = datetime.fromtimestamp(int(ts_str), tz=timezone.utc)
+            if prev_date and (curr - prev_date).days == 1:
+                current_streak += 1
+            else:
+                current_streak = 1
+            max_streak = max(max_streak, current_streak)
+            prev_date = curr
+
+        years = {datetime.fromtimestamp(int(ts), tz=timezone.utc).year for ts in calendar}
+
+        return {
+            "submissionCalendar": calendar,
+            "streak": max_streak,
+            "activeYears": sorted(list(years)),
+            "total_submissions": total,
+            "active_days": active_days,
+            "fetched_total": len(submissions)
+        }
+
+    except requests.RequestException as req_exc:
+        logger.error(f"Codeforces API network error for {handle}: {req_exc}")
+        return {
+            "submissionCalendar": {},
+            "streak": 0,
+            "activeYears": [],
+            "error": f"Failed to reach Codeforces API: {str(req_exc)}"
+        }
+    except Exception as e:
+        logger.exception(f"Unexpected error in Codeforces calendar for {handle}")
+        return {
+            "submissionCalendar": {},
+            "streak": 0,
+            "activeYears": [],
+            "error": str(e)
+        }
