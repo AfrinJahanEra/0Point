@@ -7,7 +7,7 @@ import { Plus, Edit2, TrendingUp, Globe } from 'lucide-react';
 import { SiCodechef } from 'react-icons/si'; // Import CodeChef icon from react-icons
 import RatingChart from '../components/RatingChart';
 import toast from 'react-hot-toast';
-import CfTagDonutChart from '../components/CfTagDonutChart';
+import CategoryRadarChart from '../components/CategoryRadarChart';
 import { PieChart as PieIcon } from 'lucide-react';
 import LeetcodeHeatmap from '../components/LeetcodeHeatmap';
 import CodechefHeatmap from '../components/CodechefHeatmap';
@@ -25,8 +25,8 @@ const Dashboard = () => {
     handle: ''
   });
   const [savingPlatform, setSavingPlatform] = useState(false);
-  const [cfTagStats, setCfTagStats] = useState({});
-  const [cfTagLoading, setCfTagLoading] = useState(true);
+  const [categoryScores, setCategoryScores] = useState({});
+  const [categoryLoading, setCategoryLoading] = useState(true);
 const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
   // Platform logo paths - only for platforms without react-icons
   const platformLogos = {
@@ -67,12 +67,12 @@ const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
       setLoading(false);
     }
     try {
-      const resp = await api.get('/account/tag-stats/'); // ← update endpoint if changed
-      setCfTagStats(resp.data.tag_stats || {});
+      const tagResp = await api.get('/account/tag-stats/');
+      setCategoryScores(tagResp.data.category_scores || {});
     } catch (err) {
-      console.error('Failed to load CF tag stats:', err);
+      console.error('Failed to load category scores:', err);
     } finally {
-      setCfTagLoading(false);
+      setCategoryLoading(false);
     }
   };
   const handleAddPlatform = async (e) => {
@@ -404,24 +404,25 @@ const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
   </div>
 )}
               
-                {/* In return JSX → after RatingChart section (or wherever you want)*/}
+                {/* ── NEW RADAR CHART SECTION ── */}
                 <div className="bg-white rounded-lg shadow-sm p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <PieIcon className="w-5 h-5 text-indigo-600" />
+                    <TrendingUp className="w-5 h-5 text-indigo-600" />
                     <h2 className="text-lg font-semibold text-gray-900">
-                      Codeforces Solved Problems by Tag
+                      Problem Solving Proficiency by Category
                     </h2>
                   </div>
-                  <div className="bg-white rounded-xl shadow-sm p-6">
-                    {cfTagLoading ? (
+
+                  <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
+                    {categoryLoading ? (
                       <div className="text-center py-12">
                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading Codeforces tag distribution...</p>
+                        <p className="text-gray-600">Analyzing your solving patterns...</p>
                       </div>
                     ) : (
-                      <CfTagDonutChart
-                        tagStats={cfTagStats}
-                        username={user?.name || "user"} // or fetch handle from profile if you want
+                      <CategoryRadarChart
+                        categoryScores={categoryScores}
+                        username={user?.name || "You"}
                       />
                     )}
                   </div>
