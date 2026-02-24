@@ -3,6 +3,7 @@ import { Trophy, Crown, Medal, Star } from "lucide-react";
 import axios from "axios";
 import { BACKEND_URL } from "../utils/api";
 import { useNavigate } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
 
 const Leaderboard = () => {
   const [leaderboardData, setLeaderboardData] = useState([]);
