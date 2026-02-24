@@ -35,18 +35,6 @@ const Leaderboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-purple-900 to-purple-700 text-white p-4">
-        <div className="flex items-center gap-2">
-          <Trophy className="w-5 h-5" />
-          <div>
-            <h1 className="text-lg font-bold">Global Leaderboard</h1>
-            <p className="text-sm text-purple-200">
-              Ranked by Rating (Total Points)
-            </p>
-          </div>
-        </div>
-      </div>
 
       <div className="max-w-6xl mx-auto p-4">
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
