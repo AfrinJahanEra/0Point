@@ -7,7 +7,14 @@ import Sidebar from "../components/Sidebar";
 
 const Leaderboard = () => {
   const [leaderboardData, setLeaderboardData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [paginatedData, setPaginatedData] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
   const navigate = useNavigate();
 
   useEffect(() => {
