@@ -12,6 +12,7 @@ import { PieChart as PieIcon } from 'lucide-react';
 import LeetcodeHeatmap from '../components/LeetcodeHeatmap';
 import CodechefHeatmap from '../components/CodechefHeatmap';
 import AtcoderHeatmap from '../components/AtcoderHeatmap';
+import CodeforcesHeatmap from '../components/CodeforcesHeatmap';
 const Dashboard = () => {
   const { user } = useApp();
   const navigate = useNavigate();
@@ -173,6 +174,7 @@ const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
   const hasLeetCode = userProfile?.platform_profiles?.some(p => p.platform === 'leetcode');
   const hasCodeChef = userProfile?.platform_profiles?.some(p => p.platform === 'codechef');
   const hasAtCoder = userProfile?.platform_profiles?.some(p => p.platform === 'atcoder');
+  const hasCodeforces = userProfile?.platform_profiles?.some(p => p.platform === 'codeforces');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -362,7 +364,7 @@ const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
                   </div>
                 )}
           {/* Heatmap Section */}
-{(hasLeetCode || hasCodeChef || hasAtCoder) && (
+{(hasLeetCode || hasCodeChef || hasAtCoder || hasCodeforces) && (
   <div className="bg-white rounded-lg shadow-sm p-5 mt-4">
     <div className="flex items-center justify-between mb-4">
       <h3 className="text-lg font-semibold text-gray-900">Submission Heatmap</h3>
@@ -374,6 +376,7 @@ const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
         {hasLeetCode  && <option value="leetcode">LeetCode</option>}
         {hasCodeChef  && <option value="codechef">CodeChef</option>}
         {hasAtCoder   && <option value="atcoder">AtCoder</option>}
+        {hasCodeforces && <option value="codeforces">Codeforces</option>}
       </select>
     </div>
 
@@ -389,9 +392,13 @@ const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
       {hasAtCoder && <AtcoderHeatmap />}
     </div>
 
-    {!hasLeetCode && !hasCodeChef && !hasAtCoder && (
+    <div className={selectedHeatmap === 'codeforces' ? '' : 'hidden'}>
+      {hasCodeforces && <CodeforcesHeatmap />}
+    </div>
+
+    {!hasLeetCode && !hasCodeChef && !hasAtCoder && !hasCodeforces && (
       <div className="text-center py-8 text-gray-600">
-        Connect LeetCode, CodeChef or AtCoder to see your submission heatmap.
+        Connect LeetCode, CodeChef, AtCoder or Codeforces to see your submission heatmap.
       </div>
     )}
   </div>
