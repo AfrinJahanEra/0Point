@@ -67,6 +67,7 @@ const Leaderboard = () => {
                 leaderboardData.map((user) => (
                   <tr
                     key={user.user_id}  
+                    onClick={() => navigate(`/account/profile/${user.user_id}/`)}
                     className="border-b hover:bg-gray-50"
                   >
                     <td className="p-3 flex items-center gap-2 font-bold">
