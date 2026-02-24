@@ -7,11 +7,11 @@ from django.conf import settings
 import jwt
 from math import ceil
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 
-from .calendar import  fetch_codeforces_calendar,fetch_codechef_calendar, fetch_leetcode_calendar, fetch_atcoder_calendar
+from .calendar import  fetch_codeforces_calendar,fetch_codechef_calendar, fetch_leetcode_calendar, fetch_atcoder_calendar, get_cached_calendar
 
-from .models import Account, PlatformSubmissionCache, UserTagStats, PlatformContestCache
+from .models import Account, PlatformCalendarCache, PlatformSubmissionCache, UserTagStats, PlatformContestCache
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
 from .platforms import fetch_codechef_contests, fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
 from submission.models import Submission
@@ -21,7 +21,7 @@ from .platforms.leetcode import fetch_submissions as fetch_leetcode_submissions
 from .platforms.codechef import fetch_submissions as fetch_codechef_submissions
 from .platforms.atcoder import fetch_submissions as fetch_atcoder_submissions
 
-from .tag_analysis import get_tag_stats
+from .tag_analysis import get_category_scores
 
 
 
@@ -466,11 +466,11 @@ class TagStatsView(APIView):
         if not user:
             return Response({"error": "User not found"}, status=404)
 
-        tag_stats = get_tag_stats(user)
+        category_scores = get_category_scores(user)
 
         return Response({
-            "tag_stats": tag_stats,
-            "note": "Unique solved problems per tag (Codeforces full history + LeetCode all-time)"
+            "category_scores": category_scores,
+            "note": "Proficiency scores per category based on average attempts needed to solve problems (higher score means fewer attempts, max 10)"
         })
     
 
@@ -577,12 +577,61 @@ class CodeforcesCalendarView(APIView):
             return Response({"error": "User not found"}, status=404)
 
         profile = user.get_platform_profile("codeforces")
-        if not profile:
-            return Response({"error": "Codeforces not connected"}, status=400)
 
+        cache = get_cached_calendar(user, "codeforces", profile.handle)
+
+        CACHE_VALID_HOURS = 12
+
+        fetch_needed = True
+        if cache and cache.last_fetched:
+            age = (datetime.utcnow() - cache.last_fetched).total_seconds() / 3600
+            if age < CACHE_VALID_HOURS:
+                fetch_needed = False
+
+        if fetch_needed:
+            full_data = fetch_codeforces_calendar(profile.handle)  # 🚀 fetch ONCE
+
+            calendar = full_data["submissionCalendar"]
+            streak = full_data["streak"]
+            active_years = full_data["activeYears"]
+            total = full_data["total_submissions"]
+
+            if cache:
+                cache.calendar = calendar
+                cache.streak = streak
+                cache.active_years = active_years
+                cache.total = total
+                cache.last_fetched = datetime.utcnow()
+            else:
+                user.calendar_cache.append(PlatformCalendarCache(
+                    platform="codeforces",
+                    handle=profile.handle,
+                    calendar=calendar,
+                    streak=streak,
+                    active_years=active_years,
+                    total=total,
+                    last_fetched=datetime.utcnow()
+                ))
+
+            user.save()
+        else:
+            calendar = cache.calendar
+            streak = cache.streak
+            active_years = cache.active_years
+            total = cache.total
+
+        # 🔥 Year filter (FAST — local dict filter)
         year = request.query_params.get("year")
-        try:
-            data = fetch_codeforces_calendar(profile.handle, year)
-            return Response(data)
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
+        if year:
+            y = int(year)
+            calendar = {
+                k: v for k, v in calendar.items()
+                if datetime.fromtimestamp(int(k), tz=timezone.utc).year == y
+            }
+
+        return Response({
+            "submissionCalendar": calendar,
+            "streak": streak,
+            "activeYears": active_years,
+            "total_submissions": total
+        })

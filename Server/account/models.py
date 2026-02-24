@@ -1,3 +1,4 @@
+#Server/account/models.py
 from mongoengine import Document, StringField, EmailField, BooleanField, DateTimeField, IntField, EmbeddedDocument, EmbeddedDocumentField, DictField, ListField, FloatField
 from django.contrib.auth.hashers import make_password, check_password
 from datetime import datetime
@@ -38,6 +39,18 @@ class PlatformSubmissionCache(EmbeddedDocument):
     count          = IntField(default=0)
 
 
+# Server/account/models.py
+
+class PlatformCalendarCache(EmbeddedDocument):
+    platform = StringField(required=True)
+    handle = StringField(required=True)
+    calendar = DictField()  # {"timestamp": count}
+    last_fetched = DateTimeField()
+    streak = IntField(default=0)
+    active_years = ListField(IntField(), default=list)
+    total = IntField(default=0)
+
+
 
 class Account(Document):
     name = StringField(required=True, max_length=200)
@@ -73,6 +86,10 @@ class Account(Document):
     contest_cache = ListField(EmbeddedDocumentField(PlatformContestCache), default=list)
 
     submission_cache = ListField(EmbeddedDocumentField(PlatformSubmissionCache), default=list)
+
+    calendar_cache = ListField(EmbeddedDocumentField(PlatformCalendarCache), default=list)
+
+
 
     meta = {
         "collection": "accounts"
@@ -125,10 +142,9 @@ from mongoengine import Document, StringField, DictField, DateTimeField
 
 class UserTagStats(Document):
     user_id = StringField(required=True, unique=True)
-    tags = DictField(default=dict)  # {normalized_tag: int count}
+    category_scores = DictField(default=dict)  # {category: float score}
     last_update = DateTimeField()
     last_cf_submission_time = IntField(default=0)
     last_lc_submission_time = IntField(default=0)
     
     meta = {'collection': 'user_tag_stats'}
-
