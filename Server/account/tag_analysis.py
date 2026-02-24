@@ -283,11 +283,28 @@ def get_category_scores(user):
         for cat, lst in d.items():
             all_att[cat].extend(lst)
 
+    # inside the loop where you compute scores for each category
+
     scores = {}
+
     for cat, atts in all_att.items():
-        if atts:
-            avg = sum(atts) / len(atts)
-            scores[cat] = round(10 / avg, 2)
+        if not atts:
+            continue
+        
+        solved_count = len(atts)
+        if solved_count == 0:
+            continue
+        
+        # sum of 1/attempts for each solved problem
+        total_inverse = sum(1.0 / attempts for attempts in atts)
+        
+        # average problem score
+        avg_problem_score = total_inverse / solved_count
+        
+        # scale to 0–10
+        final_score = round(10.0 * avg_problem_score, 2)
+        
+        scores[cat] = final_score
 
     # Update cache
     UserTagStats.objects(user_id=user_id).update_one(
