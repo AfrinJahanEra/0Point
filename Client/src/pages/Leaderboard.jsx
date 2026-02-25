@@ -50,6 +50,18 @@ const Leaderboard = () => {
     setCurrentPage(1);
   }, [searchQuery, leaderboardData]);
 
+    // 📄 Pagination Logic
+  useEffect(() => {
+    const total = Math.ceil(filteredData.length / itemsPerPage);
+    setTotalPages(total || 1);
+
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    setPaginatedData(filteredData.slice(start, end));
+  }, [filteredData, currentPage, itemsPerPage]);
+
+  
+
   const getRankIcon = (rank) => {
     if (rank === 1) return <Crown className="w-4 h-4 text-yellow-600" />;
     if (rank === 2) return <Medal className="w-4 h-4 text-gray-600" />;
