@@ -258,7 +258,7 @@ def get_category_scores(user):
     lc_tags = defaultdict(set)
     new_cf_last = cache.last_cf_submission_time if cache else 0
     new_lc_last = cache.last_lc_submission_time if cache else 0
-
+    
     # ── Codeforces ──────────────────────────────────────────────────
     need_cf_fetch = True
     if cache and cf_handle:
@@ -291,20 +291,15 @@ def get_category_scores(user):
         except Exception as e:
             print(f"LC recency check failed: {e}")
             need_lc_fetch = False
-
+    
     if need_lc_fetch and lc_handle:
         lc_att, new_lc_last, lc_tags = fetch_lc_category_attempts(lc_handle)
-
-    # Return cache if nothing new to fetch
-    if cache and not need_cf_fetch and not need_lc_fetch:
-        return cache.category_scores or {}
-
-    # ── Merge attempts ──────────────────────────────────────────────
+    
+        # In merge:
     all_att = defaultdict(list)
-    for d in [cf_att, lc_att]:
+    for d in [cf_att, lc_att]:           # both — even if one is empty
         for cat, lst in d.items():
             all_att[cat].extend(lst)
-
     # ── Compute scores ──────────────────────────────────────────────
     scores = {}
 
