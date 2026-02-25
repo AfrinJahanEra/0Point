@@ -16,19 +16,29 @@ HEADERS = {
 def normalize_verdict(verdict, platform):
     if not verdict:
         return "Other"
-    
-    verdict = verdict.upper()
-    
-    if "ACCEPT" in verdict or "OK" in verdict:
+
+    # Codeforces verdicts are uppercase with underscores
+    v = verdict.upper().strip()
+
+    if v == "OK":
         return "Accepted"
-    if "WRONG" in verdict:
+    if v == "WRONG_ANSWER":
         return "Wrong Answer"
-    if "TIME" in verdict:
+    if v == "TIME_LIMIT_EXCEEDED":
         return "Time Limit Exceeded"
-    if "RUNTIME" in verdict or "MEMORY" in verdict:
+    if v == "MEMORY_LIMIT_EXCEEDED":
+        return "Memory Limit Exceeded"
+    if v == "RUNTIME_ERROR":
         return "Runtime Error"
-    if "COMPIL" in verdict:
+    if v == "COMPILATION_ERROR":
         return "Compilation Error"
+    if v == "PARTIAL":
+        return "Partial"
+    if v == "CHALLENGED":
+        return "Challenged"
+    if v == "SKIPPED":
+        return "Skipped"
+        
     return "Other"
 
 def get_latest_submission_time(platform, handle):
