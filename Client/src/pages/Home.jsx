@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Code2, 
@@ -24,12 +24,21 @@ import {
   PieChart,
   LineChart
 } from 'lucide-react';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
 
 const Home = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [timeFilter, setTimeFilter] = useState('upcoming');
   const [activeVisualization, setActiveVisualization] = useState('');
   const [registeredContests, setRegisteredContests] = useState(new Set());
+  
+  // Blog states for like/dislike and comments
+  const [blogLikes, setBlogLikes] = useState({});
+  const [blogDislikes, setBlogDislikes] = useState({});
+  const [showComments, setShowComments] = useState({});
+  const [blogComments, setBlogComments] = useState({});
+  const [newComment, setNewComment] = useState({});
 
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
@@ -151,30 +160,6 @@ const Home = () => {
     }
   ];
 
-  const recommendedProblems = [
-    {
-      id: 1,
-      title: "Two Sum",
-      difficulty: "Easy",
-      acceptance: "75%",
-      topic: "Arrays"
-    },
-    {
-      id: 2,
-      title: "Binary Tree Traversal",
-      difficulty: "Medium",
-      acceptance: "68%",
-      topic: "Trees"
-    },
-    {
-      id: 3,
-      title: "Dynamic Range Sum",
-      difficulty: "Hard",
-      acceptance: "42%",
-      topic: "Segment Trees"
-    }
-  ];
-
   const blogPosts = [
     {
       id: 1,
@@ -184,6 +169,89 @@ const Home = () => {
       readTime: "8 min read"
     }
   ];
+
+  // Functions for like/dislike and comments
+  const handleBlogLike = (blogId) => {
+    setBlogLikes(prev => ({
+      ...prev,
+      [blogId]: (prev[blogId] || 0) + 1
+    }));
+    toast.success('Blog liked!');
+  };
+
+  const handleBlogDislike = (blogId) => {
+    setBlogDislikes(prev => ({
+      ...prev,
+      [blogId]: (prev[blogId] || 0) + 1
+    }));
+    toast.success('Blog disliked!');
+  };
+
+  const toggleComments = (blogId) => {
+    setShowComments(prev => ({
+      ...prev,
+      [blogId]: !prev[blogId]
+    }));
+    
+    // Initialize comments array if not exists
+    if (!blogComments[blogId]) {
+      setBlogComments(prev => ({
+        ...prev,
+        [blogId]: []
+      }));
+    }
+  };
+
+  const handleAddComment = (blogId) => {
+    const comment = newComment[blogId];
+    if (!comment || !comment.trim()) {
+      toast.error('Please enter a comment');
+      return;
+    }
+
+    const newCommentObj = {
+      id: Date.now(),
+      author: "Current User",
+      content: comment,
+      date: new Date().toLocaleDateString(),
+      likes: 0,
+      dislikes: 0
+    };
+
+    setBlogComments(prev => ({
+      ...prev,
+      [blogId]: [...(prev[blogId] || []), newCommentObj]
+    }));
+
+    setNewComment(prev => ({
+      ...prev,
+      [blogId]: ''
+    }));
+
+    toast.success('Comment added!');
+  };
+
+  const handleCommentLike = (blogId, commentId) => {
+    setBlogComments(prev => ({
+      ...prev,
+      [blogId]: prev[blogId].map(comment => 
+        comment.id === commentId 
+          ? { ...comment, likes: (comment.likes || 0) + 1 }
+          : comment
+      )
+    }));
+  };
+
+  const handleCommentDislike = (blogId, commentId) => {
+    setBlogComments(prev => ({
+      ...prev,
+      [blogId]: prev[blogId].map(comment => 
+        comment.id === commentId 
+          ? { ...comment, dislikes: (comment.dislikes || 0) + 1 }
+          : comment
+      )
+    }));
+  };
 
   const handleRegister = (contestId) => {
     setRegisteredContests(prev => new Set([...prev, contestId]));
@@ -518,7 +586,7 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Recent Blog Post */}
+            {/* Recent Blog Post - Added like/dislike and comments */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
@@ -550,7 +618,97 @@ const Home = () => {
                       By the end of this article, you'll have a solid understanding of dynamic programming techniques that will 
                       significantly improve your problem-solving skills in competitive programming contests.
                     </p>
-                    <div className="flex justify-between items-center">
+                    
+                    {/* Like/Dislike Buttons */}
+                    <div className="flex items-center gap-4 mb-3">
+                      <button 
+                        onClick={() => handleBlogLike(post.id)}
+                        className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                        </svg>
+                        Like {blogLikes[post.id] || 0}
+                      </button>
+                      <button 
+                        onClick={() => handleBlogDislike(post.id)}
+                        className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                        </svg>
+                        Dislike {blogDislikes[post.id] || 0}
+                      </button>
+                      <button 
+                        onClick={() => toggleComments(post.id)}
+                        className="flex items-center gap-1 text-xs text-gray-600 hover:text-blue-600 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                        </svg>
+                        Comments {blogComments[post.id]?.length || 0}
+                      </button>
+                    </div>
+
+                    {/* Comments Section */}
+                    {showComments[post.id] && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        {/* Add Comment */}
+                        <div className="mb-3">
+                          <textarea
+                            value={newComment[post.id] || ''}
+                            onChange={(e) => setNewComment({...newComment, [post.id]: e.target.value})}
+                            placeholder="Write a comment..."
+                            className="w-full p-2 border border-gray-300 rounded text-xs resize-y"
+                            rows="2"
+                          />
+                          <button
+                            onClick={() => handleAddComment(post.id)}
+                            className="mt-2 px-3 py-1 bg-blue-800 text-white text-xs rounded hover:bg-blue-900 transition-colors"
+                          >
+                            Post Comment
+                          </button>
+                        </div>
+
+                        {/* Comments List */}
+                        <div className="space-y-3">
+                          {blogComments[post.id]?.map((comment) => (
+                            <div key={comment.id} className="bg-gray-50 p-2 rounded">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-medium text-gray-900">{comment.author}</span>
+                                <span className="text-xs text-gray-500">{comment.date}</span>
+                              </div>
+                              <p className="text-xs text-gray-700 mb-2">{comment.content}</p>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => handleCommentLike(post.id, comment.id)}
+                                  className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600"
+                                >
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                                  </svg>
+                                  {comment.likes || 0}
+                                </button>
+                                <button
+                                  onClick={() => handleCommentDislike(post.id, comment.id)}
+                                  className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600"
+                                >
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                                  </svg>
+                                  {comment.dislikes || 0}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          {(!blogComments[post.id] || blogComments[post.id].length === 0) && (
+                            <p className="text-xs text-gray-500 text-center py-2">No comments yet. Be the first to comment!</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center mt-2">
                       <span className="text-xs text-gray-500">{post.date} • {post.readTime}</span>
                       <button className="text-xs text-blue-800 hover:text-blue-900 transition-colors duration-200 font-bold">
                         Read More
