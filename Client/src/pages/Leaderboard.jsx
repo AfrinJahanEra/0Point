@@ -75,76 +75,145 @@ const Leaderboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <div className="max-w-[1920px] mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-      <div className="max-w-6xl mx-auto p-4">
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-100 border-b">
-              <tr>
-                <th className="p-3 text-left text-sm font-semibold">Rank</th>
-                <th className="p-3 text-left text-sm font-semibold">
-                  Username
-                </th>
-                <th className="p-3 text-left text-sm font-semibold">
-                  Department
-                </th>
-                <th className="p-3 text-left text-sm font-semibold">
-                  Total Points
-                </th>
-                <th className="p-3 text-left text-sm font-semibold">
-                  Contests Participated
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="5" className="text-center p-6">
-                    Loading...
-                  </td>
-                </tr>
-              ) : (
-                leaderboardData.map((user) => (
-                  <tr
-                    key={user.user_id}  
-                    onClick={() => navigate(`/account/profile/${user.user_id}/`)}
-                    className="border-b hover:bg-gray-50"
-                  >
-                    <td className="p-3 flex items-center gap-2 font-bold">
-                      {getRankIcon(user.rank)}
-                      {user.rank}
-                    </td>
+          {/* Main Content */}
+          <div className="lg:col-span-9">
 
-                    <td className="p-3 font-semibold text-gray-900">
-                      {user.username}
-                    </td>
+            {/* Header */}
+            <div className="bg-white rounded-lg p-4 mb-4">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
 
-                    <td className="p-3 text-gray-700">
-                      {user.department}
-                    </td>
+                  {/* Items Per Page */}
+                  <div className="flex items-center gap-2 text-xs">
+                    <span>Show:</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(parseInt(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="border rounded px-2 py-1"
+                    >
+                      <option value="5">5</option>
+                      <option value="10">10</option>
+                      <option value="20">20</option>
+                      <option value="50">50</option>
+                    </select>
+                  </div>
 
-                    <td className="p-3 font-bold text-purple-700">
-                      {user.total_points}
-                    </td>
-
-                    <td className="p-3 text-gray-700">
-                      {user.contests_participated}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-
-          {!loading && leaderboardData.length === 0 && (
-            <div className="p-6 text-center text-gray-500">
-              No leaderboard data available.
+                  {/* Search */}
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 text-xs border rounded-lg"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
+
+            {/* Table */}
+            <div className="bg-white rounded-lg border overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-100 border-b">
+                  <tr>
+                    <th className="p-3 text-left text-xs font-semibold">Rank</th>
+                    <th className="p-3 text-left text-xs font-semibold">Username</th>
+                    <th className="p-3 text-left text-xs font-semibold">Department</th>
+                    <th className="p-3 text-left text-xs font-semibold">Total Points</th>
+                    <th className="p-3 text-left text-xs font-semibold">Contests</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="5" className="p-6 text-center text-xs">
+                        Loading...
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedData.map((user) => (
+                      <tr
+                        key={user.user_id}
+                        onClick={() =>
+                          navigate(`/account/profile/${user.user_id}/`)
+                        }
+                        className="border-b hover:bg-gray-50 cursor-pointer"
+                      >
+                        <td className="p-3 flex items-center gap-2 text-xs font-bold">
+                          {getRankIcon(user.rank)}
+                          {user.rank}
+                        </td>
+                        <td className="p-3 text-xs font-semibold">
+                          {user.username}
+                        </td>
+                        <td className="p-3 text-xs">{user.department}</td>
+                        <td className="p-3 text-xs font-bold text-purple-700">
+                          {user.total_points}
+                        </td>
+                        <td className="p-3 text-xs">
+                          {user.contests_participated}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+
+              {!loading && filteredData.length === 0 && (
+                <div className="p-6 text-center text-xs text-gray-500">
+                  No leaderboard data found.
+                </div>
+              )}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="bg-white mt-4 p-4 rounded-lg border flex justify-between items-center text-xs">
+                <div>
+                  Page <strong>{currentPage}</strong> of{" "}
+                  <strong>{totalPages}</strong>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button onClick={() => goToPage(1)}>
+                    <ChevronsLeft className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => goToPage(currentPage - 1)}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <span className="px-2">{currentPage}</span>
+
+                  <button onClick={() => goToPage(currentPage + 1)}>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => goToPage(totalPages)}>
+                    <ChevronsRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="lg:col-span-3">
+            <Sidebar />
+          </div>
+
         </div>
       </div>
     </div>
   );
+  
 };
 
 export default Leaderboard;
