@@ -3,12 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import api from '../utils/api';
-import { Plus, Edit2, TrendingUp, Globe } from 'lucide-react';
+import { PieChart, TrendingUp, Globe, Plus, Edit2 } from 'lucide-react';
 import { SiCodechef } from 'react-icons/si'; // Import CodeChef icon from react-icons
 import RatingChart from '../components/RatingChart';
 import toast from 'react-hot-toast';
 import CategoryRadarChart from '../components/CategoryRadarChart';
-import { PieChart as PieIcon } from 'lucide-react';
+import VerdictDonutChart from '../components/VerdictDonutChart';
+
 import LeetcodeHeatmap from '../components/LeetcodeHeatmap';
 import CodechefHeatmap from '../components/CodechefHeatmap';
 import AtcoderHeatmap from '../components/AtcoderHeatmap';
@@ -28,6 +29,11 @@ const Dashboard = () => {
   const [categoryScores, setCategoryScores] = useState({});
   const [categoryLoading, setCategoryLoading] = useState(true);
 const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
+
+const [verdictStats, setVerdictStats] = useState({});
+const [verdictLoading, setVerdictLoading] = useState(true);
+
+
   // Platform logo paths - only for platforms without react-icons
   const platformLogos = {
     codeforces: '/src/assets/codeforces-social-preview.png',
@@ -74,6 +80,14 @@ const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
     } finally {
       setCategoryLoading(false);
     }
+    try {
+  const verdictResp = await api.get('/account/verdict-stats/'); // new endpoint
+  setVerdictStats(verdictResp.data.verdict_counts || {});
+} catch (err) {
+  console.error('Failed to load verdict stats:', err);
+} finally {
+  setVerdictLoading(false);
+}
   };
   const handleAddPlatform = async (e) => {
     e.preventDefault();
@@ -405,28 +419,52 @@ const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
 )}
               
                 {/* ── NEW RADAR CHART SECTION ── */}
-                <div className="bg-white rounded-lg shadow-sm p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp className="w-5 h-5 text-indigo-600" />
-                    <h2 className="text-lg font-semibold text-gray-900">
-                      Problem Solving Proficiency by Category
-                    </h2>
-                  </div>
+                {/* Charts Section – side by side on lg+ */}
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  {/* Left: Radar Chart - Proficiency by Category */}
+  <div className="bg-white rounded-lg shadow-sm p-5">
+    <div className="flex items-center gap-2 mb-4">
+      <TrendingUp className="w-5 h-5 text-indigo-600" />
+      <h2 className="text-lg font-semibold text-gray-900">
+        Problem Solving Proficiency by Category
+      </h2>
+    </div>
 
-                  <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-                    {categoryLoading ? (
-                      <div className="text-center py-12">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600">Analyzing your solving patterns...</p>
-                      </div>
-                    ) : (
-                      <CategoryRadarChart
-                        categoryScores={categoryScores}
-                        username={user?.name || "You"}
-                      />
-                    )}
-                  </div>
-                </div>
+    {categoryLoading ? (
+      <div className="text-center py-12">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Analyzing solving patterns...</p>
+      </div>
+    ) : (
+      <CategoryRadarChart
+        categoryScores={categoryScores}
+        username={user?.name || "You"}
+      />
+    )}
+  </div>
+
+  {/* Right: Donut Chart - Verdict Distribution */}
+  <div className="bg-white rounded-lg shadow-sm p-5">
+    <div className="flex items-center gap-2 mb-4">
+      <PieChart className="w-5 h-5 text-purple-600" />
+      <h2 className="text-lg font-semibold text-gray-900">
+        Submission Verdict Distribution
+      </h2>
+    </div>
+
+   {verdictLoading ? (
+  <div className="text-center py-12">
+    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600 mx-auto mb-4"></div>
+    <p className="text-gray-600">Loading verdict stats...</p>
+  </div>
+) : (
+  <VerdictDonutChart
+    verdictStats={verdictStats}
+    username={user?.name || "You"}
+  />
+)}
+  </div>
+</div>
              </>
             )}
           </div>
