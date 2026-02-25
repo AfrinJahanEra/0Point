@@ -149,7 +149,6 @@ class UserTagStats(Document):
     
     meta = {'collection': 'user_tag_stats'}
 
-
 class UserVerdictStats(Document):
     user_id = StringField(required=True, unique=True)
     verdict_counts_per_platform = DictField(default=dict)  # {"codeforces": {"Accepted": 10, ...}, ...}
@@ -160,3 +159,4 @@ class UserVerdictStats(Document):
     last_ac_submission_time = IntField(default=0)
     
     meta = {'collection': 'user_verdict_stats'}
+

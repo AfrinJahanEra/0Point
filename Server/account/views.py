@@ -6,6 +6,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 import jwt
+from rest_framework.permissions import AllowAny
+from mongoengine.errors import DoesNotExist
 from math import ceil
 import requests
 from datetime import datetime, timezone
@@ -23,7 +25,6 @@ from .platforms.codechef import fetch_submissions as fetch_codechef_submissions
 from .platforms.atcoder import fetch_submissions as fetch_atcoder_submissions
 
 from .tag_analysis import get_category_scores
-
 from .verdict_analysis import get_verdict_counts
 
 
@@ -139,6 +140,49 @@ class UserProfileView(APIView):
             return Response({"error": str(e)}, status=400)
 
 
+class PublicUserProfileView(APIView):
+    """
+    Public endpoint to view another user's profile (no auth required for basic info)
+    """
+    permission_classes = [AllowAny]  # Public access
+
+    def get(self, request, user_id):
+        try:
+            user = Account.objects.get(id=user_id, is_deleted=False, is_inactive=False)
+        except (DoesNotExist, Exception):
+            return Response({"error": "User not found or inactive"}, status=404)
+
+        # Prepare public-safe data (do NOT expose email, password, etc.)
+        profile_data = {
+            "id": str(user.id),
+            "name": user.name,
+            "department": user.department,
+            "year": user.year,
+            "total_score": user.total_score,
+            "global_rank": user.global_rank,
+            "problems_solved": user.problems_solved,
+            "contests_count": user.contests_count,
+            "rating": user.rating,
+            "badge": user.badge,
+            "platform_profiles": [],
+            "created_at": user.created_at.isoformat() if user.created_at else None
+        }
+
+        # Only include public platform info
+        for profile in user.platform_profiles:
+            profile_data["platform_profiles"].append({
+                "platform": profile.platform,
+                "handle": profile.handle,
+                "current_rating": profile.current_rating,
+                "max_rating": profile.max_rating,
+                "min_rating": profile.min_rating,
+                "contests_count": profile.contests_count,
+                "badge": profile.badge,
+                # Do NOT include sensitive fields like rating_history if private
+            })
+
+        return Response(profile_data)
+
 class AddPlatformProfileView(APIView):
     """Add or update coding platform profile"""
     
@@ -252,13 +296,10 @@ def fetch_atcoder_rating(handle):
     from .platforms import fetch_atcoder_rating as platform_fetch
     return platform_fetch(handle)
 
-
 def fetch_leetcode_rating(handle):
     """Deprecated: Use platforms.fetch_leetcode_rating instead"""
     from .platforms import fetch_leetcode_rating as platform_fetch
     return platform_fetch(handle)
-
-
 
 class ContestHistoryView(APIView):
     def get(self, request, user_id=None):
@@ -369,7 +410,6 @@ class ContestHistoryView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-
 class ExternalSubmissionView(APIView):
     """
     Fetch submissions from external platforms (Codeforces, etc.)
@@ -458,7 +498,6 @@ class ExternalSubmissionView(APIView):
             "total_fetched": len(submissions)
         })
 
-
 class TagStatsView(APIView):
     def get(self, request):
         auth_header = request.headers.get("Authorization", "")
@@ -481,8 +520,7 @@ class TagStatsView(APIView):
         return Response({
             "category_scores": category_scores,
             "note": "Proficiency scores per category based on average attempts needed to solve problems (higher score means fewer attempts, max 10)"
-        })
-    
+        }) 
 
 class VerdictStatsView(APIView):
     def get(self, request):
@@ -538,7 +576,6 @@ class LeetCodeCalendarView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=500)
         
-
 class CodeChefCalendarView(APIView):
     def get(self, request):
         auth_header = request.headers.get("Authorization", "")
@@ -564,7 +601,6 @@ class CodeChefCalendarView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=500)
         
-
 class AtCoderCalendarView(APIView):
     def get(self, request):
         auth_header = request.headers.get("Authorization", "")
@@ -592,7 +628,6 @@ class AtCoderCalendarView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=500)
         
-# Server/account/views.py
 class CodeforcesCalendarView(APIView):
     def get(self, request):
         auth_header = request.headers.get("Authorization", "")
