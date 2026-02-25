@@ -34,6 +34,22 @@ const Leaderboard = () => {
     }
   };
 
+    // 🔎 Search Filter
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const filtered = leaderboardData.filter(
+        (user) =>
+          user.username?.toLowerCase().includes(q) ||
+          user.department?.toLowerCase().includes(q)
+      );
+      setFilteredData(filtered);
+    } else {
+      setFilteredData(leaderboardData);
+    }
+    setCurrentPage(1);
+  }, [searchQuery, leaderboardData]);
+
   const getRankIcon = (rank) => {
     if (rank === 1) return <Crown className="w-4 h-4 text-yellow-600" />;
     if (rank === 2) return <Medal className="w-4 h-4 text-gray-600" />;
