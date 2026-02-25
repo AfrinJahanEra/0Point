@@ -69,6 +69,10 @@ const Leaderboard = () => {
     return <Star className="w-4 h-4 text-purple-600" />;
   };
 
+    const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
 
