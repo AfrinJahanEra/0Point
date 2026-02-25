@@ -145,6 +145,18 @@ class UserTagStats(Document):
     category_scores = DictField(default=dict)  # {category: float score}
     last_update = DateTimeField()
     last_cf_submission_time = IntField(default=0)
-    last_lc_submission_time = IntField(default=0)
+    last_lc_submission_time = IntField(default=0) 
     
     meta = {'collection': 'user_tag_stats'}
+
+
+class UserVerdictStats(Document):
+    user_id = StringField(required=True, unique=True)
+    verdict_counts_per_platform = DictField(default=dict)  # {"codeforces": {"Accepted": 10, ...}, ...}
+    last_update = DateTimeField()
+    last_cf_submission_time = IntField(default=0)
+    last_lc_submission_time = IntField(default=0)
+    last_cc_submission_time = IntField(default=0)
+    last_ac_submission_time = IntField(default=0)
+    
+    meta = {'collection': 'user_verdict_stats'}

@@ -1,4 +1,5 @@
 #Server/account/views.py
+from collections import defaultdict
 import token
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -11,7 +12,7 @@ from datetime import datetime, timezone
 
 from .calendar import  fetch_codeforces_calendar,fetch_codechef_calendar, fetch_leetcode_calendar, fetch_atcoder_calendar, get_cached_calendar
 
-from .models import Account, PlatformCalendarCache, PlatformSubmissionCache, UserTagStats, PlatformContestCache
+from .models import Account, PlatformCalendarCache, PlatformSubmissionCache, UserTagStats, PlatformContestCache, UserVerdictStats
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
 from .platforms import fetch_codechef_contests, fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
 from submission.models import Submission
@@ -22,6 +23,8 @@ from .platforms.codechef import fetch_submissions as fetch_codechef_submissions
 from .platforms.atcoder import fetch_submissions as fetch_atcoder_submissions
 
 from .tag_analysis import get_category_scores
+
+from .verdict_analysis import get_verdict_counts
 
 
 
@@ -205,6 +208,13 @@ class AddPlatformProfileView(APIView):
            # Reset timestamps for the changed platform (forces full re-fetch)
             
             UserTagStats.objects(user_id=str(user.id)).delete()
+            UserVerdictStats.objects(user_id=str(user.id)).delete()
+
+            # Invalidate caches for this platform to force re-fetch on next access
+            user.contest_cache = [c for c in user.contest_cache if c.platform != platform]
+            user.submission_cache = [c for c in user.submission_cache if c.platform != platform]
+            user.calendar_cache = [c for c in user.calendar_cache if c.platform != platform]
+            user.save()
            
             return Response({
                 "message": "Platform profile added successfully",
@@ -474,6 +484,29 @@ class TagStatsView(APIView):
         })
     
 
+class VerdictStatsView(APIView):
+    def get(self, request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return Response({"error": "Unauthorized"}, status=401)
+
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        verdict_counts = get_verdict_counts(user)
+
+        return Response({
+            "verdict_counts": verdict_counts,
+            "note": "Submission verdict distribution across all connected platforms (based on all historical submissions where available)"
+        })
 
 class LeetCodeCalendarView(APIView):
     def get(self, request):

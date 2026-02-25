@@ -1,6 +1,6 @@
 #Server/account/urls.py
 from django.urls import path
-from .views import   CodeforcesCalendarView,LeetCodeCalendarView, CodeChefCalendarView, AtCoderCalendarView ,SignupView, LoginView, TagStatsView, UserProfileView, AddPlatformProfileView, ContestHistoryView, ExternalSubmissionView
+from .views import   CodeforcesCalendarView,LeetCodeCalendarView, CodeChefCalendarView, AtCoderCalendarView ,SignupView, LoginView, TagStatsView, UserProfileView, AddPlatformProfileView, ContestHistoryView, ExternalSubmissionView, VerdictStatsView
 
 urlpatterns = [
     path("signup/", SignupView.as_view(), name="signup"),
@@ -12,6 +12,8 @@ urlpatterns = [
     path("contest-history/", ContestHistoryView.as_view(), name="contest_history"),
     path("external-submissions/", ExternalSubmissionView.as_view(), name="external_submissions"),
     path("tag-stats/", TagStatsView.as_view(), name="tag_stats"),
+    path("verdict-stats/", VerdictStatsView.as_view(), name="verdict_stats"),
+   
     path("leetcode-calendar/", LeetCodeCalendarView.as_view(), name="leetcode_calendar"),
     path("codechef-calendar/", CodeChefCalendarView.as_view(), name="codechef_calendar"),
     path("atcoder-calendar/", AtCoderCalendarView.as_view(), name="atcoder_calendar"),
