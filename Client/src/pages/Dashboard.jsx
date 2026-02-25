@@ -1,10 +1,10 @@
-//Client/src/pages/Dashboard.jsx
+// Client/src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import api from '../utils/api';
 import { PieChart, TrendingUp, Globe, Plus, Edit2 } from 'lucide-react';
-import { SiCodechef } from 'react-icons/si'; // Import CodeChef icon from react-icons
+import { SiCodechef } from 'react-icons/si';
 import RatingChart from '../components/RatingChart';
 import toast from 'react-hot-toast';
 import CategoryRadarChart from '../components/CategoryRadarChart';
@@ -14,9 +14,14 @@ import LeetcodeHeatmap from '../components/LeetcodeHeatmap';
 import CodechefHeatmap from '../components/CodechefHeatmap';
 import AtcoderHeatmap from '../components/AtcoderHeatmap';
 import CodeforcesHeatmap from '../components/CodeforcesHeatmap';
+
 const Dashboard = () => {
+  // ────────────────────────────────────────────────
+  // ALL HOOKS FIRST – MUST BE UNCONDITIONAL
+  // ────────────────────────────────────────────────
   const { user } = useApp();
   const navigate = useNavigate();
+
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,40 +33,78 @@ const Dashboard = () => {
   const [savingPlatform, setSavingPlatform] = useState(false);
   const [categoryScores, setCategoryScores] = useState({});
   const [categoryLoading, setCategoryLoading] = useState(true);
-const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
+  const [verdictStats, setVerdictStats] = useState({});
+  const [verdictLoading, setVerdictLoading] = useState(true);
+  const [selectedHeatmap, setSelectedHeatmap] = useState('leetcode');
 
-const [verdictStats, setVerdictStats] = useState({});
-const [verdictLoading, setVerdictLoading] = useState(true);
-
-
-  // Platform logo paths - only for platforms without react-icons
-  const platformLogos = {
-    codeforces: '/src/assets/codeforces-social-preview.png',
-    atcoder: '/src/assets/atcoder.png',
-    leetcode: '/src/assets/LeetCode_logo.png'
-  };
-  // Fallback logos if image fails to load
-  const platformInitials = {
-    codeforces: 'CF',
-    codechef: 'CC',
-    atcoder: 'A',
-    leetcode: 'LC'
-  };
+  // Fetch all dashboard data when user is available
   useEffect(() => {
     if (user) {
       fetchUserData();
     }
   }, [user]);
+
+  // Auto-select the only connected platform for heatmap
+  useEffect(() => {
+    if (!userProfile?.platform_profiles) return;
+
+    const connected = [];
+    if (userProfile.platform_profiles.some(p => p.platform === 'leetcode')) connected.push('leetcode');
+    if (userProfile.platform_profiles.some(p => p.platform === 'codechef')) connected.push('codechef');
+    if (userProfile.platform_profiles.some(p => p.platform === 'atcoder')) connected.push('atcoder');
+    if (userProfile.platform_profiles.some(p => p.platform === 'codeforces')) connected.push('codeforces');
+
+    if (connected.length === 1 && selectedHeatmap !== connected[0]) {
+      setSelectedHeatmap(connected[0]);
+    } else if (connected.length > 1 && !connected.includes(selectedHeatmap)) {
+      setSelectedHeatmap(connected[0] || 'leetcode');
+    }
+  }, [userProfile?.platform_profiles]);
+
+  // ────────────────────────────────────────────────
+  // Derived values
+  // ────────────────────────────────────────────────
+  const hasLeetCode   = userProfile?.platform_profiles?.some(p => p.platform === 'leetcode')   ?? false;
+  const hasCodeChef   = userProfile?.platform_profiles?.some(p => p.platform === 'codechef')   ?? false;
+  const hasAtCoder    = userProfile?.platform_profiles?.some(p => p.platform === 'atcoder')    ?? false;
+  const hasCodeforces = userProfile?.platform_profiles?.some(p => p.platform === 'codeforces') ?? false;
+
+  // ────────────────────────────────────────────────
+  // Early returns AFTER all hooks
+  // ────────────────────────────────────────────────
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-[1920px] mx-auto px-4 py-6">
+          <div className="text-center py-12">
+            <p className="text-gray-500">Please log in to view your dashboard.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ────────────────────────────────────────────────
+  // Data fetching function
+  // ────────────────────────────────────────────────
   const fetchUserData = async () => {
     try {
       setLoading(true);
       setError(null);
-      // Fetch user profile (api service automatically adds token)
+
+      // Profile
       const profileResponse = await api.get('/account/profile/');
       setUserProfile(profileResponse.data);
-   
+
+      // Category scores (radar chart)
+      const tagResp = await api.get('/account/tag-stats/');
+      setCategoryScores(tagResp.data.category_scores || {});
+
+      // Verdict stats (donut chart)
+      const verdictResp = await api.get('/account/verdict-stats/');
+      setVerdictStats(verdictResp.data.verdict_counts || {});
     } catch (err) {
-      console.error('Error fetching user data:', err);
+      console.error('Error fetching dashboard data:', err);
       if (err.response?.status === 401) {
         setError('Session expired. Please log in again.');
       } else if (err.response?.status === 404) {
@@ -71,24 +114,11 @@ const [verdictLoading, setVerdictLoading] = useState(true);
       }
     } finally {
       setLoading(false);
-    }
-    try {
-      const tagResp = await api.get('/account/tag-stats/');
-      setCategoryScores(tagResp.data.category_scores || {});
-    } catch (err) {
-      console.error('Failed to load category scores:', err);
-    } finally {
       setCategoryLoading(false);
+      setVerdictLoading(false);
     }
-    try {
-  const verdictResp = await api.get('/account/verdict-stats/'); // new endpoint
-  setVerdictStats(verdictResp.data.verdict_counts || {});
-} catch (err) {
-  console.error('Failed to load verdict stats:', err);
-} finally {
-  setVerdictLoading(false);
-}
   };
+
   const handleAddPlatform = async (e) => {
     e.preventDefault();
     if (!platformForm.handle.trim()) {
@@ -104,7 +134,6 @@ const [verdictLoading, setVerdictLoading] = useState(true);
       toast.success('Platform profile added successfully!');
       setPlatformForm({ platform: 'codeforces', handle: '' });
       setShowAddPlatform(false);
-      // Refresh user data
       fetchUserData();
     } catch (err) {
       console.error('Error adding platform:', err);
@@ -117,37 +146,28 @@ const [verdictLoading, setVerdictLoading] = useState(true);
       setSavingPlatform(false);
     }
   };
-  // Platform Icon component with react-icons for CodeChef and images for others
-  const PlatformIcon = ({ platform, className = "w-5 h-5" }) => {
-    const [imgError, setImgError] = useState(false);
-    // Use react-icons for CodeChef
-    if (platform === 'codechef') {
-      return <SiCodechef className={`${className} text-[#5B4638]`} />;
-    }
-    // For other platforms, use images with fallback
-    if (imgError || !platformLogos[platform]) {
-      return (
-        <div className={`${className} flex items-center justify-center rounded bg-blue-100 text-blue-800 font-bold text-xs`}>
-          {platformInitials[platform] || platform.charAt(0).toUpperCase()}
-        </div>
-      );
-    }
-    return (
-      <img
-        src={platformLogos[platform]}
-        alt={platform}
-        className={className}
-        onError={() => setImgError(true)}
-      />
-    );
+
+  // Platform assets
+  const platformLogos = {
+    codeforces: '/src/assets/codeforces-social-preview.png',
+    atcoder: '/src/assets/atcoder.png',
+    leetcode: '/src/assets/LeetCode_logo.png'
   };
+
+  const platformInitials = {
+    codeforces: 'CF',
+    codechef: 'CC',
+    atcoder: 'A',
+    leetcode: 'LC'
+  };
+
   const platformNames = {
     codeforces: 'Codeforces',
     codechef: 'CodeChef',
     atcoder: 'AtCoder',
     leetcode: 'LeetCode'
   };
-  // All platforms use the same blue color scheme as Codeforces
+
   const platformColors = {
     codeforces: {
       bg: 'bg-gray-50',
@@ -174,21 +194,32 @@ const [verdictLoading, setVerdictLoading] = useState(true);
       badge: 'bg-blue-100 text-blue-800'
     }
   };
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-[1920px] mx-auto px-4 py-6">
-          <div className="text-center py-12">
-            <p className="text-gray-500">Please log in to view your dashboard.</p>
-          </div>
+
+  // Platform icon component
+  const PlatformIcon = ({ platform, className = "w-5 h-5" }) => {
+    const [imgError, setImgError] = useState(false);
+
+    if (platform === 'codechef') {
+      return <SiCodechef className={`${className} text-[#5B4638]`} />;
+    }
+
+    if (imgError || !platformLogos[platform]) {
+      return (
+        <div className={`${className} flex items-center justify-center rounded bg-blue-100 text-blue-800 font-bold text-xs`}>
+          {platformInitials[platform] || platform.charAt(0).toUpperCase()}
         </div>
-      </div>
+      );
+    }
+
+    return (
+      <img
+        src={platformLogos[platform]}
+        alt={platform}
+        className={className}
+        onError={() => setImgError(true)}
+      />
     );
-  }
-  const hasLeetCode = userProfile?.platform_profiles?.some(p => p.platform === 'leetcode');
-  const hasCodeChef = userProfile?.platform_profiles?.some(p => p.platform === 'codechef');
-  const hasAtCoder = userProfile?.platform_profiles?.some(p => p.platform === 'atcoder');
-  const hasCodeforces = userProfile?.platform_profiles?.some(p => p.platform === 'codeforces');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -197,7 +228,6 @@ const [verdictLoading, setVerdictLoading] = useState(true);
           {/* Left Sidebar - User Profile */}
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow-sm p-5 sticky top-4">
-              {/* User Avatar */}
               <div className="text-center mb-5">
                 <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold">
                   {user?.name?.charAt(0)?.toUpperCase()}
@@ -210,7 +240,7 @@ const [verdictLoading, setVerdictLoading] = useState(true);
                   <p className="text-xs text-gray-600">{userProfile.year}</p>
                 )}
               </div>
-              {/* User Stats - More compact */}
+
               <div className="space-y-3 border-t border-gray-200 pt-5">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-xs">Total Score</span>
@@ -229,7 +259,7 @@ const [verdictLoading, setVerdictLoading] = useState(true);
                   <span className="text-lg font-bold text-orange-600">{userProfile?.contests_count || 0}</span>
                 </div>
               </div>
-              {/* Edit Profile Button */}
+
               <button
                 onClick={() => navigate('/profile')}
                 className="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
@@ -239,6 +269,7 @@ const [verdictLoading, setVerdictLoading] = useState(true);
               </button>
             </div>
           </div>
+
           {/* Main Content */}
           <div className="lg:col-span-9 space-y-4">
             {error && (
@@ -246,6 +277,7 @@ const [verdictLoading, setVerdictLoading] = useState(true);
                 <p className="text-red-800 text-sm">{error}</p>
               </div>
             )}
+
             {loading ? (
               <div className="text-center py-10">
                 <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-800 mx-auto mb-3"></div>
@@ -268,7 +300,7 @@ const [verdictLoading, setVerdictLoading] = useState(true);
                       Add Profile
                     </button>
                   </div>
-                  {/* Add Platform Form - More compact */}
+
                   {showAddPlatform && (
                     <form onSubmit={handleAddPlatform} className="mb-5 p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -299,7 +331,7 @@ const [verdictLoading, setVerdictLoading] = useState(true);
                       </div>
                     </form>
                   )}
-                  {/* Platform Profiles Grid - More compact */}
+
                   {userProfile?.platform_profiles && userProfile.platform_profiles.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {userProfile.platform_profiles.map((profile) => {
@@ -327,7 +359,7 @@ const [verdictLoading, setVerdictLoading] = useState(true);
                                 </div>
                               </div>
                             </div>
-                            {/* Platform Stats - More compact */}
+
                             <div className="grid gap-1.5 text-xs">
                               {profile.platform === 'leetcode' ? (
                                 <div className="grid grid-cols-2 gap-1.5">
@@ -367,105 +399,100 @@ const [verdictLoading, setVerdictLoading] = useState(true);
                     </div>
                   )}
                 </div>
-                {/* Rating Progress Chart - Placed BEFORE Contest History */}
-                {userProfile?.platform_profiles && userProfile.platform_profiles.length > 0 && (
+
+                {/* Rating Progress Chart */}
+                {userProfile?.platform_profiles?.length > 0 && (
                   <div className="bg-white rounded-lg shadow-sm p-2">
-                    <div className="flex items-center gap-2 ">
+                    <div className="flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-blue-600" />
                       <h2 className="text-lg font-semibold text-gray-900">Rating Progress</h2>
                     </div>
                     <RatingChart platformProfiles={userProfile.platform_profiles} />
                   </div>
                 )}
-          {/* Heatmap Section */}
-{(hasLeetCode || hasCodeChef || hasAtCoder || hasCodeforces) && (
-  <div className="bg-white rounded-lg shadow-sm p-5 mt-4">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-semibold text-gray-900">Submission Heatmap</h3>
-      <select
-        value={selectedHeatmap}
-        onChange={(e) => setSelectedHeatmap(e.target.value)}
-        className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        {hasLeetCode  && <option value="leetcode">LeetCode</option>}
-        {hasCodeChef  && <option value="codechef">CodeChef</option>}
-        {hasAtCoder   && <option value="atcoder">AtCoder</option>}
-        {hasCodeforces && <option value="codeforces">Codeforces</option>}
-      </select>
-    </div>
 
-    <div className={selectedHeatmap === 'leetcode' ? '' : 'hidden'}>
-      {hasLeetCode && <LeetcodeHeatmap />}
-    </div>
+                {/* Heatmap Section */}
+                {(hasLeetCode || hasCodeChef || hasAtCoder || hasCodeforces) && (
+                  <div className="bg-white rounded-lg shadow-sm p-5 mt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Submission Heatmap</h3>
 
-    <div className={selectedHeatmap === 'codechef' ? '' : 'hidden'}>
-      {hasCodeChef && <CodechefHeatmap />}
-    </div>
+                      {(hasLeetCode + hasCodeChef + hasAtCoder + hasCodeforces > 1) && (
+                        <select
+                          value={selectedHeatmap}
+                          onChange={(e) => setSelectedHeatmap(e.target.value)}
+                          className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          {hasLeetCode   && <option value="leetcode">LeetCode</option>}
+                          {hasCodeChef   && <option value="codechef">CodeChef</option>}
+                          {hasAtCoder    && <option value="atcoder">AtCoder</option>}
+                          {hasCodeforces && <option value="codeforces">Codeforces</option>}
+                        </select>
+                      )}
+                    </div>
 
-    <div className={selectedHeatmap === 'atcoder' ? '' : 'hidden'}>
-      {hasAtCoder && <AtcoderHeatmap />}
-    </div>
+                    <div className={selectedHeatmap === 'leetcode' ? '' : 'hidden'}>
+                      {hasLeetCode && <LeetcodeHeatmap />}
+                    </div>
+                    <div className={selectedHeatmap === 'codechef' ? '' : 'hidden'}>
+                      {hasCodeChef && <CodechefHeatmap />}
+                    </div>
+                    <div className={selectedHeatmap === 'atcoder' ? '' : 'hidden'}>
+                      {hasAtCoder && <AtcoderHeatmap />}
+                    </div>
+                    <div className={selectedHeatmap === 'codeforces' ? '' : 'hidden'}>
+                      {hasCodeforces && <CodeforcesHeatmap />}
+                    </div>
+                  </div>
+                )}
 
-    <div className={selectedHeatmap === 'codeforces' ? '' : 'hidden'}>
-      {hasCodeforces && <CodeforcesHeatmap />}
-    </div>
+                {/* Charts Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Radar Chart */}
+                  <div className="bg-white rounded-lg shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingUp className="w-5 h-5 text-indigo-600" />
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        Problem Solving Proficiency by Category
+                      </h2>
+                    </div>
 
-    {!hasLeetCode && !hasCodeChef && !hasAtCoder && !hasCodeforces && (
-      <div className="text-center py-8 text-gray-600">
-        Connect LeetCode, CodeChef, AtCoder or Codeforces to see your submission heatmap.
-      </div>
-    )}
-  </div>
-)}
-              
-                {/* ── NEW RADAR CHART SECTION ── */}
-                {/* Charts Section – side by side on lg+ */}
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-  {/* Left: Radar Chart - Proficiency by Category */}
-  <div className="bg-white rounded-lg shadow-sm p-5">
-    <div className="flex items-center gap-2 mb-4">
-      <TrendingUp className="w-5 h-5 text-indigo-600" />
-      <h2 className="text-lg font-semibold text-gray-900">
-        Problem Solving Proficiency by Category
-      </h2>
-    </div>
+                    {categoryLoading ? (
+                      <div className="text-center py-12">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Analyzing solving patterns...</p>
+                      </div>
+                    ) : (
+                      <CategoryRadarChart
+                        categoryScores={categoryScores}
+                        username={user?.name || "You"}
+                      />
+                    )}
+                  </div>
 
-    {categoryLoading ? (
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Analyzing solving patterns...</p>
-      </div>
-    ) : (
-      <CategoryRadarChart
-        categoryScores={categoryScores}
-        username={user?.name || "You"}
-      />
-    )}
-  </div>
+                  {/* Verdict Donut Chart */}
+                  <div className="bg-white rounded-lg shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <PieChart className="w-5 h-5 text-purple-600" />
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        Submission Verdict Distribution
+                      </h2>
+                    </div>
 
-  {/* Right: Donut Chart - Verdict Distribution */}
-  <div className="bg-white rounded-lg shadow-sm p-5">
-    <div className="flex items-center gap-2 mb-4">
-      <PieChart className="w-5 h-5 text-purple-600" />
-      <h2 className="text-lg font-semibold text-gray-900">
-        Submission Verdict Distribution
-      </h2>
-    </div>
-
-   {verdictLoading ? (
-  <div className="text-center py-12">
-    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600 mx-auto mb-4"></div>
-    <p className="text-gray-600">Loading verdict stats...</p>
-  </div>
-) : (
-  <VerdictDonutChart
-    verdictStats={verdictStats}
-    username={user?.name || "You"}
-  />
-)}
-  </div>
-</div>
-             </>
+                    {verdictLoading ? (
+                      <div className="text-center py-12">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Loading verdict stats...</p>
+                      </div>
+                    ) : (
+                      <VerdictDonutChart
+                        verdictStats={verdictStats}
+                        username={user?.name || "You"}
+                      />
+                    )}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -473,4 +500,5 @@ const [verdictLoading, setVerdictLoading] = useState(true);
     </div>
   );
 };
+
 export default Dashboard;
