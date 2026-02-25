@@ -10,53 +10,69 @@ import {
 } from 'recharts';
 import { AlertCircle } from 'lucide-react';
 
-// Define a color palette for common verdicts
-// You can expand or adjust colors as needed
 const COLORS = {
-  Accepted: '#22c55e',           // green
-  'Wrong Answer': '#ef4444',     // red
-  'Time Limit Exceeded': '#f59e0b', // amber
-  'Runtime Error': '#8b5cf6',    // violet
-  'Compilation Error': '#64748b', // slate
-  'Memory Limit Exceeded': '#ea580c', // orange
-  Skipped: '#6b7280',
-  'Other': '#9ca3af',
-  // Add more if your backend returns additional verdict types
+  "Accepted": "#4ade80",
+  "Wrong Answer": "#a03535",
+  "Time Limit Exceeded": "#fb923c",
+  "Memory Limit Exceeded": "#edb892",
+  "Runtime Error": "#c084fc",
+  "Compilation Error": "#4489ea",
+  "Partial": "#818cf8",
+  "Challenged": "#52165c",
+  "Skipped": "#bcc4d2",
+  "Other": "#9ca3af",
 };
 
 const VerdictDonutChart = ({ verdictStats = {}, username = "You" }) => {
-  // Convert object to array for Recharts
   const data = Object.entries(verdictStats)
     .map(([verdict, count]) => ({
       name: verdict,
       value: count,
     }))
-    .filter(item => item.value > 0) // hide zero counts
-    .sort((a, b) => b.value - a.value); // sort descending by count
+    .filter(item => item.value > 0)
+    .sort((a, b) => b.value - a.value);
 
   const total = data.reduce((sum, item) => sum + item.value, 0);
 
   if (total === 0) {
     return (
-      <div className="h-[300px] flex flex-col items-center justify-center text-gray-500">
-        <AlertCircle size={48} className="mb-4 opacity-50" />
-        <p className="text-center">
-          No submission data available yet.<br />
-          Connect more platforms or wait for stats to update.
+      <div className="h-[360px] flex flex-col items-center justify-center text-gray-500">
+        <AlertCircle size={48} className="mb-4 opacity-60" />
+        <p className="text-center text-sm">
+          No submission verdicts recorded yet.<br />
+          Connect platforms and wait for stats to sync.
         </p>
       </div>
     );
   }
 
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.6;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return percent > 0.04 ? (
+      <text
+        x={x}
+        y={y}
+        fill="white"
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        fontSize="11"
+        fontWeight="600"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    ) : null;
+  };
+
   return (
-    <div className="h-[340px] w-full">
-      <div className="text-center mb-4">
-        <h3 className="text-sm font-medium text-gray-600">
-          {username}'s Submission Verdicts
-        </h3>
-        <p className="text-xs text-gray-500">
-          Total submissions: <strong>{total}</strong>
-        </p>
+    <div className="h-[380px] w-full flex flex-col items-center justify-center relative">
+      {/* Total Submissions on the right */}
+      <div className="absolute top-2 right-8 text-right">
+        <p className="text-sm font-medium text-gray-700">Total Submissions</p>
+        <p className="text-xl font-bold text-gray-900">{total.toLocaleString()}</p>
       </div>
 
       <ResponsiveContainer width="100%" height="100%">
@@ -65,51 +81,60 @@ const VerdictDonutChart = ({ verdictStats = {}, username = "You" }) => {
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={70}
-            outerRadius={110}
-            paddingAngle={2}
+            outerRadius={140}
+            innerRadius={60}
+
+            paddingAngle={0}
             dataKey="value"
             nameKey="name"
-            label={({ name, percent }) => 
-              percent > 0.08 ? `${name} ${(percent * 100).toFixed(0)}%` : null
-            }
+            label={renderCustomizedLabel}
             labelLine={false}
+            isAnimationActive={true}
+            animationDuration={1200}
+            animationBegin={0}
+            stroke="#f3f4f6"
           >
             {data.map((entry, index) => (
-              <Cell 
-                key={`cell-${index}`} 
-                fill={COLORS[entry.name] || '#9ca3af'} // fallback gray
+              <Cell
+                key={`cell-${index}`}
+                fill={COLORS[entry.name] || '#9ca3af'}
               />
             ))}
           </Pie>
 
-          <Tooltip 
-            formatter={(value, name) => [`${value} submissions`, name]}
+          <Tooltip
+            formatter={(value, name) => [
+              `${value.toLocaleString()} submissions (${((value / total) * 100).toFixed(1)}%)`,
+              name,
+            ]}
             contentStyle={{
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              border: '1px solid #e5e7eb',
+              backgroundColor: 'rgba(255,255,255,0.98)',
+              border: '1px solid #e2e8f0',
               borderRadius: '8px',
               padding: '10px 14px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              fontSize: '0.8rem',
             }}
           />
 
-          <Legend 
-            verticalAlign="bottom"
-            height={36}
+          <Legend
+            verticalAlign="middle"
+            align="right"
+            layout="vertical"
             iconType="circle"
+            iconSize={9}
             wrapperStyle={{
-              fontSize: '0.875rem',
+              fontSize: '0.75rem',
+              paddingLeft: '12px',      // small gap
+              lineHeight: '1.5',
+              color: '#374151',
             }}
+            formatter={(value) => (
+              <span className="font-medium">{value}</span>
+            )}
           />
         </PieChart>
       </ResponsiveContainer>
-
-      {/* Optional: small legend summary below chart if needed */}
-      {data.length > 6 && (
-        <div className="mt-2 text-xs text-center text-gray-500">
-          Showing top verdicts — hover for full details
-        </div>
-      )}
     </div>
   );
 };
