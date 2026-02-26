@@ -1258,7 +1258,8 @@ const CreateContest = () => {
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Expected Output
                           </label>
-                          <textarea
+                          <div className="flex gap-1">
+                            <textarea
                             value={testCase.output}
                             onChange={(e) => {
                               const updatedTestCases = currentProblem.testCases.map(tc =>
@@ -1270,6 +1271,9 @@ const CreateContest = () => {
                             className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
                             placeholder="Expected output..."
                           />
+                             <label className="cursor-pointer px-2 py-1 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 flex items-center gap-1 text-xs">
+                          </div>
+                          
                         </div>
                       </div>
                       <div>
@@ -2040,4 +2044,5 @@ const CreateContest = () => {
 
 
 export default CreateContest;
+
 
