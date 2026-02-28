@@ -1,4 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import remarkBreaks from 'remark-breaks';
+import rehypeKatex from 'rehype-katex';
+import rehypeHighlight from 'rehype-highlight';
+import rehypeRaw from 'rehype-raw';
+import 'katex/dist/katex.min.css';
+import 'highlight.js/styles/github.css';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Code2, 
