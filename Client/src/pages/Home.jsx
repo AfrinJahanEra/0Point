@@ -166,7 +166,7 @@ const Home = () => {
       title: "Mastering Dynamic Programming Techniques",
       excerpt: "Learn advanced DP patterns and optimizations used in competitive programming contests.",
       date: "Nov 15, 2023",
-      readTime: "8 min read"
+      time: "01:07 PM"
     }
   ];
 
@@ -660,7 +660,7 @@ const Home = () => {
                     )}
 
                     <div className="flex justify-between items-center mt-2">
-                      <span className="text-xs text-gray-500">{post.date} • {post.readTime}</span>
+                      <span className="text-xs text-gray-500">{post.date},{post.time}</span>
                       <button className="text-xs text-blue-800 hover:text-blue-900 transition-colors duration-200 font-bold">
                         Read More
                       </button>
@@ -687,7 +687,7 @@ const Home = () => {
             {renderVisualization()}
 
             {/* Problem of the Day - LeetCode Style */}
-            <div className="group bg-white rounded-lg p-3 text-gray-900 border border-gray-200 hover:bg-blue-800 hover:text-white transition-all duration-200">
+            {/* <div className="group bg-white rounded-lg p-3 text-gray-900 border border-gray-200 hover:bg-blue-800 hover:text-white transition-all duration-200">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold mb-1.5 text-xs">Problem of the Day</h2>
@@ -703,7 +703,7 @@ const Home = () => {
                   Solve Now
                 </button>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Right Sidebar - Additional Content */}
