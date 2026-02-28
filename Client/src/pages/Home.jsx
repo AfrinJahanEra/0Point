@@ -536,55 +536,6 @@ const Home = () => {
 
           {/* Middle Column - Main Content (Wider) */}
           <div className="lg:col-span-6 space-y-4">
-            {/* Full Contest Announcement */}
-            <div className="bg-white rounded-lg">
-              <div className="p-3 border-b border-gray-200">
-                <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
-                  <div className="flex items-center gap-1.5">
-                    <Trophy className="w-3.5 h-3.5 text-gray-700" />
-                    <h2 className="text-xs font-semibold text-gray-900">Contest Announcement</h2>
-                  </div>
-                </div>
-                <div className="mb-2">
-                  <h3 className="text-xs font-semibold text-gray-900 mb-2">AtCoder Beginner Contest 433</h3>
-                  <p className="text-xs text-gray-600 mb-2">
-                    Get ready for an exciting coding challenge! We're thrilled to announce the upcoming AtCoder Beginner Contest 433, specially designed for programmers at all skill levels to showcase their problem-solving abilities.
-                  </p>
-                  <div className="flex items-center gap-3 text-xs text-gray-600 mb-2">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-2.5 h-2.5" />
-                      Start Time: Sat, Nov 22, 2025 • 9:00 PM GMT+6
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5" />
-                      Duration: 100 minutes of intense coding
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-600 mb-2">
-                    <p><strong>Contest URL:</strong> <a href="https://atcoder.jp/contests/abc433" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://atcoder.jp/contests/abc433</a></p>
-                    <p><strong>Problem Setter:</strong> sounansya</p>
-                    <p><strong>Testers:</strong> MMNMM, kyopro_friends</p>
-                    <p><strong>Rated range:</strong> Beginners to ~1999 rating</p>
-                    <p><strong>Point values:</strong> 100 - 200 - 300 - 400 - 450 - 500 - 600</p>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full text-xs font-semibold border border-blue-200">
-                      AtCoder Contest
-                    </span>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <a href="https://atcoder.jp/contests/abc433" target="_blank" rel="noopener noreferrer" className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200">
-                      Register Now
-                    </a>
-                    <a href="http://www.timeanddate.com/worldclock/fixedtime.html?iso=20251122T2100&p1=248" target="_blank" rel="noopener noreferrer" className="text-xs border border-gray-300 text-gray-700 px-2.5 py-1 rounded hover:bg-gray-50 transition-colors duration-200">
-                      View Time Zone
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {/* Recent Blog Post - Added like/dislike and comments */}
             <div className="bg-white rounded-lg">
