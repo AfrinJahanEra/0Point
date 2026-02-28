@@ -671,7 +671,7 @@ const Home = () => {
             </div>
 
             {/* Practice of the Day */}
-            <div className="bg-white rounded-lg">
+            {/* <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
@@ -681,7 +681,7 @@ const Home = () => {
                 </div>
 
               </div>
-            </div>
+            </div> */}
 
             {/* Visualization Demo */}
             {renderVisualization()}
