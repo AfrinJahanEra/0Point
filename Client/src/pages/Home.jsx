@@ -50,6 +50,11 @@ const Home = () => {
   const [newComment, setNewComment] = useState({});
   const [blogs, setBlogs] = useState([]);
   const [loadingBlogs, setLoadingBlogs] = useState(false);
+  const [showFullContent, setShowFullContent] = useState({});
+
+  // Leaderboard state
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
@@ -223,6 +228,13 @@ const Home = () => {
     }
   };
 
+  const toggleContent = (blogId) => {
+    setShowFullContent(prev => ({
+      ...prev,
+      [blogId]: !prev[blogId]
+    }));
+  };
+
   const handleAddComment = (blogId) => {
     const comment = newComment[blogId];
     if (!comment || !comment.trim()) {
@@ -288,6 +300,47 @@ const Home = () => {
       // Reset after showing "visualization"
       setActiveVisualization('');
     }, 2000);
+  };
+
+  // Markdown components for rendering
+  const customComponents = {
+    h1: ({ children }) => (
+      <h1 className="text-2xl font-bold text-gray-900 mb-4 mt-6">{children}</h1>
+    ),
+    h2: ({ children }) => (
+      <h2 className="text-xl font-bold text-gray-900 mb-3 mt-5">{children}</h2>
+    ),
+    h3: ({ children }) => (
+      <h3 className="text-lg font-semibold text-gray-900 mb-2 mt-4">{children}</h3>
+    ),
+    p: ({ children }) => (
+      <p className="text-sm text-gray-800 leading-relaxed mb-3">{children}</p>
+    ),
+    code: ({ node, inline, className, children, ...props }) => {
+      if (inline) {
+        return (
+          <code className="px-1.5 py-0.5 bg-gray-100 text-sm text-gray-900 rounded font-mono" {...props}>
+            {children}
+          </code>
+        );
+      }
+      return (
+        <code className="block bg-gray-100 p-3 rounded text-xs font-mono overflow-x-auto" {...props}>
+          {children}
+        </code>
+      );
+    },
+    ul: ({ children }) => (
+      <ul className="list-disc ml-6 mb-3 space-y-1 text-sm">{children}</ul>
+    ),
+    ol: ({ children }) => (
+      <ol className="list-decimal ml-6 mb-3 space-y-1 text-sm">{children}</ol>
+    ),
+    blockquote: ({ children }) => (
+      <blockquote className="border-l-4 border-gray-400 pl-4 py-2 my-3 bg-gray-50 text-sm text-gray-800">
+        {children}
+      </blockquote>
+    ),
   };
 
   const renderVisualization = () => {
@@ -586,7 +639,7 @@ const Home = () => {
                   </div>
                 ) : (
                   blogs.map((post) => (
-                    <div key={post.id} className="mb-2 p-3">
+                    <div key={post.id} className="mb-2 p-3 border-b border-gray-100 last:border-b-0">
                       {/* Profile Avatar and Username Section */}
                       <div className="flex items-center gap-2 mb-3">
                         {/* Profile Avatar with user initials */}
@@ -619,14 +672,42 @@ const Home = () => {
                       </div>
                       
                       <h3 className="text-xs font-semibold text-gray-900 mb-1.5">{post.title}</h3>
-                      <p className="text-xs text-gray-600 mb-2">
-                        {post.content && post.content.length > 300 
-                          ? post.content.substring(0, 300) + '...' 
-                          : post.content}
-                      </p>
+                      
+                      <div className={`prose prose-sm max-w-none text-xs ${!showFullContent[post.id] ? 'line-clamp-4' : ''}`}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkMath, remarkBreaks]}
+                          rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                          components={customComponents}
+                        >
+                          {post.content}
+                        </ReactMarkdown>
+                      </div>
+                      
+                      {post.content && post.content.length > 300 && (
+                        <button
+                          onClick={() => toggleContent(post.id)}
+                          className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                        >
+                          {showFullContent[post.id] ? (
+                            <>
+                              <span>Show Less</span>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            </>
+                          ) : (
+                            <>
+                              <span>Read More</span>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </>
+                          )}
+                        </button>
+                      )}
                       
                       {/* Like/Dislike Buttons */}
-                      <div className="flex items-center gap-4 mb-3">
+                      <div className="flex items-center gap-4 mt-3 mb-3">
                         <button 
                           onClick={() => handleBlogLike(post.id)}
                           className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600 transition-colors"
