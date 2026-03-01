@@ -87,6 +87,7 @@ const Home = () => {
   // Fetch blogs
   useEffect(() => {
     fetchLatestBlogs();
+    fetchLeaderboard();
   }, []);
 
   const fetchLatestBlogs = async () => {
@@ -101,6 +102,22 @@ const Home = () => {
       toast.error('Failed to load latest blogs');
     } finally {
       setLoadingBlogs(false);
+    }
+  };
+
+  // Fetch leaderboard data
+  const fetchLeaderboard = async () => {
+    try {
+      setLoadingLeaderboard(true);
+      // Using the minimal leaderboard endpoint we created
+      const response = await api.get('/leaderboard/minimal/');
+      // Get only top 5 for the home page
+      setLeaderboardData(response.data.slice(0, 5));
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      toast.error('Failed to load leaderboard');
+    } finally {
+      setLoadingLeaderboard(false);
     }
   };
 
@@ -557,25 +574,35 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Leaderboard */}
-            <div className="bg-white rounded-lg">
-              <div className="p-3 border-b border-gray-200">
-                <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-blue-50">
-                  <div className="flex items-center gap-1.5">
-                    <Medal className="w-3.5 h-3.5 text-gray-700" />
-                    <h2 className="text-xs font-semibold text-gray-900">Leaderboard</h2>
-                  </div>
-                  <Link 
-                    to="/leaderboard" 
-                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
-                  >
-                    View All
-                    <ChevronRight className="w-2.5 h-2.5" />
-                  </Link>
+          {/* Leaderboard */}
+          <div className="bg-white rounded-lg">
+            <div className="p-3 border-b border-gray-200">
+              <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-blue-50">
+                <div className="flex items-center gap-1.5">
+                  <Medal className="w-3.5 h-3.5 text-gray-700" />
+                  <h2 className="text-xs font-semibold text-gray-900">Leaderboard</h2>
                 </div>
+                <Link 
+                  to="/leaderboard" 
+                  className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                >
+                  View All
+                  <ChevronRight className="w-2.5 h-2.5" />
+                </Link>
               </div>
+            </div>
 
-              <div className="px-7">
+            <div className="px-7">
+              {loadingLeaderboard ? (
+                <div className="py-4 text-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-xs text-gray-500 mt-2">Loading...</p>
+                </div>
+              ) : leaderboardData.length === 0 ? (
+                <div className="py-4 text-center">
+                  <p className="text-xs text-gray-500">No data available</p>
+                </div>
+              ) : (
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-gray-200">
@@ -585,27 +612,32 @@ const Home = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {topCoders.map((coder) => (
-                      <tr key={coder.rank} className="border-b border-gray-100 hover:bg-gray-50">
+                    {leaderboardData.map((user) => (
+                      <tr key={user.rank} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-2">
                           <div className="w-5 h-5 rounded flex items-center justify-center text-xs font-medium text-gray-900">
-                            {coder.rank}
+                            {user.rank}
                           </div>
                         </td>
                         <td className="py-2">
-                          <Link to={`/user/${coder.name.replace(/\s+/g, '-').toLowerCase()}`} className="text-blue-900 font-bold hover:text-blue-800 hover:underline">
-                            {coder.name}
+                          <Link 
+                            to={`/profile/${user.username}`}
+                            className="text-blue-900 font-bold hover:text-blue-800 hover:underline"
+                          >
+                            {user.username}
                           </Link>
                         </td>
                         <td className="py-2 text-right font-medium text-gray-900">
-                          {coder.score}
+                          {user.total_points}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              )}
             </div>
+          </div>
+
           </div>
 
           {/* Middle Column - Main Content (Wider) */}
