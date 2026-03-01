@@ -10,3 +10,10 @@ class LeaderboardSerializer(serializers.Serializer):
     contests_participated = serializers.IntegerField()
     rank = serializers.IntegerField()
 
+
+class LeaderboardMinimalSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    total_points = serializers.IntegerField()
+    rank = serializers.IntegerField()
+
+
