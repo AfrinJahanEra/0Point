@@ -181,14 +181,6 @@ const Home = () => {
     }
   ];
 
-  const topCoders = [
-    { rank: 1, name: "Ahmed Mahmud", score: 2450, department: "CSE", change: "+25" },
-    { rank: 2, name: "Sadia Rahman", score: 2310, department: "SWE", change: "+18" },
-    { rank: 3, name: "Tahmid Rahman", score: 2250, department: "CSE", change: "+12" },
-    { rank: 4, name: "Fariha Ahmed", score: 2180, department: "CSE", change: "-5" },
-    { rank: 5, name: "Nafis Shams", score: 2100, department: "SWE", change: "+8" }
-  ];
-
   const announcements = [
     {
       id: 1,
