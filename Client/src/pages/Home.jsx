@@ -315,6 +315,22 @@ const [loadingContests, setLoadingContests] = useState(false);
     }, 2000);
   };
 
+  // Fetch upcoming contests
+const fetchUpcomingContests = async () => {
+  try {
+    setLoadingContests(true);
+    const response = await api.get('/contests/upcoming/');
+    // The response structure is { contests: [...] }
+    setUpcomingContests(response.data.contests || []);
+  } catch (error) {
+    console.error('Error fetching upcoming contests:', error);
+    toast.error('Failed to load upcoming contests');
+    setUpcomingContests([]);
+  } finally {
+    setLoadingContests(false);
+  }
+};
+
   // Markdown components for rendering
   const customComponents = {
     h1: ({ children }) => (
