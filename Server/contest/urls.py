@@ -34,6 +34,7 @@ from .views import (
     ContestRecordingSettingsAPIView,
     ContestRecordingsListAPIView,
     ContestUserRecordingsAPIView,
+    UpcomingContestListCreateAPIView
 )
 
 from compiler.views import (
@@ -92,6 +93,7 @@ from testcontest.views import (
 
 urlpatterns = [
     path('contests/', ContestListCreateAPIView.as_view()),
+    path('contests/upcoming/', UpcomingContestListCreateAPIView.as_view(), name='upcoming-contests'),
     path('contests/registrations/', MyContestRegistrationsAPIView.as_view()),
     path('contests/create-full/', ContestFullCreateAPIView.as_view(), name='create-full'),
     path('contests/<contest_id>/', ContestDetailAPIView.as_view()),
@@ -190,4 +192,5 @@ urlpatterns = [
     path('admin/contests/<contest_id>/recording-settings/', ContestRecordingSettingsAPIView.as_view(), name='contest-recording-settings'),
     path('contests/<contest_id>/recordings/', ContestRecordingsListAPIView.as_view(), name='contest-recordings-list'),
     path('contests/<contest_id>/recordings/user/<user_id>/', ContestUserRecordingsAPIView.as_view(), name='contest-user-recordings'),
+
 ]
