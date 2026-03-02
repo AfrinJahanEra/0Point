@@ -52,6 +52,10 @@ const Home = () => {
   const [loadingBlogs, setLoadingBlogs] = useState(false);
   const [showFullContent, setShowFullContent] = useState({});
 
+    // Upcoming contests state
+const [upcomingContests, setUpcomingContests] = useState([]);
+const [loadingContests, setLoadingContests] = useState(false);
+
   // Leaderboard state
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
