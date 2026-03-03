@@ -92,6 +92,7 @@ const [loadingContests, setLoadingContests] = useState(false);
   useEffect(() => {
     fetchLatestBlogs();
     fetchLeaderboard();
+    fetchUpcomingContests();
   }, []);
 
   const fetchLatestBlogs = async () => {
