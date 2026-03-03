@@ -126,45 +126,6 @@ const [loadingContests, setLoadingContests] = useState(false);
     }
   };
 
-  const contests = [
-    {
-      id: 1,
-      title: "IUT Winter Coding Challenge",
-      platform: "IUT Platform",
-      date: "Dec 15, 2023 • 18:00",
-      duration: "3 hours",
-      participants: "500+",
-      difficulty: "Medium",
-      type: "Team",
-      status: "upcoming",
-      registered: true
-    },
-    {
-      id: 2,
-      title: "Algorithm Masters 2024",
-      platform: "IUT Platform",
-      date: "Dec 18, 2023 • 20:00",
-      duration: "2.5 hours",
-      participants: "300+",
-      difficulty: "Hard",
-      type: "Individual",
-      status: "upcoming",
-      registered: false
-    },
-    {
-      id: 3,
-      title: "Data Structures Sprint",
-      platform: "IUT Platform",
-      date: "Dec 22, 2023 • 16:00",
-      duration: "2 hours",
-      participants: "400+",
-      difficulty: "Easy",
-      type: "Individual",
-      status: "upcoming",
-      registered: true
-    }
-  ];
-
   const pastContests = [
     {
       id: 4,
