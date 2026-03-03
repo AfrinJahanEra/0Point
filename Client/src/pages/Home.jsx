@@ -370,101 +370,120 @@ const fetchUpcomingContests = async () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Sidebar - Contest Section */}
           <div className="lg:col-span-3 space-y-4">
-            {/* Upcoming Contests */}
-            <div className="bg-white">
-              <div className="p-3 border-b border-gray-200">
-                <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
-                  <div className="flex items-center gap-1.5">
-                    <Trophy className="w-3.5 h-3.5 text-gray-700" />
-                    <h2 className="text-xs font-semibold text-gray-900">Upcoming Contests</h2>
-                  </div>
-                  <Link 
-                    to="/contests" 
-                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
-                  >
-                    View All
-                    <ChevronRight className="w-2.5 h-2.5" />
-                  </Link>
-                </div>
 
-                {/* Filters */}
-                <div className="flex items-center gap-1.5 mt-2">
-                  <div className="flex bg-gray-100 rounded-lg p-0.5">
-                    {['all', 'registered'].map((tab) => (
-                      <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`px-2 py-1 rounded text-xs font-medium transition-colors duration-200 ${
-                          activeTab === tab 
-                            ? 'bg-white text-gray-900 shadow-sm' 
-                            : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                      >
-                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                      </button>
-                    ))}
+            {/* Upcoming Contests */}
+<div className="bg-white">
+  <div className="p-3 border-b border-gray-200">
+    <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
+      <div className="flex items-center gap-1.5">
+        <Trophy className="w-3.5 h-3.5 text-gray-700" />
+        <h2 className="text-xs font-semibold text-gray-900">Upcoming Contests</h2>
+      </div>
+      <Link 
+        to="/contests" 
+        className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+      >
+        View All
+        <ChevronRight className="w-2.5 h-2.5" />
+      </Link>
+    </div>
+
+    {/* Filters */}
+    <div className="flex items-center gap-1.5 mt-2">
+      <div className="flex bg-gray-100 rounded-lg p-0.5">
+        {['all', 'registered'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors duration-200 ${
+              activeTab === tab 
+                ? 'bg-white text-gray-900 shadow-sm' 
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+
+  {/* Contests List */}
+  <div className="p-3 space-y-2">
+    {loadingContests ? (
+      <div className="py-4 text-center">
+        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="text-xs text-gray-500 mt-2">Loading contests...</p>
+      </div>
+    ) : upcomingContests.length === 0 ? (
+      <div className="py-4 text-center">
+        <p className="text-xs text-gray-500">No upcoming contests</p>
+      </div>
+    ) : (
+      upcomingContests.map((contest) => {
+        // Filter based on active tab
+        if (activeTab === 'registered' && !registeredContests.has(contest.id) && !contest.is_registered) {
+          return null;
+        }
+        
+        return (
+          <div 
+            key={contest.id}
+            className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-2 flex-1">
+                <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900 text-xs">
+                    {contest.title}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5" />
+                      {contest.duration}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users className="w-2.5 h-2.5" />
+                      {contest.participants || 0}
+                    </span>
                   </div>
                 </div>
               </div>
-
-              {/* Contests List */}
-              <div className="p-3 space-y-2">
-                {contests.map((contest) => (
-                  <div 
-                    key={contest.id}
-                    className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-start gap-2 flex-1">
-                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
-                          <Calendar className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900 text-xs">
-                            {contest.title}
-                          </h3>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-2.5 h-2.5" />
-                              {contest.duration}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Users className="w-2.5 h-2.5" />
-                              {contest.participants}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Single Button Column */}
-                      <div className="flex flex-col items-end gap-1">
-                        <button 
-                          className={`px-2 py-1 rounded font-medium text-xs transition-all duration-200 flex items-center gap-1 ${
-                            registeredContests.has(contest.id) || contest.registered
-                              ? 'bg-blue-800 text-white cursor-not-allowed'
-                              : 'bg-blue-800 text-white hover:bg-blue-900'
-                          }`}
-                          onClick={() => !registeredContests.has(contest.id) && !contest.registered && handleRegister(contest.id)}
-                          disabled={registeredContests.has(contest.id) || contest.registered}
-                        >
-                          {registeredContests.has(contest.id) || contest.registered ? (
-                            <>
-                              <Play className="w-2.5 h-2.5" />
-                              Participate
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="w-2.5 h-2.5" />
-                              Register
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              
+              {/* Single Button Column */}
+              <div className="flex flex-col items-end gap-1">
+                <button 
+                  className={`px-2 py-1 rounded font-medium text-xs transition-all duration-200 flex items-center gap-1 ${
+                    registeredContests.has(contest.id) || contest.is_registered
+                      ? 'bg-blue-800 text-white cursor-not-allowed'
+                      : 'bg-blue-800 text-white hover:bg-blue-900'
+                  }`}
+                  onClick={() => !registeredContests.has(contest.id) && !contest.is_registered && handleRegister(contest.id)}
+                  disabled={registeredContests.has(contest.id) || contest.is_registered}
+                >
+                  {registeredContests.has(contest.id) || contest.is_registered ? (
+                    <>
+                      <Play className="w-2.5 h-2.5" />
+                      Participate
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-2.5 h-2.5" />
+                      Register
+                    </>
+                  )}
+                </button>
               </div>
             </div>
+          </div>
+        );
+      })
+    )}
+  </div>
+</div>
 
             {/* Contest Countdown */}
             <div className="bg-white rounded-lg">
