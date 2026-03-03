@@ -55,6 +55,9 @@ const Home = () => {
     // Upcoming contests state
 const [upcomingContests, setUpcomingContests] = useState([]);
 const [loadingContests, setLoadingContests] = useState(false);
+  // Past contests state
+const [pastContests, setPastContests] = useState([]);
+const [loadingPastContests, setLoadingPastContests] = useState(false);
 
   // Leaderboard state
   const [leaderboardData, setLeaderboardData] = useState([]);
