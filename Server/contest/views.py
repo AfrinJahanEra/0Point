@@ -962,6 +962,91 @@ class ContestListCreateAPIView(APIView):
             return Response({"contests": [], "warning": "Contest data temporarily unavailable"}, status=200)
 
 
+class PastContestsView(APIView):
+    def get(self, request):
+        user = get_user_from_request(request)
+        
+        try:
+            # Get all contests
+            all_contests = Contest.objects.all().order_by("-start_time").limit(200)
+
+            test_contests = []
+
+            if user:
+                # Get test contests where user is a tester or creator
+                test_contests = TestContest.objects.filter(
+                    Q(testers__contains=user.email) | Q(created_by=user)
+                ).order_by("-test_start_time").limit(50)
+            
+            data = []
+
+            for c in all_contests:
+                # Calculate status dynamically
+                status_value = get_contest_status(c)
+                
+                # Only include past/completed contests
+                if status_value != "completed" and status_value != "past":
+                    continue
+                
+                # Filter out drafts for non-creators
+                if status_value == "draft":
+                    if not user or not c.created_by or str(c.created_by.id) != str(user.id):
+                        continue
+                
+                participant_count = ContestRegistration.objects(contest=c).count()
+                
+                is_creator = user and c.created_by and str(c.created_by.id) == str(user.id)
+
+                data.append({
+                    "id": str(c.id),
+                    "title": c.title,
+                    "description": c.description,
+                    "duration": c.duration,
+                    "type": c.type,
+                    "platform": c.platform,
+                    "created_by": str(c.created_by.id) if c.created_by else None,
+                    "is_creator": is_creator,
+                    "status": status_value,
+                    "participants": participant_count,
+                })
+
+            for tc in test_contests:
+                status_value = get_contest_status(tc)
+                
+                # Only include past test contests
+                if status_value != "completed" and status_value != "past":
+                    continue
+                
+                participant_count = ContestRegistration.objects(contest=tc).count()
+                
+                data.append({
+                    "id": str(tc.id),
+                    "title": f"[TEST] {tc.title}",
+                    "description": tc.description,
+                    "duration": tc.duration,
+                    "type": tc.type,
+                    "platform": tc.platform,
+                    "created_by": str(tc.created_by.id) if tc.created_by else None,
+                    "is_creator": user and tc.created_by and str(tc.created_by.id) == str(user.id),
+                    "status": status_value,
+                    "participants": participant_count,
+                    "is_test_contest": True,
+                    "original_contest_id": str(tc.original_contest.id) if tc.original_contest else None,
+                    "testers_count": len(tc.testers)
+                })
+
+            # Optional: Broadcast update if needed
+            # broadcast_global_update({
+            #     "event": "past_contests_update",
+            #     "contests": data,
+            # })
+
+            return Response({"contests": data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            # Return empty contests list if database is unavailable
+            print(f"Database error in PastContestsView: {e}")
+            return Response({"contests": [], "warning": "Contest data temporarily unavailable"}, status=200)
+            
 
 
 class UpcomingContestListCreateAPIView(APIView):
@@ -2364,4 +2449,5 @@ class ContestUserRecordingsAPIView(APIView):
         })
     
     
+
 
