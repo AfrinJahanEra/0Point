@@ -51,17 +51,30 @@ const Home = () => {
   const [blogs, setBlogs] = useState([]);
   const [loadingBlogs, setLoadingBlogs] = useState(false);
   const [showFullContent, setShowFullContent] = useState({});
-
-    // Upcoming contests state
-const [upcomingContests, setUpcomingContests] = useState([]);
-const [loadingContests, setLoadingContests] = useState(false);
+  
+  // Upcoming contests state
+  const [upcomingContests, setUpcomingContests] = useState([]);
+  const [loadingContests, setLoadingContests] = useState(false);
+  
   // Past contests state
-const [pastContests, setPastContests] = useState([]);
-const [loadingPastContests, setLoadingPastContests] = useState(false);
+  const [pastContests, setPastContests] = useState([]);
+  const [loadingPastContests, setLoadingPastContests] = useState(false);
+  
+  // Live contests state
+  const [liveContests, setLiveContests] = useState([]);
+  const [loadingLiveContests, setLoadingLiveContests] = useState(false);
+  
+  // Soonest contest state for countdown
+  const [soonestContest, setSoonestContest] = useState(null);
+  const [loadingSoonest, setLoadingSoonest] = useState(false);
 
   // Leaderboard state
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+
+  // Add with your other useState declarations
+const [contributions, setContributions] = useState([]);
+const [loadingContributions, setLoadingContributions] = useState(false);
 
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
@@ -71,10 +84,46 @@ const [loadingPastContests, setLoadingPastContests] = useState(false);
     seconds: 45
   });
 
+  // Fetch registered contests
+  const fetchRegisteredContests = async () => {
+    try {
+      const response = await api.get('/contests/registrations/');
+      const registeredIds = response.data.registered_contests || [];
+      setRegisteredContests(new Set(registeredIds));
+    } catch (error) {
+      console.error('Error fetching registrations:', error);
+    }
+  };
+
+const fetchContributions = async () => {
+  try {
+    setLoadingContributions(true);
+    const response = await api.get('/contributions/ranking/');
+    console.log('Raw API response:', response);
+    console.log('Response data:', response.data);
+    
+    // The API returns { count: 1, ranking: [...] }
+    // So we need to use response.data.ranking
+    setContributions(response.data.ranking || []);
+  } catch (error) {
+    console.error('Error fetching contributions:', error);
+    toast.error('Failed to load contributions');
+  } finally {
+    setLoadingContributions(false);
+  }
+};
+
   // Update countdown timer every second
   useEffect(() => {
+    if (!soonestContest) return;
+
     const timer = setInterval(() => {
       setTimeLeft(prev => {
+        if (prev.days === 0 && prev.hours === 0 && prev.minutes === 0 && prev.seconds === 0) {
+          clearInterval(timer);
+          return prev;
+        }
+        
         if (prev.seconds > 0) {
           return { ...prev, seconds: prev.seconds - 1 };
         } else if (prev.minutes > 0) {
@@ -89,22 +138,24 @@ const [loadingPastContests, setLoadingPastContests] = useState(false);
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [soonestContest]);
 
-  // Fetch blogs
+  // Fetch all data
   useEffect(() => {
     fetchLatestBlogs();
     fetchLeaderboard();
     fetchUpcomingContests();
     fetchPastContests();
+    fetchSoonestContest();
+    fetchLiveContests();
+    fetchRegisteredContests();
+    fetchContributions();
   }, []);
 
   const fetchLatestBlogs = async () => {
     try {
       setLoadingBlogs(true);
-      // Use the published endpoint from your backend
       const response = await api.get('/blog/published/');
-      // Get only the 3 most recent blogs for the home page
       setBlogs(response.data.slice(0, 3));
     } catch (error) {
       console.error('Error fetching blogs:', error);
@@ -114,29 +165,76 @@ const [loadingPastContests, setLoadingPastContests] = useState(false);
     }
   };
 
-  // Fetch past contests
-const fetchPastContests = async () => {
-  try {
-    setLoadingPastContests(true);
-    const response = await api.get('/contests/past/');
-    // The response structure is { contests: [...] }
-    setPastContests(response.data.contests || []);
-  } catch (error) {
-    console.error('Error fetching past contests:', error);
-    toast.error('Failed to load past contests');
-    setPastContests([]);
-  } finally {
-    setLoadingPastContests(false);
-  }
-};
-  
-  // Fetch leaderboard data
+  const fetchUpcomingContests = async () => {
+    try {
+      setLoadingContests(true);
+      const response = await api.get('/contests/upcoming/');
+      setUpcomingContests(response.data.contests || []);
+    } catch (error) {
+      console.error('Error fetching upcoming contests:', error);
+      toast.error('Failed to load upcoming contests');
+      setUpcomingContests([]);
+    } finally {
+      setLoadingContests(false);
+    }
+  };
+
+  const fetchLiveContests = async () => {
+    try {
+      setLoadingLiveContests(true);
+      const response = await api.get('/contests/live/');
+      setLiveContests(response.data.contests || []);
+    } catch (error) {
+      console.error('Error fetching live contests:', error);
+      toast.error('Failed to load live contests');
+      setLiveContests([]);
+    } finally {
+      setLoadingLiveContests(false);
+    }
+  };
+
+  const fetchPastContests = async () => {
+    try {
+      setLoadingPastContests(true);
+      const response = await api.get('/contests/past/');
+      setPastContests(response.data.contests || []);
+    } catch (error) {
+      console.error('Error fetching past contests:', error);
+      toast.error('Failed to load past contests');
+      setPastContests([]);
+    } finally {
+      setLoadingPastContests(false);
+    }
+  };
+
+  const fetchSoonestContest = async () => {
+    try {
+      setLoadingSoonest(true);
+      const response = await api.get('/contests/soonest/');
+      
+      if (response.data.has_contest) {
+        setSoonestContest(response.data);
+        setTimeLeft({
+          days: response.data.time_until.days,
+          hours: response.data.time_until.hours,
+          minutes: response.data.time_until.minutes,
+          seconds: response.data.time_until.seconds
+        });
+      } else {
+        setSoonestContest(null);
+      }
+    } catch (error) {
+      console.error('Error fetching soonest contest:', error);
+      setSoonestContest(null);
+    } finally {
+      setLoadingSoonest(false);
+    }
+  };
+
   const fetchLeaderboard = async () => {
     try {
       setLoadingLeaderboard(true);
-      // Using the minimal leaderboard endpoint we created
       const response = await api.get('/leaderboard/minimal/');
-      // Get only top 5 for the home page
       setLeaderboardData(response.data.slice(0, 5));
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
@@ -170,7 +268,7 @@ const fetchPastContests = async () => {
     }
   ];
 
-  // Functions for like/dislike and comments
+  // Blog functions
   const handleBlogLike = (blogId) => {
     setBlogLikes(prev => ({
       ...prev,
@@ -193,7 +291,6 @@ const fetchPastContests = async () => {
       [blogId]: !prev[blogId]
     }));
     
-    // Initialize comments array if not exists
     if (!blogComments[blogId]) {
       setBlogComments(prev => ({
         ...prev,
@@ -260,37 +357,85 @@ const fetchPastContests = async () => {
     }));
   };
 
-  const handleRegister = (contestId) => {
-    setRegisteredContests(prev => new Set([...prev, contestId]));
+  const handleRegister = async (contestId) => {
+    try {
+      await api.post(`/contests/${contestId}/register/`, {});
+      
+      setRegisteredContests(prev => new Set([...prev, contestId]));
+      
+      setUpcomingContests(prev => 
+        prev.map(contest => 
+          contest.id === contestId 
+            ? { ...contest, is_registered: true } 
+            : contest
+        )
+      );
+      
+      setLiveContests(prev => 
+        prev.map(contest => 
+          contest.id === contestId 
+            ? { ...contest, is_registered: true } 
+            : contest
+        )
+      );
+      
+      toast.success('Successfully registered for contest!');
+      return true;
+    } catch (error) {
+      console.error('Registration failed:', error);
+      toast.error(error.response?.data?.error || 'Registration failed');
+      return false;
+    }
+  };
+
+  const handleContestEntry = async (contest, type = 'upcoming') => {
+    const { id, status } = contest;
+
+    if (status === 'draft') {
+      navigate(`/contests/${id}/edit`);
+      return;
+    }
+
+    if (status === 'upcoming' || status === 'live' || status === 'past') {
+      try {
+        const res = await api.get(`/contests/${id}/problems/`);
+        
+        if ((res.data.problems || []).length === 0 && status !== 'past') {
+          toast.error('No problems available yet.');
+          return;
+        }
+        
+        navigate(`/contests/${id}`);
+        
+      } catch (err) {
+        if (err.response?.status === 403 && err.response.data?.can_register) {
+          const shouldRegister = window.confirm(`You need to register for this ${status} contest. Register now?`);
+          if (shouldRegister) {
+            const registered = await handleRegister(id);
+            if (registered) {
+              try {
+                await api.get(`/contests/${id}/problems/`);
+                navigate(`/contests/${id}`);
+              } catch {
+                navigate(`/contests/${id}/register`);
+              }
+            }
+          }
+        } else {
+          toast.error(err.response?.data?.message || 'Cannot access contest.');
+        }
+      }
+    }
   };
 
   const handleVisualizationClick = (type) => {
     setActiveVisualization(type);
-    // In a real app, this would trigger actual visualizations
     console.log(`Visualization clicked: ${type}`);
     
-    // Simulate visualization loading
     setTimeout(() => {
-      // Reset after showing "visualization"
       setActiveVisualization('');
     }, 2000);
   };
-
-  // Fetch upcoming contests
-const fetchUpcomingContests = async () => {
-  try {
-    setLoadingContests(true);
-    const response = await api.get('/contests/upcoming/');
-    // The response structure is { contests: [...] }
-    setUpcomingContests(response.data.contests || []);
-  } catch (error) {
-    console.error('Error fetching upcoming contests:', error);
-    toast.error('Failed to load upcoming contests');
-    setUpcomingContests([]);
-  } finally {
-    setLoadingContests(false);
-  }
-};
 
   // Markdown components for rendering
   const customComponents = {
@@ -371,146 +516,161 @@ const fetchUpcomingContests = async () => {
           <div className="lg:col-span-3 space-y-4">
 
             {/* Upcoming Contests */}
-<div className="bg-white">
-  <div className="p-3 border-b border-gray-200">
-    <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
-      <div className="flex items-center gap-1.5">
-        <Trophy className="w-3.5 h-3.5 text-gray-700" />
-        <h2 className="text-xs font-semibold text-gray-900">Upcoming Contests</h2>
-      </div>
-      <Link 
-        to="/contests" 
-        className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
-      >
-        View All
-        <ChevronRight className="w-2.5 h-2.5" />
-      </Link>
-    </div>
-
-    {/* Filters */}
-    <div className="flex items-center gap-1.5 mt-2">
-      <div className="flex bg-gray-100 rounded-lg p-0.5">
-        {['all', 'registered'].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-2 py-1 rounded text-xs font-medium transition-colors duration-200 ${
-              activeTab === tab 
-                ? 'bg-white text-gray-900 shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
-    </div>
-  </div>
-
-  {/* Contests List */}
-  <div className="p-3 space-y-2">
-    {loadingContests ? (
-      <div className="py-4 text-center">
-        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="text-xs text-gray-500 mt-2">Loading contests...</p>
-      </div>
-    ) : upcomingContests.length === 0 ? (
-      <div className="py-4 text-center">
-        <p className="text-xs text-gray-500">No upcoming contests</p>
-      </div>
-    ) : (
-      upcomingContests.map((contest) => {
-        // Filter based on active tab
-        if (activeTab === 'registered' && !registeredContests.has(contest.id) && !contest.is_registered) {
-          return null;
-        }
-        
-        return (
-          <div 
-            key={contest.id}
-            className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-start gap-2 flex-1">
-                <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
-                  <Calendar className="w-4 h-4" />
+            <div className="bg-white">
+              <div className="p-3 border-b border-gray-200">
+                <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
+                  <div className="flex items-center gap-1.5">
+                    <Trophy className="w-3.5 h-3.5 text-gray-700" />
+                    <h2 className="text-xs font-semibold text-gray-900">Upcoming Contests</h2>
+                  </div>
+                  <Link 
+                    to="/contests" 
+                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                  >
+                    View All
+                    <ChevronRight className="w-2.5 h-2.5" />
+                  </Link>
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 text-xs">
-                    {contest.title}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5" />
-                      {contest.duration}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Users className="w-2.5 h-2.5" />
-                      {contest.participants || 0}
-                    </span>
+
+                {/* Filters */}
+                <div className="flex items-center gap-1.5 mt-2">
+                  <div className="flex bg-gray-100 rounded-lg p-0.5">
+                    {['all', 'registered'].map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-colors duration-200 ${
+                          activeTab === tab 
+                            ? 'bg-white text-gray-900 shadow-sm' 
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
-              
-              {/* Single Button Column */}
-              <div className="flex flex-col items-end gap-1">
-                <button 
-                  className={`px-2 py-1 rounded font-medium text-xs transition-all duration-200 flex items-center gap-1 ${
-                    registeredContests.has(contest.id) || contest.is_registered
-                      ? 'bg-blue-800 text-white cursor-not-allowed'
-                      : 'bg-blue-800 text-white hover:bg-blue-900'
-                  }`}
-                  onClick={() => !registeredContests.has(contest.id) && !contest.is_registered && handleRegister(contest.id)}
-                  disabled={registeredContests.has(contest.id) || contest.is_registered}
-                >
-                  {registeredContests.has(contest.id) || contest.is_registered ? (
-                    <>
-                      <Play className="w-2.5 h-2.5" />
-                      Participate
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="w-2.5 h-2.5" />
-                      Register
-                    </>
-                  )}
-                </button>
+
+              {/* Contests List */}
+              <div className="p-3 space-y-2">
+                {loadingContests ? (
+                  <div className="py-4 text-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-xs text-gray-500 mt-2">Loading contests...</p>
+                  </div>
+                ) : upcomingContests.length === 0 ? (
+                  <div className="py-4 text-center">
+                    <p className="text-xs text-gray-500">No upcoming contests</p>
+                  </div>
+                ) : (
+                  upcomingContests.slice(0, 3).map((contest) => {
+                    if (activeTab === 'registered' && !registeredContests.has(contest.id) && !contest.is_registered) {
+                      return null;
+                    }
+                    
+                    return (
+                      <div 
+                        key={contest.id}
+                        className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-start gap-2 flex-1">
+                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
+                              <Calendar className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-medium text-gray-900 text-xs">
+                                {contest.title}
+                              </h3>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  {contest.duration}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Users className="w-2.5 h-2.5" />
+                                  {contest.participants || 0}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Single Button */}
+                          <div className="flex items-center gap-1">
+                            {registeredContests.has(contest.id) || contest.is_registered ? (
+                              <button
+                                onClick={() => handleContestEntry(contest, 'upcoming')}
+                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
+                              >
+                                <Play className="w-2.5 h-2.5" />
+                                Enter
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleRegister(contest.id)}
+                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-blue-800 text-white hover:bg-blue-900 flex items-center gap-1"
+                              >
+                                <Eye className="w-2.5 h-2.5" />
+                                Register
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
-          </div>
-        );
-      })
-    )}
-  </div>
-</div>
 
             {/* Contest Countdown */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
-                <div className="text-center">
-                  <div className="text-xs text-gray-600 mb-1.5">IUT Winter Coding Challenge</div>
-                  <div className="flex justify-center gap-1 mb-2">
-                    <div className="bg-gray-100 rounded-lg p-1.5 text-center min-w-[40px]">
-                      <div className="text-xs font-bold text-gray-900">{timeLeft.days.toString().padStart(2, '0')}</div>
-                      <div className="text-xs text-gray-500">Days</div>
-                    </div>
-                    <div className="bg-gray-100 rounded-lg p-1.5 text-center min-w-[40px]">
-                      <div className="text-xs font-bold text-gray-900">{timeLeft.hours.toString().padStart(2, '0')}</div>
-                      <div className="text-xs text-gray-500">Hours</div>
-                    </div>
-                    <div className="bg-gray-100 rounded-lg p-1.5 text-center min-w-[40px]">
-                      <div className="text-xs font-bold text-gray-900">{timeLeft.minutes.toString().padStart(2, '0')}</div>
-                      <div className="text-xs text-gray-500">Minutes</div>
-                    </div>
-                    <div className="bg-gray-100 rounded-lg p-1.5 text-center min-w-[40px]">
-                      <div className="text-xs font-bold text-gray-900">{timeLeft.seconds.toString().padStart(2, '0')}</div>
-                      <div className="text-xs text-gray-500">Seconds</div>
-                    </div>
+                {loadingSoonest ? (
+                  <div className="py-4 text-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-xs text-gray-500 mt-2">Loading countdown...</p>
                   </div>
-                  <button className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200">
-                    Register Now
-                  </button>
-                </div>
+                ) : soonestContest ? (
+                  <div className="text-center">
+                    <div className="text-xs text-gray-600 mb-1.5">{soonestContest.title}</div>
+                    <div className="flex justify-center gap-1 mb-2">
+                      <div className="bg-gray-100 rounded-lg p-1.5 text-center min-w-[40px]">
+                        <div className="text-xs font-bold text-gray-900">{timeLeft.days.toString().padStart(2, '0')}</div>
+                        <div className="text-xs text-gray-500">Days</div>
+                      </div>
+                      <div className="bg-gray-100 rounded-lg p-1.5 text-center min-w-[40px]">
+                        <div className="text-xs font-bold text-gray-900">{timeLeft.hours.toString().padStart(2, '0')}</div>
+                        <div className="text-xs text-gray-500">Hours</div>
+                      </div>
+                      <div className="bg-gray-100 rounded-lg p-1.5 text-center min-w-[40px]">
+                        <div className="text-xs font-bold text-gray-900">{timeLeft.minutes.toString().padStart(2, '0')}</div>
+                        <div className="text-xs text-gray-500">Minutes</div>
+                      </div>
+                      <div className="bg-gray-100 rounded-lg p-1.5 text-center min-w-[40px]">
+                        <div className="text-xs font-bold text-gray-900">{timeLeft.seconds.toString().padStart(2, '0')}</div>
+                        <div className="text-xs text-gray-500">Seconds</div>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        if (registeredContests.has(soonestContest.contest_id)) {
+                          navigate(`/contests/${soonestContest.contest_id}`);
+                        } else {
+                          handleRegister(soonestContest.contest_id);
+                        }
+                      }}
+                      className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200"
+                    >
+                      {registeredContests.has(soonestContest.contest_id) ? 'Enter Contest' : 'Register Now'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="py-4 text-center">
+                    <p className="text-xs text-gray-500">No upcoming contests</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -532,109 +692,125 @@ const fetchUpcomingContests = async () => {
                 </div>
 
                 <div className="space-y-2">
-                  {pastContests.map((contest) => (
-                    <div 
-                      key={contest.id}
-                      className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-start gap-2 flex-1">
-                          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
-                            <Trophy className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-medium text-gray-900 text-xs">
-                              {contest.title}
-                            </h3>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
-                              <span>{contest.platform}</span>
-                              <span>{contest.date}</span>
+                  {loadingPastContests ? (
+                    <div className="py-4 text-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="text-xs text-gray-500 mt-2">Loading past contests...</p>
+                    </div>
+                  ) : pastContests.length === 0 ? (
+                    <div className="py-4 text-center">
+                      <p className="text-xs text-gray-500">No past contests</p>
+                    </div>
+                  ) : (
+                    pastContests.slice(0, 3).map((contest) => (
+                      <div 
+                        key={contest.id}
+                        className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-start gap-2 flex-1">
+                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
+                              <Trophy className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-medium text-gray-900 text-xs">
+                                {contest.title}
+                              </h3>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
+                                <span>{contest.platform || 'IUT Platform'}</span>
+                                <span>{contest.participants || 0} participants</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        
-                        {/* Single Button */}
-                        <div className="flex items-center gap-1">
-                          <button className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-blue-800 text-white hover:bg-blue-900">
-                            Practice
-                          </button>
+                          
+                          {/* Single Button */}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleContestEntry(contest, 'past')}
+                              className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-gray-800 text-white hover:bg-gray-900 flex items-center gap-1"
+                            >
+                              <Eye className="w-2.5 h-2.5" />
+                              View
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
 
-          {/* Leaderboard */}
-          <div className="bg-white rounded-lg">
-            <div className="p-3 border-b border-gray-200">
-              <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-blue-50">
-                <div className="flex items-center gap-1.5">
-                  <Medal className="w-3.5 h-3.5 text-gray-700" />
-                  <h2 className="text-xs font-semibold text-gray-900">Leaderboard</h2>
+            {/* Leaderboard */}
+            <div className="bg-white rounded-lg">
+              <div className="p-3 border-b border-gray-200">
+                <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-blue-50">
+                  <div className="flex items-center gap-1.5">
+                    <Medal className="w-3.5 h-3.5 text-gray-700" />
+                    <h2 className="text-xs font-semibold text-gray-900">Leaderboard</h2>
+                  </div>
+                  <Link 
+                    to="/leaderboard" 
+                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                  >
+                    View All
+                    <ChevronRight className="w-2.5 h-2.5" />
+                  </Link>
                 </div>
-                <Link 
-                  to="/leaderboard" 
-                  className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
-                >
-                  View All
-                  <ChevronRight className="w-2.5 h-2.5" />
-                </Link>
               </div>
-            </div>
 
-            <div className="px-7">
-              {loadingLeaderboard ? (
-                <div className="py-4 text-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="text-xs text-gray-500 mt-2">Loading...</p>
-                </div>
-              ) : leaderboardData.length === 0 ? (
-                <div className="py-4 text-center">
-                  <p className="text-xs text-gray-500">No data available</p>
-                </div>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left font-semibold text-gray-900 pb-2">Rank</th>
-                      <th className="text-left font-semibold text-gray-900 pb-2">Name</th>
-                      <th className="text-right font-semibold text-gray-900 pb-2">Rating</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leaderboardData.map((user) => (
-                      <tr key={user.rank} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-2">
-                          <div className="w-5 h-5 rounded flex items-center justify-center text-xs font-medium text-gray-900">
-                            {user.rank}
-                          </div>
-                        </td>
-                        <td className="py-2">
-                          <Link 
-                            to={`/profile/${user.username}`}
-                            className="text-blue-900 font-bold hover:text-blue-800 hover:underline"
-                          >
-                            {user.username}
-                          </Link>
-                        </td>
-                        <td className="py-2 text-right font-medium text-gray-900">
-                          {user.total_points}
-                        </td>
+              <div className="px-7">
+                {loadingLeaderboard ? (
+                  <div className="py-4 text-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-xs text-gray-500 mt-2">Loading...</p>
+                  </div>
+                ) : leaderboardData.length === 0 ? (
+                  <div className="py-4 text-center">
+                    <p className="text-xs text-gray-500">No data available</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left font-semibold text-gray-900 pb-2">Rank</th>
+                        <th className="text-left font-semibold text-gray-900 pb-2">Name</th>
+                        <th className="text-right font-semibold text-gray-900 pb-2">Rating</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                    </thead>
+                    <tbody>
+                      {leaderboardData.map((user) => (
+                        <tr key={user.rank} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-2">
+                            <div className="w-5 h-5 rounded flex items-center justify-center text-xs font-medium text-gray-900">
+                              {user.rank}
+                            </div>
+                          </td>
+                          <td className="py-2">
+                            <Link 
+                              to={`/profile/${user.username}`}
+                              className="text-blue-900 font-bold hover:text-blue-800 hover:underline"
+                            >
+                              {user.username}
+                            </Link>
+                          </td>
+                          <td className="py-2 text-right font-medium text-gray-900">
+                            {user.total_points}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
-          </div>
+
 
           </div>
 
           {/* Middle Column - Main Content (Wider) */}
           <div className="lg:col-span-6 space-y-4">
-            {/* Recent Blog Post - Added like/dislike and comments */}
+            {/* Recent Blog Post */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
@@ -666,7 +842,6 @@ const fetchUpcomingContests = async () => {
                     <div key={post.id} className="mb-2 p-3 border-b border-gray-100 last:border-b-0">
                       {/* Profile Avatar and Username Section */}
                       <div className="flex items-center gap-2 mb-3">
-                        {/* Profile Avatar with user initials */}
                         <div 
                           className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm cursor-pointer"
                           onClick={() => navigate(`/profile/${post.author?.name}`)}
@@ -674,7 +849,6 @@ const fetchUpcomingContests = async () => {
                           {post.author?.name ? post.author.name.charAt(0).toUpperCase() : 'U'}
                         </div>
                         
-                        {/* Username and Date */}
                         <div className="flex flex-col">
                           <Link 
                             to={`/profile/${post.author?.name}`}
@@ -764,7 +938,6 @@ const fetchUpcomingContests = async () => {
                       {/* Comments Section */}
                       {showComments[post.id] && (
                         <div className="mt-3 pt-3 border-t border-gray-200">
-                          {/* Add Comment */}
                           <div className="mb-3">
                             <textarea
                               value={newComment[post.id] || ''}
@@ -781,7 +954,6 @@ const fetchUpcomingContests = async () => {
                             </button>
                           </div>
 
-                          {/* Comments List */}
                           <div className="space-y-3">
                             {blogComments[post.id]?.map((comment) => (
                               <div key={comment.id} className="bg-gray-50 p-2 rounded">
@@ -839,6 +1011,84 @@ const fetchUpcomingContests = async () => {
 
           {/* Right Sidebar - Additional Content */}
           <div className="lg:col-span-3 space-y-4">
+
+            {/* Live Contests */}
+            <div className="bg-white rounded-lg">
+              <div className="p-3 border-b border-gray-200">
+                <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-gray-700" />
+                    <h2 className="text-xs font-semibold text-gray-900">Running Contests</h2>
+                  </div>
+                  <Link 
+                    to="/contests" 
+                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                  >
+                    View All
+                    <ChevronRight className="w-2.5 h-2.5" />
+                  </Link>
+                </div>
+
+                <div className="space-y-2">
+                  {loadingLiveContests ? (
+                    <div className="py-4 text-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="text-xs text-gray-500 mt-2">Loading running contests...</p>
+                    </div>
+                  ) : liveContests.length === 0 ? (
+                    <div className="py-4 text-center">
+                      <p className="text-xs text-gray-500">No running contests</p>
+                    </div>
+                  ) : (
+                    liveContests.slice(0, 3).map((contest) => (
+                      <div 
+                        key={contest.id}
+                        className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-start gap-2 flex-1">
+                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
+                              <Trophy className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-medium text-gray-900 text-xs">
+                                {contest.title}
+                              </h3>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
+                                <span>{contest.platform || 'IUT Platform'}</span>
+                                <span>{contest.participants || 0} participants</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Single Button */}
+                          <div className="flex items-center gap-1">
+                            {registeredContests.has(contest.id) || contest.is_registered ? (
+                              <button
+                                onClick={() => handleContestEntry(contest, 'live')}
+                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-red-600 text-white hover:bg-red-700 flex items-center gap-1"
+                              >
+                                <Play className="w-2.5 h-2.5" />
+                                Join
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleRegister(contest.id)}
+                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-orange-600 text-white hover:bg-orange-700 flex items-center gap-1"
+                              >
+                                <Eye className="w-2.5 h-2.5" />
+                                Register
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* All Announcements */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
@@ -875,8 +1125,70 @@ const fetchUpcomingContests = async () => {
                 </div>
               </div>
             </div>
+{/* Contributions */}
+<div className="bg-white rounded-lg">
+  <div className="p-3 border-b border-gray-200">
+    <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-blue-50">
+      <div className="flex items-center gap-1.5">
+        <Medal className="w-3.5 h-3.5 text-gray-700" />
+        <h2 className="text-xs font-semibold text-gray-900">Top Contributors</h2>
+      </div>
+    </div>
+  </div>
 
-            {/* Recommended Problem Sets (Table Format) */}
+  <div className="p-3">
+    {loadingContributions ? (
+      <div className="py-4 text-center">
+        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="text-xs text-gray-500 mt-2">Loading contributors...</p>
+      </div>
+    ) : contributions.length === 0 ? (
+      <div className="py-4 text-center">
+        <p className="text-xs text-gray-500">No contributions yet</p>
+      </div>
+    ) : (
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-gray-200">
+            <th className="text-left font-semibold text-gray-900 pb-2 w-12">Rank</th>
+            <th className="text-left font-semibold text-gray-900 pb-2">Username</th>
+            <th className="text-right font-semibold text-gray-900 pb-2 w-16">Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          {contributions.map((contributor) => (
+            <tr key={contributor.rank} className="border-b border-gray-100 hover:bg-gray-50">
+              <td className="py-2">
+                <div className={`
+                  w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold
+                  ${contributor.rank === 1 ? 'bg-yellow-100 text-yellow-700' : 
+                    contributor.rank === 2 ? 'bg-gray-200 text-gray-700' : 
+                    contributor.rank === 3 ? 'bg-orange-100 text-orange-700' : 
+                    'bg-gray-100 text-gray-600'}
+                `}>
+                  {contributor.rank}
+                </div>
+              </td>
+              <td className="py-2">
+                <Link 
+                  to={`/profile/${contributor.username}`}
+                  className="text-blue-900 font-bold hover:text-blue-800 hover:underline"
+                >
+                  {contributor.name}
+                </Link>
+              </td>
+              <td className="py-2 text-right font-medium text-gray-900">
+                {contributor.total_contributions}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+</div>
+
+            {/* Recommended Problem Sets */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
