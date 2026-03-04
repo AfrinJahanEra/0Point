@@ -96,6 +96,7 @@ const [loadingPastContests, setLoadingPastContests] = useState(false);
     fetchLatestBlogs();
     fetchLeaderboard();
     fetchUpcomingContests();
+    fetchPastContests();
   }, []);
 
   const fetchLatestBlogs = async () => {
