@@ -113,6 +113,22 @@ const [loadingPastContests, setLoadingPastContests] = useState(false);
     }
   };
 
+  // Fetch past contests
+const fetchPastContests = async () => {
+  try {
+    setLoadingPastContests(true);
+    const response = await api.get('/contests/past/');
+    // The response structure is { contests: [...] }
+    setPastContests(response.data.contests || []);
+  } catch (error) {
+    console.error('Error fetching past contests:', error);
+    toast.error('Failed to load past contests');
+    setPastContests([]);
+  } finally {
+    setLoadingPastContests(false);
+  }
+};
+  
   // Fetch leaderboard data
   const fetchLeaderboard = async () => {
     try {
