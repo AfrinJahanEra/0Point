@@ -146,27 +146,6 @@ const fetchPastContests = async () => {
     }
   };
 
-  const pastContests = [
-    {
-      id: 4,
-      title: "Fall Coding Championship",
-      platform: "Codeforces",
-      date: "Nov 10, 2023",
-      participants: "1200+",
-      difficulty: "Hard",
-      status: "completed"
-    },
-    {
-      id: 5,
-      title: "Beginner's Contest #12",
-      platform: "AtCoder",
-      date: "Nov 5, 2023",
-      participants: "800+",
-      difficulty: "Easy",
-      status: "completed"
-    }
-  ];
-
   const announcements = [
     {
       id: 1,
