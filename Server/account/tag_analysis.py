@@ -20,6 +20,81 @@ def normalize_tag(tag):
         return "binary search"
     return tag
 
+category_map = {
+    "2-sat": "Graphs",
+    "binary search": "Data Structures & Search",
+    "bitmasks": "Data Structures & Search",
+    "brute force": "Implementation",
+    "chinese remainder theorem": "Mathematics",
+    "combinatorics": "Mathematics",
+    "constructive algorithms": "Implementation",
+    "data structures": "Data Structures & Search",
+    "dfs and similar": "Graphs",
+    "divide and conquer": "Data Structures & Search",
+    "dp": "Dynamic Programming",
+    "dsu": "Data Structures & Search",
+    "expression parsing": "Implementation",
+    "fft": "Mathematics",
+    "flow": "Graphs",
+    "flows": "Graphs",
+    "games": "Game Theory",
+    "geometry": "Mathematics",
+    "graph matchings": "Graphs",
+    "graphs": "Graphs",
+    "greedy": "Greedy & Sorting",
+    "hashing": "Data Structures & Search",
+    "implementation": "Implementation",
+    "interactive": "Implementation",
+    "math": "Mathematics",
+    "matrices": "Mathematics",
+    "meet-in-the-middle": "Data Structures & Search",
+    "number theory": "Mathematics",
+    "probabilities": "Mathematics",
+    "schedules": "Implementation",
+    "shortest paths": "Graphs",
+    "sortings": "Greedy & Sorting",
+    "string suffix structures": "Strings",
+    "strings": "Strings",
+    "ternary search": "Data Structures & Search",
+    "trees": "Graphs",
+    "two pointers": "Data Structures & Search",
+    # LeetCode specific
+    "array": "Data Structures & Search",
+    "backtracking": "Implementation",
+    "bit manipulation": "Data Structures & Search",
+    "breadth-first search": "Graphs",
+    "bucket sort": "Greedy & Sorting",
+    "counting": "Mathematics",
+    "counting sort": "Greedy & Sorting",
+    "depth-first search": "Graphs",
+    "design": "Implementation",
+    "enumeration": "Implementation",
+    "game theory": "Game Theory",
+    "graph": "Graphs",
+    "heap (priority queue)": "Data Structures & Search",
+    "heap": "Data Structures & Search",
+    "linked list": "Data Structures & Search",
+    "matrix": "Data Structures & Search",
+    "memoization": "Dynamic Programming",
+    "monotonic queue": "Data Structures & Search",
+    "monotonic stack": "Data Structures & Search",
+    "ordered set": "Data Structures & Search",
+    "prefix sum": "Data Structures & Search",
+    "queue": "Data Structures & Search",
+    "radix sort": "Greedy & Sorting",
+    "recursion": "Implementation",
+    "segment tree": "Data Structures & Search",
+    "simulation": "Implementation",
+    "sliding window": "Data Structures & Search",
+    "sorting": "Greedy & Sorting",
+    "stack": "Data Structures & Search",
+    "string": "Strings",
+    "topological sort": "Graphs",
+    "tree": "Graphs",
+    "trie": "Strings",
+    "union find": "Data Structures & Search",
+}
+
 def fetch_problem_tags(slug):
     query = """
     query questionData($titleSlug: String!) {
@@ -43,21 +118,19 @@ def fetch_problem_tags(slug):
     except:
         return []
 
-# ────────────────────────────────────────────────────────────────
-# FULL FETCH (only used first time)
-# ────────────────────────────────────────────────────────────────
 
-def fetch_cf_tag_counts(handle: str):
-    tag_to_problems = defaultdict(set)
+def fetch_cf_category_attempts(handle: str):
+    category_attempts = defaultdict(list)
+    category_to_tags = defaultdict(set)
+    problem_subs = defaultdict(list)
     last_time = 0
-
     from_idx = 1
-    count = 1000
+    count = 500
 
     while True:
         try:
             url = f"{CF_API_BASE}/user.status?handle={handle}&from={from_idx}&count={count}"
-            resp = requests.get(url, headers=HEADERS, timeout=50)
+            resp = requests.get(url, headers=HEADERS, timeout=10)
             resp.raise_for_status()
             data = resp.json()
 
@@ -72,214 +145,192 @@ def fetch_cf_tag_counts(handle: str):
                 creation_time = sub.get("creationTimeSeconds", 0)
                 last_time = max(last_time, creation_time)
 
-                if sub.get("verdict") == "OK":
-                    problem = sub.get("problem", {})
-                    problem_id = f"{sub.get('contestId')}-{problem.get('index')}"
-                    tags = [normalize_tag(t) for t in problem.get("tags", [])]
-                    for tag in tags:
-                        tag_to_problems[tag].add(problem_id)
+                contestId = sub.get("contestId")
+                if not contestId:
+                    continue
+
+                problem = sub.get("problem", {})
+                index = problem.get("index", "")
+                problem_id = f"{contestId}-{index}"
+                problem_subs[problem_id].append(sub)
 
             if len(subs) < count:
                 break
 
             from_idx += count
-            time.sleep(0.5)
+            time.sleep(0.3)
 
         except Exception as e:
-            print(f"CF full fetch error: {e}")
+            print(f"CF fetch error: {e}")
             break
 
-    return {tag: len(problems) for tag, problems in tag_to_problems.items()}, last_time
+    # Process groups
+    for problem_id, subs in problem_subs.items():
+        subs.sort(key=lambda s: s["creationTimeSeconds"])  # asc
+        attempts = 0
+        solved = False
+        tags = []
+        for sub in subs:
+            attempts += 1
+            if sub.get("verdict") == "OK":
+                solved = True
+                tags = sub["problem"].get("tags", [])
+                break
 
-def fetch_lc_tag_counts(username: str, max_limit=1000):
-    tag_to_problems = defaultdict(set)
-    tag_cache = {}
+        if solved and attempts > 0:
+            normalized_tags = [normalize_tag(t) for t in tags]
+            added_cats = set()
+            for tag in normalized_tags:
+                cat = category_map.get(tag, "Other")
+                category_to_tags[cat].add(tag)
+                if cat not in added_cats:
+                    category_attempts[cat].append(attempts)
+                    added_cats.add(cat)
+
+    return category_attempts, last_time, category_to_tags
+
+
+def fetch_lc_category_attempts(username: str):
+    category_attempts = defaultdict(list)
+    category_to_tags = defaultdict(set)
+    problem_subs = defaultdict(list)
     last_time = 0
 
     try:
-        url = LC_SUBMISSIONS_API.format(username)
-        resp = requests.get(url, headers=HEADERS, timeout=50)
+        resp = requests.get(LC_SUBMISSIONS_API.format(username), headers=HEADERS, timeout=15)
         if resp.status_code != 200:
             print(f"LC API status: {resp.status_code}")
-            return {}, 0
-
-        data = resp.json()
-
-        for sub in data[:max_limit]:
-            ts = int(sub.get("timestamp", 0))
-            last_time = max(last_time, ts)
-
-            if sub.get("statusDisplay") != "Accepted":
-                continue
-
-            slug = sub.get("titleSlug")
-            if not slug:
-                continue
-
-            if slug not in tag_cache:
-                tag_cache[slug] = fetch_problem_tags(slug)
-                time.sleep(0.4)
-
-            tags = tag_cache[slug]
-            for tag in tags:
-                tag_to_problems[tag].add(slug)
-
-    except Exception as e:
-        print(f"LC full fetch error: {e}")
-
-    return {tag: len(problems) for tag, problems in tag_to_problems.items()}, last_time
-
-# ────────────────────────────────────────────────────────────────
-# INCREMENTAL UPDATE (only new submissions)
-# ────────────────────────────────────────────────────────────────
-
-def update_cf_tags(handle: str, cached_stats: UserTagStats):
-    """Only process submissions newer than last_cf_submission_time"""
-    tag_to_problems = defaultdict(set)  # only NEW unique problems
-    new_last_time = cached_stats.last_cf_submission_time
-
-    from_idx = 1
-    count = 1000
-
-    while True:
-        try:
-            url = f"{CF_API_BASE}/user.status?handle={handle}&from={from_idx}&count={count}"
-            resp = requests.get(url, headers=HEADERS, timeout=12)
-            resp.raise_for_status()
-            data = resp.json()
-
-            if data.get("status") != "OK":
-                break
-
-            subs = data.get("result", [])
-            if not subs:
-                break
-
-            stop = False
-            for sub in subs:
-                creation_time = sub.get("creationTimeSeconds", 0)
-                if creation_time <= cached_stats.last_cf_submission_time:
-                    stop = True
-                    break
-
-                new_last_time = max(new_last_time, creation_time)
-
-                if sub.get("verdict") == "OK":
-                    problem = sub.get("problem", {})
-                    problem_id = f"{sub.get('contestId')}-{problem.get('index')}"
-                    tags = [normalize_tag(t) for t in problem.get("tags", [])]
-                    for tag in tags:
-                        tag_to_problems[tag].add(problem_id)
-
-            if stop or len(subs) < count:
-                break
-
-            from_idx += count
-            time.sleep(0.5)
-
-        except Exception as e:
-            print(f"CF incremental error: {e}")
-            break
-
-    # Return only **new** counts to add
-    new_counts = {tag: len(problems) for tag, problems in tag_to_problems.items()}
-    return new_counts, new_last_time
-
-def update_lc_tags(username: str, cached_stats: UserTagStats):
-    """Only process new LeetCode submissions"""
-    tag_to_problems = defaultdict(set)
-    new_last_time = cached_stats.last_lc_submission_time
-    tag_cache = {}
-
-    try:
-        url = LC_SUBMISSIONS_API.format(username)
-        resp = requests.get(url, headers=HEADERS, timeout=50)
-        if resp.status_code != 200:
-            print(f"LC API status: {resp.status_code}")
-            return {}, new_last_time
+            return category_attempts, last_time, category_to_tags
 
         data = resp.json()
 
         for sub in data:
             ts = int(sub.get("timestamp", 0))
-            if ts <= cached_stats.last_lc_submission_time:
-                break  # assuming newest first
-
-            new_last_time = max(new_last_time, ts)
-
-            if sub.get("statusDisplay") != "Accepted":
-                continue
-
+            last_time = max(last_time, ts)
             slug = sub.get("titleSlug")
             if not slug:
                 continue
+            problem_subs[slug].append(sub)
 
-            if slug not in tag_cache:
-                tag_cache[slug] = fetch_problem_tags(slug)
-                time.sleep(0.4)
+        tag_cache = {}
+        for slug, subs in problem_subs.items():
+            subs.sort(key=lambda s: int(s["timestamp"]))  # asc
+            attempts = 0
+            solved = False
+            for sub in subs:
+                attempts += 1
+                if sub.get("statusDisplay") == "Accepted":
+                    solved = True
+                    break
 
-            tags = tag_cache[slug]
-            for tag in tags:
-                tag_to_problems[tag].add(slug)
+            if solved and attempts > 0:
+                if slug not in tag_cache:
+                    tag_cache[slug] = fetch_problem_tags(slug)
+                    time.sleep(0.4)
 
-        new_counts = {tag: len(problems) for tag, problems in tag_to_problems.items()}
-        return new_counts, new_last_time
+                tags = tag_cache[slug]
+
+                # Assign to all relevant categories
+                added_cats = set()
+                for tag in tags:
+                    cat = category_map.get(tag, "Other")
+                    category_to_tags[cat].add(tag)
+                    if cat not in added_cats:
+                        category_attempts[cat].append(attempts)
+                        added_cats.add(cat)
 
     except Exception as e:
-        print(f"LC incremental error: {e}")
-        return {}, new_last_time
+        print(f"LC fetch error: {e}")
 
-# ────────────────────────────────────────────────────────────────
-# MAIN FUNCTION - Cached + Incremental
-# ────────────────────────────────────────────────────────────────
+    return category_attempts, last_time, category_to_tags
 
-def get_tag_stats(user):
+
+def get_category_scores(user):
     user_id = str(user.id)
-    
-    # Try to get existing cache
     cache = UserTagStats.objects(user_id=user_id).first()
 
     cf_handle = user.get_platform_profile("codeforces").handle if user.get_platform_profile("codeforces") else None
     lc_handle = user.get_platform_profile("leetcode").handle if user.get_platform_profile("leetcode") else None
 
-    if not cache:
-        # First time - full fetch
-        cf_tags, cf_last = fetch_cf_tag_counts(cf_handle) if cf_handle else ({}, 0)
-        lc_tags, lc_last = fetch_lc_tag_counts(lc_handle) if lc_handle else ({}, 0)
+    cf_att = defaultdict(list)
+    lc_att = defaultdict(list)
+    cf_tags = defaultdict(set)
+    lc_tags = defaultdict(set)
+    new_cf_last = cache.last_cf_submission_time if cache else 0
+    new_lc_last = cache.last_lc_submission_time if cache else 0
+    
+    # ── Codeforces ──────────────────────────────────────────────────
+    need_cf_fetch = True
+    if cache and cf_handle:
+        try:
+            url = f"{CF_API_BASE}/user.status?handle={cf_handle}&from=1&count=1"
+            resp = requests.get(url, headers=HEADERS, timeout=5)
+            data = resp.json()
+            if data.get("status") == "OK" and data.get("result"):
+                newest = data["result"][0]["creationTimeSeconds"]
+                if newest <= cache.last_cf_submission_time:
+                    need_cf_fetch = False
+        except Exception as e:
+            print(f"CF recency check failed: {e}")
+            need_cf_fetch = False
 
-        combined = defaultdict(int)
-        for tag, cnt in cf_tags.items():
-            combined[tag] += cnt
-        for tag, cnt in lc_tags.items():
-            combined[tag] += cnt
+    if need_cf_fetch and cf_handle:
+        cf_att, new_cf_last, cf_tags = fetch_cf_category_attempts(cf_handle)
 
-        # Atomic upsert - safe even in race conditions
-        UserTagStats.objects(user_id=user_id).update_one(
-            upsert=True,
-            set__tags=dict(combined),
-            set__last_update=datetime.utcnow(),
-            set__last_cf_submission_time=cf_last,
-            set__last_lc_submission_time=lc_last
-        )
+    # ── LeetCode ────────────────────────────────────────────────────
+    need_lc_fetch = True
+    if cache and lc_handle:
+        try:
+            url = LC_SUBMISSIONS_API.format(lc_handle)
+            resp = requests.get(url, headers=HEADERS, timeout=5)
+            data = resp.json()
+            if data:
+                newest = max((int(s.get("timestamp", 0)) for s in data), default=0)
+                if newest <= cache.last_lc_submission_time:
+                    need_lc_fetch = False
+        except Exception as e:
+            print(f"LC recency check failed: {e}")
+            need_lc_fetch = False
+    
+    if need_lc_fetch and lc_handle:
+        lc_att, new_lc_last, lc_tags = fetch_lc_category_attempts(lc_handle)
+    
+        # In merge:
+    all_att = defaultdict(list)
+    for d in [cf_att, lc_att]:           # both — even if one is empty
+        for cat, lst in d.items():
+            all_att[cat].extend(lst)
+    # ── Compute scores ──────────────────────────────────────────────
+    scores = {}
 
-        return dict(sorted(combined.items(), key=lambda x: x[1], reverse=True))
+    for cat, atts in all_att.items():
+        if not atts:
+            continue
 
-    # Incremental update
-    new_cf_counts, new_cf_time = update_cf_tags(cf_handle, cache) if cf_handle else ({}, cache.last_cf_submission_time)
-    new_lc_counts, new_lc_time = update_lc_tags(lc_handle, cache) if lc_handle else ({}, cache.last_lc_submission_time)
+        solved_count = len(atts)
+        if solved_count == 0:
+            continue
 
-    # Merge new counts into existing
-    for tag, cnt in new_cf_counts.items():
-        cache.tags[tag] = cache.tags.get(tag, 0) + cnt
-    for tag, cnt in new_lc_counts.items():
-        cache.tags[tag] = cache.tags.get(tag, 0) + cnt
+        total_inverse = sum(1.0 / att for att in atts if att > 0)
+        avg_problem_score = total_inverse / solved_count
+        final_score = round(10.0 * avg_problem_score, 2)
 
-    # Atomic update cache
+        # Merge tags from both platforms
+        combined_tags = sorted(cf_tags.get(cat, set()) | lc_tags.get(cat, set()))
+
+        scores[cat] = {
+            "score": final_score,
+            "problem_count": solved_count,
+            "tags": combined_tags
+        }
+
+    # ── Update / create cache entry ────────────────────────────────
     UserTagStats.objects(user_id=user_id).update_one(
-        set__tags=cache.tags,
+        upsert=True,
+        set__category_scores=scores,
         set__last_update=datetime.utcnow(),
-        set__last_cf_submission_time=new_cf_time,
-        set__last_lc_submission_time=new_lc_time
+        set__last_cf_submission_time=new_cf_last,
+        set__last_lc_submission_time=new_lc_last
     )
 
-    return dict(sorted(cache.tags.items(), key=lambda x: x[1], reverse=True))
+    return scores

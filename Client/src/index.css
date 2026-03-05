@@ -477,3 +477,30 @@ body {
     background-position: -200% 0;
   }
 }
+
+/* react-calendar-heatmap overrides for LeetCode-like colors */
+.react-calendar-heatmap .color-empty {
+  fill: #ebedf0;
+}
+.react-calendar-heatmap .color-scale-1 {
+  fill: #ebedf0;
+}
+.react-calendar-heatmap .color-scale-2 {
+  fill: #c6e48b;
+}
+.react-calendar-heatmap .color-scale-3 {
+  fill: #7bc96f;
+}
+.react-calendar-heatmap .color-scale-4 {
+  fill: #196127;
+}
+
+/* Tooltip style (optional - if you want custom look) */
+.react-calendar-heatmap .tooltip {
+  background: #333;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+}

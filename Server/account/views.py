@@ -1,89 +1,49 @@
+#Server/account/views.py
+from collections import defaultdict
+import token
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 import jwt
-import hashlib
-import threading
-from datetime import datetime
+from rest_framework.permissions import AllowAny
+from mongoengine.errors import DoesNotExist
+from math import ceil
+import requests
+from datetime import datetime, timezone
 
-from .models import Account, IPAddress, DeviceFingerprint, UserTagStats, BannedAccount
+from .calendar import  fetch_codeforces_calendar,fetch_codechef_calendar, fetch_leetcode_calendar, fetch_atcoder_calendar, get_cached_calendar
+
+from .models import Account, PlatformCalendarCache, PlatformSubmissionCache, UserTagStats, PlatformContestCache, UserVerdictStats
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
-from admin.secret import ADMIN_SECRET_PASSWORD
-from .platforms import (
-    fetch_platform_rating,
-    fetch_codeforces_contests,
-    fetch_atcoder_contests,
-    fetch_leetcode_contests,
-    fetch_codechef_contests
-)
+from .platforms import fetch_codechef_contests, fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
+from submission.models import Submission
+from leaderboard.models import LeaderboardEntry
 from .platforms.codeforces import fetch_submissions as fetch_cf_submissions
 from .platforms.leetcode import fetch_submissions as fetch_leetcode_submissions
 from .platforms.codechef import fetch_submissions as fetch_codechef_submissions
 from .platforms.atcoder import fetch_submissions as fetch_atcoder_submissions
-from .tag_analysis import get_tag_stats
+
+from .tag_analysis import get_category_scores
+from .verdict_analysis import get_verdict_counts
+
 
 
 class SignupView(APIView):
     def post(self, request):
         serializer = SignupSerializer(data=request.data)
         if serializer.is_valid():
-            email = serializer.validated_data["email"]
-            
-            # Check if email is already registered and not deleted
-            if Account.objects(email=email, is_deleted=False).first():
+
+            # Duplicate email check
+            if Account.objects(email=serializer.validated_data["email"], is_deleted=False).first():
                 return Response({"error": "Email already exists"}, status=400)
-            
-            # Check if email is in banned accounts
-            banned_account = BannedAccount.objects(email=email).first()
-            if banned_account:
-                return Response({"error": "This email is banned from registration"}, status=403)
-            
-            # Get IP address from request
-            ip_address = self.get_client_ip(request)
-            
-            # Check if IP address is banned
-            banned_by_ip = BannedAccount.objects(ip_addresses__in=[ip_address]).first()
-            if banned_by_ip:
-                return Response({"error": "Your network/IP is banned from registration"}, status=403)
-            
-            # Get device fingerprint
-            device_fingerprint = self.generate_device_fingerprint(request)
-            
-            # Check if device is banned
-            banned_by_device = BannedAccount.objects(device_fingerprints__in=[device_fingerprint]).first()
-            if banned_by_device:
-                return Response({"error": "This device is banned from registration"}, status=403)
-            
-            role = serializer.validated_data.get("role", "user")
-            
-            # If role is admin, validate secret password
-            if role == "admin":
-                secret_password = request.data.get("secret_password")
-                if secret_password != ADMIN_SECRET_PASSWORD:
-                    return Response({"error": "Invalid admin secret password"}, status=400)
-            
-            # Create IP address object
-            ip_obj = IPAddress(
-                address=ip_address,
-                last_used=datetime.utcnow()
-            )
-            
-            # Create device fingerprint object
-            device_obj = DeviceFingerprint(
-                fingerprint=device_fingerprint,
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
-                last_used=datetime.utcnow()
-            )
-            
+
             user = Account(
                 name=serializer.validated_data["name"],
-                email=email,
-                role=role,
+                email=serializer.validated_data["email"],
+                role=serializer.validated_data.get("role", "user"),
                 year=serializer.validated_data.get("year"),
                 department=serializer.validated_data.get("department"),
-                ip_addresses=[ip_obj],  # Store as IPAddress object
-                device_fingerprints=[device_obj]  # Store as DeviceFingerprint object
             )
             user.set_password(serializer.validated_data["password"])
             user.save()
@@ -91,25 +51,6 @@ class SignupView(APIView):
             return Response({"message": "Account created successfully"}, status=201)
 
         return Response(serializer.errors, status=400)
-    
-    def get_client_ip(self, request):
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
-    
-    def generate_device_fingerprint(self, request):
-        """Generate a simple device fingerprint"""
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
-        accept_language = request.META.get('HTTP_ACCEPT_LANGUAGE', '')
-        accept_encoding = request.META.get('HTTP_ACCEPT_ENCODING', '')
-        
-        # Create a fingerprint string
-        fingerprint_string = f"{user_agent}:{accept_language}:{accept_encoding}"
-        return hashlib.sha256(fingerprint_string.encode()).hexdigest()
-
 
 class LoginView(APIView):
     def post(self, request):
@@ -132,7 +73,6 @@ class LoginView(APIView):
             "user_id": str(user.id),
             "email": user.email,
             "role": user.role,
-            "name": user.name,
         }
 
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
@@ -176,8 +116,6 @@ class UserProfileView(APIView):
                 "contests_count": user.contests_count,
                 "rating": user.rating,
                 "badge": user.badge,
-                "profile_photo": user.profile_photo,
-                "total_submissions": user.get_total_submissions(),
                 "platform_profiles": [],
                 "created_at": user.created_at.isoformat() if user.created_at else None
             }
@@ -202,13 +140,55 @@ class UserProfileView(APIView):
             return Response({"error": str(e)}, status=400)
 
 
+class PublicUserProfileView(APIView):
+    """
+    Public endpoint to view another user's profile (no auth required for basic info)
+    """
+    permission_classes = [AllowAny]  # Public access
+
+    def get(self, request, user_id):
+        try:
+            user = Account.objects.get(id=user_id, is_deleted=False, is_inactive=False)
+        except (DoesNotExist, Exception):
+            return Response({"error": "User not found or inactive"}, status=404)
+
+        # Prepare public-safe data (do NOT expose email, password, etc.)
+        profile_data = {
+            "id": str(user.id),
+            "name": user.name,
+            "department": user.department,
+            "year": user.year,
+            "total_score": user.total_score,
+            "global_rank": user.global_rank,
+            "problems_solved": user.problems_solved,
+            "contests_count": user.contests_count,
+            "rating": user.rating,
+            "badge": user.badge,
+            "platform_profiles": [],
+            "created_at": user.created_at.isoformat() if user.created_at else None
+        }
+
+        # Only include public platform info
+        for profile in user.platform_profiles:
+            profile_data["platform_profiles"].append({
+                "platform": profile.platform,
+                "handle": profile.handle,
+                "current_rating": profile.current_rating,
+                "max_rating": profile.max_rating,
+                "min_rating": profile.min_rating,
+                "contests_count": profile.contests_count,
+                "badge": profile.badge,
+                # Do NOT include sensitive fields like rating_history if private
+            })
+
+        return Response(profile_data)
+
 class AddPlatformProfileView(APIView):
     """Add or update coding platform profile"""
     
     def post(self, request):
         serializer = AddPlatformSerializer(data=request.data)
         if not serializer.is_valid():
-            print(f"Serializer validation failed: {serializer.errors}")
             return Response(serializer.errors, status=400)
         
         # Get current user
@@ -232,6 +212,8 @@ class AddPlatformProfileView(APIView):
         
         # Fetch rating data from the platform with a cross-platform timeout
         try:
+            import threading
+
             result = {"data": None, "error": None}
 
             def _fetch():
@@ -243,7 +225,7 @@ class AddPlatformProfileView(APIView):
             th = threading.Thread(target=_fetch, daemon=True)
             th.start()
 
-            # wait up to 45 seconds for the fetch to complete
+            # wait up to 15 seconds for the fetch to complete
             th.join(timeout=45)
 
             if th.is_alive():
@@ -252,15 +234,9 @@ class AddPlatformProfileView(APIView):
                 }, status=408)
 
             if result['error']:
-                print(f"Platform fetch error for {platform}/{handle}: {result['error']}")
                 return Response({"error": str(result['error'])}, status=400)
 
             rating_data = result['data'] or {}
-
-            # Convert rank to string if it's a number (LeetCode returns integers)
-            rank_value = rating_data.get('rank')
-            if rank_value is not None and not isinstance(rank_value, str):
-                rank_value = str(rank_value)
 
             user.add_or_update_platform(
                 platform,
@@ -269,13 +245,20 @@ class AddPlatformProfileView(APIView):
                 rating_data.get('max_rating', 0),
                 rating_data.get('min_rating', 0),
                 rating_data.get('contests_count', 0),
-                rank_value,
-                rating_data.get('badge'),
+                rating_data.get('badge', ''),
                 rating_data.get('rating_history', [])
             )
 
-            # Reset tag stats for full re-fetch
+           # Reset timestamps for the changed platform (forces full re-fetch)
+            
             UserTagStats.objects(user_id=str(user.id)).delete()
+            UserVerdictStats.objects(user_id=str(user.id)).delete()
+
+            # Invalidate caches for this platform to force re-fetch on next access
+            user.contest_cache = [c for c in user.contest_cache if c.platform != platform]
+            user.submission_cache = [c for c in user.submission_cache if c.platform != platform]
+            user.calendar_cache = [c for c in user.calendar_cache if c.platform != platform]
+            user.save()
            
             return Response({
                 "message": "Platform profile added successfully",
@@ -287,12 +270,40 @@ class AddPlatformProfileView(APIView):
             return Response({"error": str(e)}, status=400)
 
 
+def fetch_platform_rating(platform, handle):
+    """
+    Fetch rating data from different coding platforms
+    (Delegated to platforms.py)
+    """
+    from .platforms import fetch_platform_rating as platform_fetch
+    return platform_fetch(platform, handle)
+
+
+def fetch_codeforces_rating(handle):
+    """Deprecated: Use platforms.fetch_codeforces_rating instead"""
+    from .platforms import fetch_codeforces_rating as platform_fetch
+    return platform_fetch(handle)
+
+
+def fetch_codechef_rating(handle):
+    """Deprecated: Use platforms.fetch_codechef_rating instead"""
+    from .platforms import fetch_codechef_rating as platform_fetch
+    return platform_fetch(handle)
+
+
+def fetch_atcoder_rating(handle):
+    """Deprecated: Use platforms.fetch_atcoder_rating instead"""
+    from .platforms import fetch_atcoder_rating as platform_fetch
+    return platform_fetch(handle)
+
+def fetch_leetcode_rating(handle):
+    """Deprecated: Use platforms.fetch_leetcode_rating instead"""
+    from .platforms import fetch_leetcode_rating as platform_fetch
+    return platform_fetch(handle)
+
 class ContestHistoryView(APIView):
-    """Get contest history from various platforms"""
-    
     def get(self, request, user_id=None):
         if user_id is None:
-            # Get current user from token
             auth_header = request.headers.get('Authorization', '')
             if auth_header.startswith('Bearer '):
                 token = auth_header[7:]
@@ -303,275 +314,392 @@ class ContestHistoryView(APIView):
                     return Response({"error": "Invalid token"}, status=401)
             else:
                 return Response({"error": "Unauthorized"}, status=401)
-        
+
         try:
             user = Account.objects(id=user_id, is_deleted=False).first()
             if not user:
                 return Response({"error": "User not found"}, status=404)
-            
-            platform = request.GET.get('platform')
-            if not platform:
-                return Response({"error": "Platform parameter required"}, status=400)
-            
-            # Handle 'all' platform - fetch from all platforms
-            if platform == 'all':
-                all_contests = []
-                for profile in user.platform_profiles:
-                    # Check cache first
-                    cache = user.get_contest_cache(profile.platform, profile.handle)
-                    if cache and cache.last_fetched:
-                        from datetime import timedelta
-                        if datetime.utcnow() - cache.last_fetched < timedelta(hours=1):
-                            all_contests.extend(cache.contests)
-                            continue
-                    
-                    # Fetch fresh data
-                    try:
-                        contests = []
-                        if profile.platform == "codeforces":
-                            contests = fetch_codeforces_contests(profile.handle)
-                        elif profile.platform == "atcoder":
-                            contests = fetch_atcoder_contests(profile.handle)
-                        elif profile.platform == "leetcode":
-                            contests = fetch_leetcode_contests(profile.handle)
-                        elif profile.platform == "codechef":
-                            contests = fetch_codechef_contests(profile.handle)
-                        
-                        # Update cache
-                        user.update_contest_cache(profile.platform, profile.handle, contests)
-                        all_contests.extend(contests)
-                    except Exception as e:
-                        print(f"Error fetching contests for {profile.platform}/{profile.handle}: {e}")
-                        continue
-                
-                return Response({
-                    "platform": "all",
-                    "contests": all_contests,
-                    "cached": False
-                })
-            
-            # Handle 'internal' platform - this should fetch from your internal contest system
-            if platform == 'internal':
-                # TODO: Implement internal contest history fetching
-                return Response({
-                    "platform": "internal",
-                    "contests": [],
-                    "cached": False,
-                    "message": "Internal contest history not yet implemented"
-                })
-            
-            profile = user.get_platform_profile(platform)
-            if not profile:
-                return Response({"error": f"No {platform} profile found"}, status=404)
-            
-            # Check cache first
-            cache = user.get_contest_cache(platform, profile.handle)
-            if cache and cache.last_fetched:
-                # Return cached data if fresh (less than 1 hour old)
-                from datetime import timedelta
-                if datetime.utcnow() - cache.last_fetched < timedelta(hours=1):
-                    return Response({
-                        "platform": platform,
-                        "handle": profile.handle,
-                        "contests": cache.contests,
-                        "cached": True,
-                        "last_updated": cache.last_fetched.isoformat()
-                    })
-            
-            # Fetch fresh data
+
+            # ── Platform filter ────────────────────────────────────────
+            platform_filter = request.query_params.get('platform', 'all').lower()
+            valid_platforms = {'all', 'codeforces', 'atcoder', 'codechef', 'leetcode', 'internal'}
+            if platform_filter not in valid_platforms:
+                platform_filter = 'all'
+
             contests = []
-            if platform == "codeforces":
-                contests = fetch_codeforces_contests(profile.handle)
-            elif platform == "atcoder":
-                contests = fetch_atcoder_contests(profile.handle)
-            elif platform == "leetcode":
-                contests = fetch_leetcode_contests(profile.handle)
-            elif platform == "codechef":
-                contests = fetch_codechef_contests(profile.handle)
-            
-            # Update cache
-            user.update_contest_cache(platform, profile.handle, contests)
-            
+
+            # Internal contests
+            leaderboard_entries = LeaderboardEntry.objects(user=user).order_by('-last_updated')
+            for entry in leaderboard_entries:
+                contest = entry.contest
+                entry_platform = contest.platform or "internal"
+
+                if platform_filter == 'all' or platform_filter == entry_platform:
+                    contests.append({
+                        "id": str(contest.id),
+                        "title": contest.title,
+                        "date": contest.start_time.isoformat() if contest.start_time else None,
+                        "rank": entry.rank,
+                        "score": entry.total_score,
+                        "platform": entry_platform,
+                        "status": contest.status,
+                        "type": contest.type or "general",
+                    })
+
+            # External platforms (cached or fresh)
+            CACHE_VALID_FOR_HOURS = 3   # ← keep your value
+
+            for profile in user.platform_profiles:
+                if platform_filter != 'all' and platform_filter != profile.platform:
+                    continue  # skip platforms user didn't ask for
+
+                cache_entry = next(
+                    (c for c in user.contest_cache
+                     if c.platform == profile.platform and c.handle == profile.handle),
+                    None
+                )
+
+                fetch_needed = True
+                if cache_entry and cache_entry.last_fetched:
+                    age_hours = (datetime.utcnow() - cache_entry.last_fetched).total_seconds() / 3600
+                    if age_hours < CACHE_VALID_FOR_HOURS:
+                        fetch_needed = False
+                        contests.extend(cache_entry.contests)
+
+                if fetch_needed:
+                    try:
+                        if profile.platform == "codeforces":
+                            fresh = fetch_codeforces_contests(profile.handle)
+                        elif profile.platform == "atcoder":
+                            fresh = fetch_atcoder_contests(profile.handle)
+                        elif profile.platform == "leetcode":
+                            fresh = fetch_leetcode_contests(profile.handle)
+                        elif profile.platform == "codechef":
+                            fresh = fetch_codechef_contests(profile.handle)
+                        else:
+                            fresh = []
+
+                        if fresh:
+                            if cache_entry:
+                                cache_entry.contests = fresh
+                                cache_entry.last_fetched = datetime.utcnow()
+                            else:
+                                user.contest_cache.append(PlatformContestCache(
+                                    platform=profile.platform,
+                                    handle=profile.handle,
+                                    contests=fresh,
+                                    last_fetched=datetime.utcnow()
+                                ))
+                            user.save()
+
+                            contests.extend(fresh)
+
+                    except Exception:
+                        if cache_entry:
+                            contests.extend(cache_entry.contests)
+
+            # Sort newest first
+            contests.sort(key=lambda x: x.get('date', ''), reverse=True)
+
             return Response({
-                "platform": platform,
-                "handle": profile.handle,
+                "total_contests": len(contests),
                 "contests": contests,
-                "cached": False
+                "applied_filter": platform_filter,
             })
+
         except Exception as e:
             return Response({"error": str(e)}, status=400)
-
 
 class ExternalSubmissionView(APIView):
-    """Get external platform submissions"""
-    
+    """
+    Fetch submissions from external platforms (Codeforces, etc.)
+    """
+
     def get(self, request):
-        # Get current user from token
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
+        # Auth
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
             return Response({"error": "Unauthorized"}, status=401)
-        
+
         try:
             token = auth_header[7:]
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-            user_id = payload.get('user_id')
+            user_id = payload.get("user_id")
         except:
             return Response({"error": "Invalid token"}, status=401)
-        
+
         user = Account.objects(id=user_id, is_deleted=False).first()
         if not user:
             return Response({"error": "User not found"}, status=404)
-        
-        platform = request.GET.get('platform')
-        limit = int(request.GET.get('limit', 100))
-        
-        if not platform:
-            return Response({"error": "Platform parameter required"}, status=400)
-        
-        # Handle 'all' platform - fetch from all platforms
-        if platform == 'all':
-            all_submissions = []
-            for profile in user.platform_profiles:
-                try:
-                    print(f"Fetching submissions for {profile.platform}/{profile.handle}...")
-                    submissions = []
-                    if profile.platform == "codeforces":
-                        submissions = fetch_cf_submissions(profile.handle, limit)
-                    elif profile.platform == "leetcode":
-                        submissions = fetch_leetcode_submissions(profile.handle, limit)
-                    elif profile.platform == "codechef":
-                        submissions = fetch_codechef_submissions(profile.handle, limit)
-                    elif profile.platform == "atcoder":
-                        submissions = fetch_atcoder_submissions(profile.handle, limit)
-                    
-                    print(f"✓ Fetched {len(submissions)} submissions from {profile.platform}")
-                    all_submissions.extend(submissions)
-                except Exception as e:
-                    print(f"✗ Error fetching submissions for {profile.platform}/{profile.handle}: {e}")
-                    continue
-            
-            print(f"Total submissions fetched: {len(all_submissions)}")
-            return Response({
-                "platform": "all",
-                "submissions": all_submissions,
-                "count": len(all_submissions)
-            })
-        
-        profile = user.get_platform_profile(platform)
-        if not profile:
-            return Response({"error": f"No {platform} profile found"}, status=404)
-        
-        try:
-            submissions = []
-            if platform == "codeforces":
-                submissions = fetch_cf_submissions(profile.handle, limit)
-            elif platform == "leetcode":
-                submissions = fetch_leetcode_submissions(profile.handle, limit)
-            elif platform == "codechef":
-                submissions = fetch_codechef_submissions(profile.handle, limit)
-            elif platform == "atcoder":
-                submissions = fetch_atcoder_submissions(profile.handle, limit)
-            
-            return Response({
-                "platform": platform,
-                "handle": profile.handle,
-                "submissions": submissions,
-                "count": len(submissions)
-            })
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
 
+        CACHE_VALID_HOURS = 2
+        submissions = []
+
+        for profile in user.platform_profiles:
+            cache_entry = next(
+                (c for c in user.submission_cache
+                 if c.platform == profile.platform and c.handle == profile.handle),
+                None
+            )
+
+            age_ok = False
+            if cache_entry and cache_entry.last_fetched:
+                age = (datetime.utcnow() - cache_entry.last_fetched).total_seconds() / 3600
+                age_ok = age < CACHE_VALID_HOURS
+
+            if age_ok and cache_entry.submissions:
+                submissions.extend(cache_entry.submissions)
+                continue
+
+            # fetch live
+            try:
+                if profile.platform == "codeforces":
+                    fresh = fetch_cf_submissions(profile.handle, limit=150)
+                elif profile.platform == "leetcode":
+                    fresh = fetch_leetcode_submissions(profile.handle, limit=150)
+                elif profile.platform == "codechef":
+                    fresh = fetch_codechef_submissions(profile.handle, limit=21)
+                elif profile.platform == "atcoder":
+                    fresh = fetch_atcoder_submissions(profile.handle)
+                else:
+                    fresh = []
+
+                if fresh:
+                    # update or create cache
+                    if cache_entry:
+                        cache_entry.submissions = fresh
+                        cache_entry.last_fetched = datetime.utcnow()
+                        cache_entry.count = len(fresh)
+                        cache_entry.fetch_status = "success"
+                    else:
+                        user.submission_cache.append(PlatformSubmissionCache(
+                            platform=profile.platform,
+                            handle=profile.handle,
+                            submissions=fresh,
+                            last_fetched=datetime.utcnow(),
+                            count=len(fresh),
+                            fetch_status="success"
+                        ))
+                    user.save()
+
+                submissions.extend(fresh)
+
+            except Exception as exc:
+                # fallback to cache even if stale
+                if cache_entry and cache_entry.submissions:
+                    submissions.extend(cache_entry.submissions)
+
+        # sort newest first
+        submissions.sort(key=lambda x: x.get("submitted_at", ""), reverse=True)
+
+        return Response({
+            "submissions": submissions[:300],  # safety limit
+            "cached": True,                        # optional frontend hint
+            "total_fetched": len(submissions)
+        })
 
 class TagStatsView(APIView):
-    """Get user's tag statistics from external platforms"""
-    
     def get(self, request):
-        # Get current user from token
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
             return Response({"error": "Unauthorized"}, status=401)
-        
+
         try:
             token = auth_header[7:]
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-            user_id = payload.get('user_id')
+            user_id = payload.get("user_id")
         except:
             return Response({"error": "Invalid token"}, status=401)
-        
+
         user = Account.objects(id=user_id, is_deleted=False).first()
         if not user:
             return Response({"error": "User not found"}, status=404)
-        
-        # Check if user has any platform profiles
-        if not user.platform_profiles:
-            return Response({"error": "No platform profiles found. Please add a platform first."}, status=404)
-        
-        try:
-            # Get tag statistics (uses caching internally)
-            tag_stats = get_tag_stats(user)
-            
-            return Response({
-                "user_id": str(user.id),
-                "tags": tag_stats,
-                "total_tags": len(tag_stats),
-                "total_problems": sum(tag_stats.values())
-            })
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
 
+        category_scores = get_category_scores(user)
 
-class UpdateProfileView(APIView):
-    """Update user profile including name, department, year, and profile photo"""
-    
-    def put(self, request):
-        # Get current user from token
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return Response({"error": "Unauthorized"}, status=401)
-        
-        try:
-            token = auth_header[7:]
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-            user_id = payload.get('user_id')
-        except:
-            return Response({"error": "Invalid token"}, status=401)
-        
-        user = Account.objects(id=user_id, is_deleted=False).first()
-        if not user:
-            return Response({"error": "User not found"}, status=404)
-        
-        # Update allowed fields
-        if 'name' in request.data:
-            user.name = request.data['name']
-        if 'department' in request.data:
-            user.department = request.data['department']
-        if 'year' in request.data:
-            user.year = request.data['year']
-        if 'profile_photo' in request.data:
-            user.profile_photo = request.data['profile_photo']
-        
-        user.save()
-        
-        # Update token user data
-        updated_payload = {
-            "user_id": str(user.id),
-            "email": user.email,
-            "role": user.role,
-            "name": user.name
-        }
-        
-        updated_token = jwt.encode(updated_payload, settings.SECRET_KEY, algorithm="HS256")
-        
         return Response({
-            "message": "Profile updated successfully",
-            "token": updated_token,
-            "user": {
-                "id": str(user.id),
-                "name": user.name,
-                "email": user.email,
-                "department": user.department,
-                "year": user.year,
-                "profile_photo": user.profile_photo,
-                "role": user.role
+            "category_scores": category_scores,
+            "note": "Proficiency scores per category based on average attempts needed to solve problems (higher score means fewer attempts, max 10)"
+        }) 
+
+class VerdictStatsView(APIView):
+    def get(self, request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return Response({"error": "Unauthorized"}, status=401)
+
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        verdict_counts = get_verdict_counts(user)
+
+        return Response({
+            "verdict_counts": verdict_counts,
+            "note": "Submission verdict distribution across all connected platforms (based on all historical submissions where available)"
+        })
+
+class LeetCodeCalendarView(APIView):
+    def get(self, request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return Response({"error": "Unauthorized"}, status=401)
+
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        # find leetcode handle
+        profile = user.get_platform_profile("leetcode")
+        if not profile:
+            return Response({"error": "LeetCode not connected"}, status=400)
+
+        year = request.query_params.get("year")
+
+        try:
+            data = fetch_leetcode_calendar(profile.handle, year)
+            return Response(data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+        
+class CodeChefCalendarView(APIView):
+    def get(self, request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return Response({"error": "Unauthorized"}, status=401)
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+        # find codechef handle
+        profile = user.get_platform_profile("codechef")
+        if not profile:
+            return Response({"error": "CodeChef not connected"}, status=400)
+        year = request.query_params.get("year")
+        try:
+            data = fetch_codechef_calendar(profile.handle, year)
+            return Response(data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+        
+class AtCoderCalendarView(APIView):
+    def get(self, request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return Response({"error": "Unauthorized"}, status=401)
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        profile = user.get_platform_profile("atcoder")
+        if not profile:
+            return Response({"error": "AtCoder not connected"}, status=400)
+
+        year = request.query_params.get("year")
+        try:
+            data = fetch_atcoder_calendar(profile.handle, year)
+            return Response(data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+        
+class CodeforcesCalendarView(APIView):
+    def get(self, request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return Response({"error": "Unauthorized"}, status=401)
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+        except:
+            return Response({"error": "Invalid token"}, status=401)
+
+        user = Account.objects(id=user_id, is_deleted=False).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        profile = user.get_platform_profile("codeforces")
+
+        cache = get_cached_calendar(user, "codeforces", profile.handle)
+
+        CACHE_VALID_HOURS = 12
+
+        fetch_needed = True
+        if cache and cache.last_fetched:
+            age = (datetime.utcnow() - cache.last_fetched).total_seconds() / 3600
+            if age < CACHE_VALID_HOURS:
+                fetch_needed = False
+
+        if fetch_needed:
+            full_data = fetch_codeforces_calendar(profile.handle)  # 🚀 fetch ONCE
+
+            calendar = full_data["submissionCalendar"]
+            streak = full_data["streak"]
+            active_years = full_data["activeYears"]
+            total = full_data["total_submissions"]
+
+            if cache:
+                cache.calendar = calendar
+                cache.streak = streak
+                cache.active_years = active_years
+                cache.total = total
+                cache.last_fetched = datetime.utcnow()
+            else:
+                user.calendar_cache.append(PlatformCalendarCache(
+                    platform="codeforces",
+                    handle=profile.handle,
+                    calendar=calendar,
+                    streak=streak,
+                    active_years=active_years,
+                    total=total,
+                    last_fetched=datetime.utcnow()
+                ))
+
+            user.save()
+        else:
+            calendar = cache.calendar
+            streak = cache.streak
+            active_years = cache.active_years
+            total = cache.total
+
+        # 🔥 Year filter (FAST — local dict filter)
+        year = request.query_params.get("year")
+        if year:
+            y = int(year)
+            calendar = {
+                k: v for k, v in calendar.items()
+                if datetime.fromtimestamp(int(k), tz=timezone.utc).year == y
             }
+
+        return Response({
+            "submissionCalendar": calendar,
+            "streak": streak,
+            "activeYears": active_years,
+            "total_submissions": total
         })

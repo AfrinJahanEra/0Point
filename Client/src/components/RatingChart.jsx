@@ -31,7 +31,7 @@ const platformColors = {
   codeforces: '#3b82f6',
   codechef:   '#8b5cf6',
   atcoder:    '#ef4444',
-  leetcode:   '#f59e0b',
+  leetcode:   '#5a9570',
 };
 
 const platformNames = {

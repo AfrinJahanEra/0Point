@@ -19,7 +19,6 @@ import Leaderboard from './pages/Leaderboard';
 import Blog from './pages/Blog';
 import Community from './pages/Community';
 import Dashboard from './pages/Dashboard';
-import Profile from './pages/Profile';
 import CreateBlog from './pages/CreateBlog';
 import Submissions from './pages/Submissions';
 import Interview from './pages/Interview';  // Updated import
@@ -39,9 +38,8 @@ import TestContestLeaderboard  from './pages/TestContestLeaderboard';
 import TestContestSubmission from './pages/TestContestSubmission';
 import BlogDetail from './pages/BlogDetail';
 import Recording from './pages/Recording';
-import AdminDashboard from './pages/AdminDashboard';
 import ContestHistory from './pages/ContestHistory';
-import ChatBot from './components/ChatBot';
+import PublicDashboard from './pages/PublicDashboard';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -88,9 +86,9 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
-// Public Route Component (redirects based on role if already logged in)
+// Public Route Component (redirects to contests if already logged in)
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, loading, user } = useApp();
+  const { isAuthenticated, loading } = useApp();
   
   if (loading) {
     return (
@@ -103,12 +101,7 @@ const PublicRoute = ({ children }) => {
     );
   }
   
-  if (isAuthenticated) {
-    // Redirect based on user role
-    return <Navigate to={user?.role === "admin" ? "/admin" : "/home"} />;
-  }
-  
-  return children;
+  return !isAuthenticated ? children : <Navigate to="/contests" />;
 };
 function App() {
   return (
@@ -322,12 +315,6 @@ function App() {
                 <Blog />
               </NavLayout>
             } />
-           
-            <Route path="/profile" element={
-              <Layout>
-                <Profile />
-              </Layout>
-            } />
 
             <Route path="/blog/:id" element={
               <NavLayout>
@@ -338,6 +325,12 @@ function App() {
             <Route path="/dashboard" element={
               <NavLayout>
                 <Dashboard />
+              </NavLayout>
+            } />
+
+            <Route path="/user/:userId" element={
+              <NavLayout>
+                <PublicDashboard />
               </NavLayout>
             } />
            
@@ -352,26 +345,19 @@ function App() {
                 <Submissions />
               </NavLayout>
             } />
+
+            <Route path="/contest-history" element={
+              <NavLayout>
+                <ContestHistory />
+              </NavLayout>
+            } />
            
             <Route path="/interview" element={
               <NavLayout>
                 <Interview />
               </NavLayout>
             } />
-            
-            <Route path="/contest-history" element={
-              <NavLayout>
-                <ContestHistory />
-              </NavLayout>
-            } />
-            
-            <Route path="/admin" element={
-              <FullScreenLayout>
-                <AdminDashboard />
-              </FullScreenLayout>
-            } />
           </Routes>
-          <ChatBot />
         </div>
       </Router>
     </AppProvider>
