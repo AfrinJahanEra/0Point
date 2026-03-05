@@ -1211,7 +1211,9 @@ const CreateContest = () => {
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Input
                           </label>
-                          <textarea
+
+                          <div className="flex gap-1">
+                            <textarea
                             value={testCase.input}
                             onChange={(e) => {
                               const updatedTestCases = currentProblem.testCases.map(tc =>
@@ -1223,12 +1225,41 @@ const CreateContest = () => {
                             className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
                             placeholder="Input..."
                           />
+                            <label className="cursor-pointer px-2 py-1 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 flex items-center gap-1 text-xs">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+                              Upload
+                              <input
+          type="file"
+          accept=".txt"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const updatedTestCases = currentProblem.testCases.map(tc =>
+                  tc.id === testCase.id ? { ...tc, input: event.target.result } : tc
+                );
+                handleProblemChange(currentProblem.id, 'testCases', updatedTestCases);
+              };
+              reader.readAsText(file);
+            }
+            // Clear the input so the same file can be uploaded again
+            e.target.value = '';
+          }}
+        />
+                            </label>
+                          </div>
+                          
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Expected Output
                           </label>
-                          <textarea
+                          <div className="flex gap-1">
+                            <textarea
                             value={testCase.output}
                             onChange={(e) => {
                               const updatedTestCases = currentProblem.testCases.map(tc =>
@@ -1240,6 +1271,34 @@ const CreateContest = () => {
                             className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono text-xs"
                             placeholder="Expected output..."
                           />
+                             <label className="cursor-pointer px-2 py-1 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 flex items-center gap-1 text-xs">
+                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+                               Upload
+                               <input
+          type="file"
+          accept=".txt"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const updatedTestCases = currentProblem.testCases.map(tc =>
+                  tc.id === testCase.id ? { ...tc, output: event.target.result } : tc
+                );
+                handleProblemChange(currentProblem.id, 'testCases', updatedTestCases);
+              };
+              reader.readAsText(file);
+            }
+            // Clear the input so the same file can be uploaded again
+            e.target.value = '';
+          }}
+        />
+                             </label>
+                          </div>
+                          
                         </div>
                       </div>
                       <div>
@@ -2008,4 +2067,8 @@ const CreateContest = () => {
   );
 };
 
+
 export default CreateContest;
+
+
+

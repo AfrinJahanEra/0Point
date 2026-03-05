@@ -34,6 +34,10 @@ from .views import (
     ContestRecordingSettingsAPIView,
     ContestRecordingsListAPIView,
     ContestUserRecordingsAPIView,
+    UpcomingContestListCreateAPIView,
+    PastContestsListCreateView,
+    SoonestUpcomingContestView,
+    LiveContestsView
 )
 
 from compiler.views import (
@@ -91,29 +95,37 @@ from testcontest.views import (
 )
 
 urlpatterns = [
-    path('contests/', ContestListCreateAPIView.as_view()),
-    path('contests/registrations/', MyContestRegistrationsAPIView.as_view()),
-    path('contests/create-full/', ContestFullCreateAPIView.as_view(), name='create-full'),
-    path('contests/<contest_id>/', ContestDetailAPIView.as_view()),
-    path('contests/<contest_id>/register/', ContestRegisterAPIView.as_view()),
-    path('contests/<contest_id>/publish/', ContestPublishAPIView.as_view(), name='publish-contest'),
-    path('contests/<contest_id>/update/', ContestUpdateAPIView.as_view(), name='update-contest'),
-    path('contests/<contest_id>/problems/', ContestProblemsAPIView.as_view(), name='contest-problems'),
-    # IMPORTANT: Put the specific 'status' route BEFORE the generic problem_index route
-    path('contests/<contest_id>/problems/status/', UserProblemStatusAPIView.as_view(), name='user-problem-status'),
-    path('contests/<contest_id>/problems/<problem_index>/', ContestProblemDetailAPIView.as_view(), name='contest-problem-detail'),
-    path('contests/<contest_id>/problems/<problem_index>/tutorial/', ContestProblemTutorialAPIView.as_view(), name='contest-problem-tutorial'),
-    path('contests/<contest_id>/editorial/', ContestEditorialAPIView.as_view(), name='contest-editorial'),
-    path('contests/<contest_id>/announcements/', ContestAnnouncementsAPIView.as_view(), name='contest-announcements'),
-    path('announcements/create/', AnnouncementCreateAPIView.as_view(), name='announcement-create'),   
-    path('contests/<str:contest_id>/standings/', LeaderboardView.as_view()), 
-    path('contests/<str:contest_id>/submissions/', ContestSubmissionsAPIView.as_view(), name='contest-submissions'),
-    # Keep this for problem submissions:
-    path('problems/<str:problem_id>/submissions/', SubmissionListByProblemAPIView.as_view(), name='problem-submissions'),
-    path('contests/<str:contest_id>/problems/list/', ContestProblemsListAPIView.as_view(), name='contest-problems-list'),
-    # path('submissions/create/', SubmissionCreateAPIView.as_view(), name='submission-create'),
-    path('contests/<str:contest_id>/editorial/', ContestEditorialAPIView.as_view()),
-    # path('contests/<str:contest_id>/execute/', CodeExecuteAPIView.as_view(), name='code-execute'),
+    # In your urls.py - CORRECT ORDER (specific first, generic last)
+
+# FIRST: All specific named routes without parameters
+path('contests/soonest/', SoonestUpcomingContestView.as_view(), name='soonest-upcoming-contest'),
+path('contests/upcoming/', UpcomingContestListCreateAPIView.as_view(), name='upcoming-contests'),
+path('contests/past/', PastContestsListCreateView.as_view(), name='past-contests'),
+path('contests/live/', LiveContestsView.as_view(), name='live-contests'),
+path('contests/registrations/', MyContestRegistrationsAPIView.as_view()),
+path('contests/create-full/', ContestFullCreateAPIView.as_view(), name='create-full'),
+
+# NEXT: Routes with specific action names (like problems/status)
+path('contests/<contest_id>/problems/status/', UserProblemStatusAPIView.as_view(), name='user-problem-status'),
+path('contests/<contest_id>/problems/list/', ContestProblemsListAPIView.as_view(), name='contest-problems-list'),
+path('contests/<contest_id>/problems/<problem_index>/', ContestProblemDetailAPIView.as_view(), name='contest-problem-detail'),
+path('contests/<contest_id>/problems/<problem_index>/tutorial/', ContestProblemTutorialAPIView.as_view(), name='contest-problem-tutorial'),
+path('contests/<contest_id>/editorial/', ContestEditorialAPIView.as_view(), name='contest-editorial'),
+path('contests/<contest_id>/announcements/', ContestAnnouncementsAPIView.as_view(), name='contest-announcements'),
+path('contests/<contest_id>/standings/', LeaderboardView.as_view()), 
+path('contests/<contest_id>/submissions/', ContestSubmissionsAPIView.as_view(), name='contest-submissions'),
+path('contests/<contest_id>/problems/', ContestProblemsAPIView.as_view(), name='contest-problems'),
+
+# THEN: Routes with simple parameters (register, publish, update)
+path('contests/<contest_id>/register/', ContestRegisterAPIView.as_view()),
+path('contests/<contest_id>/publish/', ContestPublishAPIView.as_view(), name='publish-contest'),
+path('contests/<contest_id>/update/', ContestUpdateAPIView.as_view(), name='update-contest'),
+
+# LAST: The most generic route - this catches ANY contest_id
+path('contests/<contest_id>/', ContestDetailAPIView.as_view()),
+
+# FINALLY: The base list route (this is fine at the end)
+path('contests/', ContestListCreateAPIView.as_view()),
 
     # Discussion endpoints
     path('contests/<contest_id>/discussions/', DiscussionListCreateAPIView.as_view(), name='contest-discussions'),

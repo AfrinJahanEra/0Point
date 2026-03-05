@@ -153,6 +153,39 @@ function App() {
                 <Home />
               </Layout>
             } />
+
+
+
+            
+            <Route path="/contests/upcoming" element={
+              <Layout>
+                <Home />
+              </Layout>
+            } />
+
+            <Route path="/contests/past" element={
+              <Layout>
+                <Home />
+              </Layout>
+            } />
+
+            <Route path="/contests/live" element={
+              <Layout>
+                <Home />
+              </Layout>
+            } />
+
+            <Route path="/contests/soonest" element={
+              <Layout>
+                <Home />
+              </Layout>
+            } />
+
+            <Route path="/contests/:contestId" element={
+              <Layout>
+                <ContestInside />
+              </Layout>
+            } />
            
             {/* Contest-specific routes */}
             <Route path="/contests/:contestId/register" element={
@@ -273,6 +306,9 @@ function App() {
                 <Leaderboard />
               </Layout>
             } />
+           
+           <Route path="/account/profile/:user_id/" element={<Profile />} />
+           
            
             <Route path="/community" element={
               <Layout>

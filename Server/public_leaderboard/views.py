@@ -6,7 +6,7 @@ from rest_framework import status
 
 from account.models import Account
 from contest.models import ContestRegistration
-from .serializers import LeaderboardSerializer
+from .serializers import LeaderboardMinimalSerializer, LeaderboardSerializer
 
 
 class GlobalLeaderboardView(APIView):
@@ -30,6 +30,7 @@ class GlobalLeaderboardView(APIView):
             ).count()
 
             leaderboard_data.append({
+                "user_id": str(user.id),
                 "username": user.name,
                 "total_points": user.rating,
                 "department": user.department,
@@ -41,3 +42,29 @@ class GlobalLeaderboardView(APIView):
 
         serializer = LeaderboardSerializer(leaderboard_data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class LeaderboardMinimalView(APIView):
+
+    def get(self, request):
+        # Fetch active users sorted by rating descending
+        users = Account.objects(
+            is_deleted=False,
+            is_inactive=False
+        ).order_by('-rating')
+
+        leaderboard_data = []
+        current_rank = 1
+
+        for user in users:
+            leaderboard_data.append({
+                "username": user.name,
+                "total_points": user.rating,
+                "rank": current_rank
+            })
+
+            current_rank += 1
+
+        serializer = LeaderboardMinimalSerializer(leaderboard_data, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+

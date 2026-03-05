@@ -27,6 +27,7 @@ urlpatterns = [
     path('report/', include('report.urls')),
     path('notification/', include('notification.urls')),
     path('', include('public_leaderboard.urls')),
+    path('', include('contribution.urls')),
 ]
 
 # Serve media files during development
