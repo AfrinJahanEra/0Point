@@ -1082,8 +1082,16 @@ class SoonestUpcomingContestView(APIView):
             
             # Calculate time until contest starts
             from datetime import datetime, timezone
+            
+            # Make sure start_time is timezone-aware
+            if soonest_contest.start_time.tzinfo is None:
+                # If start_time is naive, assume it's UTC and make it aware
+                start_time = soonest_contest.start_time.replace(tzinfo=timezone.utc)
+            else:
+                start_time = soonest_contest.start_time
+            
             now = datetime.now(timezone.utc)
-            time_until = soonest_contest.start_time - now
+            time_until = start_time - now
             
             # Extract days, hours, minutes, seconds
             days = time_until.days
@@ -1097,10 +1105,10 @@ class SoonestUpcomingContestView(APIView):
                 "title": soonest_contest.title,
                 "start_time": soonest_contest.start_time.isoformat() if soonest_contest.start_time else None,
                 "time_until": {
-                    "days": days,
-                    "hours": hours,
-                    "minutes": minutes,
-                    "seconds": seconds
+                    "days": max(0, days),
+                    "hours": max(0, hours),
+                    "minutes": max(0, minutes),
+                    "seconds": max(0, seconds)
                 },
                 "duration": soonest_contest.duration,
                 "type": soonest_contest.type,
@@ -1118,7 +1126,6 @@ class SoonestUpcomingContestView(APIView):
                 "has_contest": False,
                 "error": f"Failed to fetch contest data: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
- 
 
 class PastContestsListCreateView(APIView):
     def get(self, request):
