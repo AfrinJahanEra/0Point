@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'Chatapp',
     'difficulty_prediction',
     'public_leaderboard',
+    'contribution',
 ]
 
 MIDDLEWARE = [
