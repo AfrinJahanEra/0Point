@@ -45,7 +45,7 @@ import Profile from './pages/Profile';
 const Layout = ({ children }) => (
   <>
     <Header />
-    <main className="flex-grow">
+    <main>
       {children}
     </main>
     <Footer />
@@ -56,7 +56,7 @@ const NavLayout = ({ children }) => (
   <>
     <Header />
     <NavigationBar />
-    <main className="flex-grow">
+    <main>
       {children}
     </main>
     <Footer />
@@ -64,7 +64,7 @@ const NavLayout = ({ children }) => (
 );
 // Full-screen layout (no header/footer)
 const FullScreenLayout = ({ children }) => (
-  <main className="flex-grow">
+  <main>
     {children}
   </main>
 );
@@ -108,7 +108,7 @@ function App() {
   return (
     <AppProvider>
       <Router>
-        <div className="flex flex-col min-h-screen">
+        <div className="flex flex-col">
           <Toaster
             toastOptions={{
               style: {
