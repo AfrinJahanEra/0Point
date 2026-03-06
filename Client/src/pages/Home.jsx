@@ -1265,14 +1265,14 @@ const fetchContributions = async () => {
               </div>
             </div>
 
-            {/* Latest Announcement + Popular Blog */}
+            {/* Latest Announcements + Popular Blog */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
-                {/* Latest Announcement */}
+                {/* Latest Announcements */}
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
                     <Bell className="w-3.5 h-3.5 text-gray-700" />
-                    <h2 className="text-xs font-semibold text-gray-900">Latest Announcement</h2>
+                    <h2 className="text-xs font-semibold text-gray-900">Latest Announcements</h2>
                   </div>
                 </div>
 
@@ -1287,17 +1287,19 @@ const fetchContributions = async () => {
                       <p className="text-xs text-gray-500">No announcements yet</p>
                     </div>
                   ) : (
-                    <div className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-                      <div className="flex items-center gap-2 mb-1">
-                        {announcements[0].is_pinned && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Pinned</span>}
-                        {announcements[0].is_important && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Important</span>}
+                    announcements.slice(0, 5).map((announcement) => (
+                      <div key={announcement.id} className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200 border-b border-gray-100 last:border-b-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          {announcement.is_pinned && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Pinned</span>}
+                          {announcement.is_important && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Important</span>}
+                        </div>
+                        {announcement.topic && <h3 className="text-xs font-semibold text-gray-900 mb-1">{announcement.topic}</h3>}
+                        <p className="text-xs text-gray-600 mb-1 line-clamp-2">{announcement.text}</p>
+                        <span className="text-xs text-gray-400">
+                          {announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : ''}
+                        </span>
                       </div>
-                      {announcements[0].topic && <h3 className="text-xs font-semibold text-gray-900 mb-1">{announcements[0].topic}</h3>}
-                      <p className="text-xs text-gray-600 mb-1.5">{announcements[0].text}</p>
-                      <span className="text-xs text-gray-500">
-                        {announcements[0].created_at ? new Date(announcements[0].created_at).toLocaleDateString() : ''}
-                      </span>
-                    </div>
+                    ))
                   )}
                 </div>
 
