@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
 import ReportBlogModal from '../components/ReportBlogModal';
@@ -17,7 +17,6 @@ import toast from 'react-hot-toast';
 const Community = () => {
   const { user } = useApp();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,30 +30,6 @@ const Community = () => {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportingBlog, setReportingBlog] = useState(null);
   const blogsPerPage = 5;
-
-  // Handle expandBlog query parameter from Home page
-  useEffect(() => {
-    if (!searchParams) return;
-    const expandBlogId = searchParams.get('expandBlog');
-    if (expandBlogId && blogs.length > 0) {
-      // Find the blog and expand it
-      const blogIndex = blogs.findIndex(b => b.id === expandBlogId);
-      if (blogIndex !== -1) {
-        // Calculate page number and navigate to that page
-        const pageNum = Math.floor(blogIndex / blogsPerPage) + 1;
-        setCurrentPage(pageNum);
-        // Expand the blog
-        setExpandedBlogs(prev => new Set([...prev, expandBlogId]));
-        // Scroll to the blog after a short delay
-        setTimeout(() => {
-          const blogElement = document.getElementById(`blog-${expandBlogId}`);
-          if (blogElement) {
-            blogElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 100);
-      }
-    }
-  }, [searchParams, blogs]);
 
   // Comment Item Component
   const CommentItem = ({ comment, blogId, depth = 0 }) => {
@@ -520,11 +495,7 @@ const Community = () => {
                 const isExpanded = expandedBlogs.has(blog.id);
                 
                 return (
-                  <article 
-                    key={blog.id} 
-                    id={`blog-${blog.id}`}
-                    className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
-                  >
+                  <article key={blog.id} className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                     {/* Blog Header */}
                     <div className="p-4 border-b border-gray-100">
                       <div className="flex items-center justify-between mb-2">

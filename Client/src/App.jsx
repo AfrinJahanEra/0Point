@@ -40,13 +40,11 @@ import BlogDetail from './pages/BlogDetail';
 import Recording from './pages/Recording';
 import ContestHistory from './pages/ContestHistory';
 import PublicDashboard from './pages/PublicDashboard';
-import Profile from './pages/Profile';
-import AdminDashboard from './pages/AdminDashboard';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
     <Header />
-    <main>
+    <main className="flex-grow">
       {children}
     </main>
     <Footer />
@@ -57,7 +55,7 @@ const NavLayout = ({ children }) => (
   <>
     <Header />
     <NavigationBar />
-    <main>
+    <main className="flex-grow">
       {children}
     </main>
     <Footer />
@@ -65,7 +63,7 @@ const NavLayout = ({ children }) => (
 );
 // Full-screen layout (no header/footer)
 const FullScreenLayout = ({ children }) => (
-  <main>
+  <main className="flex-grow">
     {children}
   </main>
 );
@@ -88,9 +86,9 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
-// Public Route Component (redirects based on role if already logged in)
+// Public Route Component (redirects to contests if already logged in)
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, loading, user } = useApp();
+  const { isAuthenticated, loading } = useApp();
   
   if (loading) {
     return (
@@ -103,18 +101,13 @@ const PublicRoute = ({ children }) => {
     );
   }
   
-  if (!isAuthenticated) {
-    return children;
-  }
-  
-  // Redirect based on user role
-  return user?.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/home" />;
+  return !isAuthenticated ? children : <Navigate to="/contests" />;
 };
 function App() {
   return (
     <AppProvider>
       <Router>
-        <div className="flex flex-col">
+        <div className="flex flex-col min-h-screen">
           <Toaster
             toastOptions={{
               style: {
@@ -146,13 +139,6 @@ function App() {
             {/* Visualizer and InterviewSession take full screen without Header and Footer */}
             <Route path="/visualizer" element={<Visualizer />} />
             <Route path="/interview-room/:sessionId" element={<InterviewSession />} />  {/* Updated dynamic route */}
-            
-            {/* Admin Dashboard - Protected for admin only */}
-            <Route path="/admin" element={
-              <ProtectedRoute>
-                <AdminDashboard />
-              </ProtectedRoute>
-            } />
            
             {/* Pages with Header and Footer only */}
             <Route path="/home" element={

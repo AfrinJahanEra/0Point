@@ -7,12 +7,10 @@ from .views import (
     AnnouncementUpdateAPIView,
     AnnouncementDeleteAPIView,
     TogglePinAnnouncementAPIView,
-    PlatformAnnouncementsAPIView,
 )
 
 urlpatterns = [
     path('announcements/', AnnouncementCreateAPIView.as_view(), name='create-announcement'),
-    path('announcements/platform/', PlatformAnnouncementsAPIView.as_view(), name='platform-announcements'),
     path('announcements/<announcement_id>/', AnnouncementDetailAPIView.as_view(), name='announcement-detail'),
     path('announcements/<announcement_id>/update/', AnnouncementUpdateAPIView.as_view(), name='update-announcement'),
     path('announcements/<announcement_id>/delete/', AnnouncementDeleteAPIView.as_view(), name='delete-announcement'),

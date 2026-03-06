@@ -30,9 +30,7 @@ import {
   Cpu,
   BarChart,
   PieChart,
-  LineChart,
-  Globe,
-  X
+  LineChart
 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -78,11 +76,6 @@ const Home = () => {
 const [contributions, setContributions] = useState([]);
 const [loadingContributions, setLoadingContributions] = useState(false);
 
-  // Announcements state
-  const [announcements, setAnnouncements] = useState([]);
-  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
-  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
-
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
     days: 5,
@@ -106,10 +99,15 @@ const fetchContributions = async () => {
   try {
     setLoadingContributions(true);
     const response = await api.get('/contributions/ranking/');
+    console.log('Raw API response:', response);
+    console.log('Response data:', response.data);
+    
+    // The API returns { count: 1, ranking: [...] }
+    // So we need to use response.data.ranking
     setContributions(response.data.ranking || []);
   } catch (error) {
     console.error('Error fetching contributions:', error);
-    setContributions([]);
+    toast.error('Failed to load contributions');
   } finally {
     setLoadingContributions(false);
   }
@@ -148,23 +146,11 @@ const fetchContributions = async () => {
     fetchLeaderboard();
     fetchUpcomingContests();
     fetchPastContests();
+    fetchSoonestContest();
     fetchLiveContests();
     fetchRegisteredContests();
     fetchContributions();
-    fetchAnnouncements();
   }, []);
-
-  const fetchAnnouncements = async () => {
-    try {
-      setLoadingAnnouncements(true);
-      const response = await api.get('/announcements/platform/');
-      setAnnouncements(response.data.announcements || []);
-    } catch (error) {
-      console.error('Error fetching announcements:', error);
-    } finally {
-      setLoadingAnnouncements(false);
-    }
-  };
 
   const fetchLatestBlogs = async () => {
     try {
@@ -173,7 +159,7 @@ const fetchContributions = async () => {
       setBlogs(response.data.slice(0, 3));
     } catch (error) {
       console.error('Error fetching blogs:', error);
-      setBlogs([]);
+      toast.error('Failed to load latest blogs');
     } finally {
       setLoadingBlogs(false);
     }
@@ -182,94 +168,12 @@ const fetchContributions = async () => {
   const fetchUpcomingContests = async () => {
     try {
       setLoadingContests(true);
-      
-      // Fetch both internal and external contests in parallel
-      const [internalRes, externalRes] = await Promise.all([
-        api.get('/contests/upcoming/').catch(() => ({ data: { contests: [] } })),
-        api.get('/external/contests/').catch(() => ({ data: [] }))
-      ]);
-      
-      const now = new Date();
-      
-      // Include internal contests (they're already filtered as 'upcoming' by backend)
-      const internalContests = (internalRes.data.contests || [])
-        .map(c => ({
-          ...c,
-          source: 'internal',
-          start_time: c.start_time,
-          platform: '0Point'
-        }));
-      
-      // Get external upcoming contests - trust status OR future date
-      const externalContests = (externalRes.data || [])
-        .filter(c => c.status === 'upcoming' || (c.start_time && new Date(c.start_time) > now))
-        .map(c => ({
-          id: c.external_id,
-          title: c.title,
-          platform: c.platform?.toUpperCase() || c.original_platform?.toUpperCase(),
-          start_time: c.start_time,
-          duration: c.duration_formatted || `${Math.round((c.duration_seconds || 0) / 60)} min`,
-          participants: c.participants || 0,
-          url: c.url,
-          source: 'external'
-        }));
-      
-      // Combine and sort: future contests first (by date), then past contests
-      const allContests = [...internalContests, ...externalContests]
-        .sort((a, b) => {
-          const dateA = new Date(a.start_time);
-          const dateB = new Date(b.start_time);
-          const aIsFuture = dateA > now;
-          const bIsFuture = dateB > now;
-          
-          // Future contests come first
-          if (aIsFuture && !bIsFuture) return -1;
-          if (!aIsFuture && bIsFuture) return 1;
-          
-          // Within same category, sort by date (soonest first)
-          return dateA - dateB;
-        })
-        .slice(0, 5);
-      
-      setUpcomingContests(allContests);
-      
-      // Find the first contest with a FUTURE start_time for countdown
-      const futureContest = allContests.find(c => {
-        const startTime = new Date(c.start_time);
-        return !isNaN(startTime.getTime()) && startTime > now;
-      });
-      
-      if (futureContest) {
-        const startTime = new Date(futureContest.start_time);
-        const diff = startTime - now;
-        
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        
-        setSoonestContest({
-          ...futureContest,
-          contest_id: futureContest.id,
-          has_contest: true
-        });
-        setTimeLeft({ days, hours, minutes, seconds });
-      } else if (allContests.length > 0) {
-        // No future contest but have contests - show first without countdown
-        setSoonestContest({
-          ...allContests[0],
-          contest_id: allContests[0].id,
-          has_contest: true
-        });
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-      } else {
-        setSoonestContest(null);
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-      }
+      const response = await api.get('/contests/upcoming/');
+      setUpcomingContests(response.data.contests || []);
     } catch (error) {
       console.error('Error fetching upcoming contests:', error);
+      toast.error('Failed to load upcoming contests');
       setUpcomingContests([]);
-      setSoonestContest(null);
     } finally {
       setLoadingContests(false);
     }
@@ -282,6 +186,7 @@ const fetchContributions = async () => {
       setLiveContests(response.data.contests || []);
     } catch (error) {
       console.error('Error fetching live contests:', error);
+      toast.error('Failed to load live contests');
       setLiveContests([]);
     } finally {
       setLoadingLiveContests(false);
@@ -295,6 +200,7 @@ const fetchContributions = async () => {
       setPastContests(response.data.contests || []);
     } catch (error) {
       console.error('Error fetching past contests:', error);
+      toast.error('Failed to load past contests');
       setPastContests([]);
     } finally {
       setLoadingPastContests(false);
@@ -332,11 +238,35 @@ const fetchContributions = async () => {
       setLeaderboardData(response.data.slice(0, 5));
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
-      setLeaderboardData([]);
+      toast.error('Failed to load leaderboard');
     } finally {
       setLoadingLeaderboard(false);
     }
   };
+
+  const announcements = [
+    {
+      id: 1,
+      title: "New Practice Problems Added",
+      content: "We've added 50 new practice problems covering dynamic programming and graph theory.",
+      date: "2 hours ago",
+      priority: "high"
+    },
+    {
+      id: 2,
+      title: "System Maintenance Notice",
+      content: "Scheduled maintenance on Sunday, Dec 10th from 2AM-4AM. Some services may be temporarily unavailable.",
+      date: "1 day ago",
+      priority: "medium"
+    },
+    {
+      id: 3,
+      title: "Winter Coding Challenge Registration Open",
+      content: "Register now for the upcoming Winter Coding Challenge with exciting prizes.",
+      date: "2 days ago",
+      priority: "high"
+    }
+  ];
 
   // Blog functions
   const handleBlogLike = (blogId) => {
@@ -447,13 +377,6 @@ const fetchContributions = async () => {
             ? { ...contest, is_registered: true } 
             : contest
         )
-      );
-      
-      // Also update soonestContest if it matches
-      setSoonestContest(prev => 
-        prev && (prev.id === contestId || prev.contest_id === contestId)
-          ? { ...prev, is_registered: true }
-          : prev
       );
       
       toast.success('Successfully registered for contest!');
@@ -585,12 +508,13 @@ const fetchContributions = async () => {
   };
 
   return (
-    <div className="bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Main Content */}
       <div className="max-w-[1920px] mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Sidebar - Contest Section */}
           <div className="lg:col-span-3 space-y-4">
+
             {/* Upcoming Contests */}
             <div className="bg-white">
               <div className="p-3 border-b border-gray-200">
@@ -640,43 +564,15 @@ const fetchContributions = async () => {
                     <p className="text-xs text-gray-500">No upcoming contests</p>
                   </div>
                 ) : (
-                  (() => {
-                    // Filter contests based on activeTab BEFORE slicing
-                    const filteredContests = upcomingContests.filter(contest => {
-                      if (activeTab === 'registered') {
-                        // Only show registered internal contests
-                        return contest.source === 'internal' && 
-                          (registeredContests.has(contest.id) || contest.is_registered);
-                      }
-                      return true; // Show all for 'all' tab
-                    });
-                    
-                    if (filteredContests.length === 0) {
-                      return (
-                        <div className="py-4 text-center">
-                          <p className="text-xs text-gray-500">
-                            {activeTab === 'registered' ? 'No registered contests' : 'No upcoming contests'}
-                          </p>
-                        </div>
-                      );
+                  upcomingContests.slice(0, 3).map((contest) => {
+                    if (activeTab === 'registered' && !registeredContests.has(contest.id) && !contest.is_registered) {
+                      return null;
                     }
-                    
-                    return filteredContests.slice(0, 5).map((contest, index) => {
-                    // Platform badge colors
-                    const platformColors = {
-                      'CF': 'bg-red-100 text-red-700',
-                      'LC': 'bg-yellow-100 text-yellow-700',
-                      'CC': 'bg-orange-100 text-orange-700',
-                      'AC': 'bg-cyan-100 text-cyan-700',
-                      '0Point': 'bg-blue-100 text-blue-700'
-                    };
-                    const badgeColor = platformColors[contest.platform] || 'bg-gray-100 text-gray-700';
-                    const isRegistered = contest.source === 'internal' && (registeredContests.has(contest.id) || contest.is_registered);
                     
                     return (
                       <div 
-                        key={`${contest.source}-${contest.id}`}
-                        className={`p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200 ${index === 0 ? 'border-l-2 border-green-500 bg-green-50' : ''}`}
+                        key={contest.id}
+                        className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-start gap-2 flex-1">
@@ -684,47 +580,35 @@ const fetchContributions = async () => {
                               <Calendar className="w-4 h-4" />
                             </div>
                             <div className="flex-1">
-                              <div className="flex items-center gap-1.5 mb-0.5">
-                                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${badgeColor}`}>
-                                  {contest.platform}
-                                </span>
-                                {index === 0 && <span className="text-xs text-green-600 font-medium">Next</span>}
-                              </div>
-                              <h3 className="font-medium text-gray-900 text-xs line-clamp-1">
+                              <h3 className="font-medium text-gray-900 text-xs">
                                 {contest.title}
                               </h3>
                               <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
                                 <span className="flex items-center gap-1">
                                   <Clock className="w-2.5 h-2.5" />
-                                  {contest.duration || 'TBD'}
+                                  {contest.duration}
                                 </span>
                                 <span className="flex items-center gap-1">
-                                  <Calendar className="w-2.5 h-2.5" />
-                                  {contest.start_time ? new Date(contest.start_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
+                                  <Users className="w-2.5 h-2.5" />
+                                  {contest.participants || 0}
                                 </span>
                               </div>
                             </div>
                           </div>
                           
-                          {/* Action Button */}
+                          {/* Single Button */}
                           <div className="flex items-center gap-1">
-                            {contest.source === 'external' ? (
-                              <a
-                                href={contest.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-gray-600 text-white hover:bg-gray-700 flex items-center gap-1"
+                            {registeredContests.has(contest.id) || contest.is_registered ? (
+                              <button
+                                onClick={() => handleContestEntry(contest, 'upcoming')}
+                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
                               >
-                                <Globe className="w-2.5 h-2.5" />
-                                Visit
-                              </a>
-                            ) : isRegistered ? (
-                              <span className="px-2 py-1 rounded font-medium text-xs bg-green-100 text-green-700">
-                                Registered
-                              </span>
+                                <Play className="w-2.5 h-2.5" />
+                                Enter
+                              </button>
                             ) : (
                               <button
-                                onClick={() => navigate(`/contests/${contest.id}/register`)}
+                                onClick={() => handleRegister(contest.id)}
                                 className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-blue-800 text-white hover:bg-blue-900 flex items-center gap-1"
                               >
                                 <Eye className="w-2.5 h-2.5" />
@@ -735,8 +619,7 @@ const fetchContributions = async () => {
                         </div>
                       </div>
                     );
-                  });
-                  })()
+                  })
                 )}
               </div>
             </div>
@@ -744,27 +627,14 @@ const fetchContributions = async () => {
             {/* Contest Countdown */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
-                {loadingContests ? (
+                {loadingSoonest ? (
                   <div className="py-4 text-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
                     <p className="text-xs text-gray-500 mt-2">Loading countdown...</p>
                   </div>
                 ) : soonestContest ? (
                   <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 mb-1.5">
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                        soonestContest.platform === '0Point' ? 'bg-blue-100 text-blue-700' :
-                        soonestContest.platform === 'CF' ? 'bg-red-100 text-red-700' :
-                        soonestContest.platform === 'LC' ? 'bg-yellow-100 text-yellow-700' :
-                        soonestContest.platform === 'CC' ? 'bg-orange-100 text-orange-700' :
-                        soonestContest.platform === 'AC' ? 'bg-cyan-100 text-cyan-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {soonestContest.platform}
-                      </span>
-                      <span className="text-xs text-green-600 font-medium">Next Contest</span>
-                    </div>
-                    <div className="text-xs text-gray-600 mb-1.5 line-clamp-1">{soonestContest.title}</div>
+                    <div className="text-xs text-gray-600 mb-1.5">{soonestContest.title}</div>
                     <div className="flex justify-center gap-1 mb-2">
                       <div className="bg-gray-100 rounded-lg p-1.5 text-center min-w-[40px]">
                         <div className="text-xs font-bold text-gray-900">{timeLeft.days.toString().padStart(2, '0')}</div>
@@ -783,28 +653,18 @@ const fetchContributions = async () => {
                         <div className="text-xs text-gray-500">Seconds</div>
                       </div>
                     </div>
-                    {soonestContest.source === 'external' ? (
-                      <a 
-                        href={soonestContest.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs bg-gray-600 text-white px-2.5 py-1 rounded hover:bg-gray-700 transition-colors duration-200 inline-flex items-center gap-1"
-                      >
-                        <Globe className="w-3 h-3" />
-                        Visit Contest
-                      </a>
-                    ) : registeredContests.has(soonestContest.contest_id) || soonestContest.is_registered ? (
-                      <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded font-medium">
-                        Registered
-                      </span>
-                    ) : (
-                      <button 
-                        onClick={() => navigate(`/contests/${soonestContest.contest_id}/register`)}
-                        className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200"
-                      >
-                        Register Now
-                      </button>
-                    )}
+                    <button 
+                      onClick={() => {
+                        if (registeredContests.has(soonestContest.contest_id)) {
+                          navigate(`/contests/${soonestContest.contest_id}`);
+                        } else {
+                          handleRegister(soonestContest.contest_id);
+                        }
+                      }}
+                      className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200"
+                    >
+                      {registeredContests.has(soonestContest.contest_id) ? 'Enter Contest' : 'Register Now'}
+                    </button>
                   </div>
                 ) : (
                   <div className="py-4 text-center">
@@ -928,7 +788,7 @@ const fetchContributions = async () => {
                           </td>
                           <td className="py-2">
                             <Link 
-                              to={`/user/${user.user_id}`}
+                              to={`/profile/${user.username}`}
                               className="text-blue-900 font-bold hover:text-blue-800 hover:underline"
                             >
                               {user.username}
@@ -950,43 +810,6 @@ const fetchContributions = async () => {
 
           {/* Middle Column - Main Content (Wider) */}
           <div className="lg:col-span-6 space-y-4">
-            {/* Latest Announcement */}
-            <div className="bg-white rounded-lg">
-              <div className="p-3">
-                <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50 rounded-t-lg">
-                  <div className="flex items-center gap-1.5">
-                    <Bell className="w-3.5 h-3.5 text-gray-700" />
-                    <h2 className="text-xs font-semibold text-gray-900">Latest Announcement</h2>
-                  </div>
-                </div>
-                
-                {loadingAnnouncements ? (
-                  <div className="py-4 text-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-xs text-gray-500 mt-2">Loading...</p>
-                  </div>
-                ) : announcements.length === 0 ? (
-                  <div className="py-4 text-center">
-                    <p className="text-xs text-gray-500">No announcements yet</p>
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-lg bg-gray-50">
-                    <div className="flex items-center gap-2 mb-2">
-                      {announcements[0].is_pinned && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Pinned</span>}
-                      {announcements[0].is_important && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Important</span>}
-                    </div>
-                    {announcements[0].topic && <h3 className="text-sm font-semibold text-gray-900 mb-2">{announcements[0].topic}</h3>}
-                    <p className="text-sm text-gray-700 mb-2">{announcements[0].text}</p>
-                    <span className="text-xs text-gray-500">
-                      {announcements[0].created_at ? new Date(announcements[0].created_at).toLocaleDateString('en-US', {
-                        year: 'numeric', month: 'short', day: 'numeric'
-                      }) : ''}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Recent Blog Post */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
@@ -1021,14 +844,14 @@ const fetchContributions = async () => {
                       <div className="flex items-center gap-2 mb-3">
                         <div 
                           className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm cursor-pointer"
-                          onClick={() => navigate(`/user/${post.author?.id}`)}
+                          onClick={() => navigate(`/profile/${post.author?.name}`)}
                         >
                           {post.author?.name ? post.author.name.charAt(0).toUpperCase() : 'U'}
                         </div>
                         
                         <div className="flex flex-col">
                           <Link 
-                            to={`/user/${post.author?.id}`}
+                            to={`/profile/${post.author?.name}`}
                             className="text-xs font-semibold text-gray-900 hover:text-blue-600"
                           >
                             {post.author?.name || 'Unknown User'}
@@ -1060,19 +883,117 @@ const fetchContributions = async () => {
                       
                       {post.content && post.content.length > 300 && (
                         <button
-                          onClick={() => navigate(`/community?expandBlog=${post.id}`)}
+                          onClick={() => toggleContent(post.id)}
                           className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
                         >
-                          <span>Read More</span>
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
+                          {showFullContent[post.id] ? (
+                            <>
+                              <span>Show Less</span>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            </>
+                          ) : (
+                            <>
+                              <span>Read More</span>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </>
+                          )}
                         </button>
+                      )}
+                      
+                      {/* Like/Dislike Buttons */}
+                      <div className="flex items-center gap-4 mt-3 mb-3">
+                        <button 
+                          onClick={() => handleBlogLike(post.id)}
+                          className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                          </svg>
+                          Like {blogLikes[post.id] || 0}
+                        </button>
+                        <button 
+                          onClick={() => handleBlogDislike(post.id)}
+                          className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                          </svg>
+                          Dislike {blogDislikes[post.id] || 0}
+                        </button>
+                        <button 
+                          onClick={() => toggleComments(post.id)}
+                          className="flex items-center gap-1 text-xs text-gray-600 hover:text-blue-600 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                          </svg>
+                          Comments {blogComments[post.id]?.length || 0}
+                        </button>
+                      </div>
+
+                      {/* Comments Section */}
+                      {showComments[post.id] && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <div className="mb-3">
+                            <textarea
+                              value={newComment[post.id] || ''}
+                              onChange={(e) => setNewComment({...newComment, [post.id]: e.target.value})}
+                              placeholder="Write a comment..."
+                              className="w-full p-2 border border-gray-300 rounded text-xs resize-y"
+                              rows="2"
+                            />
+                            <button
+                              onClick={() => handleAddComment(post.id)}
+                              className="mt-2 px-3 py-1 bg-blue-800 text-white text-xs rounded hover:bg-blue-900 transition-colors"
+                            >
+                              Post Comment
+                            </button>
+                          </div>
+
+                          <div className="space-y-3">
+                            {blogComments[post.id]?.map((comment) => (
+                              <div key={comment.id} className="bg-gray-50 p-2 rounded">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs font-medium text-gray-900">{comment.author}</span>
+                                  <span className="text-xs text-gray-500">{comment.date}</span>
+                                </div>
+                                <p className="text-xs text-gray-700 mb-2">{comment.content}</p>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => handleCommentLike(post.id, comment.id)}
+                                    className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600"
+                                  >
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                                    </svg>
+                                    {comment.likes || 0}
+                                  </button>
+                                  <button
+                                    onClick={() => handleCommentDislike(post.id, comment.id)}
+                                    className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600"
+                                  >
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                                    </svg>
+                                    {comment.dislikes || 0}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            {(!blogComments[post.id] || blogComments[post.id].length === 0) && (
+                              <p className="text-xs text-gray-500 text-center py-2">No comments yet. Be the first to comment!</p>
+                            )}
+                          </div>
+                        </div>
                       )}
 
                       <div className="flex justify-end items-center mt-2">
                         <Link 
-                          to={`/community?expandBlog=${post.id}`}
+                          to={`/blog/${post.id}`}
                           className="text-xs text-blue-800 hover:text-blue-900 transition-colors duration-200 font-bold"
                         >
                           Read More
@@ -1168,73 +1089,40 @@ const fetchContributions = async () => {
               </div>
             </div>
 
-            {/* Latest Announcements + Popular Blog */}
+            {/* All Announcements */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
-                {/* Latest Announcements */}
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
                     <Bell className="w-3.5 h-3.5 text-gray-700" />
-                    <h2 className="text-xs font-semibold text-gray-900">Latest Announcements</h2>
+                    <h2 className="text-xs font-semibold text-gray-900">All Announcements</h2>
                   </div>
+                  <Link 
+                    to="/blog" 
+                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                  >
+                    View All
+                    <ChevronRight className="w-2.5 h-2.5" />
+                  </Link>
                 </div>
 
                 <div className="space-y-2">
-                  {loadingAnnouncements ? (
-                    <div className="py-4 text-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-                      <p className="text-xs text-gray-500 mt-2">Loading...</p>
-                    </div>
-                  ) : announcements.length === 0 ? (
-                    <div className="py-4 text-center">
-                      <p className="text-xs text-gray-500">No announcements yet</p>
-                    </div>
-                  ) : (
-                    announcements.slice(0, 5).map((announcement) => (
-                      <div 
-                        key={announcement.id} 
-                        className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200 border-b border-gray-100 last:border-b-0 cursor-pointer"
-                        onClick={() => setSelectedAnnouncement(announcement)}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          {announcement.is_pinned && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Pinned</span>}
-                          {announcement.is_important && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Important</span>}
-                        </div>
-                        {announcement.topic && <h3 className="text-xs font-semibold text-gray-900 mb-1">{announcement.topic}</h3>}
-                        <p className="text-xs text-gray-600 mb-1 line-clamp-2">{announcement.text}</p>
-                        <span className="text-xs text-gray-400">
-                          {announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : ''}
-                        </span>
+                  {announcements.map((announcement) => (
+                    <div 
+                      key={announcement.id}
+                      className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                    >
+                      <h3 className="text-xs font-semibold text-gray-900 mb-1">{announcement.title}</h3>
+                      <p className="text-xs text-gray-600 mb-1.5">{announcement.content}</p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">{announcement.date}</span>
+                        <button className="text-xs text-blue-800 hover:text-blue-900 transition-colors duration-200 font-bold">
+                          Read More
+                        </button>
                       </div>
-                    ))
-                  )}
+                    </div>
+                  ))}
                 </div>
-
-                {/* Popular Blogs */}
-                {blogs.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-gray-200">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <BookOpen className="w-3.5 h-3.5 text-gray-700" />
-                      <h3 className="text-xs font-semibold text-gray-900">Popular Blogs</h3>
-                    </div>
-                    <div className="space-y-2">
-                      {blogs.slice(0, 3).map((blog) => (
-                        <Link 
-                          key={blog.id}
-                          to={`/blog/${blog.id}`}
-                          className="block p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
-                        >
-                          <h4 className="text-xs font-semibold text-blue-800 hover:text-blue-900 mb-1 line-clamp-1">{blog.title}</h4>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">By {blog.author?.name || 'Unknown'}</span>
-                            <span className="text-xs text-gray-400">|</span>
-                            <span className="text-xs text-gray-500">{blog.upvotes || 0} likes</span>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 {/* Contributions */}
@@ -1283,7 +1171,7 @@ const fetchContributions = async () => {
               </td>
               <td className="py-2">
                 <Link 
-                  to={`/user/${contributor.user_id}`}
+                  to={`/profile/${contributor.username}`}
                   className="text-blue-900 font-bold hover:text-blue-800 hover:underline"
                 >
                   {contributor.name}
@@ -1299,57 +1187,68 @@ const fetchContributions = async () => {
     )}
   </div>
 </div>
+
+            {/* Recommended Problem Sets */}
+            <div className="bg-white rounded-lg">
+              <div className="p-3 border-b border-gray-200">
+                <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
+                  <div className="flex items-center gap-1.5">
+                    <Code2 className="w-3.5 h-3.5 text-gray-700" />
+                    <h2 className="text-xs font-semibold text-gray-900">Recommended Problem Sets</h2>
+                  </div>
+                  <Link 
+                    to="/practice" 
+                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                  >
+                    View All
+                    <ChevronRight className="w-2.5 h-2.5" />
+                  </Link>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left font-semibold text-gray-900 pb-2">Problem</th>
+                        <th className="text-center font-semibold text-gray-900 pb-2">Difficulty</th>
+                        <th className="text-center font-semibold text-gray-900 pb-2">Topic</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { id: 1, title: "Two Sum", difficulty: "Easy", topic: "Arrays" },
+                        { id: 2, title: "Binary Tree Traversal", difficulty: "Medium", topic: "Trees" },
+                        { id: 3, title: "Dynamic Range Sum", difficulty: "Hard", topic: "Segment Trees" },
+                        { id: 5, title: "String Matching", difficulty: "Easy", topic: "Strings" },
+                        { id: 6, title: "Dynamic Programming Basics", difficulty: "Medium", topic: "DP" },
+                        { id: 8, title: "Linked List Operations", difficulty: "Easy", topic: "LinkedList" },
+                        { id: 9, title: "Backtracking Patterns", difficulty: "Medium", topic: "Recursion" },
+                        { id: 11, title: "Sliding Window Technique", difficulty: "Medium", topic: "Arrays" },
+                        { id: 12, title: "Heap Operations", difficulty: "Medium", topic: "Data Structures" },
+                        { id: 13, title: "Bit Manipulation", difficulty: "Easy", topic: "Bits" },
+                        { id: 14, title: "Greedy Algorithms", difficulty: "Medium", topic: "Algorithms" }
+                      ].map((problem) => (
+                        <tr key={problem.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-2">
+                            <Link to={`/problem/${problem.id}`} className="text-blue-900 font-bold hover:text-blue-800 hover:underline">
+                              {problem.title}
+                            </Link>
+                          </td>
+                          <td className="py-2 text-center text-gray-700">
+                            {problem.difficulty}
+                          </td>
+                          <td className="py-2 text-center text-gray-600">
+                            {problem.topic}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Announcement Modal */}
-      {selectedAnnouncement && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setSelectedAnnouncement(null)}
-        >
-          <div 
-            className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-blue-600" />
-                <h2 className="text-sm font-semibold text-gray-900">Announcement</h2>
-              </div>
-              <button 
-                onClick={() => setSelectedAnnouncement(null)}
-                className="text-gray-500 hover:text-gray-700 p-1"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                {selectedAnnouncement.is_pinned && (
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Pinned</span>
-                )}
-                {selectedAnnouncement.is_important && (
-                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">Important</span>
-                )}
-              </div>
-              {selectedAnnouncement.topic && (
-                <h3 className="text-base font-semibold text-gray-900 mb-3">{selectedAnnouncement.topic}</h3>
-              )}
-              <p className="text-sm text-gray-700 whitespace-pre-wrap mb-4">{selectedAnnouncement.text}</p>
-              <div className="text-xs text-gray-500 pt-3 border-t border-gray-100">
-                {selectedAnnouncement.author && <span>By {selectedAnnouncement.author} | </span>}
-                {selectedAnnouncement.created_at && (
-                  <span>{new Date(selectedAnnouncement.created_at).toLocaleDateString('en-US', {
-                    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                  })}</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Trophy, Crown, Medal, Star, Search } from "lucide-react";
+import { Trophy, Crown, Medal, Star } from "lucide-react";
 import axios from "axios";
 import { BACKEND_URL } from "../utils/api";
 import { useNavigate } from "react-router-dom";

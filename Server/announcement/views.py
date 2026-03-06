@@ -333,22 +333,3 @@ class TogglePinAnnouncementAPIView(APIView):
             "is_pinned": announcement.is_pinned,
             "announcement": announcement.to_dict()
         })
-
-
-class PlatformAnnouncementsAPIView(APIView):
-    """
-    GET /announcements/platform/
-    Get all platform-wide announcements (not contest-specific)
-    """
-    def get(self, request):
-        # Get platform-wide announcements (where contest is None)
-        announcements = Announcement.objects(contest=None).order_by("-is_pinned", "-created_at")
-        
-        data = []
-        for announcement in announcements:
-            data.append(announcement.to_dict())
-        
-        return Response({
-            "announcements": data,
-            "total": len(data)
-        })

@@ -12,7 +12,6 @@ class LeaderboardSerializer(serializers.Serializer):
 
 
 class LeaderboardMinimalSerializer(serializers.Serializer):
-    user_id = serializers.CharField()
     username = serializers.CharField()
     total_points = serializers.IntegerField()
     rank = serializers.IntegerField()
