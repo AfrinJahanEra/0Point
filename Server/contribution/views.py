@@ -59,6 +59,7 @@ class ContributionRankingAPIView(APIView):
                 # Only include users with at least one contribution
                 if total > 0:
                     ranking.append({
+                        "user_id": str(user_account.id),
                         "name": user_account.name,
                         "total_contributions": total,
                         "blogs": blogs_count,

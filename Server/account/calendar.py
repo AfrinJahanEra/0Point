@@ -9,6 +9,20 @@ import requests
 
 LEETCODE_CALENDAR_API = "https://leetcode-api-pied.vercel.app/user/{handle}/calendar"
 
+
+def get_cached_calendar(user, platform, handle):
+    """
+    Retrieve cached calendar from user's calendar_cache list.
+    Returns the cache entry if found, None otherwise.
+    """
+    if not hasattr(user, 'calendar_cache') or not user.calendar_cache:
+        return None
+    
+    for cache in user.calendar_cache:
+        if cache.platform == platform and cache.handle == handle:
+            return cache
+    return None
+
 def fetch_leetcode_calendar(handle, year=None):
     """
     Fetch LeetCode submission calendar
