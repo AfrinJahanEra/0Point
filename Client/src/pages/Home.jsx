@@ -31,7 +31,8 @@ import {
   BarChart,
   PieChart,
   LineChart,
-  Globe
+  Globe,
+  X
 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -80,6 +81,7 @@ const [loadingContributions, setLoadingContributions] = useState(false);
   // Announcements state
   const [announcements, setAnnouncements] = useState([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
 
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
@@ -1288,7 +1290,11 @@ const fetchContributions = async () => {
                     </div>
                   ) : (
                     announcements.slice(0, 5).map((announcement) => (
-                      <div key={announcement.id} className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200 border-b border-gray-100 last:border-b-0">
+                      <div 
+                        key={announcement.id} 
+                        className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200 border-b border-gray-100 last:border-b-0 cursor-pointer"
+                        onClick={() => setSelectedAnnouncement(announcement)}
+                      >
                         <div className="flex items-center gap-2 mb-1">
                           {announcement.is_pinned && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Pinned</span>}
                           {announcement.is_important && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Important</span>}
@@ -1454,6 +1460,54 @@ const fetchContributions = async () => {
           </div>
         </div>
       </div>
+
+      {/* Announcement Modal */}
+      {selectedAnnouncement && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedAnnouncement(null)}
+        >
+          <div 
+            className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-blue-600" />
+                <h2 className="text-sm font-semibold text-gray-900">Announcement</h2>
+              </div>
+              <button 
+                onClick={() => setSelectedAnnouncement(null)}
+                className="text-gray-500 hover:text-gray-700 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                {selectedAnnouncement.is_pinned && (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Pinned</span>
+                )}
+                {selectedAnnouncement.is_important && (
+                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">Important</span>
+                )}
+              </div>
+              {selectedAnnouncement.topic && (
+                <h3 className="text-base font-semibold text-gray-900 mb-3">{selectedAnnouncement.topic}</h3>
+              )}
+              <p className="text-sm text-gray-700 whitespace-pre-wrap mb-4">{selectedAnnouncement.text}</p>
+              <div className="text-xs text-gray-500 pt-3 border-t border-gray-100">
+                {selectedAnnouncement.author && <span>By {selectedAnnouncement.author} | </span>}
+                {selectedAnnouncement.created_at && (
+                  <span>{new Date(selectedAnnouncement.created_at).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                  })}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
