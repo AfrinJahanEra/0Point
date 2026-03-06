@@ -41,6 +41,7 @@ import Recording from './pages/Recording';
 import ContestHistory from './pages/ContestHistory';
 import PublicDashboard from './pages/PublicDashboard';
 import Profile from './pages/Profile';
+import AdminDashboard from './pages/AdminDashboard';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -87,9 +88,9 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
-// Public Route Component (redirects to contests if already logged in)
+// Public Route Component (redirects based on role if already logged in)
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useApp();
+  const { isAuthenticated, loading, user } = useApp();
   
   if (loading) {
     return (
@@ -102,7 +103,12 @@ const PublicRoute = ({ children }) => {
     );
   }
   
-  return !isAuthenticated ? children : <Navigate to="/contests" />;
+  if (!isAuthenticated) {
+    return children;
+  }
+  
+  // Redirect based on user role
+  return user?.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/home" />;
 };
 function App() {
   return (
@@ -140,6 +146,13 @@ function App() {
             {/* Visualizer and InterviewSession take full screen without Header and Footer */}
             <Route path="/visualizer" element={<Visualizer />} />
             <Route path="/interview-room/:sessionId" element={<InterviewSession />} />  {/* Updated dynamic route */}
+            
+            {/* Admin Dashboard - Protected for admin only */}
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
            
             {/* Pages with Header and Footer only */}
             <Route path="/home" element={
