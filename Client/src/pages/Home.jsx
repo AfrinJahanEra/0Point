@@ -1061,24 +1061,13 @@ const fetchContributions = async () => {
                       
                       {post.content && post.content.length > 300 && (
                         <button
-                          onClick={() => toggleContent(post.id)}
+                          onClick={() => navigate(`/community?expandBlog=${post.id}`)}
                           className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
                         >
-                          {showFullContent[post.id] ? (
-                            <>
-                              <span>Show Less</span>
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                              </svg>
-                            </>
-                          ) : (
-                            <>
-                              <span>Read More</span>
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </>
-                          )}
+                          <span>Read More</span>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
                         </button>
                       )}
                       
@@ -1171,7 +1160,7 @@ const fetchContributions = async () => {
 
                       <div className="flex justify-end items-center mt-2">
                         <Link 
-                          to={`/blog/${post.id}`}
+                          to={`/community?expandBlog=${post.id}`}
                           className="text-xs text-blue-800 hover:text-blue-900 transition-colors duration-200 font-bold"
                         >
                           Read More
