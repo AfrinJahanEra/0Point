@@ -969,7 +969,7 @@ const fetchContributions = async () => {
                     <p className="text-xs text-gray-500">No announcements yet</p>
                   </div>
                 ) : (
-                  <div className={`p-3 rounded-lg ${announcements[0].is_important ? 'border-l-2 border-red-500 bg-red-50' : 'bg-gray-50'}`}>
+                  <div className="p-3 rounded-lg bg-gray-50">
                     <div className="flex items-center gap-2 mb-2">
                       {announcements[0].is_pinned && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Pinned</span>}
                       {announcements[0].is_important && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Important</span>}
@@ -1287,9 +1287,7 @@ const fetchContributions = async () => {
                       <p className="text-xs text-gray-500">No announcements yet</p>
                     </div>
                   ) : (
-                    <div 
-                      className={`p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200 ${announcements[0].is_important ? 'border-l-2 border-red-500 bg-red-50' : ''}`}
-                    >
+                    <div className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200">
                       <div className="flex items-center gap-2 mb-1">
                         {announcements[0].is_pinned && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Pinned</span>}
                         {announcements[0].is_important && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Important</span>}
