@@ -19,15 +19,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
-# Fix for Python 3.13 async shutdown issues
-os.environ.setdefault('ASGI_THREADS', '1')
-
-# Suppress Python 3.13 shutdown warnings for async tasks
-import warnings
-import asyncio
-warnings.filterwarnings('ignore', message='.*was never awaited.*')
-warnings.filterwarnings('ignore', message='.*coroutine.*was never awaited.*')
-
 INSTALLED_APPS = [
     'daphne',
     'django.contrib.admin',
@@ -39,9 +30,12 @@ INSTALLED_APPS = [
     'rest_framework',
     'account',
     'contest',
+    'problem',
+    'testcase',
     'submission',
     'leaderboard',
     'announcement',
+    'tutorial',
     'executor',
     'mock_interview',
     'videoconference',
@@ -56,10 +50,7 @@ INSTALLED_APPS = [
     'testcontest',
     'crossPlatform',
     'blog',
-    'Chatapp',
-    'difficulty_prediction',
-    'public_leaderboard',
-    'contribution',
+    'recommendation',
 ]
 
 MIDDLEWARE = [
@@ -144,32 +135,38 @@ connect_to_mongo()
 
 ASGI_APPLICATION = "zeropoint.asgi.application"
 
-# Redis Configuration for Django Channels
-if os.getenv('DJANGO_ENV') == 'production':
-    REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379')
-else:
-    REDIS_URL = 'redis://127.0.0.1:6379'
+# For development, using in-memory channel layer
+# For production with Redis, uncomment the Redis configuration below
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    },
+}
 
-# Channel Layers Configuration
-if os.getenv('REDIS_URL'):
-    # Production: Use Redis for real-time features (WebSocket support)
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                'hosts': [REDIS_URL],
-            },
-        },
-    }
-    print(f"Using Redis Channel Layer: {REDIS_URL}")
-else:
-    # Development: Use in-memory channel layer
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels.layers.InMemoryChannelLayer"
-        },
-    }
-    print("Using InMemory Channel Layer")
+# Production Redis configuration (uncomment when Redis is available):
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {
+#             "hosts": [("127.0.0.1", 6379)],
+#         },
+#     },
+# }
+
+# if os.getenv('DJANGO_ENV') == 'production':
+#     REDIS_URL = os.getenv('REDIS_URL') 
+# else:
+#     REDIS_URL = 'redis://127.0.0.1:6379' 
+
+
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             'hosts': [REDIS_URL],
+#         },
+#     },
+# }
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
@@ -185,37 +182,10 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = [
     'https://0-point.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000',
+    'http://localhost:5173',  
 ]
 
-# Allow any vercel.app subdomain
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.vercel\.app$",
-]
-
-# Allow all CORS headers and methods
 CORS_ALLOW_CREDENTIALS = True
-CORS_PREFLIGHT_MAX_AGE = 86400  # Cache preflight for 24 hours
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
 
 cloudinary.config(
     cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
@@ -281,5 +251,5 @@ JD_CLIENT_ID = os.getenv('JD_CLIENT_ID')
 JD_CLIENT_SECRET = os.getenv('JD_CLIENT_SECRET')
 JD_API_URL = os.getenv('JD_API_URL', 'https://api.jdoodle.com/v1/execute')
 
-
+groq_api_key = os.getenv('groq_api_key')
 
