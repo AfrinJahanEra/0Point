@@ -12,6 +12,8 @@ from math import ceil
 import requests
 from datetime import datetime, timezone
 
+from recommendation.models import UserRecommendation
+
 from .calendar import  fetch_codeforces_calendar,fetch_codechef_calendar, fetch_leetcode_calendar, fetch_atcoder_calendar, get_cached_calendar
 
 from .models import Account, PlatformCalendarCache, PlatformSubmissionCache, UserTagStats, PlatformContestCache, UserVerdictStats
@@ -253,6 +255,7 @@ class AddPlatformProfileView(APIView):
             
             UserTagStats.objects(user_id=str(user.id)).delete()
             UserVerdictStats.objects(user_id=str(user.id)).delete()
+            UserRecommendation.invalidate(str(user.id))
 
             # Invalidate caches for this platform to force re-fetch on next access
             user.contest_cache = [c for c in user.contest_cache if c.platform != platform]
