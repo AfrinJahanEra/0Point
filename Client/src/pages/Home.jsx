@@ -76,6 +76,10 @@ const Home = () => {
 const [contributions, setContributions] = useState([]);
 const [loadingContributions, setLoadingContributions] = useState(false);
 
+  // Announcements state
+  const [announcements, setAnnouncements] = useState([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
     days: 5,
@@ -136,6 +140,19 @@ const fetchContributions = async () => {
   }
 };
 
+  const fetchAnnouncements = async () => {
+    try {
+      setLoadingAnnouncements(true);
+      const response = await api.get('/announcements/platform/?limit=5');
+      setAnnouncements(response.data.announcements || []);
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+      setAnnouncements([]);
+    } finally {
+      setLoadingAnnouncements(false);
+    }
+  };
+
   // Update countdown timer every second
   useEffect(() => {
     if (!soonestContest) return;
@@ -173,6 +190,7 @@ const fetchContributions = async () => {
     fetchLiveContests();
     fetchRegisteredContests();
     fetchContributions();
+    fetchAnnouncements();
   }, []);
 
   const fetchLatestBlogs = async () => {
@@ -315,30 +333,6 @@ const fetchContributions = async () => {
       setLoadingLeaderboard(false);
     }
   };
-
-  const announcements = [
-    {
-      id: 1,
-      title: "New Practice Problems Added",
-      content: "We've added 50 new practice problems covering dynamic programming and graph theory.",
-      date: "2 hours ago",
-      priority: "high"
-    },
-    {
-      id: 2,
-      title: "System Maintenance Notice",
-      content: "Scheduled maintenance on Sunday, Dec 10th from 2AM-4AM. Some services may be temporarily unavailable.",
-      date: "1 day ago",
-      priority: "medium"
-    },
-    {
-      id: 3,
-      title: "Winter Coding Challenge Registration Open",
-      content: "Register now for the upcoming Winter Coding Challenge with exciting prizes.",
-      date: "2 days ago",
-      priority: "high"
-    }
-  ];
 
   // Blog functions
   const handleBlogLike = (blogId) => {
@@ -1230,10 +1224,10 @@ const fetchContributions = async () => {
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
                     <Bell className="w-3.5 h-3.5 text-gray-700" />
-                    <h2 className="text-xs font-semibold text-gray-900">All Announcements</h2>
+                    <h2 className="text-xs font-semibold text-gray-900">Announcements</h2>
                   </div>
                   <Link 
-                    to="/blog" 
+                    to="/announcements" 
                     className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
                   >
                     View All
@@ -1241,22 +1235,53 @@ const fetchContributions = async () => {
                   </Link>
                 </div>
 
-                <div className="space-y-2">
-                  {announcements.map((announcement) => (
-                    <div 
-                      key={announcement.id}
-                      className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
-                    >
-                      <h3 className="text-xs font-semibold text-gray-900 mb-1">{announcement.title}</h3>
-                      <p className="text-xs text-gray-600 mb-1.5">{announcement.content}</p>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500">{announcement.date}</span>
-                        <button className="text-xs text-blue-800 hover:text-blue-900 transition-colors duration-200 font-bold">
-                          Read More
-                        </button>
-                      </div>
+                <div className="space-y-2 p-2">
+                  {loadingAnnouncements ? (
+                    <div className="py-4 text-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="text-xs text-gray-500 mt-2">Loading announcements...</p>
                     </div>
-                  ))}
+                  ) : announcements.length === 0 ? (
+                    <div className="py-4 text-center">
+                      <p className="text-xs text-gray-500">No announcements</p>
+                    </div>
+                  ) : (
+                    announcements.map((announcement) => (
+                      <div 
+                        key={announcement.id}
+                        className="p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-200"
+                      >
+                        <div className="flex items-start gap-2">
+                          {announcement.is_pinned && (
+                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">
+                              Pinned
+                            </span>
+                          )}
+                          {announcement.is_important && (
+                            <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[10px] font-medium">
+                              Important
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-xs font-semibold text-gray-900 mt-1 mb-1">
+                          {announcement.topic || 'Announcement'}
+                        </h3>
+                        <div className="text-xs text-gray-600 mb-2 line-clamp-2 prose prose-sm max-w-none">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkMath, remarkBreaks]}
+                            rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                          >
+                            {announcement.text?.slice(0, 150) + (announcement.text?.length > 150 ? '...' : '')}
+                          </ReactMarkdown>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-400">
+                            {announcement.author} - {new Date(announcement.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>

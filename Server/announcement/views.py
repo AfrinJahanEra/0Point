@@ -13,6 +13,30 @@ from contest.utils.auth import get_user_from_request
 from account.models import Account
 
 
+class PlatformAnnouncementsAPIView(APIView):
+    """
+    GET /announcements/platform/
+    Get platform-wide announcements (not tied to any contest)
+    """
+    def get(self, request):
+        try:
+            limit = int(request.GET.get('limit', 5))
+        except ValueError:
+            limit = 5
+        
+        # Get platform-wide announcements (where contest is None)
+        announcements = Announcement.objects(contest=None).order_by("-is_pinned", "-created_at")[:limit]
+        
+        data = []
+        for announcement in announcements:
+            data.append(announcement.to_dict())
+        
+        return Response({
+            "announcements": data,
+            "total": len(data)
+        })
+
+
 class AnnouncementCreateAPIView(APIView):
     """
     POST /announcements/
