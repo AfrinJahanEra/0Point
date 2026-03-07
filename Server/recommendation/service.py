@@ -27,11 +27,16 @@ def get_recommendations(user_id, force_refresh=False):
     result = call_groq(prompt)
 
     # Save to cache
+    tag_stats = UserTagStats.objects(user_id=str(user_id)).first()
+    weak_snapshot = {}
+    if tag_stats and tag_stats.category_scores:
+        weak_snapshot = {k: v.get('score') for k, v in tag_stats.category_scores.items()}
+    
     UserRecommendation(
         user_id=str(user_id),
         recommendations=result.get("recommendations", []),
         practice_plan=result.get("practice_plan", ""),
-        weak_snapshot={k: v.get('score') for k, v in (UserTagStats.objects(user_id=str(user_id)).first() or {}).category_scores.items()}
+        weak_snapshot=weak_snapshot
     ).save()
 
     return {
