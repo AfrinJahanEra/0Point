@@ -53,9 +53,18 @@ class PlatformCalendarCache(EmbeddedDocument):
 
 class IPAddress(EmbeddedDocument):
     """Store IP address information for an account"""
-    ip_address = StringField(required=True)
+    ip_address = StringField()
+    address = StringField()  # Legacy field - some documents use this
     first_seen = DateTimeField(default=datetime.utcnow)
     last_seen = DateTimeField(default=datetime.utcnow)
+    last_used = DateTimeField()  # Legacy field - some documents use this
+    
+    meta = {'strict': False}  # Allow unknown fields from database
+    
+    @property
+    def get_ip(self):
+        """Get IP address from either field"""
+        return self.ip_address or self.address
 
 
 class DeviceFingerprint(EmbeddedDocument):
@@ -63,6 +72,8 @@ class DeviceFingerprint(EmbeddedDocument):
     fingerprint = StringField(required=True)
     first_seen = DateTimeField(default=datetime.utcnow)
     last_seen = DateTimeField(default=datetime.utcnow)
+    
+    meta = {'strict': False}  # Allow unknown fields from database
 
 
 class Account(Document):
