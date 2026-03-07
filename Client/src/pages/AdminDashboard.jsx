@@ -1261,44 +1261,44 @@ const AdminDashboard = () => {
                     )}
 
                     {activeTab === 'blogs' && (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full">
+                      <div className="overflow-x-auto max-w-full">
+                        <table className="w-full table-fixed">
                           <thead>
                             <tr className="border-b border-gray-200">
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Title</th>
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Author</th>
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Stats</th>
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Created</th>
-                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Title</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">Author</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">Stats</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/8">Status</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/8">Created</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white">
                             {filteredBlogs.map((blog) => (
                               <React.Fragment key={blog.id}>
                                 <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                  <td className="px-4 py-4 text-sm font-medium text-gray-900">
                                     <div className="flex items-center gap-2">
                                       <button
                                         onClick={() => toggleBlogExpand(blog.id)}
-                                        className="text-blue-900 hover:text-blue-950"
+                                        className="text-blue-900 hover:text-blue-950 flex-shrink-0"
                                       >
                                         {expandedBlogIds.includes(blog.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                       </button>
-                                      <span>{blog.title}</span>
+                                      <span className="truncate">{blog.title}</span>
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <div>
-                                      <div className="font-medium">
+                                  <td className="px-4 py-4 text-sm text-gray-500">
+                                    <div className="truncate">
+                                      <div className="font-medium truncate">
                                         {typeof blog.author === 'string' ? blog.author : blog.author?.name || 'Unknown'}
                                       </div>
                                       {blog.author?.email && (
-                                        <div className="text-xs text-gray-500">{blog.author.email}</div>
+                                        <div className="text-xs text-gray-500 truncate">{blog.author.email}</div>
                                       )}
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                  <td className="px-4 py-4 text-sm text-gray-700">
                                     <div className="flex flex-col gap-1">
                                       {blog.comment_count !== undefined && (
                                         <span className="text-xs bg-gray-100 px-2 py-1 rounded">{blog.comment_count} comments</span>
@@ -1308,7 +1308,7 @@ const AdminDashboard = () => {
                                       )}
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
+                                  <td className="px-4 py-4 whitespace-nowrap">
                                     <span className={`px-2 py-1 text-xs font-medium rounded ${
                                       blog.is_published 
                                         ? 'bg-blue-100 text-blue-900' 
@@ -1317,10 +1317,10 @@ const AdminDashboard = () => {
                                       {blog.is_published ? 'Published' : 'Draft'}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                                     {new Date(blog.created_at).toLocaleDateString()}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                  <td className="px-4 py-4 whitespace-nowrap text-sm">
                                     <button
                                       onClick={() => handleDeleteBlog(blog.id)}
                                       className="text-blue-900 hover:text-blue-950 font-medium flex items-center gap-1 transition-colors"
@@ -1332,14 +1332,16 @@ const AdminDashboard = () => {
                                 </tr>
                                 {expandedBlogIds.includes(blog.id) && (
                                   <tr>
-                                    <td colSpan="6" className="px-6 py-4 bg-blue-50">
-                                      <div className="space-y-3">
+                                    <td colSpan="6" className="px-4 py-4 bg-blue-50">
+                                      <div className="space-y-3 max-w-full">
                                         <div>
                                           <h4 className="font-bold text-sm text-blue-900 mb-2">Content:</h4>
-                                          <div className="p-4 bg-white rounded border border-blue-200 text-sm text-gray-700 max-h-96 overflow-y-auto prose prose-sm max-w-none">
-                                            <ReactMarkdown>
-                                              {blog.full_content || blog.content_preview || 'No content available'}
-                                            </ReactMarkdown>
+                                          <div className="p-4 bg-white rounded border border-blue-200 text-sm text-gray-700 max-h-64 overflow-y-auto overflow-x-hidden">
+                                            <div className="prose prose-sm max-w-none break-words">
+                                              <ReactMarkdown>
+                                                {blog.full_content || blog.content_preview || 'No content available'}
+                                              </ReactMarkdown>
+                                            </div>
                                           </div>
                                         </div>
                                         {blog.tags && blog.tags.length > 0 && (
