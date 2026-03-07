@@ -33,9 +33,16 @@ const Practice = () => {
       }
 
       setRecData(res.data);
+      
+      // Dismiss loading toast and show success on refresh
+      if (forceRefresh) {
+        toast.dismiss();
+        toast.success('AI practice plan updated');
+      }
     } catch (err) {
       console.error('Recommendation fetch error:', err);
       setError(err.response?.data?.error || 'Could not load AI recommendations');
+      toast.dismiss();
       toast.error('Failed to load recommendations');
     } finally {
       setLoading(false);
