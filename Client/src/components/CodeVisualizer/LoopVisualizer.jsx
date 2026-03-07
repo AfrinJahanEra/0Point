@@ -87,34 +87,97 @@ const LoopVisualizer = ({
     return langMap[ext] || 'python';
   };
 
-  // Analyze code patterns
+  // Analyze code patterns with improved detection
   const analyzeCodePatterns = (code) => {
     const patterns = {
       loops: 0,
       conditionals: 0,
       functionCalls: 0,
-      recursionDepth: 0
+      recursionDepth: 0,
+      functionDefinitions: 0,
+      arrayOperations: 0,
+      sizeofUsage: 0
     };
     
-    // Split code into lines for analysis
-    const lines = code.split('\n');
+    // Remove comments and strings for accurate analysis
+    const cleanCode = code
+      .replace(/\/\*[\s\S]*?\*\//g, '') // Remove multi-line comments
+      .replace(/\/\/.*$/gm, '')          // Remove single-line comments
+      .replace(/"[^"]*"/g, '""')          // Replace strings with empty strings
+      .replace(/'[^']*'/g, "''");         // Replace char literals
+    
+    const lines = cleanCode.split('\n');
+    const functionNames = new Set();
     
     lines.forEach(line => {
       const trimmed = line.trim();
       
-      // Count loops
-      if (/\b(for|while)\b/.test(trimmed)) {
+      // Count loops (for, while, do-while)
+      if (/\b(for|while)\s*\(/.test(trimmed)) {
+        patterns.loops++;
+      }
+      if (/\bdo\s*\{/.test(trimmed)) {
         patterns.loops++;
       }
       
-      // Count conditionals
-      if (/\b(if|else|elif|switch)\b/.test(trimmed)) {
+      // Count conditionals (if, else if, else, switch, case, ternary)
+      if (/\b(if|else\s+if|switch)\s*\(/.test(trimmed)) {
         patterns.conditionals++;
       }
+      if (/\belse\s*\{/.test(trimmed) || /\belse\s*$/.test(trimmed)) {
+        patterns.conditionals++;
+      }
+      // Count ternary operators
+      const ternaryCount = (trimmed.match(/\?[^:]+:/g) || []).length;
+      patterns.conditionals += ternaryCount;
       
-      // Count function calls (simple pattern)
-      if (/\w+\s*\([^)]*\)/.test(trimmed) && !/^(if|for|while|function|def|class)/.test(trimmed)) {
-        patterns.functionCalls++;
+      // Detect function definitions (C++ and other languages)
+      const funcDefMatch = trimmed.match(/^(?:(?:int|void|bool|char|float|double|long|string|auto|vector|pair|map|set)\s+)+(\w+)\s*\([^)]*\)\s*\{?$/);
+      if (funcDefMatch) {
+        const funcName = funcDefMatch[1];
+        if (funcName !== 'main' && funcName !== 'if' && funcName !== 'while' && funcName !== 'for') {
+          functionNames.add(funcName);
+          patterns.functionDefinitions++;
+        }
+      }
+      
+      // Python function definitions
+      if (/^def\s+(\w+)\s*\(/.test(trimmed)) {
+        const match = trimmed.match(/^def\s+(\w+)/);
+        if (match) {
+          functionNames.add(match[1]);
+          patterns.functionDefinitions++;
+        }
+      }
+      
+      // Count function calls (excluding control structures and declarations)
+      const funcCallMatches = trimmed.match(/\b(\w+)\s*\(/g) || [];
+      funcCallMatches.forEach(match => {
+        const funcName = match.replace(/\s*\($/, '');
+        // Exclude control structures and type declarations
+        if (!['if', 'while', 'for', 'switch', 'int', 'void', 'bool', 'char', 'float', 'double', 'long', 'string', 'vector', 'pair', 'map', 'set', 'def', 'class'].includes(funcName)) {
+          patterns.functionCalls++;
+        }
+      });
+      
+      // Detect array/vector operations
+      if (/\[\s*\d*\s*\]/.test(trimmed) || /\.push_back\(|\.pop_back\(|\.size\(|\.empty\(|\.begin\(|\.end\(/.test(trimmed)) {
+        patterns.arrayOperations++;
+      }
+      
+      // Detect sizeof usage
+      if (/sizeof\s*\(/.test(trimmed)) {
+        patterns.sizeofUsage++;
+      }
+    });
+    
+    // Detect recursion by checking if any defined function is called
+    functionNames.forEach(funcName => {
+      const callPattern = new RegExp(`\\b${funcName}\\s*\\(`, 'g');
+      const matches = cleanCode.match(callPattern) || [];
+      // If function is called more than once (definition + calls), likely recursive
+      if (matches.length > 1) {
+        patterns.recursionDepth++;
       }
     });
     
@@ -239,37 +302,137 @@ const LoopVisualizer = ({
     }
   };
 
-  // Determine variable type from value
+  // Determine variable type from value with improved detection
   const getVariableType = (value) => {
+    // Handle null/undefined
+    if (value === null || value === undefined) {
+      return 'null';
+    }
+    
+    // Handle boolean
+    if (typeof value === 'boolean') {
+      return 'bool';
+    }
+    
+    // Handle numbers
     if (typeof value === 'number') {
+      if (Number.isNaN(value)) return 'NaN';
+      if (!Number.isFinite(value)) return 'infinity';
       return Number.isInteger(value) ? 'int' : 'float';
     }
     
+    // Handle arrays (vectors, C++ arrays)
+    if (Array.isArray(value)) {
+      if (value.length === 0) return 'array (empty)';
+      const elemType = typeof value[0] === 'number' 
+        ? (Number.isInteger(value[0]) ? 'int' : 'float')
+        : typeof value[0];
+      return `array<${elemType}>`;
+    }
+    
+    // Handle strings
     if (typeof value === 'string') {
+      // Check for boolean string representations
       if (value === 'true' || value === 'false' || value === 'True' || value === 'False') {
         return 'bool';
       }
+      
+      // Check for array-like strings (from C++ output)
       if (value.startsWith('[') && value.endsWith(']')) {
         return 'array';
       }
-      if (!isNaN(value) && !isNaN(parseFloat(value))) {
-        return value.includes('.') ? 'float' : 'int';
+      if (value.startsWith('{') && value.endsWith('}')) {
+        return 'array';
       }
+      
+      // Check for numeric strings
+      if (!isNaN(value) && value.trim() !== '') {
+        const num = parseFloat(value);
+        if (!isNaN(num)) {
+          return value.includes('.') ? 'float' : 'int';
+        }
+      }
+      
+      // Check for C++ type indicators
       if (value.includes('vector') || value.includes('std::')) {
         return 'array';
       }
+      
+      // Check for pointer values
+      if (value.startsWith('0x') || value.includes('ptr')) {
+        return 'pointer';
+      }
+      
+      // Check for char (single character)
+      if (value.length === 1) {
+        return 'char';
+      }
+      
       return 'string';
     }
     
-    if (Array.isArray(value)) {
-      return 'array';
-    }
-    
-    if (value !== null && typeof value === 'object') {
+    // Handle objects
+    if (typeof value === 'object') {
+      if (value.constructor && value.constructor.name !== 'Object') {
+        return value.constructor.name.toLowerCase();
+      }
       return 'object';
     }
     
     return 'unknown';
+  };
+
+  // Format variable value for display
+  const formatVariableValue = (value, type) => {
+    if (value === null || value === undefined) {
+      return 'null';
+    }
+    
+    if (Array.isArray(value)) {
+      if (value.length > 10) {
+        return `[${value.slice(0, 10).join(', ')}, ... (${value.length} items)]`;
+      }
+      return `[${value.join(', ')}]`;
+    }
+    
+    if (typeof value === 'string' && value.length > 50) {
+      return `"${value.substring(0, 47)}..."`;
+    }
+    
+    if (typeof value === 'object') {
+      try {
+        const str = JSON.stringify(value);
+        return str.length > 50 ? str.substring(0, 47) + '...' : str;
+      } catch {
+        return String(value);
+      }
+    }
+    
+    return String(value);
+  };
+
+  // Get type color for visual indication
+  const getTypeColor = (type) => {
+    const colors = {
+      'int': 'bg-blue-100 text-blue-800',
+      'float': 'bg-purple-100 text-purple-800',
+      'double': 'bg-purple-100 text-purple-800',
+      'bool': 'bg-green-100 text-green-800',
+      'string': 'bg-amber-100 text-amber-800',
+      'char': 'bg-orange-100 text-orange-800',
+      'array': 'bg-cyan-100 text-cyan-800',
+      'pointer': 'bg-red-100 text-red-800',
+      'object': 'bg-pink-100 text-pink-800',
+      'null': 'bg-gray-100 text-gray-500',
+      'unknown': 'bg-gray-100 text-gray-600',
+    };
+    
+    // Check for array subtypes
+    if (type.startsWith('array')) {
+      return colors['array'];
+    }
+    
+    return colors[type] || colors['unknown'];
   };
 
   // Navigation functions
@@ -345,31 +508,51 @@ const LoopVisualizer = ({
     };
   }, []);
 
-  // Variable tracking (only real variables)
+  // Variable tracking - accumulate all variables across all steps up to current
   const variableData = useMemo(() => {
     if (iterations.length === 0) return { currentVars: [] };
 
-    const currentStepVars = iterations[currentStep]?.variables || [];
-    const prevStepVars = currentStep > 0 ? iterations[currentStep - 1]?.variables || [] : [];
+    // Accumulate all variables from step 0 to currentStep
+    // This ensures variables persist with their last known value
+    const accumulatedVars = {};
     
-    // Build variables list
-    const vars = [];
-    const allVarNames = new Set();
-    
-    currentStepVars.forEach(v => allVarNames.add(v.name));
-    prevStepVars.forEach(v => allVarNames.add(v.name));
-    
-    Array.from(allVarNames).sort().forEach(name => {
-      const currentVar = currentStepVars.find(v => v.name === name);
-      const prevVar = prevStepVars.find(v => v.name === name);
-      
-      vars.push({
-        name,
-        type: currentVar?.type || prevVar?.type || 'unknown',
-        value: currentVar?.value || '—',
-        changed: currentVar && prevVar && currentVar.value !== prevVar.value
+    for (let stepIdx = 0; stepIdx <= currentStep && stepIdx < iterations.length; stepIdx++) {
+      const stepVars = iterations[stepIdx]?.variables || [];
+      stepVars.forEach(v => {
+        accumulatedVars[v.name] = {
+          name: v.name,
+          type: v.type,
+          value: v.value,
+          lastUpdatedStep: stepIdx
+        };
       });
+    }
+    
+    // Get current step variables for change detection
+    const currentStepVars = iterations[currentStep]?.variables || [];
+    const currentStepVarMap = {};
+    currentStepVars.forEach(v => {
+      currentStepVarMap[v.name] = v.value;
     });
+    
+    // Get previous step variables for change detection
+    const prevStepVars = currentStep > 0 ? iterations[currentStep - 1]?.variables || [] : [];
+    const prevStepVarMap = {};
+    prevStepVars.forEach(v => {
+      prevStepVarMap[v.name] = v.value;
+    });
+    
+    // Build final variables list
+    const vars = Object.values(accumulatedVars)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(v => ({
+        name: v.name,
+        type: v.type,
+        value: v.value,
+        changed: v.name in currentStepVarMap && 
+                 v.name in prevStepVarMap && 
+                 currentStepVarMap[v.name] !== prevStepVarMap[v.name]
+      }));
     
     return { currentVars: vars };
   }, [iterations, currentStep]);

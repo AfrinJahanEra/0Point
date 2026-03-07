@@ -151,7 +151,7 @@ const CodeVisualizer = ({ algorithmId, algorithmCode, inputData }) => {
                   </svg>
                   Code Patterns
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-80 overflow-y-auto">
                   <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
                     <span className="text-gray-700 flex items-center">
                       <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -159,7 +159,7 @@ const CodeVisualizer = ({ algorithmId, algorithmCode, inputData }) => {
                       </svg>
                       Loops Detected
                     </span>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full $ {
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       codePatterns.loops > 0 
                         ? 'bg-blue-100 text-blue-800' 
                         : 'bg-gray-100 text-gray-500'
@@ -174,7 +174,7 @@ const CodeVisualizer = ({ algorithmId, algorithmCode, inputData }) => {
                       </svg>
                       Conditionals
                     </span>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full $ {
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       codePatterns.conditionals > 0 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-gray-100 text-gray-500'
@@ -189,7 +189,7 @@ const CodeVisualizer = ({ algorithmId, algorithmCode, inputData }) => {
                       </svg>
                       Function Calls
                     </span>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full $ {
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       codePatterns.functionCalls > 0 
                         ? 'bg-purple-100 text-purple-800' 
                         : 'bg-gray-100 text-gray-500'
@@ -199,17 +199,62 @@ const CodeVisualizer = ({ algorithmId, algorithmCode, inputData }) => {
                   </div>
                   <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
                     <span className="text-gray-700 flex items-center">
+                      <svg className="w-4 h-4 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                      Function Definitions
+                    </span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      codePatterns.functionDefinitions > 0 
+                        ? 'bg-indigo-100 text-indigo-800' 
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {codePatterns.functionDefinitions || 0}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                    <span className="text-gray-700 flex items-center">
                       <svg className="w-4 h-4 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                       Recursion Depth
                     </span>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full $ {
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       codePatterns.recursionDepth > 0 
                         ? 'bg-amber-100 text-amber-800' 
                         : 'bg-gray-100 text-gray-500'
                     }`}>
                       {codePatterns.recursionDepth}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                    <span className="text-gray-700 flex items-center">
+                      <svg className="w-4 h-4 mr-2 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                      </svg>
+                      Array Operations
+                    </span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      codePatterns.arrayOperations > 0 
+                        ? 'bg-cyan-100 text-cyan-800' 
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {codePatterns.arrayOperations || 0}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                    <span className="text-gray-700 flex items-center">
+                      <svg className="w-4 h-4 mr-2 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      sizeof() Usage
+                    </span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      codePatterns.sizeofUsage > 0 
+                        ? 'bg-rose-100 text-rose-800' 
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {codePatterns.sizeofUsage || 0}
                     </span>
                   </div>
                 </div>
@@ -218,7 +263,7 @@ const CodeVisualizer = ({ algorithmId, algorithmCode, inputData }) => {
             
             <div className="mt-6 bg-gradient-to-r from-[#001F3F] to-gray-800 rounded-xl p-6 text-white">
               <h3 className="text-lg font-semibold mb-3">Pro Tip</h3>
-              <p className="text-gray-200">Upload your code and run visualization to see detailed analysis of execution patterns, variable changes, and performance metrics in real-time.</p>
+              <p className="text-gray-200">Upload your code and run visualization to see detailed analysis of execution patterns, variable changes, and performance metrics in real-time. The analyzer detects functions, loops, sizeof() expressions, and more.</p>
             </div>
           </div>
         )}
