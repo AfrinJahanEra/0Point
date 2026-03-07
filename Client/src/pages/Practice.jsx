@@ -64,7 +64,7 @@ const Practice = () => {
                 <button
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 disabled:opacity-50 transition disabled:cursor-not-allowed"
                 >
                   <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
                   {refreshing ? 'Generating...' : 'Refresh AI Plan'}
@@ -75,7 +75,7 @@ const Practice = () => {
             {/* Loading / Error / Content */}
             {loading ? (
               <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-800 mx-auto mb-4"></div>
                 <p className="text-gray-600">Loading your personalized practice plan...</p>
                 <p className="text-sm text-gray-500 mt-2">This may take a few seconds the first time</p>
               </div>
@@ -93,8 +93,8 @@ const Practice = () => {
               <>
                 {/* Practice Plan */}
                 {recData?.practice_plan && (
-                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6 border border-indigo-100">
-                    <h2 className="text-lg font-semibold text-indigo-800 mb-3">Your 7-Day AI Practice Plan</h2>
+                  <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                    <h2 className="text-lg font-semibold text-blue-800 mb-3">Your 7-Day AI Practice Plan</h2>
                     <p className="text-gray-700 whitespace-pre-line">{recData.practice_plan}</p>
                   </div>
                 )}
@@ -112,7 +112,7 @@ const Practice = () => {
                             <h3 className="font-semibold text-gray-900 text-lg line-clamp-2">
                               {prob.title}
                             </h3>
-                            <span className="px-2.5 py-1 bg-indigo-100 text-indigo-800 text-xs font-medium rounded-full">
+                            <span className="px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
                               {prob.difficulty}
                             </span>
                           </div>
@@ -134,7 +134,7 @@ const Practice = () => {
                             href={prob.link}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-block px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 transition"
+                            className="inline-block px-4 py-2 bg-blue-800 text-white text-sm font-medium rounded hover:bg-blue-900 transition"
                           >
                             Solve Now →
                           </a>
