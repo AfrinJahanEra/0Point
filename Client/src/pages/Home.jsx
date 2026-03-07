@@ -77,6 +77,10 @@ const Home = () => {
   const [announcementDislikes, setAnnouncementDislikes] = useState({});
   const [showAnnouncementFullContent, setShowAnnouncementFullContent] = useState({});
 
+  // Recommendations state
+  const [recommendations, setRecommendations] = useState([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+
   // Single loading state for dashboard
   const [loading, setLoading] = useState(true);
 
@@ -159,6 +163,25 @@ const Home = () => {
     }
   };
 
+  // Fetch AI recommendations (only for logged-in users)
+  const fetchRecommendations = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return; // Skip if not logged in
+    
+    try {
+      setRecommendationsLoading(true);
+      const response = await api.get('/account/recommend-problems/');
+      if (response.data.success && response.data.recommendations) {
+        setRecommendations(response.data.recommendations.slice(0, 5)); // Top 5 only
+      }
+    } catch (error) {
+      console.error('Recommendations fetch error:', error);
+      // Silently fail - recommendations are optional enhancement
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  };
+
   // Update countdown timer every second
   useEffect(() => {
     if (!soonestContest) return;
@@ -189,6 +212,7 @@ const Home = () => {
   // Fetch all dashboard data on mount
   useEffect(() => {
     fetchDashboardData();
+    fetchRecommendations();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Blog functions
@@ -1386,44 +1410,52 @@ const Home = () => {
                   </Link>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left font-semibold text-gray-900 pb-2">Problem</th>
-                        <th className="text-center font-semibold text-gray-900 pb-2">Difficulty</th>
-                        <th className="text-center font-semibold text-gray-900 pb-2">Topic</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { id: 1, title: "Two Sum", difficulty: "Easy", topic: "Arrays" },
-                        { id: 2, title: "Binary Tree Traversal", difficulty: "Medium", topic: "Trees" },
-                        { id: 3, title: "Dynamic Range Sum", difficulty: "Hard", topic: "Segment Trees" },
-                        { id: 5, title: "String Matching", difficulty: "Easy", topic: "Strings" },
-                        { id: 6, title: "Dynamic Programming Basics", difficulty: "Medium", topic: "DP" },
-                        { id: 8, title: "Linked List Operations", difficulty: "Easy", topic: "LinkedList" },
-                        { id: 9, title: "Backtracking Patterns", difficulty: "Medium", topic: "Recursion" },
-                        { id: 11, title: "Sliding Window Technique", difficulty: "Medium", topic: "Arrays" },
-                        { id: 12, title: "Heap Operations", difficulty: "Medium", topic: "Data Structures" },
-                        { id: 13, title: "Bit Manipulation", difficulty: "Easy", topic: "Bits" },
-                        { id: 14, title: "Greedy Algorithms", difficulty: "Medium", topic: "Algorithms" }
-                      ].map((problem) => (
-                        <tr key={problem.id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-2">
-                            <Link to={`/problem/${problem.id}`} className="text-blue-900 font-bold hover:text-blue-800 hover:underline">
-                              {problem.title}
-                            </Link>
-                          </td>
-                          <td className="py-2 text-center text-gray-700">
-                            {problem.difficulty}
-                          </td>
-                          <td className="py-2 text-center text-gray-600">
-                            {problem.topic}
-                          </td>
+                  {recommendationsLoading ? (
+                    <div className="py-4 text-center text-gray-500 text-xs">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                      Loading AI recommendations...
+                    </div>
+                  ) : recommendations.length > 0 ? (
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left font-semibold text-gray-900 pb-2">Problem</th>
+                          <th className="text-center font-semibold text-gray-900 pb-2">Difficulty</th>
+                          <th className="text-center font-semibold text-gray-900 pb-2">Topic</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {recommendations.map((problem, index) => (
+                          <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="py-2">
+                              <a 
+                                href={problem.link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-900 font-bold hover:text-blue-800 hover:underline"
+                              >
+                                {problem.title}
+                              </a>
+                              <span className="ml-1.5 text-[10px] text-gray-400">{problem.platform}</span>
+                            </td>
+                            <td className="py-2 text-center text-gray-700">
+                              {problem.difficulty}
+                            </td>
+                            <td className="py-2 text-center text-gray-600">
+                              {Array.isArray(problem.tags) ? problem.tags[0] : problem.tags || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="py-4 text-center text-gray-500 text-xs">
+                      <p>Sign in to get AI-powered recommendations</p>
+                      <Link to="/practice" className="text-blue-600 hover:underline mt-1 inline-block">
+                        Explore practice problems
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
