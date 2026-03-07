@@ -1,11 +1,14 @@
 #Server/account/urls.py
 from django.urls import path
-from .views import   CodeforcesCalendarView,LeetCodeCalendarView, CodeChefCalendarView, AtCoderCalendarView ,SignupView, LoginView, TagStatsView, UserProfileView, AddPlatformProfileView, ContestHistoryView, ExternalSubmissionView, VerdictStatsView
+from .views import   CodeforcesCalendarView,LeetCodeCalendarView, CodeChefCalendarView, AtCoderCalendarView ,SignupView, LoginView, TagStatsView, UserProfileView, PublicUserProfileView, PublicTagStatsView, PublicVerdictStatsView, AddPlatformProfileView, ContestHistoryView, ExternalSubmissionView, VerdictStatsView
 from recommendation.views import RecommendationView, RefreshRecommendationView
 
 urlpatterns = [
     path("signup/", SignupView.as_view(), name="signup"),
     path("login/", LoginView.as_view(), name="login"),
+    path("public-profile/<str:user_id>/", PublicUserProfileView.as_view(), name="public_user_profile"),
+    path("tag-stats/<str:user_id>/", PublicTagStatsView.as_view(), name="public_tag_stats"),
+    path("verdict-stats/<str:user_id>/", PublicVerdictStatsView.as_view(), name="public_verdict_stats"),
     path("profile/<str:user_id>/", UserProfileView.as_view(), name="user_profile"),
     path("profile/", UserProfileView.as_view(), name="current_user_profile"),
     path("platform/add/", AddPlatformProfileView.as_view(), name="add_platform"),

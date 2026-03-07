@@ -798,7 +798,7 @@ const Home = () => {
                           </td>
                           <td className="py-2">
                             <Link 
-                              to={`/profile/${user.username}`}
+                              to={`/user/${user.user_id}`}
                               className="text-blue-900 font-bold hover:text-blue-800 hover:underline"
                             >
                               {user.username}
@@ -845,19 +845,25 @@ const Home = () => {
                     {/* Profile Avatar and Author Section */}
                     <div className="flex items-center gap-2 mb-3">
                       <div 
-                        className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm cursor-pointer"
-                        onClick={() => navigate(`/profile/${announcements[0]?.author}`)}
+                        className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm ${announcements[0]?.author_id ? 'cursor-pointer' : ''}`}
+                        onClick={() => announcements[0]?.author_id && navigate(`/user/${announcements[0].author_id}`)}
                       >
                         {announcements[0]?.author ? announcements[0].author.charAt(0).toUpperCase() : 'A'}
                       </div>
                       
                       <div className="flex flex-col">
-                        <Link 
-                          to={`/profile/${announcements[0]?.author}`}
-                          className="text-xs font-semibold text-gray-900 hover:text-blue-600"
-                        >
-                          {announcements[0]?.author || 'Admin'}
-                        </Link>
+                        {announcements[0]?.author_id ? (
+                          <Link 
+                            to={`/user/${announcements[0].author_id}`}
+                            className="text-xs font-semibold text-gray-900 hover:text-blue-600"
+                          >
+                            {announcements[0]?.author || 'Admin'}
+                          </Link>
+                        ) : (
+                          <span className="text-xs font-semibold text-gray-900">
+                            {announcements[0]?.author || 'Admin'}
+                          </span>
+                        )}
                         <span className="text-xs text-gray-500">
                           {announcements[0]?.created_at ? new Date(announcements[0].created_at).toLocaleDateString('en-US', {
                             year: 'numeric',
@@ -987,19 +993,25 @@ const Home = () => {
                       {/* Profile Avatar and Username Section */}
                       <div className="flex items-center gap-2 mb-3">
                         <div 
-                          className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm cursor-pointer"
-                          onClick={() => navigate(`/profile/${post.author?.name}`)}
+                          className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm ${post.author?.id ? 'cursor-pointer' : ''}`}
+                          onClick={() => post.author?.id && navigate(`/user/${post.author.id}`)}
                         >
                           {post.author?.name ? post.author.name.charAt(0).toUpperCase() : 'U'}
                         </div>
                         
                         <div className="flex flex-col">
-                          <Link 
-                            to={`/profile/${post.author?.name}`}
-                            className="text-xs font-semibold text-gray-900 hover:text-blue-600"
-                          >
-                            {post.author?.name || 'Unknown User'}
-                          </Link>
+                          {post.author?.id ? (
+                            <Link 
+                              to={`/user/${post.author.id}`}
+                              className="text-xs font-semibold text-gray-900 hover:text-blue-600"
+                            >
+                              {post.author?.name || 'Unknown User'}
+                            </Link>
+                          ) : (
+                            <span className="text-xs font-semibold text-gray-900">
+                              {post.author?.name || 'Unknown User'}
+                            </span>
+                          )}
                           <span className="text-xs text-gray-500">
                             {post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', {
                               year: 'numeric',
@@ -1340,7 +1352,7 @@ const Home = () => {
               </td>
               <td className="py-2">
                 <Link 
-                  to={`/profile/${contributor.username}`}
+                  to={`/user/${contributor.user_id}`}
                   className="text-blue-900 font-bold hover:text-blue-800 hover:underline"
                 >
                   {contributor.name}

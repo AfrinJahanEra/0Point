@@ -66,6 +66,7 @@ class LeaderboardMinimalView(APIView):
             for user in users:
                 try:
                     leaderboard_data.append({
+                        "user_id": str(user.id),
                         "username": user.name,
                         "total_points": user.rating,
                         "rank": current_rank

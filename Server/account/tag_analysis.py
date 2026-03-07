@@ -252,50 +252,71 @@ def get_category_scores(user):
     cf_handle = user.get_platform_profile("codeforces").handle if user.get_platform_profile("codeforces") else None
     lc_handle = user.get_platform_profile("leetcode").handle if user.get_platform_profile("leetcode") else None
 
+    # Check if we need to fetch new data or can return cached scores
+    need_cf_fetch = False
+    need_lc_fetch = False
+    
+    # ── Check Codeforces freshness ──────────────────────────────────
+    if cf_handle:
+        if cache and cache.last_cf_submission_time:
+            try:
+                url = f"{CF_API_BASE}/user.status?handle={cf_handle}&from=1&count=1"
+                resp = requests.get(url, headers=HEADERS, timeout=5)
+                data = resp.json()
+                if data.get("status") == "OK" and data.get("result"):
+                    newest = data["result"][0]["creationTimeSeconds"]
+                    if newest > cache.last_cf_submission_time:
+                        need_cf_fetch = True
+            except Exception as e:
+                print(f"CF recency check failed: {e}")
+        else:
+            need_cf_fetch = True  # No cache, need to fetch
+    
+    # ── Check LeetCode freshness ────────────────────────────────────
+    if lc_handle:
+        if cache and cache.last_lc_submission_time:
+            try:
+                url = LC_SUBMISSIONS_API.format(lc_handle)
+                resp = requests.get(url, headers=HEADERS, timeout=5)
+                data = resp.json()
+                if data:
+                    newest = max((int(s.get("timestamp", 0)) for s in data), default=0)
+                    if newest > cache.last_lc_submission_time:
+                        need_lc_fetch = True
+            except Exception as e:
+                print(f"LC recency check failed: {e}")
+        else:
+            need_lc_fetch = True  # No cache, need to fetch
+
+    # ── Return cached data if no new fetches needed ─────────────────
+    if not need_cf_fetch and not need_lc_fetch and cache and cache.category_scores:
+        return cache.category_scores
+
+    # ── If no handles at all, return empty or cached ────────────────
+    if not cf_handle and not lc_handle:
+        return cache.category_scores if cache and cache.category_scores else {}
+
+    # ── Fetch fresh data ────────────────────────────────────────────
     cf_att = defaultdict(list)
     lc_att = defaultdict(list)
     cf_tags = defaultdict(set)
     lc_tags = defaultdict(set)
     new_cf_last = cache.last_cf_submission_time if cache else 0
     new_lc_last = cache.last_lc_submission_time if cache else 0
-    
-    # ── Codeforces ──────────────────────────────────────────────────
-    need_cf_fetch = True
-    if cache and cf_handle:
-        try:
-            url = f"{CF_API_BASE}/user.status?handle={cf_handle}&from=1&count=1"
-            resp = requests.get(url, headers=HEADERS, timeout=5)
-            data = resp.json()
-            if data.get("status") == "OK" and data.get("result"):
-                newest = data["result"][0]["creationTimeSeconds"]
-                if newest <= cache.last_cf_submission_time:
-                    need_cf_fetch = False
-        except Exception as e:
-            print(f"CF recency check failed: {e}")
-            need_cf_fetch = False
 
     if need_cf_fetch and cf_handle:
         cf_att, new_cf_last, cf_tags = fetch_cf_category_attempts(cf_handle)
-
-    # ── LeetCode ────────────────────────────────────────────────────
-    need_lc_fetch = True
-    if cache and lc_handle:
-        try:
-            url = LC_SUBMISSIONS_API.format(lc_handle)
-            resp = requests.get(url, headers=HEADERS, timeout=5)
-            data = resp.json()
-            if data:
-                newest = max((int(s.get("timestamp", 0)) for s in data), default=0)
-                if newest <= cache.last_lc_submission_time:
-                    need_lc_fetch = False
-        except Exception as e:
-            print(f"LC recency check failed: {e}")
-            need_lc_fetch = False
     
     if need_lc_fetch and lc_handle:
         lc_att, new_lc_last, lc_tags = fetch_lc_category_attempts(lc_handle)
+
+    # ── If partial fetch returned no data, return cache if available ─
+    if not cf_att and not lc_att:
+        if cache and cache.category_scores:
+            return cache.category_scores
+        return {}
     
-        # In merge:
+    # Merge results
     all_att = defaultdict(list)
     for d in [cf_att, lc_att]:           # both — even if one is empty
         for cat, lst in d.items():

@@ -144,7 +144,7 @@ const Leaderboard = () => {
                       <tr
                         key={user.user_id}
                         onClick={() =>
-                          navigate(`/account/profile/${user.user_id}/`)
+                          navigate(`/user/${user.user_id}`)
                         }
                         className="border-b hover:bg-gray-50 cursor-pointer"
                       >

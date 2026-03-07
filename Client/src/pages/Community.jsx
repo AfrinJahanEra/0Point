@@ -540,12 +540,18 @@ const Community = () => {
                           
                           {/* Author Info */}
                           <div>
-                            <Link 
-                              to={`/profile/${blog.author?.name}`}
-                              className={`text-sm font-medium hover:underline ${getRatingColor(blog.author?.rating)}`}
-                            >
-                              {blog.author?.name || 'Unknown Author'}
-                            </Link>
+                            {blog.author?.id ? (
+                              <Link 
+                                to={`/user/${blog.author.id}`}
+                                className={`text-sm font-medium hover:underline ${getRatingColor(blog.author?.rating)}`}
+                              >
+                                {blog.author?.name || 'Unknown Author'}
+                              </Link>
+                            ) : (
+                              <span className={`text-sm font-medium ${getRatingColor(blog.author?.rating)}`}>
+                                {blog.author?.name || 'Unknown Author'}
+                              </span>
+                            )}
                             <div className="text-xs text-gray-500">
                               {formatDate(blog.published_at)}
                             </div>

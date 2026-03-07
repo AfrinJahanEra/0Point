@@ -133,6 +133,7 @@ class LeaderboardView(APIView):
 
             results.append({
                 "rank": 0,
+                "user_id": user_id,
                 "username": getattr(user, "username", getattr(user, "name", "Anonymous")),
                 "name": getattr(user, "name", "Anonymous"),
                 "country": getattr(user, "country", "Unknown"),

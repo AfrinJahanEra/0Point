@@ -263,12 +263,18 @@ const Blog = () => {
                         {/* Author */}
                         {blog.author?.username && (
                           <>
-                            <Link 
-                              to={`/profile/${blog.author.username}`}
-                              className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {blog.author.username}
-                            </Link>
+                            {blog.author?.id ? (
+                              <Link 
+                                to={`/user/${blog.author.id}`}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                {blog.author.username}
+                              </Link>
+                            ) : (
+                              <span className="text-xs font-medium text-gray-700">
+                                {blog.author.username}
+                              </span>
+                            )}
                             <span className="text-gray-400 text-xs">•</span>
                           </>
                         )}

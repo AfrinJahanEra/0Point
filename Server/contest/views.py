@@ -2795,6 +2795,7 @@ class HomeDashboardAPIView(APIView):
                 rank = 1
                 for u in Account.objects(is_deleted=False, is_inactive=False).order_by('-rating').limit(5):
                     leaderboard_data.append({
+                        "user_id": str(u.id),
                         "username": u.name,
                         "total_points": u.rating,
                         "rank": rank

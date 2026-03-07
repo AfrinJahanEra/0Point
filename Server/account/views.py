@@ -180,10 +180,39 @@ class PublicUserProfileView(APIView):
                 "min_rating": profile.min_rating,
                 "contests_count": profile.contests_count,
                 "badge": profile.badge,
-                # Do NOT include sensitive fields like rating_history if private
+                "rating_history": profile.rating_history,  # Public data on all CP platforms
             })
 
         return Response(profile_data)
+
+
+class PublicTagStatsView(APIView):
+    """Public endpoint to get tag stats for any user"""
+    permission_classes = [AllowAny]
+
+    def get(self, request, user_id):
+        try:
+            user = Account.objects.get(id=user_id, is_deleted=False, is_inactive=False)
+        except (DoesNotExist, Exception):
+            return Response({"error": "User not found"}, status=404)
+
+        category_scores = get_category_scores(user)
+        return Response({"category_scores": category_scores})
+
+
+class PublicVerdictStatsView(APIView):
+    """Public endpoint to get verdict stats for any user"""
+    permission_classes = [AllowAny]
+
+    def get(self, request, user_id):
+        try:
+            user = Account.objects.get(id=user_id, is_deleted=False, is_inactive=False)
+        except (DoesNotExist, Exception):
+            return Response({"error": "User not found"}, status=404)
+
+        verdict_counts = get_verdict_counts(user)
+        return Response({"verdict_counts": verdict_counts})
+
 
 class AddPlatformProfileView(APIView):
     """Add or update coding platform profile"""

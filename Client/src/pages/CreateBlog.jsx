@@ -111,9 +111,15 @@ const CreateBlog = () => {
     
     switch (type) {
       case 'user':
-        linkTo = `/profile/${trimmedValue}`;
-        displayText = isPreview ? `user - ${trimmedValue}` : trimmedValue;
-        break;
+        // User mentions are styled but not linked (would need user ID lookup)
+        displayText = isPreview ? `user - ${trimmedValue}` : `@${trimmedValue}`;
+        return (
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-medium text-sm"
+          >
+            {displayText}
+          </span>
+        );
         
       case 'submission':
         // Handle format: [submission:contests/contest_id/submissions]
@@ -253,8 +259,8 @@ const CreateBlog = () => {
 
     // Enhanced link component
     a: ({ href, children, ...props }) => {
-      // Check if it's a Codeforces tag link
-      if (href && (href.startsWith('/profile/') || href.startsWith('/contests/') || href.startsWith('/problems/') || href.startsWith('/submissions/'))) {
+      // Check if it's a Codeforces tag link (excluding profile links which are no longer used)
+      if (href && (href.startsWith('/contests/') || href.startsWith('/problems/') || href.startsWith('/submissions/'))) {
         return (
           <Link to={href} className="text-blue-600 hover:text-blue-800 hover:underline font-medium" {...props}>
             {children}

@@ -232,12 +232,15 @@ const ContestLeaderboard = () => {
                         </div>
                       </td>
                       <td className="p-2">
-                        <div className="flex items-center gap-2">
+                        <div 
+                          className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded-lg p-1 -m-1 transition-colors"
+                          onClick={() => participant.user_id && navigate(`/user/${participant.user_id}`)}
+                        >
                           <div className="w-7 h-7 bg-gradient-to-br from-blue-600 to-blue-800 rounded-full flex items-center justify-center text-white text-xs font-bold">
                             {participant.username?.charAt(0).toUpperCase() || 'A'}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-gray-900 truncate">
+                            <div className="font-semibold text-gray-900 truncate hover:text-blue-600">
                               {participant.username || 'Anonymous'}
                               {participant.isCurrentUser && (
                                 <span className="ml-1 px-1 py-0.5 bg-blue-600 text-white text-[10px] rounded">You</span>

@@ -177,6 +177,7 @@ from mongoengine import Document, StringField, DictField, DateTimeField
 class UserTagStats(Document):
     user_id = StringField(required=True, unique=True)
     category_scores = DictField(default=dict)  # {category: float score}
+    tags = DictField(default=dict)  # Legacy field for old data compatibility
     last_update = DateTimeField()
     last_cf_submission_time = IntField(default=0)
     last_lc_submission_time = IntField(default=0) 
