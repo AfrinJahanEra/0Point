@@ -30,7 +30,8 @@ import {
   Cpu,
   BarChart,
   PieChart,
-  LineChart
+  LineChart,
+  X
 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -71,6 +72,10 @@ const Home = () => {
 
   // Announcements state
   const [announcements, setAnnouncements] = useState([]);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+  const [announcementLikes, setAnnouncementLikes] = useState({});
+  const [announcementDislikes, setAnnouncementDislikes] = useState({});
+  const [showAnnouncementFullContent, setShowAnnouncementFullContent] = useState({});
 
   // Single loading state for dashboard
   const [loading, setLoading] = useState(true);
@@ -201,6 +206,30 @@ const Home = () => {
       [blogId]: (prev[blogId] || 0) + 1
     }));
     toast.success('Blog disliked!');
+  };
+
+  // Announcement handlers
+  const handleAnnouncementLike = (announcementId) => {
+    setAnnouncementLikes(prev => ({
+      ...prev,
+      [announcementId]: (prev[announcementId] || 0) + 1
+    }));
+    toast.success('Announcement liked!');
+  };
+
+  const handleAnnouncementDislike = (announcementId) => {
+    setAnnouncementDislikes(prev => ({
+      ...prev,
+      [announcementId]: (prev[announcementId] || 0) + 1
+    }));
+    toast.success('Announcement disliked!');
+  };
+
+  const toggleAnnouncementContent = (announcementId) => {
+    setShowAnnouncementFullContent(prev => ({
+      ...prev,
+      [announcementId]: !prev[announcementId]
+    }));
   };
 
   const toggleComments = (blogId) => {
@@ -791,7 +820,141 @@ const Home = () => {
 
           {/* Middle Column - Main Content (Wider) */}
           <div className="lg:col-span-6 space-y-4">
-            {/* Recent Blog Post */}
+            {/* Featured Announcement */}
+            <div className="bg-white rounded-lg">
+              <div className="p-3 border-b border-gray-200">
+                <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
+                  <div className="flex items-center gap-1.5">
+                    <Bell className="w-3.5 h-3.5 text-gray-700" />
+                    <h2 className="text-xs font-semibold text-gray-900">Featured Announcement</h2>
+                  </div>
+                </div>
+                
+                {loading ? (
+                  <div className="p-8 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                    <p className="text-xs text-gray-600">Loading announcement...</p>
+                  </div>
+                ) : announcements.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <Bell className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-xs text-gray-600">No announcements yet</p>
+                  </div>
+                ) : (
+                  <div className="mb-2 p-3 border-b border-gray-100 last:border-b-0">
+                    {/* Profile Avatar and Author Section */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div 
+                        className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm cursor-pointer"
+                        onClick={() => navigate(`/profile/${announcements[0]?.author}`)}
+                      >
+                        {announcements[0]?.author ? announcements[0].author.charAt(0).toUpperCase() : 'A'}
+                      </div>
+                      
+                      <div className="flex flex-col">
+                        <Link 
+                          to={`/profile/${announcements[0]?.author}`}
+                          className="text-xs font-semibold text-gray-900 hover:text-blue-600"
+                        >
+                          {announcements[0]?.author || 'Admin'}
+                        </Link>
+                        <span className="text-xs text-gray-500">
+                          {announcements[0]?.created_at ? new Date(announcements[0].created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          }) : 'Unknown date'}, {announcements[0]?.created_at ? new Date(announcements[0].created_at).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : ''}
+                        </span>
+                      </div>
+
+                      {/* Badges */}
+                      <div className="flex items-center gap-1 ml-auto">
+                        {announcements[0]?.is_pinned && (
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">
+                            Pinned
+                          </span>
+                        )}
+                        {announcements[0]?.is_important && (
+                          <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[10px] font-medium">
+                            Important
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <h3 className="text-xs font-semibold text-gray-900 mb-1.5">{announcements[0]?.topic || 'Announcement'}</h3>
+                    
+                    <div className={`prose prose-sm max-w-none text-xs ${!showAnnouncementFullContent[announcements[0]?.id] ? 'line-clamp-4' : ''}`}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath, remarkBreaks]}
+                        rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                      >
+                        {announcements[0]?.text}
+                      </ReactMarkdown>
+                    </div>
+                    
+                    {announcements[0]?.text && announcements[0].text.length > 300 && (
+                      <button
+                        onClick={() => toggleAnnouncementContent(announcements[0].id)}
+                        className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                      >
+                        {showAnnouncementFullContent[announcements[0]?.id] ? (
+                          <>
+                            <span>Show Less</span>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          </>
+                        ) : (
+                          <>
+                            <span>Read More</span>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    
+                    {/* Like/Dislike Buttons */}
+                    <div className="flex items-center gap-4 mt-3 mb-3">
+                      <button 
+                        onClick={() => handleAnnouncementLike(announcements[0]?.id)}
+                        className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                        </svg>
+                        Like {announcementLikes[announcements[0]?.id] || 0}
+                      </button>
+                      <button 
+                        onClick={() => handleAnnouncementDislike(announcements[0]?.id)}
+                        className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                        </svg>
+                        Dislike {announcementDislikes[announcements[0]?.id] || 0}
+                      </button>
+                    </div>
+
+                    <div className="flex justify-end items-center mt-2">
+                      <button 
+                        onClick={() => setSelectedAnnouncement(announcements[0])}
+                        className="text-xs text-blue-800 hover:text-blue-900 transition-colors duration-200 font-bold"
+                      >
+                        Read More
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Featured Blog Posts - Show 3 */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
@@ -800,7 +963,7 @@ const Home = () => {
                     <h2 className="text-xs font-semibold text-gray-900">Featured Blog Post</h2>
                   </div>
                   <Link 
-                    to="/blog" 
+                    to="/community"
                     className="text-blue-800 hover:text-blue-900 transition-colors duration-200 flex items-center gap-1 text-xs font-medium"
                   >
                     View All
@@ -819,7 +982,7 @@ const Home = () => {
                     <p className="text-xs text-gray-600">No blogs yet</p>
                   </div>
                 ) : (
-                  blogs.map((post) => (
+                  blogs.slice(0, 3).map((post) => (
                     <div key={post.id} className="mb-2 p-3 border-b border-gray-100 last:border-b-0">
                       {/* Profile Avatar and Username Section */}
                       <div className="flex items-center gap-2 mb-3">
@@ -974,7 +1137,7 @@ const Home = () => {
 
                       <div className="flex justify-end items-center mt-2">
                         <Link 
-                          to={`/blog/${post.id}`}
+                          to={`/community?blog=${post.id}`}
                           className="text-xs text-blue-800 hover:text-blue-900 transition-colors duration-200 font-bold"
                         >
                           Read More
@@ -1078,13 +1241,6 @@ const Home = () => {
                     <Bell className="w-3.5 h-3.5 text-gray-700" />
                     <h2 className="text-xs font-semibold text-gray-900">Announcements</h2>
                   </div>
-                  <Link 
-                    to="/announcements" 
-                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
-                  >
-                    View All
-                    <ChevronRight className="w-2.5 h-2.5" />
-                  </Link>
                 </div>
 
                 <div className="space-y-2 p-2">
@@ -1101,7 +1257,8 @@ const Home = () => {
                     announcements.map((announcement) => (
                       <div 
                         key={announcement.id}
-                        className="p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-200"
+                        onClick={() => setSelectedAnnouncement(announcement)}
+                        className="p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-200 cursor-pointer"
                       >
                         <div className="flex items-start gap-2">
                           {announcement.is_pinned && (
@@ -1261,6 +1418,73 @@ const Home = () => {
           </div>
         </div>
       </div>
+
+      {/* Announcement Popup Modal */}
+      {selectedAnnouncement && (
+        <div 
+          className="fixed inset-0 bg-white/10 backdrop-blur-md flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedAnnouncement(null)}
+        >
+          <div 
+            className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-blue-50">
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-blue-600" />
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {selectedAnnouncement.topic || 'Announcement'}
+                </h2>
+              </div>
+              <button
+                onClick={() => setSelectedAnnouncement(null)}
+                className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              <div className="flex items-center gap-2 mb-3">
+                {selectedAnnouncement.is_pinned && (
+                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                    Pinned
+                  </span>
+                )}
+                {selectedAnnouncement.is_important && (
+                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">
+                    Important
+                  </span>
+                )}
+              </div>
+              
+              <div className="prose prose-sm max-w-none text-gray-700">
+                <ReactMarkdown
+                  remarkPlugins={[remarkMath, remarkBreaks]}
+                  rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
+                >
+                  {selectedAnnouncement.text}
+                </ReactMarkdown>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+              <span className="text-sm text-gray-500">
+                Posted by {selectedAnnouncement.author} on {new Date(selectedAnnouncement.created_at).toLocaleDateString()}
+              </span>
+              <button
+                onClick={() => setSelectedAnnouncement(null)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

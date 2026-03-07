@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
 import ReportBlogModal from '../components/ReportBlogModal';
@@ -17,6 +17,8 @@ import toast from 'react-hot-toast';
 const Community = () => {
   const { user } = useApp();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const blogRefs = useRef({});
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -175,6 +177,33 @@ const Community = () => {
   useEffect(() => {
     fetchAllPublishedBlogs();
   }, []);
+
+  // Handle blog query parameter - scroll to and expand specific blog
+  useEffect(() => {
+    const blogId = searchParams.get('blog');
+    if (blogId && blogs.length > 0 && !loading) {
+      // Find the blog index to calculate the correct page
+      const blogIndex = blogs.findIndex(b => b.id === blogId);
+      if (blogIndex !== -1) {
+        // Calculate which page the blog is on
+        const targetPage = Math.floor(blogIndex / blogsPerPage) + 1;
+        if (targetPage !== currentPage) {
+          setCurrentPage(targetPage);
+        }
+        
+        // Expand the blog
+        setExpandedBlogs(prev => new Set([...prev, blogId]));
+        
+        // Scroll to the blog after a short delay to ensure rendering
+        setTimeout(() => {
+          const blogElement = blogRefs.current[blogId];
+          if (blogElement) {
+            blogElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      }
+    }
+  }, [searchParams, blogs, loading]);
 
   const fetchAllPublishedBlogs = async () => {
     try {
@@ -495,7 +524,11 @@ const Community = () => {
                 const isExpanded = expandedBlogs.has(blog.id);
                 
                 return (
-                  <article key={blog.id} className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                  <article 
+                    key={blog.id} 
+                    ref={el => blogRefs.current[blog.id] = el}
+                    className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                  >
                     {/* Blog Header */}
                     <div className="p-4 border-b border-gray-100">
                       <div className="flex items-center justify-between mb-2">

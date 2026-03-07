@@ -2722,6 +2722,12 @@ class HomeDashboardAPIView(APIView):
                     elif status_val == "live":
                         live_contests.append(contest_data)
                     else:
+                        # For past contests, get actual participant count
+                        try:
+                            from bson import ObjectId
+                            contest_data["participants"] = ContestRegistration.objects(contest=ObjectId(cid)).count()
+                        except:
+                            pass
                         past_contests.append(contest_data)
             except Exception as e:
                 print(f"Internal contests error: {e}")
