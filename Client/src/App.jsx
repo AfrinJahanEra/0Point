@@ -41,6 +41,7 @@ import Recording from './pages/Recording';
 import ContestHistory from './pages/ContestHistory';
 import PublicDashboard from './pages/PublicDashboard';
 import Profile from './pages/Profile';
+import AdminDashboard from './pages/AdminDashboard';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -87,9 +88,9 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
-// Public Route Component (redirects to contests if already logged in)
+// Public Route Component (redirects to home if already logged in)
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useApp();
+  const { isAuthenticated, loading, user } = useApp();
   
   if (loading) {
     return (
@@ -102,7 +103,12 @@ const PublicRoute = ({ children }) => {
     );
   }
   
-  return !isAuthenticated ? children : <Navigate to="/contests" />;
+  if (isAuthenticated) {
+    // Redirect based on role
+    return <Navigate to={user?.role === 'admin' ? '/admin' : '/home'} />;
+  }
+  
+  return children;
 };
 function App() {
   return (
@@ -146,6 +152,13 @@ function App() {
               <Layout>
                 <Home />
               </Layout>
+            } />
+
+            {/* Admin Dashboard - protected route for admins (no regular header/nav) */}
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
             } />
 
 

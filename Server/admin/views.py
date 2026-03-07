@@ -121,8 +121,11 @@ class AdminDashboardView(APIView):
         test_contest_count = TestContest.objects.count()
         virtual_contest_count = VirtualContest.objects.count()
         
-        # Problem stats
-        problem_count = Problem.objects.count()
+        # Problem stats - count from contest problems
+        problem_count = 0
+        for contest in Contest.objects.only('problems'):
+            if contest.problems:
+                problem_count += len(contest.problems)
         
         # Submission stats
         submission_count = Submission.objects.count()
@@ -190,7 +193,17 @@ class AdminDashboardView(APIView):
 
 class AdminUsersView(APIView):
     def get(self, request):
-        users = Account.objects(is_deleted=False).order_by("-created_at")
+        search = request.GET.get('search', '')
+        limit = int(request.GET.get('limit', 100))  # Default limit
+        
+        if search:
+            from mongoengine.queryset.visitor import Q
+            users = Account.objects(
+                Q(is_deleted=False) & (Q(name__icontains=search) | Q(email__icontains=search))
+            ).order_by("-created_at").limit(limit)
+        else:
+            users = Account.objects(is_deleted=False).order_by("-created_at").limit(limit)
+        
         user_data = []
         
         for user in users:
@@ -360,6 +373,7 @@ class AdminBlogsView(APIView):
         # Get query params for filtering
         status_filter = request.GET.get('status', 'all')  # all, published, draft
         search = request.GET.get('search', '')
+        limit = int(request.GET.get('limit', 50))  # Default limit
         
         # Build query
         query = {}
@@ -372,51 +386,50 @@ class AdminBlogsView(APIView):
         # Apply search if provided
         if search:
             from mongoengine.queryset.visitor import Q
-            blogs = Blog.objects(Q(**query) & (Q(title__icontains=search) | Q(tags__icontains=search))).order_by("-created_at")
+            blogs = Blog.objects(Q(**query) & (Q(title__icontains=search) | Q(tags__icontains=search))).order_by("-created_at").limit(limit)
         else:
-            blogs = Blog.objects(**query).order_by("-created_at")
+            blogs = Blog.objects(**query).order_by("-created_at").limit(limit)
+        
+        # Batch get blog IDs for counts
+        blog_ids = [blog.id for blog in blogs]
+        
+        # Pre-compute counts using aggregation (much faster than N+1)
+        comment_counts = {}
+        upvote_counts = {}
+        downvote_counts = {}
+        
+        for bid in blog_ids:
+            comment_counts[str(bid)] = BlogComment.objects(blog=bid, is_deleted=False).count()
+            upvote_counts[str(bid)] = BlogVote.objects(blog=bid, vote_type='upvote').count()
+            downvote_counts[str(bid)] = BlogVote.objects(blog=bid, vote_type='downvote').count()
         
         blog_data = []
         for blog in blogs:
             author = blog.author if blog.author else None
+            bid_str = str(blog.id)
             
-            # Get comment count
-            comment_count = BlogComment.objects(blog=blog, is_deleted=False).count()
-            
-            # Get vote counts
-            upvote_count = BlogVote.objects(blog=blog, vote_type='upvote').count()
-            downvote_count = BlogVote.objects(blog=blog, vote_type='downvote').count()
+            upvotes = upvote_counts.get(bid_str, 0)
+            downvotes = downvote_counts.get(bid_str, 0)
             
             blog_data.append({
-                "id": str(blog.id),
+                "id": bid_str,
                 "title": blog.title,
                 "content_preview": blog.content[:200] + "..." if len(blog.content) > 200 else blog.content,
-                "full_content": blog.content,
                 "tags": blog.tags,
                 "author": {
                     "id": str(author.id) if author else None,
                     "name": author.name if author else "Unknown",
                     "email": author.email if author else "Unknown",
                     "role": author.role if author else "Unknown",
-                    "rating": getattr(author, 'rating', 0) if author else 0,
-                    "badge": getattr(author, 'badge', 'none') if author else 'none'
                 },
-                "co_authors": [
-                    {
-                        "id": str(co_author.id),
-                        "name": co_author.name,
-                        "email": co_author.email
-                    } for co_author in (blog.co_authors or [])
-                ],
                 "created_at": blog.created_at,
-                "updated_at": blog.updated_at,
                 "published_at": blog.published_at,
                 "is_published": blog.is_published,
                 "is_draft": blog.is_draft,
-                "comment_count": comment_count,
-                "upvotes": upvote_count,
-                "downvotes": downvote_count,
-                "score": upvote_count - downvote_count
+                "comment_count": comment_counts.get(bid_str, 0),
+                "upvotes": upvotes,
+                "downvotes": downvotes,
+                "score": upvotes - downvotes
             })
         
         return Response(blog_data)
@@ -450,6 +463,7 @@ class AdminContestsView(APIView):
         # Get query params for filtering
         status_filter = request.GET.get('status', 'all')
         search = request.GET.get('search', '')
+        limit = int(request.GET.get('limit', 50))  # Default limit
         
         # Build query
         query = {}
@@ -459,59 +473,46 @@ class AdminContestsView(APIView):
         # Apply search
         if search:
             from mongoengine.queryset.visitor import Q
-            contests = Contest.objects(Q(**query) & Q(title__icontains=search)).order_by("-start_time")
+            contests = Contest.objects(Q(**query) & Q(title__icontains=search)).order_by("-start_time").limit(limit)
         else:
-            contests = Contest.objects(**query).order_by("-start_time")
+            contests = Contest.objects(**query).order_by("-start_time").limit(limit)
+        
+        # Batch get all contest IDs
+        contest_ids = [contest.id for contest in contests]
+        
+        # Batch count registrations, submissions, announcements
+        from contest.models import ContestRegistration
+        registration_counts = {}
+        submission_counts = {}
+        announcement_counts = {}
+        
+        for cid in contest_ids:
+            registration_counts[str(cid)] = ContestRegistration.objects(contest=cid).count()
+            submission_counts[str(cid)] = Submission.objects(contest=cid).count()
+            announcement_counts[str(cid)] = Announcement.objects(contest=cid).count()
         
         contest_data = []
         
         for contest in contests:
             creator = contest.created_by if contest.created_by else None
-            
-            # Get registration count
-            from contest.models import ContestRegistration
-            registration_count = ContestRegistration.objects(contest=contest).count()
-            
-            # Get submission count
-            submission_count = Submission.objects(contest=contest).count()
-            
-            # Get announcement count
-            announcement_count = Announcement.objects(contest=contest).count()
+            cid_str = str(contest.id)
             
             # Get problem count
             problem_count = len(contest.problems) if contest.problems else 0
             
-            # Serialize problems
+            # Serialize problems (only basic info for list view)
             problems_data = []
             if contest.problems:
                 for problem in contest.problems:
-                    test_cases_data = []
-                    if problem.test_cases:
-                        for tc in problem.test_cases:
-                            test_cases_data.append({
-                                "input": tc.input,
-                                "output": tc.output,
-                                "explanation": tc.explanation if hasattr(tc, 'explanation') else '',
-                                "difficulty": tc.difficulty if hasattr(tc, 'difficulty') else '',
-                                "sample": tc.sample if hasattr(tc, 'sample') else False,
-                                "hidden": tc.hidden if hasattr(tc, 'hidden') else False
-                            })
-                    
                     problems_data.append({
                         "index": problem.index,
                         "title": problem.title,
-                        "statement": problem.statement,
-                        "time_limit_seconds": problem.time_limit_seconds,
-                        "memory_limit_mb": problem.memory_limit_mb,
-                        "tags": problem.tags if problem.tags else [],
                         "difficulty": problem.difficulty if hasattr(problem, 'difficulty') else '',
-                        "tutorial": problem.tutorial if hasattr(problem, 'tutorial') else '',
                         "points": problem.points if hasattr(problem, 'points') else 0,
-                        "test_cases": test_cases_data
                     })
             
             contest_data.append({
-                "id": str(contest.id),
+                "id": cid_str,
                 "title": contest.title,
                 "description": contest.description,
                 "type": contest.type,
@@ -527,9 +528,9 @@ class AdminContestsView(APIView):
                 "duration": contest.duration,
                 "test_start_time": contest.test_start_time,
                 "registration_required": contest.registration_required,
-                "registration_count": registration_count,
-                "submission_count": submission_count,
-                "announcement_count": announcement_count,
+                "registration_count": registration_counts.get(cid_str, 0),
+                "submission_count": submission_counts.get(cid_str, 0),
+                "announcement_count": announcement_counts.get(cid_str, 0),
                 "problem_count": problem_count,
                 "problems": problems_data,
                 "testers": contest.testers,

@@ -68,6 +68,7 @@ const AdminDashboard = () => {
   const [isImportant, setIsImportant] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [adminInfo, setAdminInfo] = useState({ name: '', email: '' });
   const textareaRef = useRef(null);
   const activityChartRef = useRef(null);
   const [activityData, setActivityData] = useState([]);
@@ -80,6 +81,7 @@ const AdminDashboard = () => {
       navigate('/home');
       return;
     }
+    setAdminInfo({ name: user.name || 'Admin', email: user.email || '' });
     loadDashboardData();
   }, [navigate]);
 
@@ -87,23 +89,7 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
       const response = await api.get('/admin-panel/dashboard/');
-      
-      // Get actual problem count from contests
-      const contestsResponse = await api.get('/admin-panel/contests/');
-      let totalProblems = 0;
-      contestsResponse.data.forEach(contest => {
-        if (contest.problems && contest.problems.length > 0) {
-          totalProblems += contest.problems.length;
-        }
-      });
-      
-      setStats({
-        ...response.data.stats,
-        problems: {
-          ...response.data.stats.problems,
-          total: totalProblems
-        }
-      });
+      setStats(response.data.stats);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -802,13 +788,19 @@ const AdminDashboard = () => {
                 <p className="text-xs text-gray-500">Complete platform control</p>
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </button>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">{adminInfo.name}</p>
+                <p className="text-xs text-gray-500">{adminInfo.email}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
