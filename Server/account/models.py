@@ -51,6 +51,19 @@ class PlatformCalendarCache(EmbeddedDocument):
     total = IntField(default=0)
 
 
+class IPAddress(EmbeddedDocument):
+    """Store IP address information for an account"""
+    ip_address = StringField(required=True)
+    first_seen = DateTimeField(default=datetime.utcnow)
+    last_seen = DateTimeField(default=datetime.utcnow)
+
+
+class DeviceFingerprint(EmbeddedDocument):
+    """Store device fingerprint information for an account"""
+    fingerprint = StringField(required=True)
+    first_seen = DateTimeField(default=datetime.utcnow)
+    last_seen = DateTimeField(default=datetime.utcnow)
+
 
 class Account(Document):
     name = StringField(required=True, max_length=200)
@@ -73,6 +86,7 @@ class Account(Document):
 
     year = StringField(null=True)
     department = StringField(null=True)
+    profile_photo = StringField(null=True)  # URL or path to profile photo
     
     # Coding platform profiles
     platform_profiles = ListField(EmbeddedDocumentField(PlatformProfile), default=list)
@@ -89,7 +103,16 @@ class Account(Document):
 
     calendar_cache = ListField(EmbeddedDocumentField(PlatformCalendarCache), default=list)
 
-
+    # Ban-related fields
+    is_banned = BooleanField(default=False)
+    banned_at = DateTimeField(null=True)
+    ban_reason = StringField(null=True)
+    banned_by = StringField(null=True)  # Admin user ID
+    
+    # Security tracking fields
+    ip_address = StringField(null=True)  # Last known IP
+    ip_addresses = ListField(EmbeddedDocumentField(IPAddress), default=list)
+    device_fingerprints = ListField(EmbeddedDocumentField(DeviceFingerprint), default=list)
 
     meta = {
         "collection": "accounts"
@@ -159,4 +182,17 @@ class UserVerdictStats(Document):
     last_ac_submission_time = IntField(default=0)
     
     meta = {'collection': 'user_verdict_stats'}
+
+
+class BannedAccount(Document):
+    """Store banned account information"""
+    email = EmailField(required=True)
+    name = StringField(required=True)
+    ban_reason = StringField(required=True)
+    banned_at = DateTimeField(default=datetime.utcnow)
+    banned_by = StringField()  # Admin user ID
+    ip_addresses = ListField(StringField(), default=list)
+    device_fingerprints = ListField(StringField(), default=list)
+    
+    meta = {'collection': 'banned_accounts'}
 

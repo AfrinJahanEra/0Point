@@ -7,6 +7,17 @@ from venv import logger
 import requests
 
 
+def get_cached_calendar(user, platform, handle):
+    """
+    Retrieve a cached calendar entry for a specific platform and handle.
+    Returns the cache object if found, otherwise None.
+    """
+    for cache in user.calendar_cache:
+        if cache.platform == platform and cache.handle == handle:
+            return cache
+    return None
+
+
 LEETCODE_CALENDAR_API = "https://leetcode-api-pied.vercel.app/user/{handle}/calendar"
 
 def fetch_leetcode_calendar(handle, year=None):

@@ -95,6 +95,29 @@ const [loadingContributions, setLoadingContributions] = useState(false);
     }
   };
 
+  // Get platform badge styling - professional blue/gray theme
+  const getPlatformBadge = (platform) => {
+    const badges = {
+      '0point': { label: '0Point', color: 'bg-blue-600 text-white' },
+      'cf': { label: 'CF', color: 'bg-gray-600 text-white' },
+      'codeforces': { label: 'CF', color: 'bg-gray-600 text-white' },
+      'lc': { label: 'LC', color: 'bg-gray-500 text-white' },
+      'leetcode': { label: 'LC', color: 'bg-gray-500 text-white' },
+      'cc': { label: 'CC', color: 'bg-gray-700 text-white' },
+      'codechef': { label: 'CC', color: 'bg-gray-700 text-white' },
+      'ac': { label: 'AC', color: 'bg-slate-600 text-white' },
+      'atcoder': { label: 'AC', color: 'bg-slate-600 text-white' }
+    };
+    return badges[platform?.toLowerCase()] || { label: platform, color: 'bg-gray-500 text-white' };
+  };
+
+  // Check if contest has started
+  const hasContestStarted = (contest) => {
+    if (!contest.start_time) return false;
+    const startTime = new Date(contest.start_time);
+    return startTime <= new Date();
+  };
+
 const fetchContributions = async () => {
   try {
     setLoadingContributions(true);
@@ -168,8 +191,57 @@ const fetchContributions = async () => {
   const fetchUpcomingContests = async () => {
     try {
       setLoadingContests(true);
-      const response = await api.get('/contests/upcoming/');
-      setUpcomingContests(response.data.contests || []);
+      
+      // Fetch both internal and external contests in parallel
+      const [internalResponse, externalResponse] = await Promise.all([
+        api.get('/contests/upcoming/'),
+        api.get('/external/contests/?platform=all').catch(err => {
+          console.log('External contests fetch error:', err);
+          return { data: [] };
+        })
+      ]);
+      
+      console.log('Internal contests:', internalResponse.data);
+      console.log('External contests:', externalResponse.data);
+      
+      const internalContests = (internalResponse.data.contests || []).map(c => ({
+        ...c,
+        platform: '0point',
+        is_external: false
+      }));
+      
+      // Transform external contests to match internal format
+      const externalContests = (externalResponse.data || [])
+        .filter(c => {
+          const startTime = new Date(c.start_time);
+          return startTime > new Date(); // Only upcoming
+        })
+        .map(c => ({
+          id: `external_${c.platform}_${c.external_id}`,
+          title: c.title,
+          start_time: c.start_time,
+          end_time: c.end_time,
+          duration: c.duration_formatted || c.duration || 'N/A',
+          participants: c.participants || 0,
+          platform: c.platform,
+          is_external: true,
+          external_url: c.url,
+          status: 'upcoming'
+        }));
+      
+      console.log('Processed internal:', internalContests.length);
+      console.log('Processed external:', externalContests.length);
+      
+      // Combine and sort by start_time (soonest first)
+      const allContests = [...internalContests, ...externalContests].sort((a, b) => {
+        const dateA = new Date(a.start_time);
+        const dateB = new Date(b.start_time);
+        return dateA - dateB;
+      });
+      
+      console.log('All contests sorted:', allContests);
+      
+      setUpcomingContests(allContests);
     } catch (error) {
       console.error('Error fetching upcoming contests:', error);
       toast.error('Failed to load upcoming contests');
@@ -379,6 +451,11 @@ const fetchContributions = async () => {
         )
       );
       
+      // Update soonest contest if it matches
+      if (soonestContest && soonestContest.contest_id === contestId) {
+        setSoonestContest(prev => ({ ...prev, is_registered: true }));
+      }
+      
       toast.success('Successfully registered for contest!');
       return true;
     } catch (error) {
@@ -564,10 +641,23 @@ const fetchContributions = async () => {
                     <p className="text-xs text-gray-500">No upcoming contests</p>
                   </div>
                 ) : (
-                  upcomingContests.slice(0, 3).map((contest) => {
-                    if (activeTab === 'registered' && !registeredContests.has(contest.id) && !contest.is_registered) {
-                      return null;
-                    }
+                  upcomingContests
+                    .filter(contest => {
+                      if (activeTab === 'registered') {
+                        // For internal contests, check registration
+                        if (!contest.is_external) {
+                          return registeredContests.has(contest.id) || contest.is_registered;
+                        }
+                        // External contests can't be registered on our platform
+                        return false;
+                      }
+                      return true;
+                    })
+                    .slice(0, 5)
+                    .map((contest) => {
+                      const isRegistered = !contest.is_external && (registeredContests.has(contest.id) || contest.is_registered);
+                      const contestStarted = hasContestStarted(contest);
+                      const platformBadge = getPlatformBadge(contest.platform);
                     
                     return (
                       <div 
@@ -580,9 +670,14 @@ const fetchContributions = async () => {
                               <Calendar className="w-4 h-4" />
                             </div>
                             <div className="flex-1">
-                              <h3 className="font-medium text-gray-900 text-xs">
-                                {contest.title}
-                              </h3>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${platformBadge.color}`}>
+                                  {platformBadge.label}
+                                </span>
+                                <h3 className="font-medium text-gray-900 text-xs truncate max-w-[150px]">
+                                  {contest.title}
+                                </h3>
+                              </div>
                               <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
                                 <span className="flex items-center gap-1">
                                   <Clock className="w-2.5 h-2.5" />
@@ -596,22 +691,41 @@ const fetchContributions = async () => {
                             </div>
                           </div>
                           
-                          {/* Single Button */}
+                          {/* Action Button */}
                           <div className="flex items-center gap-1">
-                            {registeredContests.has(contest.id) || contest.is_registered ? (
-                              <button
-                                onClick={() => handleContestEntry(contest, 'upcoming')}
-                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
+                            {contest.is_external ? (
+                              // External contest - Visit button
+                              <a
+                                href={contest.external_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-gray-500 text-white hover:bg-gray-600 flex items-center gap-1"
                               >
-                                <Play className="w-2.5 h-2.5" />
-                                Enter
-                              </button>
+                                <Eye className="w-2.5 h-2.5" />
+                                Visit
+                              </a>
+                            ) : isRegistered ? (
+                              // Registered - Show status based on whether contest started
+                              contestStarted ? (
+                                <button
+                                  onClick={() => handleContestEntry(contest, 'upcoming')}
+                                  className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1"
+                                >
+                                  <Play className="w-2.5 h-2.5" />
+                                  Enter
+                                </button>
+                              ) : (
+                                <span className="px-2 py-1 rounded font-medium text-xs bg-blue-100 text-blue-700 flex items-center gap-1">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  Registered
+                                </span>
+                              )
                             ) : (
+                              // Not registered - Show Register button
                               <button
                                 onClick={() => handleRegister(contest.id)}
                                 className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-blue-800 text-white hover:bg-blue-900 flex items-center gap-1"
                               >
-                                <Eye className="w-2.5 h-2.5" />
                                 Register
                               </button>
                             )}
@@ -621,10 +735,16 @@ const fetchContributions = async () => {
                     );
                   })
                 )}
+                {/* Show message when no registered contests in Registered tab */}
+                {activeTab === 'registered' && upcomingContests.filter(c => !c.is_external && (registeredContests.has(c.id) || c.is_registered)).length === 0 && !loadingContests && (
+                  <div className="py-4 text-center">
+                    <p className="text-xs text-gray-500">No registered contests</p>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Contest Countdown */}
+            {/* Contest Countdown - Only 0Point Contests */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
                 {loadingSoonest ? (
@@ -653,18 +773,33 @@ const fetchContributions = async () => {
                         <div className="text-xs text-gray-500">Seconds</div>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => {
-                        if (registeredContests.has(soonestContest.contest_id)) {
-                          navigate(`/contests/${soonestContest.contest_id}`);
-                        } else {
-                          handleRegister(soonestContest.contest_id);
-                        }
-                      }}
-                      className="text-xs bg-blue-800 text-white px-2.5 py-1 rounded hover:bg-blue-900 transition-colors duration-200"
-                    >
-                      {registeredContests.has(soonestContest.contest_id) ? 'Enter Contest' : 'Register Now'}
-                    </button>
+                    {/* Show appropriate button based on registration and contest status */}
+                    {registeredContests.has(soonestContest.contest_id) || soonestContest.is_registered ? (
+                      // User is registered
+                      timeLeft.days === 0 && timeLeft.hours === 0 && timeLeft.minutes === 0 && timeLeft.seconds === 0 ? (
+                        // Contest has started - can enter
+                        <button 
+                          onClick={() => navigate(`/contests/${soonestContest.contest_id}`)}
+                          className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 transition-colors duration-200"
+                        >
+                          Enter Contest
+                        </button>
+                      ) : (
+                        // Contest not started - show registered status
+                        <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded font-medium">
+                          <Clock className="w-3 h-3" />
+                          Registered
+                        </span>
+                      )
+                    ) : (
+                      // Not registered - show register button
+                      <button 
+                        onClick={() => handleRegister(soonestContest.contest_id)}
+                        className="text-xs bg-blue-800 text-white px-3 py-1.5 rounded hover:bg-blue-900 transition-colors duration-200"
+                      >
+                        Register Now
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="py-4 text-center">

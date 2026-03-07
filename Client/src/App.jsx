@@ -40,6 +40,7 @@ import BlogDetail from './pages/BlogDetail';
 import Recording from './pages/Recording';
 import ContestHistory from './pages/ContestHistory';
 import PublicDashboard from './pages/PublicDashboard';
+import Profile from './pages/Profile';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
