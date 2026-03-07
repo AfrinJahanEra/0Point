@@ -2843,3 +2843,123 @@ class HomeDashboardAPIView(APIView):
                 "soonest_contest": None,
                 "registered_contest_ids": []
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ContestsDashboardAPIView(APIView):
+    """
+    GET /contests/dashboard/
+    Single endpoint that returns ALL contest data for faster loading on Contests page.
+    """
+    
+    def get(self, request):
+        try:
+            from crossPlatform.models import ExternalContest
+            import pytz
+            from datetime import datetime, timedelta
+            
+            user = get_user_from_request(request)
+            dhaka_tz = pytz.timezone('Asia/Dhaka')
+            now = datetime.now(dhaka_tz)
+            
+            platform_map = {"codeforces": "cf", "leetcode": "lc", "codechef": "cc", "atcoder": "ac"}
+            all_contests = []
+            registered_ids = set()
+            user_id = str(user.id) if user else None
+            
+            # Registrations
+            if user:
+                try:
+                    for r in ContestRegistration.objects.filter(user=user).only('contest'):
+                        if r.contest:
+                            registered_ids.add(str(r.contest.id))
+                except:
+                    pass
+            
+            # Internal contests - raw query for speed
+            try:
+                pipeline = [{"$sort": {"start_time": -1}}, {"$limit": 100}]
+                for c in Contest.objects.aggregate(pipeline):
+                    cid = str(c.get('_id'))
+                    start = c.get('start_time')
+                    duration = c.get('duration') or 0
+                    contest_status = c.get('status', '')
+                    
+                    # Calculate status - skip only if explicitly draft and not creator
+                    if contest_status == 'draft':
+                        if user_id and str(c.get('created_by')) == user_id:
+                            status_val = 'draft'
+                        else:
+                            continue
+                    elif start:
+                        if start.tzinfo is None:
+                            start = dhaka_tz.localize(start)
+                        end = start + timedelta(hours=duration)
+                        if now < start:
+                            status_val = 'upcoming'
+                        elif now <= end:
+                            status_val = 'live'
+                        else:
+                            status_val = 'past'
+                    else:
+                        status_val = 'upcoming'
+                    
+                    all_contests.append({
+                        "id": cid,
+                        "title": c.get('title', ''),
+                        "description": c.get('description', ''),
+                        "start_time": start.isoformat() if start else None,
+                        "duration": duration,
+                        "type": c.get('type', 'individual'),
+                        "platform": "IUT",
+                        "status": status_val,
+                        "participants": 0,
+                        "is_registered": cid in registered_ids,
+                        "is_creator": user_id and str(c.get('created_by')) == user_id,
+                        "external": False,
+                        "is_external": False,
+                        "is_test_contest": False
+                    })
+            except Exception as e:
+                print(f"Internal error: {e}")
+            
+            # External contests - raw query
+            try:
+                pipeline = [{"$sort": {"start_time": -1}}, {"$limit": 30}]
+                for ec in ExternalContest.objects.aggregate(pipeline):
+                    plat = ec.get('platform', '')
+                    plat_code = platform_map.get(plat, plat)
+                    ext_status = ec.get('status', '')
+                    if ext_status == 'finished':
+                        ext_status = 'past'
+                    
+                    start = ec.get('start_time')
+                    all_contests.append({
+                        "id": f"{plat}-{ec.get('external_id', '')}",
+                        "title": ec.get('title', ''),
+                        "description": f"{plat_code.upper()} Contest",
+                        "start_time": start.isoformat() if start else None,
+                        "duration": ec.get('duration_formatted', ''),
+                        "duration_seconds": ec.get('duration_seconds', 0),
+                        "type": "individual",
+                        "platform": plat_code,
+                        "status": ext_status,
+                        "participants": ec.get('participants', 0),
+                        "is_registered": False,
+                        "is_creator": False,
+                        "external": True,
+                        "is_external": True,
+                        "is_test_contest": False,
+                        "url": ec.get('url', '')
+                    })
+            except Exception as e:
+                print(f"External error: {e}")
+            
+            return Response({
+                "contests": all_contests,
+                "registered_contests": list(registered_ids),
+                "total": len(all_contests)
+            })
+            
+        except Exception as e:
+            print(f"Dashboard error: {e}")
+            return Response({"contests": [], "registered_contests": [], "total": 0})

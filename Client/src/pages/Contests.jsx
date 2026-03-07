@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BACKEND_URL, WS_URL } from '../utils/api';
+import api, { BACKEND_URL, WS_URL } from '../utils/api';
 import { 
   Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, 
   AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, 
@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useContests } from '../context/ContestContext';
 
 const Contests = () => {
   const [contests, setContests] = useState([]);
@@ -17,9 +16,6 @@ const Contests = () => {
   const [filteredContests, setFilteredContests] = useState([]);
   const [registeredContests, setRegisteredContests] = useState([]);
   const navigate = useNavigate();
-  
-  // Use contest context for cached data
-  const { fetchAllContests, contestsCache, getCombinedContests } = useContests();
   
   // Ref to track fetch ID to prevent stale updates
   const fetchIdRef = useRef(0);
@@ -76,7 +72,7 @@ const Contests = () => {
     external: true
   });
 
-  // Combined fetch function - uses cache
+  // Combined fetch function - uses unified endpoint for faster loading
   const fetchData = async () => {
     // Increment fetch ID to track this specific fetch
     const currentFetchId = ++fetchIdRef.current;
@@ -86,51 +82,34 @@ const Contests = () => {
       
       const token = localStorage.getItem('token');
       if (!token) {
-        console.log('⚠️ User not logged in');
         setError('Please log in to view contests');
         setLoading(false);
         return;
       }
 
-      console.log('📡 Fetching contests data (fetch #' + currentFetchId + ')...');
-      
-      // Use cached data from context (already fetched on Home page)
-      await fetchAllContests(false); // false = use cache if valid
+      // Single API call to unified endpoint - MUCH FASTER
+      const response = await api.get('/contests/dashboard/');
       
       // Check if this fetch is still the current one
       if (currentFetchId !== fetchIdRef.current) {
-        console.log('🔄 Fetch #' + currentFetchId + ' superseded, ignoring results');
         return;
       }
 
-      // Get combined contests from cache
-      const allContests = getCombinedContests();
-      
-      console.log('✅ Combined contests from cache:', allContests.length);
+      const { contests: allContests, registered_contests } = response.data;
 
       if (currentFetchId === fetchIdRef.current) {
-        setContests(allContests);
-        console.log('✅ Total contests set:', allContests.length);
-      }
-
-      // Set registered contests from cache
-      if (contestsCache.registrations) {
-        setRegisteredContests(contestsCache.registrations || []);
-        console.log('✅ Registrations from cache:', contestsCache.registrations.length);
-      }
-
-      if (currentFetchId === fetchIdRef.current) {
+        setContests(allContests || []);
+        setRegisteredContests(registered_contests || []);
         setError(null);
       }
     } catch (err) {
-      console.error('❌ Contests fetch failed:', err);
+      console.error('Contests fetch failed:', err);
       if (currentFetchId === fetchIdRef.current) {
         setError(err.response?.data?.error || 'Failed to load contests');
       }
     } finally {
       if (currentFetchId === fetchIdRef.current) {
         setLoading(false);
-        console.log('✅ Loading set to false (fetch #' + currentFetchId + ')');
       }
     }
   };
@@ -148,51 +127,38 @@ const Contests = () => {
     }
   }, [urlTab, setSearchParams]);
 
-  // WebSocket – only refresh manual contests (from first version with enhancements)
+  // WebSocket – real-time contest updates
   useEffect(() => {
-    console.log('🔌 [WebSocket] Initializing connection...');
-    
     let ws;
     
     try {
       ws = new WebSocket(`${WS_URL}/ws/contest/global/`);
       
-      ws.onopen = () => {
-        console.log('✅ [WebSocket] Connected to real-time contest updates');
-      };
+      ws.onopen = () => {};
 
       ws.onerror = (err) => {
-        console.warn('⚠️ [WebSocket] Connection failed (Redis may not be running):', err);
+        console.warn('WebSocket connection failed');
       };
 
-      ws.onclose = (event) => {
-        console.log('⚠️ [WebSocket] Disconnected');
-        console.log('📊 Close code:', event.code);
-      };
+      ws.onclose = () => {};
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('📩 [WebSocket] Message received:', data.event);
           
           if (data.event === "contest_list_update") {
-            setContests(prev => {
-              const external = prev.filter(c => c.external || c.is_external);
-              const test = prev.filter(c => c.is_test_contest);
-              const updatedManual = data.contests || [];
-              return [...updatedManual, ...test, ...external];
-            });
+            // Refresh data when contests update
+            fetchData();
           }
         } catch (e) {
-          console.error('❌ WS parse error', e);
+          console.error('WS parse error', e);
         }
       };
     } catch (error) {
-      console.warn('⚠️ [WebSocket] Failed to initialize connection:', error);
+      console.warn('WebSocket init failed');
     }
 
     return () => {
-      console.log('🔌 [WebSocket] Cleaning up connection...');
       if (ws) ws.close();
     };
   }, []);
@@ -247,23 +213,32 @@ const Contests = () => {
       }
     }
 
-    // Platform filter (enhanced from second version)
+    // Platform filter
     if (activePlatform !== 'all') {
       result = result.filter(c => {
-        // For local contests, platform matches directly
-        if (!c.external && !c.is_external) {
-          return c.platform === activePlatform;
-        }
+        const contestPlatform = c.platform?.toLowerCase();
+        const filterPlatform = activePlatform.toLowerCase();
         
-        // For external contests, map platform codes
-        const externalPlatformMap = {
-          'cf': 'cf',
-          'cc': 'codechef', 
-          'ac': 'atcoder',
-          'lc': 'leetcode'
+        // Direct match
+        if (contestPlatform === filterPlatform) return true;
+        
+        // IUT platform mapping
+        if (filterPlatform === 'iut' && contestPlatform === 'iut') return true;
+        
+        // External platform mappings
+        const platformAliases = {
+          'cf': ['cf', 'codeforces'],
+          'cc': ['cc', 'codechef'],
+          'ac': ['ac', 'atcoder'],
+          'lc': ['lc', 'leetcode'],
+          'codechef': ['cc', 'codechef'],
+          'atcoder': ['ac', 'atcoder'],
+          'leetcode': ['lc', 'leetcode'],
+          'codeforces': ['cf', 'codeforces']
         };
         
-        return c.platform === activePlatform || externalPlatformMap[c.platform] === activePlatform;
+        const aliases = platformAliases[filterPlatform] || [filterPlatform];
+        return aliases.includes(contestPlatform);
       });
     }
 
@@ -369,10 +344,9 @@ const Contests = () => {
   const refreshRegisteredContests = async () => {
     try {
       const registrationsRes = await api.get('/contests/registrations/');
-      console.log('✅ Updated registrations:', registrationsRes.data.registered_contests?.length || 0);
       setRegisteredContests(registrationsRes.data.registered_contests || []);
     } catch (regErr) {
-      console.warn('⚠️ Could not refresh registrations:', regErr);
+      console.warn('Could not refresh registrations');
     }
   };
 
@@ -395,8 +369,6 @@ const Contests = () => {
     e?.stopPropagation?.();
     const { id, status, external, is_external, external_url } = contest;
 
-    console.log('🎯 Contest entry:', { id, status, external, is_external });
-
     // Handle external contests
     if ((external || is_external) && external_url) {
       window.open(external_url, '_blank');
@@ -416,27 +388,18 @@ const Contests = () => {
       contest.original_contest_id !== undefined
     );
 
-    console.log('🔍 Contest type check:', { 
-      isTestContest, 
-      id,
-      hasIsTestField: contest?.is_test_contest,
-      visibility: contest?.visibility,
-      hasOriginalId: contest?.original_contest_id !== undefined
-    });
-
     // If it's a test contest, navigate to test contest page
     if (isTestContest) {
-      console.log('🔧 Navigating to test contest page:', id);
       navigate(`/test-contests/${id}/problems`);
       return;
     }
 
     // Regular contest flow...
-    if (status === 'upcoming' || status === 'live' || status === 'past') {
+    if (status === 'upcoming' || status === 'live' || status === 'past' || status === 'ongoing' || status === 'completed') {
       try {
         const res = await api.get(`/contests/${id}/problems/`);
         
-        if ((res.data.problems || []).length === 0 && status !== 'past') {
+        if ((res.data.problems || []).length === 0 && status !== 'past' && status !== 'completed') {
           alert('No problems available yet.');
           return;
         }
@@ -877,17 +840,24 @@ const Contests = () => {
               <div className="p-3 border-b border-gray-200">
                 <h2 className="text-xs font-semibold text-gray-900 mb-3">Filter by Platform</h2>
                 <div className="space-y-1">
-                  {['all', 'IUT', 'cf', 'codechef', 'atcoder', 'leetcode'].map(p => (
+                  {[
+                    { value: 'all', label: 'All Platforms' },
+                    { value: 'IUT', label: 'IUT Platform' },
+                    { value: 'cf', label: 'Codeforces' },
+                    { value: 'lc', label: 'LeetCode' },
+                    { value: 'cc', label: 'CodeChef' },
+                    { value: 'ac', label: 'AtCoder' }
+                  ].map(p => (
                     <button
-                      key={p}
-                      onClick={() => setActivePlatform(p)}
+                      key={p.value}
+                      onClick={() => setActivePlatform(p.value)}
                       className={`w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors duration-200 ${
-                        activePlatform === p
+                        activePlatform === p.value
                           ? 'bg-blue-50 text-blue-800 border border-blue-200'
                           : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
-                      <span>{p === 'all' ? 'All Platforms' : getPlatformName(p)}</span>
+                      <span>{p.label}</span>
                     </button>
                   ))}
                 </div>

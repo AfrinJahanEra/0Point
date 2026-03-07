@@ -39,6 +39,7 @@ from .views import (
     SoonestUpcomingContestView,
     LiveContestsView,
     HomeDashboardAPIView,
+    ContestsDashboardAPIView,
 )
 
 from compiler.views import (
@@ -100,6 +101,9 @@ urlpatterns = [
 
 # Home dashboard - unified endpoint for faster loading
 path('home/dashboard/', HomeDashboardAPIView.as_view(), name='home-dashboard'),
+
+# Contests dashboard - unified endpoint for Contests page
+path('contests/dashboard/', ContestsDashboardAPIView.as_view(), name='contests-dashboard'),
 
 # FIRST: All specific named routes without parameters
 path('contests/soonest/', SoonestUpcomingContestView.as_view(), name='soonest-upcoming-contest'),
