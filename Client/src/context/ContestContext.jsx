@@ -46,6 +46,7 @@ export const ContestProvider = ({ children }) => {
       
       const token = localStorage.getItem('token');
       if (!token) {
+        console.warn('⚠️ No authentication token found');
         setError('Authentication required');
         setLoading(false);
         return contestsCache;
@@ -53,33 +54,47 @@ export const ContestProvider = ({ children }) => {
 
       console.log('📡 Fetching all contests data...');
 
-      // Fetch all contest types in parallel
+      // Fetch all contest types in parallel with longer timeout
       const [upcomingRes, liveRes, pastRes, externalRes, testContestsRes, regRes] = await Promise.all([
-        api.get('/contests/upcoming/', { timeout: 30000 }).catch(err => {
-          console.warn('⚠️ Upcoming contests fetch failed:', err.message);
+        api.get('/contests/upcoming/', { timeout: 60000 }).then(res => res).catch(err => {
+          console.error('❌ Upcoming contests error:', err.message);
+          console.error('Response:', err.response?.data);
           return { data: { contests: [] } };
         }),
-        api.get('/contests/live/', { timeout: 30000 }).catch(err => {
-          console.warn('⚠️ Live contests fetch failed:', err.message);
+        api.get('/contests/live/', { timeout: 60000 }).then(res => res).catch(err => {
+          console.error('❌ Live contests error:', err.message);
+          console.error('Response:', err.response?.data);
           return { data: { contests: [] } };
         }),
-        api.get('/contests/past/', { timeout: 30000 }).catch(err => {
-          console.warn('⚠️ Past contests fetch failed:', err.message);
+        api.get('/contests/past/', { timeout: 60000 }).then(res => res).catch(err => {
+          console.error('❌ Past contests error:', err.message);
+          console.error('Response:', err.response?.data);
           return { data: { contests: [] } };
         }),
-        api.get('/external/contests/?platform=all', { timeout: 30000 }).catch(err => {
-          console.warn('⚠️ External contests fetch failed:', err.message);
+        api.get('/external/contests/?platform=all', { timeout: 60000 }).then(res => res).catch(err => {
+          console.error('❌ External contests error:', err.message);
+          console.error('Response:', err.response?.data);
           return { data: [] };
         }),
-        api.get('/test-contests/my/', { timeout: 30000 }).catch(err => {
-          console.warn('⚠️ Test contests fetch failed:', err.message);
+        api.get('/test-contests/my/', { timeout: 60000 }).then(res => res).catch(err => {
+          console.error('❌ Test contests error:', err.message);
+          console.error('Response:', err.response?.data);
           return { data: { test_contests: [] } };
         }),
-        api.get('/contests/registrations/').catch(err => {
-          console.warn('⚠️ Registrations fetch failed:', err.message);
+        api.get('/contests/registrations/', { timeout: 60000 }).then(res => res).catch(err => {
+          console.error('❌ Registrations error:', err.message);
+          console.error('Response:', err.response?.data);
           return { data: { registered_contests: [] } };
         })
       ]);
+
+      console.log('📊 Raw responses:', {
+        upcoming: upcomingRes?.data?.contests?.length || 0,
+        live: liveRes?.data?.contests?.length || 0,
+        past: pastRes?.data?.contests?.length || 0,
+        external: externalRes?.data?.length || 0,
+        test: testContestsRes?.data?.test_contests?.length || 0
+      });
 
       // Process and cache the data
       const newCache = {

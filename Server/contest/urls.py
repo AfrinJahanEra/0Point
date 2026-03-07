@@ -37,7 +37,8 @@ from .views import (
     UpcomingContestListCreateAPIView,
     PastContestsListCreateView,
     SoonestUpcomingContestView,
-    LiveContestsView
+    LiveContestsView,
+    HomeDashboardAPIView,
 )
 
 from compiler.views import (
@@ -96,6 +97,9 @@ from testcontest.views import (
 
 urlpatterns = [
     # In your urls.py - CORRECT ORDER (specific first, generic last)
+
+# Home dashboard - unified endpoint for faster loading
+path('home/dashboard/', HomeDashboardAPIView.as_view(), name='home-dashboard'),
 
 # FIRST: All specific named routes without parameters
 path('contests/soonest/', SoonestUpcomingContestView.as_view(), name='soonest-upcoming-contest'),

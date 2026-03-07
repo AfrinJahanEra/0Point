@@ -76,7 +76,64 @@ const Contests = () => {
     external: true
   });
 
-  // Combined fetch function - uses cache\n  const fetchData = async () => {\n    // Increment fetch ID to track this specific fetch\n    const currentFetchId = ++fetchIdRef.current;\n    \n    try {\n      setLoading(true);\n      \n      const token = localStorage.getItem('token');\n      if (!token) {\n        console.log('⚠️ User not logged in');\n        setError('Please log in to view contests');\n        setLoading(false);\n        return;\n      }\n\n      console.log('📡 Fetching contests data (fetch #' + currentFetchId + ')...');\n      \n      // Use cached data from context (already fetched on Home page)\n      await fetchAllContests(false); // false = use cache if valid\n      \n      // Check if this fetch is still the current one\n      if (currentFetchId !== fetchIdRef.current) {\n        console.log('🔄 Fetch #' + currentFetchId + ' superseded, ignoring results');\n        return;\n      }\n\n      // Get combined contests from cache\n      const allContests = getCombinedContests();\n      \n      console.log('✅ Combined contests from cache:', allContests.length);\n\n      if (currentFetchId === fetchIdRef.current) {\n        setContests(allContests);\n        console.log('✅ Total contests set:', allContests.length);\n      }\n\n      // Set registered contests from cache\n      if (contestsCache.registrations) {\n        setRegisteredContests(contestsCache.registrations || []);\n        console.log('✅ Registrations from cache:', contestsCache.registrations.length);\n      }\n\n      if (currentFetchId === fetchIdRef.current) {\n        setError(null);\n      }\n    } catch (err) {\n      console.error('❌ Contests fetch failed:', err);\n      if (currentFetchId === fetchIdRef.current) {\n        setError(err.response?.data?.error || 'Failed to load contests');\n      }\n    } finally {\n      if (currentFetchId === fetchIdRef.current) {\n        setLoading(false);\n        console.log('✅ Loading set to false (fetch #' + currentFetchId + ')');\n      }\n    }\n  };
+  // Combined fetch function - uses cache
+  const fetchData = async () => {
+    // Increment fetch ID to track this specific fetch
+    const currentFetchId = ++fetchIdRef.current;
+    
+    try {
+      setLoading(true);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('⚠️ User not logged in');
+        setError('Please log in to view contests');
+        setLoading(false);
+        return;
+      }
+
+      console.log('📡 Fetching contests data (fetch #' + currentFetchId + ')...');
+      
+      // Use cached data from context (already fetched on Home page)
+      await fetchAllContests(false); // false = use cache if valid
+      
+      // Check if this fetch is still the current one
+      if (currentFetchId !== fetchIdRef.current) {
+        console.log('🔄 Fetch #' + currentFetchId + ' superseded, ignoring results');
+        return;
+      }
+
+      // Get combined contests from cache
+      const allContests = getCombinedContests();
+      
+      console.log('✅ Combined contests from cache:', allContests.length);
+
+      if (currentFetchId === fetchIdRef.current) {
+        setContests(allContests);
+        console.log('✅ Total contests set:', allContests.length);
+      }
+
+      // Set registered contests from cache
+      if (contestsCache.registrations) {
+        setRegisteredContests(contestsCache.registrations || []);
+        console.log('✅ Registrations from cache:', contestsCache.registrations.length);
+      }
+
+      if (currentFetchId === fetchIdRef.current) {
+        setError(null);
+      }
+    } catch (err) {
+      console.error('❌ Contests fetch failed:', err);
+      if (currentFetchId === fetchIdRef.current) {
+        setError(err.response?.data?.error || 'Failed to load contests');
+      }
+    } finally {
+      if (currentFetchId === fetchIdRef.current) {
+        setLoading(false);
+        console.log('✅ Loading set to false (fetch #' + currentFetchId + ')');
+      }
+    }
+  };
 
   useEffect(() => {
     fetchData();

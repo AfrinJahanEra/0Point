@@ -34,7 +34,6 @@ import {
 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { useContests } from '../context/ContestContext';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -43,9 +42,6 @@ const Home = () => {
   const [activeVisualization, setActiveVisualization] = useState('');
   const [registeredContests, setRegisteredContests] = useState(new Set());
   
-  // Use contest context for cached data
-  const { fetchAllContests, contestsCache, isCacheValid } = useContests();
-  
   // Blog states for like/dislike and comments
   const [blogLikes, setBlogLikes] = useState({});
   const [blogDislikes, setBlogDislikes] = useState({});
@@ -53,43 +49,38 @@ const Home = () => {
   const [blogComments, setBlogComments] = useState({});
   const [newComment, setNewComment] = useState({});
   const [blogs, setBlogs] = useState([]);
-  const [loadingBlogs, setLoadingBlogs] = useState(false);
   const [showFullContent, setShowFullContent] = useState({});
   
   // Upcoming contests state - use from cache
   const [upcomingContests, setUpcomingContests] = useState([]);
-  const [loadingContests, setLoadingContests] = useState(false);
   
   // Past contests state - use from cache
   const [pastContests, setPastContests] = useState([]);
-  const [loadingPastContests, setLoadingPastContests] = useState(false);
   
   // Live contests state - use from cache
   const [liveContests, setLiveContests] = useState([]);
-  const [loadingLiveContests, setLoadingLiveContests] = useState(false);
   
   // Soonest contest state for countdown
   const [soonestContest, setSoonestContest] = useState(null);
-  const [loadingSoonest, setLoadingSoonest] = useState(false);
 
   // Leaderboard state
   const [leaderboardData, setLeaderboardData] = useState([]);
-  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
-  // Add with your other useState declarations
+  // Contributions state
   const [contributions, setContributions] = useState([]);
-  const [loadingContributions, setLoadingContributions] = useState(false);
 
   // Announcements state
   const [announcements, setAnnouncements] = useState([]);
-  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+
+  // Single loading state for dashboard
+  const [loading, setLoading] = useState(true);
 
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
-    days: 5,
-    hours: 12,
-    minutes: 30,
-    seconds: 45
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0
   });
 
   // Fetch registered contests
@@ -126,34 +117,40 @@ const Home = () => {
     return startTime <= new Date();
   };
 
-const fetchContributions = async () => {
-  try {
-    setLoadingContributions(true);
-    const response = await api.get('/contributions/ranking/');
-    console.log('Raw API response:', response);
-    console.log('Response data:', response.data);
-    
-    // The API returns { count: 1, ranking: [...] }
-    // So we need to use response.data.ranking
-    setContributions(response.data.ranking || []);
-  } catch (error) {
-    console.error('Error fetching contributions:', error);
-    toast.error('Failed to load contributions');
-  } finally {
-    setLoadingContributions(false);
-  }
-};
-
-  const fetchAnnouncements = async () => {
+  // Single unified fetch for all dashboard data - FASTER LOADING
+  const fetchDashboardData = async () => {
     try {
-      setLoadingAnnouncements(true);
-      const response = await api.get('/announcements/platform/?limit=5');
-      setAnnouncements(response.data.announcements || []);
+      setLoading(true);
+      const response = await api.get('/home/dashboard/');
+      const data = response.data;
+      
+      // Set all data from single response
+      setUpcomingContests(data.upcoming_contests || []);
+      setLiveContests(data.live_contests || []);
+      setPastContests(data.past_contests || []);
+      setBlogs(data.blogs || []);
+      setAnnouncements(data.announcements || []);
+      setLeaderboardData(data.leaderboard || []);
+      setContributions(data.contributions || []);
+      setRegisteredContests(new Set(data.registered_contest_ids || []));
+      
+      // Set soonest contest for countdown
+      if (data.soonest_contest) {
+        setSoonestContest(data.soonest_contest);
+        setTimeLeft({
+          days: data.soonest_contest.time_until?.days || 0,
+          hours: data.soonest_contest.time_until?.hours || 0,
+          minutes: data.soonest_contest.time_until?.minutes || 0,
+          seconds: data.soonest_contest.time_until?.seconds || 0
+        });
+      } else {
+        setSoonestContest(null);
+      }
     } catch (error) {
-      console.error('Error fetching announcements:', error);
-      setAnnouncements([]);
+      console.error('Error fetching dashboard data:', error);
+      toast.error('Failed to load dashboard data');
     } finally {
-      setLoadingAnnouncements(false);
+      setLoading(false);
     }
   };
 
@@ -184,84 +181,10 @@ const fetchContributions = async () => {
     return () => clearInterval(timer);
   }, [soonestContest]);
 
-  // Fetch all data - contests fetched only ONCE
+  // Fetch all dashboard data on mount
   useEffect(() => {
-    const initializeData = async () => {
-      // Fetch contests data ONCE (cached for 5 minutes)
-      await fetchAllContests(false);
-      
-      // Fetch other data
-      fetchLatestBlogs();
-      fetchLeaderboard();
-      fetchPastContests();
-      fetchSoonestContest();
-      fetchLiveContests();
-      fetchContributions();
-      fetchAnnouncements();
-    };
-    
-    initializeData();
+    fetchDashboardData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fetchLatestBlogs = async () => {
-    try {
-      setLoadingBlogs(true);
-      const response = await api.get('/blog/published/');
-      setBlogs(response.data.slice(0, 3));
-    } catch (error) {
-      console.error('Error fetching blogs:', error);
-      toast.error('Failed to load latest blogs');
-    } finally {
-      setLoadingBlogs(false);
-    }
-  };
-
-  // Update upcoming contests from cache when it changes\n  useEffect(() => {\n    if (contestsCache.upcoming && contestsCache.external) {\n      const internalContests = (contestsCache.upcoming || []).map(c => ({\n        ...c,\n        platform: '0point',\n        is_external: false\n      }));\n      \n      // Transform external contests to match internal format\n      const externalContests = (contestsCache.external || [])\n        .filter(c => {\n          const startTime = new Date(c.start_time);\n          return startTime > new Date(); // Only upcoming\n        })\n        .map(c => ({\n          id: `external_${c.platform}_${c.external_id}`,\n          title: c.title,\n          start_time: c.start_time,\n          end_time: c.end_time,\n          duration: c.duration_formatted || c.duration || 'N/A',\n          participants: c.participants || 0,\n          platform: c.platform,\n          is_external: true,\n          external_url: c.url,\n          status: 'upcoming'\n        }));\n      \n      console.log('Processed internal:', internalContests.length);\n      console.log('Processed external:', externalContests.length);\n      \n      // Combine and sort by start_time (soonest first)\n      const allContests = [...internalContests, ...externalContests].sort((a, b) => {\n        const dateA = new Date(a.start_time);\n        const dateB = new Date(b.start_time);\n        return dateA - dateB;\n      });\n      \n      console.log('All contests sorted:', allContests);\n      \n      setUpcomingContests(allContests);\n      setLoadingContests(false);\n    }\n  }, [contestsCache.upcoming, contestsCache.external]);\n\n  // Update live contests from cache\n  useEffect(() => {\n    if (contestsCache.live) {\n      setLiveContests(contestsCache.live || []);\n      setLoadingLiveContests(false);\n    }\n  }, [contestsCache.live]);\n\n  // Update past contests from cache\n  useEffect(() => {\n    if (contestsCache.past) {\n      setPastContests(contestsCache.past || []);\n      setLoadingPastContests(false);\n    }\n  }, [contestsCache.past]);\n\n  // Update registered contests from cache\n  useEffect(() => {\n    if (contestsCache.registrations) {\n      setRegisteredContests(new Set(contestsCache.registrations || []));\n    }\n  }, [contestsCache.registrations]);\n
-    } catch (error) {
-      console.error('Error fetching past contests:', error);
-      toast.error('Failed to load past contests');
-      setPastContests([]);
-    } finally {
-      setLoadingPastContests(false);
-    }
-  };
-
-  const fetchSoonestContest = async () => {
-    try {
-      setLoadingSoonest(true);
-      const response = await api.get('/contests/soonest/');
-      
-      if (response.data.has_contest) {
-        setSoonestContest(response.data);
-        setTimeLeft({
-          days: response.data.time_until.days,
-          hours: response.data.time_until.hours,
-          minutes: response.data.time_until.minutes,
-          seconds: response.data.time_until.seconds
-        });
-      } else {
-        setSoonestContest(null);
-      }
-    } catch (error) {
-      console.error('Error fetching soonest contest:', error);
-      setSoonestContest(null);
-    } finally {
-      setLoadingSoonest(false);
-    }
-  };
-
-  const fetchLeaderboard = async () => {
-    try {
-      setLoadingLeaderboard(true);
-      const response = await api.get('/leaderboard/minimal/');
-      setLeaderboardData(response.data.slice(0, 5));
-    } catch (error) {
-      console.error('Error fetching leaderboard:', error);
-      toast.error('Failed to load leaderboard');
-    } finally {
-      setLoadingLeaderboard(false);
-    }
-  };
 
   // Blog functions
   const handleBlogLike = (blogId) => {
@@ -554,7 +477,7 @@ const fetchContributions = async () => {
 
               {/* Contests List */}
               <div className="p-3 space-y-2">
-                {loadingContests ? (
+                {loading ? (
                   <div className="py-4 text-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
                     <p className="text-xs text-gray-500 mt-2">Loading contests...</p>
@@ -659,7 +582,7 @@ const fetchContributions = async () => {
                   })
                 )}
                 {/* Show message when no registered contests in Registered tab */}
-                {activeTab === 'registered' && upcomingContests.filter(c => !c.is_external && (registeredContests.has(c.id) || c.is_registered)).length === 0 && !loadingContests && (
+                {activeTab === 'registered' && upcomingContests.filter(c => !c.is_external && (registeredContests.has(c.id) || c.is_registered)).length === 0 && !loading && (
                   <div className="py-4 text-center">
                     <p className="text-xs text-gray-500">No registered contests</p>
                   </div>
@@ -670,7 +593,7 @@ const fetchContributions = async () => {
             {/* Contest Countdown - Only 0Point Contests */}
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
-                {loadingSoonest ? (
+                {loading ? (
                   <div className="py-4 text-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
                     <p className="text-xs text-gray-500 mt-2">Loading countdown...</p>
@@ -750,7 +673,7 @@ const fetchContributions = async () => {
                 </div>
 
                 <div className="space-y-2">
-                  {loadingPastContests ? (
+                  {loading ? (
                     <div className="py-4 text-center">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
                       <p className="text-xs text-gray-500 mt-2">Loading past contests...</p>
@@ -818,7 +741,7 @@ const fetchContributions = async () => {
               </div>
 
               <div className="px-7">
-                {loadingLeaderboard ? (
+                {loading ? (
                   <div className="py-4 text-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
                     <p className="text-xs text-gray-500 mt-2">Loading...</p>
@@ -885,7 +808,7 @@ const fetchContributions = async () => {
                   </Link>
                 </div>
                 
-                {loadingBlogs ? (
+                {loading ? (
                   <div className="p-8 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
                     <p className="text-xs text-gray-600">Loading latest blogs...</p>
@@ -1088,7 +1011,7 @@ const fetchContributions = async () => {
                 </div>
 
                 <div className="space-y-2">
-                  {loadingLiveContests ? (
+                  {loading ? (
                     <div className="py-4 text-center">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
                       <p className="text-xs text-gray-500 mt-2">Loading running contests...</p>
@@ -1165,7 +1088,7 @@ const fetchContributions = async () => {
                 </div>
 
                 <div className="space-y-2 p-2">
-                  {loadingAnnouncements ? (
+                  {loading ? (
                     <div className="py-4 text-center">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
                       <p className="text-xs text-gray-500 mt-2">Loading announcements...</p>
@@ -1226,7 +1149,7 @@ const fetchContributions = async () => {
   </div>
 
   <div className="p-3">
-    {loadingContributions ? (
+    {loading ? (
       <div className="py-4 text-center">
         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
         <p className="text-xs text-gray-500 mt-2">Loading contributors...</p>

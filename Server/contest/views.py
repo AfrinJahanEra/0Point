@@ -2623,5 +2623,223 @@ class ContestUserRecordingsAPIView(APIView):
             },
             "total_count": len(recordings_list)
         })
+
+
+class HomeDashboardAPIView(APIView):
+    """
+    GET /home/dashboard/
+    Single endpoint that returns all home page data for faster loading.
+    Reduces 6+ API calls to 1.
+    Includes contests from ALL platforms (0Point + Codeforces + LeetCode + CodeChef + AtCoder)
+    """
     
-    
+    def get(self, request):
+        user = get_user_from_request(request)
+        
+        try:
+            from datetime import datetime, timezone as dt_timezone
+            from blog.models import Blog
+            from announcement.models import Announcement
+            from crossPlatform.models import ExternalContest
+            from public_leaderboard.serializers import LeaderboardMinimalSerializer
+            
+            now = datetime.now(dt_timezone.utc)
+            
+            # Platform display mapping for external contests
+            platform_display_mapping = {
+                "codeforces": "cf",
+                "leetcode": "lc",
+                "codechef": "cc",
+                "atcoder": "ac"
+            }
+            
+            # 1. Get internal 0Point contests
+            all_internal_contests = list(Contest.objects.all())
+            
+            upcoming_contests = []
+            live_contests = []
+            past_contests = []
+            soonest_upcoming = None
+            
+            # Get registered contest IDs for this user
+            registered_ids = set()
+            if user:
+                registrations = ContestRegistration.objects(user=user)
+                registered_ids = {str(r.contest.id) for r in registrations if r.contest}
+            
+            for c in all_internal_contests:
+                status_value = get_contest_status(c)
+                
+                contest_data = {
+                    "id": str(c.id),
+                    "title": c.title,
+                    "description": c.description,
+                    "start_time": c.start_time.isoformat() if c.start_time else None,
+                    "duration": c.duration,
+                    "type": c.type,
+                    "platform": "0point",
+                    "status": status_value,
+                    "participants": ContestRegistration.objects(contest=c).count(),
+                    "is_registered": str(c.id) in registered_ids,
+                    "is_external": False
+                }
+                
+                if status_value == "upcoming":
+                    upcoming_contests.append(contest_data)
+                    # Track soonest upcoming (only for 0Point contests - countdown timer)
+                    if soonest_upcoming is None or (c.start_time and c.start_time < soonest_upcoming["start_time_raw"]):
+                        start_time = c.start_time
+                        if start_time and start_time.tzinfo is None:
+                            start_time = start_time.replace(tzinfo=dt_timezone.utc)
+                        
+                        if start_time:
+                            time_until = start_time - now
+                            days = max(0, time_until.days)
+                            hours = max(0, time_until.seconds // 3600)
+                            minutes = max(0, (time_until.seconds % 3600) // 60)
+                            seconds = max(0, time_until.seconds % 60)
+                            
+                            soonest_upcoming = {
+                                "contest_id": str(c.id),
+                                "title": c.title,
+                                "platform": "0point",
+                                "start_time": c.start_time.isoformat() if c.start_time else None,
+                                "start_time_raw": c.start_time,
+                                "is_registered": str(c.id) in registered_ids,
+                                "time_until": {
+                                    "days": days,
+                                    "hours": hours,
+                                    "minutes": minutes,
+                                    "seconds": seconds
+                                }
+                            }
+                elif status_value == "live":
+                    live_contests.append(contest_data)
+                elif status_value == "past":
+                    past_contests.append(contest_data)
+            
+            # 2. Get external platform contests (upcoming only)
+            try:
+                external_contests = ExternalContest.objects(status="upcoming").order_by("start_time")
+                
+                for ec in external_contests:
+                    platform_code = platform_display_mapping.get(ec.platform, ec.platform)
+                    
+                    external_data = {
+                        "id": f"external_{ec.platform}_{ec.external_id}",
+                        "title": ec.title,
+                        "description": "",
+                        "start_time": ec.start_time.isoformat() if ec.start_time else None,
+                        "duration": ec.duration_formatted or f"{ec.duration_seconds // 3600}h",
+                        "type": "external",
+                        "platform": platform_code,
+                        "status": "upcoming",
+                        "participants": ec.participants or 0,
+                        "is_registered": False,
+                        "is_external": True,
+                        "external_url": ec.url
+                    }
+                    upcoming_contests.append(external_data)
+            except Exception as e:
+                print(f"Error fetching external contests: {e}")
+            
+            # Sort all upcoming contests by start_time (soonest first)
+            upcoming_contests.sort(key=lambda x: x["start_time"] or "9999", reverse=False)
+            past_contests.sort(key=lambda x: x["start_time"] or "", reverse=True)
+            
+            # Clean up soonest_upcoming
+            if soonest_upcoming:
+                soonest_upcoming.pop("start_time_raw", None)
+            
+            # 3. Get latest blogs (top 3)
+            blogs_data = []
+            try:
+                blogs = Blog.objects(is_published=True).order_by('-published_at')[:3]
+                for blog in blogs:
+                    blogs_data.append(blog.to_dict())
+            except Exception as e:
+                print(f"Error fetching blogs: {e}")
+            
+            # 4. Get platform announcements (top 5)
+            announcements_data = []
+            try:
+                announcements = Announcement.objects(contest=None).order_by("-is_pinned", "-created_at")[:5]
+                for ann in announcements:
+                    announcements_data.append(ann.to_dict())
+            except Exception as e:
+                print(f"Error fetching announcements: {e}")
+            
+            # 5. Get leaderboard minimal (top 5)
+            leaderboard_data = []
+            try:
+                users = Account.objects(
+                    is_deleted=False,
+                    is_inactive=False
+                ).order_by('-rating')[:5]
+                
+                current_rank = 1
+                for u in users:
+                    leaderboard_data.append({
+                        "username": u.name,
+                        "total_points": u.rating,
+                        "rank": current_rank
+                    })
+                    current_rank += 1
+            except Exception as e:
+                print(f"Error fetching leaderboard: {e}")
+            
+            # 6. Get top contributors (top 5)
+            contributions_data = []
+            try:
+                all_users = Account.objects.filter(is_deleted=False)
+                contributor_list = []
+                
+                for u in all_users:
+                    blogs_count = Blog.objects.filter(author=u, is_published=True).count()
+                    contests_count = Contest.objects.filter(created_by=u).count()
+                    total = blogs_count + contests_count
+                    
+                    if total > 0:
+                        contributor_list.append({
+                            "name": u.name,
+                            "username": u.email.split('@')[0] if u.email else u.name,
+                            "total_contributions": total,
+                            "blogs": blogs_count,
+                            "contests": contests_count
+                        })
+                
+                contributor_list.sort(key=lambda x: x['total_contributions'], reverse=True)
+                for idx, contrib in enumerate(contributor_list[:5], start=1):
+                    contrib['rank'] = idx
+                    contributions_data.append(contrib)
+            except Exception as e:
+                print(f"Error fetching contributions: {e}")
+            
+            return Response({
+                "upcoming_contests": upcoming_contests[:5],  # Top 5 from all platforms combined
+                "live_contests": live_contests,
+                "past_contests": past_contests[:5],
+                "blogs": blogs_data,
+                "announcements": announcements_data,
+                "leaderboard": leaderboard_data,
+                "contributions": contributions_data,
+                "soonest_contest": soonest_upcoming,  # Only 0Point contests for countdown
+                "registered_contest_ids": list(registered_ids)
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            import traceback
+            print(f"Error in HomeDashboardAPIView: {str(e)}")
+            print(traceback.format_exc())
+            return Response({
+                "error": f"Failed to fetch home data: {str(e)}",
+                "upcoming_contests": [],
+                "live_contests": [],
+                "past_contests": [],
+                "blogs": [],
+                "announcements": [],
+                "leaderboard": [],
+                "contributions": [],
+                "soonest_contest": None,
+                "registered_contest_ids": []
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
