@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { useContests } from '../context/ContestContext';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -41,6 +42,9 @@ const Home = () => {
   const [timeFilter, setTimeFilter] = useState('upcoming');
   const [activeVisualization, setActiveVisualization] = useState('');
   const [registeredContests, setRegisteredContests] = useState(new Set());
+  
+  // Use contest context for cached data
+  const { fetchAllContests, contestsCache, isCacheValid } = useContests();
   
   // Blog states for like/dislike and comments
   const [blogLikes, setBlogLikes] = useState({});
@@ -52,15 +56,15 @@ const Home = () => {
   const [loadingBlogs, setLoadingBlogs] = useState(false);
   const [showFullContent, setShowFullContent] = useState({});
   
-  // Upcoming contests state
+  // Upcoming contests state - use from cache
   const [upcomingContests, setUpcomingContests] = useState([]);
   const [loadingContests, setLoadingContests] = useState(false);
   
-  // Past contests state
+  // Past contests state - use from cache
   const [pastContests, setPastContests] = useState([]);
   const [loadingPastContests, setLoadingPastContests] = useState(false);
   
-  // Live contests state
+  // Live contests state - use from cache
   const [liveContests, setLiveContests] = useState([]);
   const [loadingLiveContests, setLoadingLiveContests] = useState(false);
   
@@ -73,8 +77,8 @@ const Home = () => {
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
   // Add with your other useState declarations
-const [contributions, setContributions] = useState([]);
-const [loadingContributions, setLoadingContributions] = useState(false);
+  const [contributions, setContributions] = useState([]);
+  const [loadingContributions, setLoadingContributions] = useState(false);
 
   // Announcements state
   const [announcements, setAnnouncements] = useState([]);
@@ -180,18 +184,24 @@ const fetchContributions = async () => {
     return () => clearInterval(timer);
   }, [soonestContest]);
 
-  // Fetch all data
+  // Fetch all data - contests fetched only ONCE
   useEffect(() => {
-    fetchLatestBlogs();
-    fetchLeaderboard();
-    fetchUpcomingContests();
-    fetchPastContests();
-    fetchSoonestContest();
-    fetchLiveContests();
-    fetchRegisteredContests();
-    fetchContributions();
-    fetchAnnouncements();
-  }, []);
+    const initializeData = async () => {
+      // Fetch contests data ONCE (cached for 5 minutes)
+      await fetchAllContests(false);
+      
+      // Fetch other data
+      fetchLatestBlogs();
+      fetchLeaderboard();
+      fetchPastContests();
+      fetchSoonestContest();
+      fetchLiveContests();
+      fetchContributions();
+      fetchAnnouncements();
+    };
+    
+    initializeData();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchLatestBlogs = async () => {
     try {
@@ -206,88 +216,7 @@ const fetchContributions = async () => {
     }
   };
 
-  const fetchUpcomingContests = async () => {
-    try {
-      setLoadingContests(true);
-      
-      // Fetch both internal and external contests in parallel
-      const [internalResponse, externalResponse] = await Promise.all([
-        api.get('/contests/upcoming/'),
-        api.get('/external/contests/?platform=all').catch(err => {
-          console.log('External contests fetch error:', err);
-          return { data: [] };
-        })
-      ]);
-      
-      console.log('Internal contests:', internalResponse.data);
-      console.log('External contests:', externalResponse.data);
-      
-      const internalContests = (internalResponse.data.contests || []).map(c => ({
-        ...c,
-        platform: '0point',
-        is_external: false
-      }));
-      
-      // Transform external contests to match internal format
-      const externalContests = (externalResponse.data || [])
-        .filter(c => {
-          const startTime = new Date(c.start_time);
-          return startTime > new Date(); // Only upcoming
-        })
-        .map(c => ({
-          id: `external_${c.platform}_${c.external_id}`,
-          title: c.title,
-          start_time: c.start_time,
-          end_time: c.end_time,
-          duration: c.duration_formatted || c.duration || 'N/A',
-          participants: c.participants || 0,
-          platform: c.platform,
-          is_external: true,
-          external_url: c.url,
-          status: 'upcoming'
-        }));
-      
-      console.log('Processed internal:', internalContests.length);
-      console.log('Processed external:', externalContests.length);
-      
-      // Combine and sort by start_time (soonest first)
-      const allContests = [...internalContests, ...externalContests].sort((a, b) => {
-        const dateA = new Date(a.start_time);
-        const dateB = new Date(b.start_time);
-        return dateA - dateB;
-      });
-      
-      console.log('All contests sorted:', allContests);
-      
-      setUpcomingContests(allContests);
-    } catch (error) {
-      console.error('Error fetching upcoming contests:', error);
-      toast.error('Failed to load upcoming contests');
-      setUpcomingContests([]);
-    } finally {
-      setLoadingContests(false);
-    }
-  };
-
-  const fetchLiveContests = async () => {
-    try {
-      setLoadingLiveContests(true);
-      const response = await api.get('/contests/live/');
-      setLiveContests(response.data.contests || []);
-    } catch (error) {
-      console.error('Error fetching live contests:', error);
-      toast.error('Failed to load live contests');
-      setLiveContests([]);
-    } finally {
-      setLoadingLiveContests(false);
-    }
-  };
-
-  const fetchPastContests = async () => {
-    try {
-      setLoadingPastContests(true);
-      const response = await api.get('/contests/past/');
-      setPastContests(response.data.contests || []);
+  // Update upcoming contests from cache when it changes\n  useEffect(() => {\n    if (contestsCache.upcoming && contestsCache.external) {\n      const internalContests = (contestsCache.upcoming || []).map(c => ({\n        ...c,\n        platform: '0point',\n        is_external: false\n      }));\n      \n      // Transform external contests to match internal format\n      const externalContests = (contestsCache.external || [])\n        .filter(c => {\n          const startTime = new Date(c.start_time);\n          return startTime > new Date(); // Only upcoming\n        })\n        .map(c => ({\n          id: `external_${c.platform}_${c.external_id}`,\n          title: c.title,\n          start_time: c.start_time,\n          end_time: c.end_time,\n          duration: c.duration_formatted || c.duration || 'N/A',\n          participants: c.participants || 0,\n          platform: c.platform,\n          is_external: true,\n          external_url: c.url,\n          status: 'upcoming'\n        }));\n      \n      console.log('Processed internal:', internalContests.length);\n      console.log('Processed external:', externalContests.length);\n      \n      // Combine and sort by start_time (soonest first)\n      const allContests = [...internalContests, ...externalContests].sort((a, b) => {\n        const dateA = new Date(a.start_time);\n        const dateB = new Date(b.start_time);\n        return dateA - dateB;\n      });\n      \n      console.log('All contests sorted:', allContests);\n      \n      setUpcomingContests(allContests);\n      setLoadingContests(false);\n    }\n  }, [contestsCache.upcoming, contestsCache.external]);\n\n  // Update live contests from cache\n  useEffect(() => {\n    if (contestsCache.live) {\n      setLiveContests(contestsCache.live || []);\n      setLoadingLiveContests(false);\n    }\n  }, [contestsCache.live]);\n\n  // Update past contests from cache\n  useEffect(() => {\n    if (contestsCache.past) {\n      setPastContests(contestsCache.past || []);\n      setLoadingPastContests(false);\n    }\n  }, [contestsCache.past]);\n\n  // Update registered contests from cache\n  useEffect(() => {\n    if (contestsCache.registrations) {\n      setRegisteredContests(new Set(contestsCache.registrations || []));\n    }\n  }, [contestsCache.registrations]);\n
     } catch (error) {
       console.error('Error fetching past contests:', error);
       toast.error('Failed to load past contests');

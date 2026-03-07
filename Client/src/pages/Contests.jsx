@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useRef } from 'react';
 import { BACKEND_URL, WS_URL } from '../utils/api';
 import { 
   Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, 
   AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, 
-  ChevronsRight, Video, ExternalLink 
+  ChevronsRight, Video, ExternalLink, Plus 
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useContests } from '../context/ContestContext';
 
 const Contests = () => {
   const [contests, setContests] = useState([]);
@@ -17,6 +17,12 @@ const Contests = () => {
   const [filteredContests, setFilteredContests] = useState([]);
   const [registeredContests, setRegisteredContests] = useState([]);
   const navigate = useNavigate();
+  
+  // Use contest context for cached data
+  const { fetchAllContests, contestsCache, getCombinedContests } = useContests();
+  
+  // Ref to track fetch ID to prevent stale updates
+  const fetchIdRef = useRef(0);
   
   // Backend URL configuration
   const backendUrl = BACKEND_URL;
@@ -38,6 +44,22 @@ const Contests = () => {
   // Get token from localStorage
   const TOKEN = localStorage.getItem('token');
 
+  // Platform name helper - defined early for use in fetchData
+  const getPlatformName = (p) => {
+    const map = {
+      'IUT': 'IUT Platform',
+      'cf': 'Codeforces',
+      'lc': 'LeetCode',
+      'cc': 'CodeChef',
+      'codechef': 'CodeChef',
+      'ac': 'AtCoder',
+      'atcoder': 'AtCoder',
+      'hackerrank': 'HackerRank',
+      'leetcode': 'LeetCode',
+    };
+    return map[p] || p || 'Unknown';
+  };
+
   // Normalize external contest → unified shape (from first version)
   const normalizeExternalContest = (c) => ({
     id: `${c.platform}-${c.external_id}`,
@@ -54,100 +76,11 @@ const Contests = () => {
     external: true
   });
 
-  // Combined fetch function
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      
-      if (!TOKEN) {
-        console.log('⚠️ User not logged in');
-        setError('Please log in to view contests');
-        setLoading(false);
-        return;
-      }
-
-      console.log('📡 Fetching initial contests data...');
-
-      // 1. Manual contests (from first version)
-      const manualRes = await axios.get(`${backendUrl}/contests/`, {
-        headers: { Authorization: `Bearer ${TOKEN}` }
-      });
-      
-      // Filter out test contests (from second version)
-      const regularContests = (manualRes.data.contests || []).filter(contest => 
-        !contest.is_test_contest && contest.visibility !== 'test'
-      ).map(c => ({
-        ...c,
-        external: false,
-        platform: c.platform || 'IUT',
-        id: c.id || `manual-${c._id || Math.random()}`
-      }));
-
-      // 2. Test contests separately (from second version)
-      const testContestsRes = await axios.get(`${backendUrl}/test-contests/my/`, {
-        headers: { Authorization: `Bearer ${TOKEN}` }
-      });
-
-      const testContests = (testContestsRes.data.test_contests || []).map(c => ({
-        ...c,
-        is_test_contest: true,
-        external: false
-      }));
-
-      // 3. All external contests in one call (from first version)
-      const externalRes = await axios.get(`${backendUrl}/external/contests/?platform=all`, {
-        headers: { Authorization: `Bearer ${TOKEN}` }
-      });
-      
-      // Transform external contests (from second version)
-      const externalContests = (externalRes.data || []).map(contest => ({
-        id: `external_${contest.platform}_${contest.external_id}`,
-        title: contest.title,
-        platform: contest.platform,
-        status: contest.status === 'finished' ? 'past' : contest.status,
-        start_time: contest.start_time,
-        duration_seconds: contest.duration_seconds,
-        duration_formatted: contest.duration_formatted,
-        participants: contest.participants || 0,
-        type: 'individual',
-        is_external: true,
-        external_url: contest.url,
-        description: `External contest from ${getPlatformName(contest.platform)}`,
-        external: true
-      }));
-
-      console.log('✅ Regular contests loaded:', regularContests.length);
-      console.log('✅ Test contests loaded:', testContests.length);
-      console.log('✅ External contests loaded:', externalContests.length);
-
-      // Combine all contests
-      const allContests = [...regularContests, ...testContests, ...externalContests];
-      setContests(allContests);
-
-      // 4. Registrations (only for manual contests)
-      try {
-        const regRes = await axios.get(`${backendUrl}/contests/registrations/`, {
-          headers: { Authorization: `Bearer ${TOKEN}` }
-        });
-        console.log('✅ Registrations loaded:', regRes.data.registered_contests?.length || 0);
-        setRegisteredContests(regRes.data.registered_contests || []);
-      } catch (regErr) {
-        console.warn('⚠️ Registrations fetch failed', regErr);
-        setRegisteredContests([]);
-      }
-
-      setError(null);
-    } catch (err) {
-      console.error('❌ Contests fetch failed:', err);
-      setError(err.response?.data?.error || 'Failed to load contests');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Combined fetch function - uses cache\n  const fetchData = async () => {\n    // Increment fetch ID to track this specific fetch\n    const currentFetchId = ++fetchIdRef.current;\n    \n    try {\n      setLoading(true);\n      \n      const token = localStorage.getItem('token');\n      if (!token) {\n        console.log('⚠️ User not logged in');\n        setError('Please log in to view contests');\n        setLoading(false);\n        return;\n      }\n\n      console.log('📡 Fetching contests data (fetch #' + currentFetchId + ')...');\n      \n      // Use cached data from context (already fetched on Home page)\n      await fetchAllContests(false); // false = use cache if valid\n      \n      // Check if this fetch is still the current one\n      if (currentFetchId !== fetchIdRef.current) {\n        console.log('🔄 Fetch #' + currentFetchId + ' superseded, ignoring results');\n        return;\n      }\n\n      // Get combined contests from cache\n      const allContests = getCombinedContests();\n      \n      console.log('✅ Combined contests from cache:', allContests.length);\n\n      if (currentFetchId === fetchIdRef.current) {\n        setContests(allContests);\n        console.log('✅ Total contests set:', allContests.length);\n      }\n\n      // Set registered contests from cache\n      if (contestsCache.registrations) {\n        setRegisteredContests(contestsCache.registrations || []);\n        console.log('✅ Registrations from cache:', contestsCache.registrations.length);\n      }\n\n      if (currentFetchId === fetchIdRef.current) {\n        setError(null);\n      }\n    } catch (err) {\n      console.error('❌ Contests fetch failed:', err);\n      if (currentFetchId === fetchIdRef.current) {\n        setError(err.response?.data?.error || 'Failed to load contests');\n      }\n    } finally {\n      if (currentFetchId === fetchIdRef.current) {\n        setLoading(false);\n        console.log('✅ Loading set to false (fetch #' + currentFetchId + ')');\n      }\n    }\n  };
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update activeTab when URL parameter changes
   useEffect(() => {
@@ -246,6 +179,12 @@ const Contests = () => {
     if (activeTab !== 'all') {
       if (activeTab === 'draft') {
         result = result.filter(c => c.status === 'draft' && !c.external && !c.is_external);
+      } else if (activeTab === 'live') {
+        // Accept both 'live' and 'ongoing' for live contests
+        result = result.filter(c => c.status === 'live' || c.status === 'ongoing');
+      } else if (activeTab === 'past') {
+        // Accept both 'past' and 'completed' for past contests
+        result = result.filter(c => c.status === 'past' || c.status === 'completed');
       } else {
         result = result.filter(c => c.status === activeTab);
       }
@@ -306,37 +245,34 @@ const Contests = () => {
     setPaginatedContests(paginated);
   }, [filteredContests, currentPage, itemsPerPage]);
 
-  const getPlatformName = (p) => {
-    const map = {
-      'IUT': 'IUT Platform',
-      'cf': 'Codeforces',
-      'lc': 'LeetCode',
-      'cc': 'CodeChef',
-      'codechef': 'CodeChef',
-      'ac': 'AtCoder',
-      'atcoder': 'AtCoder',
-      'hackerrank': 'HackerRank',
-      'leetcode': 'LeetCode',
-    };
-    return map[p] || p || 'Unknown';
-  };
-
   const getStatusBadge = (status, isTestContest) => {
     const base = "px-2 py-1 rounded-full text-xs font-semibold border";
     
+    // Normalize status for styling
+    const normalizedStatus = status === 'ongoing' ? 'live' : (status === 'completed' ? 'past' : status);
+    
     // If it's a test contest and status is upcoming/live/past, show test badge
-    if (isTestContest && ['upcoming', 'live', 'past'].includes(status)) {
+    if (isTestContest && ['upcoming', 'live', 'past', 'ongoing', 'completed'].includes(status)) {
       return `${base} bg-purple-50 text-purple-800 border-purple-200`;
     }
     
     const styles = {
       live: "bg-red-50 text-red-800 border-red-200",
+      ongoing: "bg-red-50 text-red-800 border-red-200",
       upcoming: "bg-blue-50 text-blue-800 border-blue-200",
       past: "bg-green-50 text-green-800 border-green-200",
+      completed: "bg-green-50 text-green-800 border-green-200",
       draft: "bg-yellow-50 text-yellow-800 border-yellow-200",
       test: "bg-purple-50 text-purple-800 border-purple-200",
     };
-    return `${base} ${styles[status] || "bg-gray-50 text-gray-800 border-gray-200"}`;
+    return `${base} ${styles[normalizedStatus] || styles[status] || "bg-gray-50 text-gray-800 border-gray-200"}`;
+  };
+
+  // Normalize status display text
+  const getStatusDisplayText = (status) => {
+    if (status === 'ongoing') return 'LIVE';
+    if (status === 'completed') return 'PAST';
+    return status?.toUpperCase() || 'UNKNOWN';
   };
 
   const formatHourDuration = (c) => {
@@ -375,9 +311,7 @@ const Contests = () => {
 
   const refreshRegisteredContests = async () => {
     try {
-      const registrationsRes = await axios.get(`${backendUrl}/contests/registrations/`, {
-        headers: { Authorization: `Bearer ${TOKEN}` }
-      });
+      const registrationsRes = await api.get('/contests/registrations/');
       console.log('✅ Updated registrations:', registrationsRes.data.registered_contests?.length || 0);
       setRegisteredContests(registrationsRes.data.registered_contests || []);
     } catch (regErr) {
@@ -389,11 +323,7 @@ const Contests = () => {
   const handlePublishDraft = async (contestId) => {
     if (window.confirm("Publish this draft contest? Once published, it will be visible to users.")) {
       try {
-        await axios.post(
-          `${backendUrl}/contests/${contestId}/publish/`,
-          { type: "final" },
-          { headers: { Authorization: `Bearer ${TOKEN}` } }
-        );
+        await api.post(`/contests/${contestId}/publish/`, { type: "final" });
         alert("Contest published successfully!");
         fetchData(); // Refresh contests list
       } catch (err) {
@@ -447,10 +377,7 @@ const Contests = () => {
     // Regular contest flow...
     if (status === 'upcoming' || status === 'live' || status === 'past') {
       try {
-        const res = await axios.get(
-          `${backendUrl}/contests/${id}/problems/`,
-          { headers: { Authorization: `Bearer ${TOKEN}` } }
-        );
+        const res = await api.get(`/contests/${id}/problems/`);
         
         if ((res.data.problems || []).length === 0 && status !== 'past') {
           alert('No problems available yet.');
@@ -464,11 +391,7 @@ const Contests = () => {
           const ok = window.confirm(`Register for this ${status} contest?`);
           if (ok) {
             try {
-              await axios.post(
-                `${backendUrl}/contests/${id}/register/`,
-                {},
-                { headers: { Authorization: `Bearer ${TOKEN}` } }
-              );
+              await api.post(`/contests/${id}/register/`, {});
               await refreshRegisteredContests();
               alert('Successfully registered!');
               navigate(`/contests/${id}`);
@@ -582,6 +505,15 @@ const Contests = () => {
                   </p>
                 </div>
                 <div className="flex items-center space-x-4">
+                  {/* Create Contest Button */}
+                  <button
+                    onClick={() => navigate('/create-contest')}
+                    className="flex items-center space-x-1 bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Create Contest</span>
+                  </button>
+                  
                   {/* Items per page selector */}
                   <div className="flex items-center space-x-2">
                     <label htmlFor="itemsPerPage" className="text-xs text-gray-600">
@@ -672,7 +604,7 @@ const Contests = () => {
                             )}
                           </h3>
                           <span className={getStatusBadge(c.status, c.visibility === 'test' || c.is_test_contest)}>
-                            {c.status.toUpperCase()}
+                            {getStatusDisplayText(c.status)}
                           </span>
                         </div>
                         <p className="text-xs text-gray-600 mb-2">

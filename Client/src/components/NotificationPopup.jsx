@@ -101,13 +101,13 @@ const NotificationPopup = () => {
     // Fetch initial notifications
     fetchNotifications(true);
     
-    // Set up polling interval
+    // Set up polling interval - reduced frequency to avoid server overload
     intervalId = setInterval(() => {
-      // Only fetch if component is still mounted and not during page unload
+      // Only fetch if component is still mounted and page is visible
       if (isComponentMounted && document.visibilityState === 'visible') {
         fetchNotifications(false);
       }
-    }, 5000);
+    }, 30000); // Poll every 30 seconds instead of 5 seconds
 
     // Cleanup function
     return () => {
@@ -116,7 +116,7 @@ const NotificationPopup = () => {
         clearInterval(intervalId);
       }
     };
-  }, [previousUnreadCount]); // Add dependency to track changes
+  }, []); // Remove previousUnreadCount to prevent multiple intervals
 
   useEffect(() => {
     const handleClickOutside = (event) => {

@@ -967,8 +967,10 @@ class UpcomingContestListCreateAPIView(APIView):
         user = get_user_from_request(request)
         
         try:
-            # Get all contests
-            all_contests = Contest.objects.all().order_by("-start_time").limit(200)
+            # Get upcoming contests only - limit for performance
+            all_contests = Contest.objects.all().order_by("start_time").limit(50)
+            
+            print(f"🔍 [DEBUG] Total contests in DB: {len(all_contests)}")  # DEBUG
 
             test_contests = []
 
@@ -976,13 +978,17 @@ class UpcomingContestListCreateAPIView(APIView):
                 # Get test contests where user is a tester or creator
                 test_contests = TestContest.objects.filter(
                     Q(testers__contains=user.email) | Q(created_by=user)
-                ).order_by("-test_start_time").limit(50)
+                ).order_by("test_start_time").limit(20)
+                
+                print(f"🔍 [DEBUG] User test contests: {len(test_contests)}")  # DEBUG
             
             data = []
 
             for c in all_contests:
                 # Calculate status dynamically
                 status_value = get_contest_status(c)
+                
+                print(f"🔍 [DEBUG] Contest: {c.title[:50]}... | Status: {status_value}")  # DEBUG
                 
                 # Only include upcoming contests
                 if status_value != "upcoming":
@@ -993,7 +999,8 @@ class UpcomingContestListCreateAPIView(APIView):
                     if not user or not c.created_by or str(c.created_by.id) != str(user.id):
                         continue
                 
-                participant_count = ContestRegistration.objects(contest=c).count()
+                # Skip participant count for performance
+                participant_count = getattr(c, 'participant_count', 0) or 0
                 
                 is_creator = user and c.created_by and str(c.created_by.id) == str(user.id)
 
@@ -1001,6 +1008,7 @@ class UpcomingContestListCreateAPIView(APIView):
                     "id": str(c.id),
                     "title": c.title,
                     "description": c.description,
+                    "start_time": c.start_time.isoformat() if c.start_time else None,
                     "duration": c.duration,
                     "type": c.type,
                     "platform": c.platform,
@@ -1010,6 +1018,8 @@ class UpcomingContestListCreateAPIView(APIView):
                     "participants": participant_count,
                 })
 
+            print(f"🔍 [DEBUG] Final upcoming contests: {len(data)}")  # DEBUG
+
             for tc in test_contests:
                 status_value = get_contest_status(tc)
                 
@@ -1017,12 +1027,13 @@ class UpcomingContestListCreateAPIView(APIView):
                 if status_value != "upcoming":
                     continue
                 
-                participant_count = ContestRegistration.objects(contest=tc).count()
+                participant_count = getattr(tc, 'participant_count', 0) or 0
                 
                 data.append({
                     "id": str(tc.id),
                     "title": f"[TEST] {tc.title}",
                     "description": tc.description,
+                    "start_time": tc.test_start_time.isoformat() if tc.test_start_time else None,
                     "duration": tc.duration,
                     "type": tc.type,
                     "platform": tc.platform,
@@ -1035,16 +1046,10 @@ class UpcomingContestListCreateAPIView(APIView):
                     "testers_count": len(tc.testers)
                 })
 
-            # Broadcast update
-            broadcast_global_update({
-                "event": "contest_list_update",
-                "contests": data,
-            })
-
             return Response({"contests": data})
         except Exception as e:
             # Return empty contests list if database is unavailable
-            print(f"Database error in ContestListCreateAPIView: {e}")
+            print(f"Database error in UpcomingContestListCreateAPIView: {e}")
             return Response({"contests": [], "warning": "Contest data temporarily unavailable"}, status=200)
 
 
@@ -1132,8 +1137,10 @@ class PastContestsListCreateView(APIView):
         user = get_user_from_request(request)
         
         try:
-            # Get all contests
-            all_contests = Contest.objects.all().order_by("-start_time").limit(200)
+            # Get past contests only - limit to 50 for performance
+            all_contests = Contest.objects.all().order_by("-start_time").limit(50)
+            
+            print(f"🔍 [DEBUG] PastContests - Total contests in DB: {len(all_contests)}")  # DEBUG
 
             test_contests = []
 
@@ -1141,13 +1148,17 @@ class PastContestsListCreateView(APIView):
                 # Get test contests where user is a tester or creator
                 test_contests = TestContest.objects.filter(
                     Q(testers__contains=user.email) | Q(created_by=user)
-                ).order_by("-test_start_time").limit(50)
+                ).order_by("-test_start_time").limit(20)
+                
+                print(f"🔍 [DEBUG] PastContests - User test contests: {len(test_contests)}")  # DEBUG
             
             data = []
 
             for c in all_contests:
                 # Calculate status dynamically
                 status_value = get_contest_status(c)
+                
+                print(f"🔍 [DEBUG] PastContests - Contest: {c.title[:50]}... | Status: {status_value}")  # DEBUG
                 
                 # Only include past/completed contests
                 if status_value != "completed" and status_value != "past":
@@ -1158,7 +1169,8 @@ class PastContestsListCreateView(APIView):
                     if not user or not c.created_by or str(c.created_by.id) != str(user.id):
                         continue
                 
-                participant_count = ContestRegistration.objects(contest=c).count()
+                # Skip participant count for performance - use cached value if available
+                participant_count = getattr(c, 'participant_count', 0) or 0
                 
                 is_creator = user and c.created_by and str(c.created_by.id) == str(user.id)
 
@@ -1166,6 +1178,7 @@ class PastContestsListCreateView(APIView):
                     "id": str(c.id),
                     "title": c.title,
                     "description": c.description,
+                    "start_time": c.start_time.isoformat() if c.start_time else None,
                     "duration": c.duration,
                     "type": c.type,
                     "platform": c.platform,
@@ -1175,6 +1188,8 @@ class PastContestsListCreateView(APIView):
                     "participants": participant_count,
                 })
 
+            print(f"🔍 [DEBUG] PastContests - Final past contests: {len(data)}")  # DEBUG
+
             for tc in test_contests:
                 status_value = get_contest_status(tc)
                 
@@ -1182,12 +1197,13 @@ class PastContestsListCreateView(APIView):
                 if status_value != "completed" and status_value != "past":
                     continue
                 
-                participant_count = ContestRegistration.objects(contest=tc).count()
+                participant_count = getattr(tc, 'participant_count', 0) or 0
                 
                 data.append({
                     "id": str(tc.id),
                     "title": f"[TEST] {tc.title}",
                     "description": tc.description,
+                    "start_time": tc.test_start_time.isoformat() if tc.test_start_time else None,
                     "duration": tc.duration,
                     "type": tc.type,
                     "platform": tc.platform,
@@ -1199,12 +1215,6 @@ class PastContestsListCreateView(APIView):
                     "original_contest_id": str(tc.original_contest.id) if tc.original_contest else None,
                     "testers_count": len(tc.testers)
                 })
-
-            # Optional: Broadcast update if needed
-            # broadcast_global_update({
-            #     "event": "past_contests_update",
-            #     "contests": data,
-            # })
 
             return Response({"contests": data}, status=status.HTTP_200_OK)
         except Exception as e:
@@ -1217,8 +1227,10 @@ class LiveContestsView(APIView):
         user = get_user_from_request(request)
         
         try:
-            # Get all contests
-            all_contests = Contest.objects.all().order_by("-start_time").limit(200)
+            # Get live contests only - limit for performance
+            all_contests = Contest.objects.all().order_by("-start_time").limit(50)
+            
+            print(f"🔍 [DEBUG] LiveContests - Total contests in DB: {len(all_contests)}")  # DEBUG
 
             test_contests = []
 
@@ -1226,13 +1238,17 @@ class LiveContestsView(APIView):
                 # Get test contests where user is a tester or creator
                 test_contests = TestContest.objects.filter(
                     Q(testers__contains=user.email) | Q(created_by=user)
-                ).order_by("-test_start_time").limit(50)
+                ).order_by("-test_start_time").limit(20)
+                
+                print(f"🔍 [DEBUG] LiveContests - User test contests: {len(test_contests)}")  # DEBUG
             
             data = []
 
             for c in all_contests:
                 # Calculate status dynamically
                 status_value = get_contest_status(c)
+                
+                print(f"🔍 [DEBUG] LiveContests - Contest: {c.title[:50]}... | Status: {status_value}")  # DEBUG
                 
                 # Only include live/ongoing contests
                 if status_value != "ongoing" and status_value != "live":
@@ -1243,7 +1259,8 @@ class LiveContestsView(APIView):
                     if not user or not c.created_by or str(c.created_by.id) != str(user.id):
                         continue
                 
-                participant_count = ContestRegistration.objects(contest=c).count()
+                # Skip participant count for performance
+                participant_count = getattr(c, 'participant_count', 0) or 0
                 
                 is_creator = user and c.created_by and str(c.created_by.id) == str(user.id)
 
@@ -1251,6 +1268,7 @@ class LiveContestsView(APIView):
                     "id": str(c.id),
                     "title": c.title,
                     "description": c.description,
+                    "start_time": c.start_time.isoformat() if c.start_time else None,
                     "duration": c.duration,
                     "type": c.type,
                     "platform": c.platform,
@@ -1260,6 +1278,8 @@ class LiveContestsView(APIView):
                     "participants": participant_count,
                 })
 
+            print(f"🔍 [DEBUG] LiveContests - Final live contests: {len(data)}")  # DEBUG
+
             for tc in test_contests:
                 status_value = get_contest_status(tc)
                 
@@ -1267,12 +1287,13 @@ class LiveContestsView(APIView):
                 if status_value != "ongoing" and status_value != "live":
                     continue
                 
-                participant_count = ContestRegistration.objects(contest=tc).count()
+                participant_count = getattr(tc, 'participant_count', 0) or 0
                 
                 data.append({
                     "id": str(tc.id),
                     "title": f"[TEST] {tc.title}",
                     "description": tc.description,
+                    "start_time": tc.test_start_time.isoformat() if tc.test_start_time else None,
                     "duration": tc.duration,
                     "type": tc.type,
                     "platform": tc.platform,
@@ -1284,12 +1305,6 @@ class LiveContestsView(APIView):
                     "original_contest_id": str(tc.original_contest.id) if tc.original_contest else None,
                     "testers_count": len(tc.testers)
                 })
-
-            # Optional: Broadcast update if needed
-            # broadcast_global_update({
-            #     "event": "live_contests_update",
-            #     "contests": data,
-            # })
 
             return Response({"contests": data}, status=status.HTTP_200_OK)
         except Exception as e:
