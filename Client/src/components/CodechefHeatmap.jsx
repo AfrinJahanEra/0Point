@@ -10,7 +10,23 @@ const CodechefHeatmap = () => {
     fetchCalendar();
   }, [year]);
   const fetchCalendar = async () => {
-    setLoading(true);
+    const CACHE_KEY    = `cc_heatmap_${year}`;
+    const CACHE_TS_KEY = `${CACHE_KEY}_ts`;
+    const MAX_AGE      = 5 * 60 * 1000; // 5 minutes
+
+    // 1. Show stale data instantly
+    try {
+      const cached   = localStorage.getItem(CACHE_KEY);
+      const cachedAt = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
+      const isFresh  = (Date.now() - cachedAt) < MAX_AGE;
+      if (cached) {
+        setData(JSON.parse(cached));
+        setLoading(false);
+        if (isFresh) return;
+      }
+    } catch (_) {}
+
+    // 2. Background refresh
     try {
       const url =
         year === 'current'
@@ -18,9 +34,13 @@ const CodechefHeatmap = () => {
           : `/account/codechef-calendar/?year=${year}`;
       const res = await api.get(url);
       setData(res.data);
+      setLoading(false);
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(res.data));
+        localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+      } catch (_) {}
     } catch (err) {
       console.error('Calendar fetch error', err);
-    } finally {
       setLoading(false);
     }
   };
@@ -88,7 +108,17 @@ const CodechefHeatmap = () => {
         </div>
       </div>
       {loading ? (
-        <div className="lc-loading">Loading heatmap...</div>
+        <div className="lc-loading animate-pulse">
+          <div style={{display:'flex', gap:'4px', flexWrap:'wrap'}}>
+            {Array.from({length: 52}).map((_, i) => (
+              <div key={i} style={{display:'flex', flexDirection:'column', gap:'3px'}}>
+                {Array.from({length: 7}).map((_, j) => (
+                  <div key={j} style={{width:'12px', height:'12px', background:'#e5e7eb', borderRadius:'2px'}} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         /* MONTH BLOCKS */
         <div className="lc-months-container">

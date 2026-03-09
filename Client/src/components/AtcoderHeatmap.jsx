@@ -14,16 +14,36 @@ const AtcoderHeatmap = () => {
 
   const fetchCalendar = async () => {
     setLoading(true);
+    const url = year === 'current'
+      ? '/account/atcoder-calendar/'
+      : `/account/atcoder-calendar/?year=${year}`;
+    const CACHE_KEY    = `atcoder_calendar_${year}`;
+    const CACHE_TS_KEY = `${CACHE_KEY}_ts`;
+    const MAX_AGE      = 10 * 60 * 1000; // 10 minutes
+
+    // 1. Show stale data instantly
     try {
-      const url =
-        year === 'current'
-          ? '/account/atcoder-calendar/'
-          : `/account/atcoder-calendar/?year=${year}`;
+      const cached   = localStorage.getItem(CACHE_KEY);
+      const cachedAt = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
+      const isFresh  = (Date.now() - cachedAt) < MAX_AGE;
+      if (cached) {
+        setData(JSON.parse(cached));
+        setLoading(false);
+        if (isFresh) return;
+      }
+    } catch (_) {}
+
+    // 2. Background refresh
+    try {
       const res = await api.get(url);
       setData(res.data);
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(res.data));
+        localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+      } catch (_) {}
     } catch (err) {
       console.error('AtCoder calendar fetch error', err);
-      setData(null);
+      if (!localStorage.getItem(CACHE_KEY)) setData(null);
     } finally {
       setLoading(false);
     }
@@ -93,7 +113,18 @@ const AtcoderHeatmap = () => {
         </div>
       </div>
       {loading ? (
-        <div className="lc-loading">Loading heatmap...</div>
+        <div className="lc-months-container">
+          {Array.from({length: 12}).map((_, i) => (
+            <div key={i} className="lc-month-block">
+              <div className="lc-month-title" style={{background:'#e5e7eb',borderRadius:3,height:10,width:24,marginBottom:4}} />
+              <div className="lc-month-grid">
+                {Array.from({length: 35}).map((_, j) => (
+                  <div key={j} className="lc-cell" style={{background:'#e5e7eb',opacity:0.5}} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         /* MONTH BLOCKS */
         <div className="lc-months-container">

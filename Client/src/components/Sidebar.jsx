@@ -41,38 +41,57 @@ const Sidebar = () => {
   }, []);
 
   // Fetch contests data
+  const SIDEBAR_CACHE_KEY    = 'sidebar_dashboard_cache';
+  const SIDEBAR_CACHE_TS_KEY = 'sidebar_dashboard_cache_ts';
+  const SIDEBAR_MAX_AGE      = 2 * 60 * 1000; // 2 minutes
+
+  const applySidebarData = (data) => {
+    const contests = (data.upcoming_contests || []).slice(0, 3).map(c => ({
+      id: c.id,
+      title: c.title,
+      platform: c.platform === '0point' ? '0Point' : c.platform?.toUpperCase(),
+      duration: c.duration,
+      participants: c.participants || 0,
+      is_registered: c.is_registered,
+      is_external: c.is_external,
+      external_url: c.external_url,
+      start_time: c.start_time
+    }));
+    setUpcomingContests(contests);
+    setRegisteredContests(new Set(data.registered_contest_ids || []));
+    if (data.soonest_contest) {
+      setSoonestContest(data.soonest_contest);
+      setTimeLeft({
+        days:    data.soonest_contest.time_until?.days    || 0,
+        hours:   data.soonest_contest.time_until?.hours   || 0,
+        minutes: data.soonest_contest.time_until?.minutes || 0,
+        seconds: data.soonest_contest.time_until?.seconds || 0,
+      });
+    }
+  };
+
   const fetchSidebarData = async () => {
+    // 1. Show stale data instantly
     try {
-      setContestsLoading(true);
+      const cached   = localStorage.getItem(SIDEBAR_CACHE_KEY);
+      const cachedAt = parseInt(localStorage.getItem(SIDEBAR_CACHE_TS_KEY) || '0', 10);
+      const isFresh  = (Date.now() - cachedAt) < SIDEBAR_MAX_AGE;
+      if (cached) {
+        applySidebarData(JSON.parse(cached));
+        setContestsLoading(false);
+        if (isFresh) return;
+      }
+    } catch (_) {}
+
+    // 2. Background refresh (reuses same home/dashboard endpoint)
+    try {
       const response = await api.get('/home/dashboard/');
       const data = response.data;
-      
-      // Get upcoming contests (limit to 3 for sidebar)
-      const contests = (data.upcoming_contests || []).slice(0, 3).map(c => ({
-        id: c.id,
-        title: c.title,
-        platform: c.platform === '0point' ? '0Point' : c.platform?.toUpperCase(),
-        duration: c.duration,
-        participants: c.participants || 0,
-        is_registered: c.is_registered,
-        is_external: c.is_external,
-        external_url: c.external_url,
-        start_time: c.start_time
-      }));
-      
-      setUpcomingContests(contests);
-      setRegisteredContests(new Set(data.registered_contest_ids || []));
-      
-      // Set soonest contest for countdown
-      if (data.soonest_contest) {
-        setSoonestContest(data.soonest_contest);
-        setTimeLeft({
-          days: data.soonest_contest.time_until?.days || 0,
-          hours: data.soonest_contest.time_until?.hours || 0,
-          minutes: data.soonest_contest.time_until?.minutes || 0,
-          seconds: data.soonest_contest.time_until?.seconds || 0
-        });
-      }
+      applySidebarData(data);
+      try {
+        localStorage.setItem(SIDEBAR_CACHE_KEY, JSON.stringify(data));
+        localStorage.setItem(SIDEBAR_CACHE_TS_KEY, String(Date.now()));
+      } catch (_) {}
     } catch (error) {
       console.error('Sidebar data fetch error:', error);
     } finally {
@@ -159,8 +178,13 @@ const Sidebar = () => {
           {/* Contests List */}
           <div className="space-y-2">
             {contestsLoading ? (
-              <div className="py-4 text-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+              <div className="space-y-2 py-1">
+                {[1,2,3].map(i => (
+                  <div key={i} className="animate-pulse p-2 rounded-lg bg-gray-50">
+                    <div className="h-2.5 bg-gray-200 rounded w-3/4 mb-1.5" />
+                    <div className="h-2 bg-gray-200 rounded w-1/2" />
+                  </div>
+                ))}
               </div>
             ) : upcomingContests.length > 0 ? (
               upcomingContests.map((contest) => (
@@ -309,8 +333,14 @@ const Sidebar = () => {
           </div>
           <div className="overflow-x-auto">
             {recommendationsLoading ? (
-              <div className="py-4 text-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
+              <div className="space-y-2 py-1">
+                {[1,2,3,4,5].map(i => (
+                  <div key={i} className="animate-pulse flex items-center gap-2 py-1.5 border-b border-gray-100">
+                    <div className="flex-1 h-2.5 bg-gray-200 rounded" />
+                    <div className="h-5 bg-gray-200 rounded w-12" />
+                    <div className="h-5 bg-gray-200 rounded w-10" />
+                  </div>
+                ))}
               </div>
             ) : recommendations.length > 0 ? (
               <table className="w-full text-xs">

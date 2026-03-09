@@ -72,39 +72,64 @@ const Contests = () => {
     external: true
   });
 
-  // Combined fetch function - uses unified endpoint for faster loading
+    // Combined fetch function - uses unified endpoint for faster loading
+  // Stale-while-revalidate: show localStorage cache instantly, refresh in background.
+  const CACHE_KEY    = 'contests_dashboard_cache';
+  const CACHE_TS_KEY = 'contests_dashboard_cache_ts';
+  const CACHE_MAX_AGE = 2 * 60 * 1000; // 2 minutes
+
+  const applyContestsData = (data) => {
+    setContests(data.contests || []);
+    setRegisteredContests(data.registered_contests || []);
+    setError(null);
+  };
+
   const fetchData = async () => {
     // Increment fetch ID to track this specific fetch
     const currentFetchId = ++fetchIdRef.current;
-    
+
+    // --- 1. Show stale data immediately (zero-latency first paint) ---
     try {
-      setLoading(true);
-      
+      const cached   = localStorage.getItem(CACHE_KEY);
+      const cachedAt = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
+      const isFresh  = (Date.now() - cachedAt) < CACHE_MAX_AGE;
+
+      if (cached) {
+        const cachedData = JSON.parse(cached);
+        if (currentFetchId === fetchIdRef.current) {
+          applyContestsData(cachedData);
+          setLoading(false);    // hide skeleton immediately
+        }
+        if (isFresh) return;   // fresh enough - skip network
+      }
+    } catch (_) { /* ignore parse errors */ }
+
+    // --- 2. Background refresh from server ---
+    try {
       const token = localStorage.getItem('token');
       if (!token) {
-        setError('Please log in to view contests');
-        setLoading(false);
+        if (currentFetchId === fetchIdRef.current) {
+          setError('Please log in to view contests');
+          setLoading(false);
+        }
         return;
       }
 
-      // Single API call to unified endpoint - MUCH FASTER
       const response = await api.get('/contests/dashboard/');
-      
-      // Check if this fetch is still the current one
-      if (currentFetchId !== fetchIdRef.current) {
-        return;
-      }
 
-      const { contests: allContests, registered_contests } = response.data;
+      if (currentFetchId !== fetchIdRef.current) return;
 
-      if (currentFetchId === fetchIdRef.current) {
-        setContests(allContests || []);
-        setRegisteredContests(registered_contests || []);
-        setError(null);
-      }
+      const data = response.data;
+      applyContestsData(data);
+
+      // Persist for next visit
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+      } catch (_) { /* ignore quota errors */ }
     } catch (err) {
       console.error('Contests fetch failed:', err);
-      if (currentFetchId === fetchIdRef.current) {
+      if (currentFetchId === fetchIdRef.current && !localStorage.getItem(CACHE_KEY)) {
         setError(err.response?.data?.error || 'Failed to load contests');
       }
     } finally {
@@ -113,6 +138,7 @@ const Contests = () => {
       }
     }
   };
+
 
   useEffect(() => {
     fetchData();
@@ -485,8 +511,63 @@ const Contests = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Loading contests...</div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-[1920px] mx-auto px-4 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-9">
+              {/* Header skeleton */}
+              <div className="bg-white rounded-lg p-4 mb-4 animate-pulse">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-24" />
+                    <div className="h-3 bg-gray-200 rounded w-32" />
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="h-8 bg-gray-200 rounded w-28" />
+                    <div className="h-8 bg-gray-200 rounded w-48" />
+                  </div>
+                </div>
+                <div className="flex gap-1 mt-4">
+                  {[1,2,3,4,5].map(i => <div key={i} className="flex-1 h-8 bg-gray-200 rounded-md" />)}
+                </div>
+              </div>
+              {/* Contest card skeletons */}
+              <div className="grid gap-4">
+                {[1,2,3,4,5].map(i => (
+                  <div key={i} className="bg-white rounded-lg border border-gray-200 p-4 animate-pulse">
+                    <div className="flex justify-between">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 bg-gray-200 rounded w-1/2" />
+                          <div className="h-5 bg-gray-200 rounded w-12" />
+                        </div>
+                        <div className="h-2.5 bg-gray-200 rounded w-1/3" />
+                        <div className="flex gap-4 mt-2">
+                          <div className="h-2.5 bg-gray-200 rounded w-20" />
+                          <div className="h-2.5 bg-gray-200 rounded w-20" />
+                          <div className="h-2.5 bg-gray-200 rounded w-20" />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 items-end">
+                        <div className="h-6 bg-gray-200 rounded w-16" />
+                        <div className="h-7 bg-gray-200 rounded w-20" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Sidebar skeleton */}
+            <div className="lg:col-span-3 space-y-4">
+              {[1,2].map(i => (
+                <div key={i} className="bg-white rounded-lg p-4 animate-pulse space-y-3">
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  {[1,2,3].map(j => <div key={j} className="h-2.5 bg-gray-200 rounded" />)}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Trophy, Crown, Medal, Star, Search } from "lucide-react";
-import axios from "axios";
-import { BACKEND_URL } from "../utils/api";
+import api from "../utils/api";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 
@@ -21,12 +20,31 @@ const Leaderboard = () => {
     fetchLeaderboard();
   }, []);
 
+  const LB_CACHE_KEY    = 'leaderboard_cache';
+  const LB_CACHE_TS_KEY = 'leaderboard_cache_ts';
+  const LB_MAX_AGE      = 3 * 60 * 1000; // 3 minutes
+
   const fetchLeaderboard = async () => {
+    // 1. Show stale data instantly
     try {
-      const response = await axios.get(
-        `${BACKEND_URL}/leaderboard/`
-      );
+      const cached   = localStorage.getItem(LB_CACHE_KEY);
+      const cachedAt = parseInt(localStorage.getItem(LB_CACHE_TS_KEY) || '0', 10);
+      const isFresh  = (Date.now() - cachedAt) < LB_MAX_AGE;
+      if (cached) {
+        setLeaderboardData(JSON.parse(cached));
+        setLoading(false);
+        if (isFresh) return;
+      }
+    } catch (_) {}
+
+    // 2. Background refresh
+    try {
+      const response = await api.get('/leaderboard/');
       setLeaderboardData(response.data);
+      try {
+        localStorage.setItem(LB_CACHE_KEY, JSON.stringify(response.data));
+        localStorage.setItem(LB_CACHE_TS_KEY, String(Date.now()));
+      } catch (_) {}
     } catch (error) {
       console.error("Error fetching leaderboard:", error);
     } finally {
@@ -134,11 +152,15 @@ const Leaderboard = () => {
 
                 <tbody>
                   {loading ? (
-                    <tr>
-                      <td colSpan="5" className="p-6 text-center text-xs">
-                        Loading...
-                      </td>
-                    </tr>
+                    Array.from({length: 8}).map((_, i) => (
+                      <tr key={i} className="animate-pulse border-b">
+                        <td className="p-3"><div className="h-2.5 bg-gray-200 rounded w-8" /></td>
+                        <td className="p-3"><div className="h-2.5 bg-gray-200 rounded w-24" /></td>
+                        <td className="p-3"><div className="h-2.5 bg-gray-200 rounded w-20" /></td>
+                        <td className="p-3"><div className="h-2.5 bg-gray-200 rounded w-14" /></td>
+                        <td className="p-3"><div className="h-2.5 bg-gray-200 rounded w-10" /></td>
+                      </tr>
+                    ))
                   ) : (
                     paginatedData.map((user) => (
                       <tr

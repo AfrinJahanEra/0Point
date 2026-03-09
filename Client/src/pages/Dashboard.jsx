@@ -87,30 +87,53 @@ const Dashboard = () => {
   // ────────────────────────────────────────────────
   // Data fetching function
   // ────────────────────────────────────────────────
+  const DASH_CACHE_KEY    = 'user_dashboard_cache';
+  const DASH_CACHE_TS_KEY = 'user_dashboard_cache_ts';
+  const DASH_MAX_AGE      = 2 * 60 * 1000; // 2 minutes
+
+  const applyDashData = (d) => {
+    setUserProfile(d.profile);
+    setCategoryScores(d.categoryScores || {});
+    setVerdictStats(d.verdictStats || {});
+  };
+
   const fetchUserData = async () => {
+    // 1. Show stale data instantly
     try {
-      setLoading(true);
+      const cached   = localStorage.getItem(DASH_CACHE_KEY);
+      const cachedAt = parseInt(localStorage.getItem(DASH_CACHE_TS_KEY) || '0', 10);
+      const isFresh  = (Date.now() - cachedAt) < DASH_MAX_AGE;
+      if (cached) {
+        applyDashData(JSON.parse(cached));
+        setLoading(false); setCategoryLoading(false); setVerdictLoading(false);
+        if (isFresh) return;
+      }
+    } catch (_) {}
+
+    // 2. Background refresh — parallel calls for speed
+    try {
       setError(null);
-
-      // Profile
-      const profileResponse = await api.get('/account/profile/');
-      setUserProfile(profileResponse.data);
-
-      // Category scores (radar chart)
-      const tagResp = await api.get('/account/tag-stats/');
-      setCategoryScores(tagResp.data.category_scores || {});
-
-      // Verdict stats (donut chart)
-      const verdictResp = await api.get('/account/verdict-stats/');
-      setVerdictStats(verdictResp.data.verdict_counts || {});
+      const [profileResponse, tagResp, verdictResp] = await Promise.all([
+        api.get('/account/profile/'),
+        api.get('/account/tag-stats/'),
+        api.get('/account/verdict-stats/'),
+      ]);
+      const profile       = profileResponse.data;
+      const categoryScores = tagResp.data.category_scores || {};
+      const verdictStats  = verdictResp.data.verdict_counts || {};
+      setUserProfile(profile);
+      setCategoryScores(categoryScores);
+      setVerdictStats(verdictStats);
+      try {
+        localStorage.setItem(DASH_CACHE_KEY, JSON.stringify({ profile, categoryScores, verdictStats }));
+        localStorage.setItem(DASH_CACHE_TS_KEY, String(Date.now()));
+      } catch (_) {}
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      if (err.response?.status === 401) {
-        setError('Session expired. Please log in again.');
-      } else if (err.response?.status === 404) {
-        setError('User profile not found.');
-      } else {
-        setError(err.response?.data?.error || 'Failed to load dashboard data');
+      if (!localStorage.getItem(DASH_CACHE_KEY)) {
+        if (err.response?.status === 401) setError('Session expired. Please log in again.');
+        else if (err.response?.status === 404) setError('User profile not found.');
+        else setError(err.response?.data?.error || 'Failed to load dashboard data');
       }
     } finally {
       setLoading(false);
@@ -279,9 +302,19 @@ const Dashboard = () => {
             )}
 
             {loading ? (
-              <div className="text-center py-10">
-                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-800 mx-auto mb-3"></div>
-                <p className="text-gray-500 text-sm">Loading your dashboard...</p>
+              <div className="space-y-4 py-4">
+                <div className="bg-white rounded-lg shadow-sm p-5 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-48 mb-4" />
+                  <div className="flex gap-3">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="flex-1 h-16 bg-gray-200 rounded-lg" />
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg shadow-sm p-5 animate-pulse space-y-3">
+                  <div className="h-4 bg-gray-200 rounded w-36" />
+                  {[1,2,3,4].map(i => <div key={i} className="h-2.5 bg-gray-200 rounded" />)}
+                </div>
               </div>
             ) : (
               <>
@@ -458,9 +491,11 @@ const Dashboard = () => {
                     </div>
 
                     {categoryLoading ? (
-                      <div className="text-center py-12">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600">Analyzing solving patterns...</p>
+                      <div className="py-8 animate-pulse">
+                        <div className="w-40 h-40 bg-gray-200 rounded-full mx-auto" />
+                        <div className="flex justify-center gap-2 mt-4">
+                          {[1,2,3].map(i => <div key={i} className="h-2.5 bg-gray-200 rounded w-16" />)}
+                        </div>
                       </div>
                     ) : (
                       <CategoryRadarChart
@@ -480,9 +515,11 @@ const Dashboard = () => {
                     </div>
 
                     {verdictLoading ? (
-                      <div className="text-center py-12">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading verdict stats...</p>
+                      <div className="py-8 animate-pulse">
+                        <div className="w-40 h-40 bg-gray-200 rounded-full mx-auto" />
+                        <div className="flex justify-center gap-2 mt-4">
+                          {[1,2,3].map(i => <div key={i} className="h-2.5 bg-gray-200 rounded w-16" />)}
+                        </div>
                       </div>
                     ) : (
                       <VerdictDonutChart

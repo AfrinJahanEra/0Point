@@ -239,8 +239,16 @@ const NotificationPopup = () => {
 
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
-              <div className="p-4 text-center text-gray-500">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <div className="p-3 space-y-2">
+                {[1,2,3].map(i => (
+                  <div key={i} className="animate-pulse flex items-start gap-3 p-2">
+                    <div className="w-7 h-7 bg-gray-200 rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-2.5 bg-gray-200 rounded w-3/4" />
+                      <div className="h-2 bg-gray-200 rounded w-1/2" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : notifications.length === 0 ? (
               <div className="p-8 text-center text-gray-500">

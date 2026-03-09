@@ -64,41 +64,45 @@ const Submissions = () => {
   }, [allSubmissions, platformFilter, tagFilter]);
 
   const fetchUserSubmissions = async () => {
+    if (!user) {
+      setAllSubmissions([]); setFilteredSubmissions([]); setTotalSubmissions(0);
+      setLoading(false); return;
+    }
+
+    const CACHE_KEY    = `submissions_external_${user.id || user.email || 'me'}`;
+    const CACHE_TS_KEY = `${CACHE_KEY}_ts`;
+    const MAX_AGE      = 3 * 60 * 1000; // 3 minutes
+
+    // 1. Show stale data instantly
     try {
-      setLoading(true);
-      setError(null);
-
-      if (!user) {
-        setAllSubmissions([]);
-        setFilteredSubmissions([]);
-        setTotalSubmissions(0);
-        return;
+      const cached   = localStorage.getItem(CACHE_KEY);
+      const cachedAt = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
+      const isFresh  = (Date.now() - cachedAt) < MAX_AGE;
+      if (cached) {
+        setAllSubmissions(JSON.parse(cached));
+        setLoading(false);
+        if (isFresh) return;
       }
+    } catch (_) {}
 
-      console.log('Fetching submissions from all platforms...');
+    // 2. Background refresh
+    try {
+      setError(null);
       const res = await api.get('/account/external-submissions/?platform=all');
       const externalSubs = res.data.submissions || [];
-      
-      console.log(`Fetched ${externalSubs.length} submissions from external platforms`);
-      
-      // Log which platforms have submissions
-      const platformCounts = {};
-      externalSubs.forEach(sub => {
-        const platform = sub.platform || 'unknown';
-        platformCounts[platform] = (platformCounts[platform] || 0) + 1;
-      });
-      console.log('Submissions by platform:', platformCounts);
-
       setAllSubmissions(externalSubs);
-      
-      // Show info message if no submissions found
       if (externalSubs.length === 0) {
         setError('No submissions found. Add your handles for Codeforces, LeetCode, CodeChef, or AtCoder in your profile to see submissions.');
       }
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(externalSubs));
+        localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+      } catch (_) {}
     } catch (err) {
       console.error('Error fetching submissions:', err);
-      const errorMsg = err.response?.data?.error || err.message || 'Failed to load submissions';
-      setError(errorMsg);
+      if (!localStorage.getItem(CACHE_KEY)) {
+        setError(err.response?.data?.error || err.message || 'Failed to load submissions');
+      }
     } finally {
       setLoading(false);
     }
@@ -202,9 +206,16 @@ const Submissions = () => {
             </div>
 
             {loading && (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-800"></div>
-                <p className="text-gray-500 mt-4">Loading submissions...</p>
+              <div className="space-y-2">
+                {[1,2,3,4,5,6].map(i => (
+                  <div key={i} className="animate-pulse flex items-center gap-3 py-2 border-b border-gray-100">
+                    <div className="h-2.5 bg-gray-200 rounded w-24" />
+                    <div className="h-2.5 bg-gray-200 rounded w-32 flex-1" />
+                    <div className="h-5 bg-gray-200 rounded w-12" />
+                    <div className="h-2.5 bg-gray-200 rounded w-16" />
+                    <div className="h-2.5 bg-gray-200 rounded w-20" />
+                  </div>
+                ))}
               </div>
             )}
 

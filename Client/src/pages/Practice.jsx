@@ -81,10 +81,18 @@ const Practice = () => {
 
             {/* Loading / Error / Content */}
             {loading ? (
-              <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-800 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading your personalized practice plan...</p>
-                <p className="text-sm text-gray-500 mt-2">This may take a few seconds the first time</p>
+              <div className="bg-white rounded-lg shadow-sm p-6 animate-pulse space-y-4">
+                <div className="h-4 bg-gray-200 rounded w-1/3" />
+                <div className="space-y-2">
+                  {[1,2,3,4,5].map(i => (
+                    <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-100">
+                      <div className="h-2.5 bg-gray-200 rounded flex-1" />
+                      <div className="h-5 bg-gray-200 rounded w-14" />
+                      <div className="h-5 bg-gray-200 rounded w-16" />
+                      <div className="h-5 bg-gray-200 rounded w-12" />
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : error ? (
               <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">

@@ -205,18 +205,39 @@ const Community = () => {
     }
   }, [searchParams, blogs, loading]);
 
+  const COMMUNITY_CACHE_KEY    = 'community_blogs_cache';
+  const COMMUNITY_CACHE_TS_KEY  = 'community_blogs_cache_ts';
+  const COMMUNITY_CACHE_MAX_AGE = 2 * 60 * 1000; // 2 minutes
+
   const fetchAllPublishedBlogs = async () => {
+    // 1. Show stale data instantly
     try {
-      setLoading(true);
+      const cached   = localStorage.getItem(COMMUNITY_CACHE_KEY);
+      const cachedAt = parseInt(localStorage.getItem(COMMUNITY_CACHE_TS_KEY) || '0', 10);
+      const isFresh  = (Date.now() - cachedAt) < COMMUNITY_CACHE_MAX_AGE;
+      if (cached) {
+        setBlogs(JSON.parse(cached));
+        setLoading(false);
+        if (isFresh) return;
+      }
+    } catch (_) {}
+
+    // 2. Background refresh
+    try {
       const response = await api.get('/blog/published/');
       setBlogs(response.data);
+      try {
+        localStorage.setItem(COMMUNITY_CACHE_KEY, JSON.stringify(response.data));
+        localStorage.setItem(COMMUNITY_CACHE_TS_KEY, String(Date.now()));
+      } catch (_) {}
     } catch (error) {
       console.error('Error fetching blogs:', error);
-      toast.error('Failed to load community blogs');
+      if (!localStorage.getItem(COMMUNITY_CACHE_KEY)) toast.error('Failed to load community blogs');
     } finally {
       setLoading(false);
     }
   };
+
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown date';
@@ -461,10 +482,41 @@ const Community = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-600">Loading community blogs...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-[1920px] mx-auto px-4 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-9 space-y-4">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="bg-white rounded-lg border border-gray-200 p-5 animate-pulse">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 bg-gray-200 rounded-full" />
+                    <div className="space-y-1">
+                      <div className="h-3 bg-gray-200 rounded w-28" />
+                      <div className="h-2.5 bg-gray-200 rounded w-20" />
+                    </div>
+                  </div>
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                  <div className="space-y-1.5">
+                    <div className="h-2.5 bg-gray-200 rounded w-full" />
+                    <div className="h-2.5 bg-gray-200 rounded w-5/6" />
+                    <div className="h-2.5 bg-gray-200 rounded w-4/6" />
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <div className="h-5 bg-gray-200 rounded-full w-14" />
+                    <div className="h-5 bg-gray-200 rounded-full w-14" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="lg:col-span-3 space-y-4">
+              {[1,2].map(i => (
+                <div key={i} className="bg-white rounded-lg border border-gray-200 p-4 animate-pulse space-y-3">
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  {[1,2,3].map(j => <div key={j} className="h-2.5 bg-gray-200 rounded" />)}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );

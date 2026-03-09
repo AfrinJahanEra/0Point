@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BACKEND_URL } from '../utils/api';
+import api from '../utils/api';
 import { 
   ArrowLeft, 
   FileText, 
@@ -23,14 +23,33 @@ const RegisterNow = () => {
   // Fetch contest data from backend
   useEffect(() => {
     const fetchContest = async () => {
+      const CACHE_KEY    = `register_contest_${contestId}`;
+      const CACHE_TS_KEY = `${CACHE_KEY}_ts`;
+      const MAX_AGE      = 5 * 60 * 1000; // 5 minutes
+
+      // 1. Show stale data instantly
       try {
-        const res = await fetch(`${BACKEND_URL}/contests/${contestId}/`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
-        setContestData(data);
+        const cached   = localStorage.getItem(CACHE_KEY);
+        const cachedAt = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
+        const isFresh  = (Date.now() - cachedAt) < MAX_AGE;
+        if (cached) {
+          setContestData(JSON.parse(cached));
+          setLoading(false);
+          if (isFresh) return;
+        }
+      } catch (_) {}
+
+      // 2. Refresh from server
+      try {
+        const res = await api.get(`/contests/${contestId}/`);
+        setContestData(res.data);
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(res.data));
+          localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+        } catch (_) {}
       } catch (err) {
         console.error('Failed to fetch contest:', err);
-        setContestData(null);
+        if (!localStorage.getItem(CACHE_KEY)) setContestData(null);
       } finally {
         setLoading(false);
       }
@@ -42,26 +61,22 @@ const RegisterNow = () => {
   const handleRegister = async () => {
     if (!acceptedTerms) return;
     setIsRegistering(true);
-
     try {
-      const res = await fetch(`${BACKEND_URL}/contests/${contestId}/register/`, {
-        method: 'POST',
-        headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem('token')}`
-      },
-      });
-
-      const data = await res.json();
-
-      if (res.ok || data.message === "Already registered") {
+      const res = await api.post(`/contests/${contestId}/register/`);
+      const data = res.data;
+      if (data.message === 'Already registered' || res.status === 200 || res.status === 201) {
         setRegistrationSuccess(true);
       } else {
-        alert(data.error || data.message || "Failed to register");
+        alert(data.error || data.message || 'Failed to register');
       }
     } catch (err) {
-      console.error(err);
-      alert("An error occurred while registering. Try again.");
+      const data = err.response?.data;
+      if (data?.message === 'Already registered') {
+        setRegistrationSuccess(true);
+      } else {
+        console.error(err);
+        alert(data?.error || data?.message || 'An error occurred while registering. Try again.');
+      }
     } finally {
       setIsRegistering(false);
     }
@@ -69,8 +84,18 @@ const RegisterNow = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <span>Loading contest details...</span>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-sm p-6 w-full max-w-xl animate-pulse space-y-4">
+          <div className="h-5 bg-gray-200 rounded w-1/2" />
+          <div className="h-3 bg-gray-200 rounded w-1/3" />
+          <div className="grid grid-cols-2 gap-4 mt-2">
+            {[1,2,3,4].map(i => <div key={i} className="h-10 bg-gray-200 rounded-lg" />)}
+          </div>
+          <div className="space-y-2 mt-3">
+            {[1,2,3,4,5].map(i => <div key={i} className="h-2.5 bg-gray-200 rounded" />)}
+          </div>
+          <div className="h-10 bg-gray-200 rounded-lg mt-4" />
+        </div>
       </div>
     );
   }

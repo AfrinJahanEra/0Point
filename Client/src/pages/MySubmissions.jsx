@@ -314,9 +314,16 @@ const MySubmissions = () => {
 
         {/* Submissions Table */}
         {loading ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-            <p className="text-gray-600 text-xs">Loading...</p>
+          <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="animate-pulse flex items-center gap-3 py-2 border-b border-gray-100">
+                <div className="h-2.5 bg-gray-200 rounded w-20" />
+                <div className="h-2.5 bg-gray-200 rounded flex-1" />
+                <div className="h-5 bg-gray-200 rounded w-12" />
+                <div className="h-2.5 bg-gray-200 rounded w-16" />
+                <div className="h-2.5 bg-gray-200 rounded w-14" />
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">

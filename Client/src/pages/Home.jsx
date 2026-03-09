@@ -126,42 +126,71 @@ const Home = () => {
     return startTime <= new Date();
   };
 
+  // Apply dashboard API response data to all state variables
+  const applyDashboardData = (data) => {
+    setUpcomingContests(data.upcoming_contests || []);
+    setLiveContests(data.live_contests || []);
+    setPastContests(data.past_contests || []);
+    setBlogs(data.blogs || []);
+    setAnnouncements(data.announcements || []);
+    setLeaderboardData(data.leaderboard || []);
+    setContributions(data.contributions || []);
+    setRegisteredContests(new Set(data.registered_contest_ids || []));
+    if (data.soonest_contest) {
+      setSoonestContest(data.soonest_contest);
+      setTimeLeft({
+        days:    data.soonest_contest.time_until?.days    || 0,
+        hours:   data.soonest_contest.time_until?.hours   || 0,
+        minutes: data.soonest_contest.time_until?.minutes || 0,
+        seconds: data.soonest_contest.time_until?.seconds || 0,
+      });
+    } else {
+      setSoonestContest(null);
+    }
+  };
+
   // Single unified fetch for all dashboard data - FASTER LOADING
+  // Uses stale-while-revalidate: show cached data instantly, then refresh.
+  const CACHE_KEY    = 'home_dashboard_cache';
+  const CACHE_TS_KEY = 'home_dashboard_cache_ts';
+  const CACHE_MAX_AGE = 2 * 60 * 1000; // 2 minutes client-side cache
+
   const fetchDashboardData = async () => {
+    // --- 1. Show stale data immediately (zero-latency first paint) ---
     try {
-      setLoading(true);
+      const cached = localStorage.getItem(CACHE_KEY);
+      const cachedAt = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
+      const isFresh = (Date.now() - cachedAt) < CACHE_MAX_AGE;
+
+      if (cached) {
+        const cachedData = JSON.parse(cached);
+        applyDashboardData(cachedData);
+        setLoading(false);      // Remove all spinners instantly
+        if (isFresh) return;    // Fresh enough — skip network call
+      }
+    } catch (_) { /* ignore parse errors */ }
+
+    // --- 2. Background refresh from server ---
+    try {
       const response = await api.get('/home/dashboard/');
       const data = response.data;
-      
-      // Set all data from single response
-      setUpcomingContests(data.upcoming_contests || []);
-      setLiveContests(data.live_contests || []);
-      setPastContests(data.past_contests || []);
-      setBlogs(data.blogs || []);
-      setAnnouncements(data.announcements || []);
-      setLeaderboardData(data.leaderboard || []);
-      setContributions(data.contributions || []);
-      setRegisteredContests(new Set(data.registered_contest_ids || []));
-      
-      // Set soonest contest for countdown
-      if (data.soonest_contest) {
-        setSoonestContest(data.soonest_contest);
-        setTimeLeft({
-          days: data.soonest_contest.time_until?.days || 0,
-          hours: data.soonest_contest.time_until?.hours || 0,
-          minutes: data.soonest_contest.time_until?.minutes || 0,
-          seconds: data.soonest_contest.time_until?.seconds || 0
-        });
-      } else {
-        setSoonestContest(null);
-      }
+      applyDashboardData(data);
+      // Persist to localStorage for next visit
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+      } catch (_) { /* ignore quota errors */ }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+      // Don’t show toast if we already have cached data showing
+      if (!localStorage.getItem(CACHE_KEY)) {
+        toast.error('Failed to load dashboard data');
+      }
     } finally {
       setLoading(false);
     }
   };
+
 
   // Fetch AI recommendations (only for logged-in users)
   const fetchRecommendations = async () => {
@@ -531,9 +560,16 @@ const Home = () => {
               {/* Contests List */}
               <div className="p-3 space-y-2">
                 {loading ? (
-                  <div className="py-4 text-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-xs text-gray-500 mt-2">Loading contests...</p>
+                  <div className="space-y-2 py-2">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="animate-pulse flex items-center gap-2 p-2 rounded-lg bg-gray-50">
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-1">
+                          <div className="h-2.5 bg-gray-200 rounded w-3/4" />
+                          <div className="h-2 bg-gray-200 rounded w-1/2" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : upcomingContests.length === 0 ? (
                   <div className="py-4 text-center">
@@ -647,9 +683,11 @@ const Home = () => {
             <div className="bg-white rounded-lg">
               <div className="p-3 border-b border-gray-200">
                 {loading ? (
-                  <div className="py-4 text-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-xs text-gray-500 mt-2">Loading countdown...</p>
+                  <div className="py-4 animate-pulse">
+                    <div className="h-3 bg-gray-200 rounded w-1/2 mx-auto mb-2" />
+                    <div className="flex justify-center gap-3 mt-2">
+                      {[1,2,3,4].map(i => <div key={i} className="w-10 h-10 bg-gray-200 rounded-lg" />)}
+                    </div>
                   </div>
                 ) : soonestContest ? (
                   <div className="text-center">
@@ -727,9 +765,16 @@ const Home = () => {
 
                 <div className="space-y-2">
                   {loading ? (
-                    <div className="py-4 text-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-                      <p className="text-xs text-gray-500 mt-2">Loading past contests...</p>
+                    <div className="space-y-2 py-2">
+                      {[1,2,3].map(i => (
+                        <div key={i} className="animate-pulse flex items-center gap-2 p-2 rounded-lg bg-gray-50">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0" />
+                          <div className="flex-1 space-y-1">
+                            <div className="h-2.5 bg-gray-200 rounded w-3/4" />
+                            <div className="h-2 bg-gray-200 rounded w-1/2" />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : pastContests.length === 0 ? (
                     <div className="py-4 text-center">
@@ -795,9 +840,15 @@ const Home = () => {
 
               <div className="px-7">
                 {loading ? (
-                  <div className="py-4 text-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-xs text-gray-500 mt-2">Loading...</p>
+                  <div className="space-y-2 py-2 animate-pulse">
+                    {[1,2,3,4,5].map(i => (
+                      <div key={i} className="flex items-center gap-2 py-1">
+                        <div className="w-5 h-4 bg-gray-200 rounded" />
+                        <div className="w-6 h-6 bg-gray-200 rounded-full" />
+                        <div className="flex-1 h-2.5 bg-gray-200 rounded" />
+                        <div className="w-10 h-2.5 bg-gray-200 rounded" />
+                      </div>
+                    ))}
                   </div>
                 ) : leaderboardData.length === 0 ? (
                   <div className="py-4 text-center">
@@ -855,9 +906,10 @@ const Home = () => {
                 </div>
                 
                 {loading ? (
-                  <div className="p-8 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                    <p className="text-xs text-gray-600">Loading announcement...</p>
+                  <div className="p-6 space-y-3 animate-pulse">
+                    <div className="h-3 bg-gray-200 rounded w-2/3" />
+                    <div className="h-2 bg-gray-200 rounded w-full" />
+                    <div className="h-2 bg-gray-200 rounded w-4/5" />
                   </div>
                 ) : announcements.length === 0 ? (
                   <div className="p-8 text-center">
@@ -1002,9 +1054,14 @@ const Home = () => {
                 </div>
                 
                 {loading ? (
-                  <div className="p-8 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                    <p className="text-xs text-gray-600">Loading latest blogs...</p>
+                  <div className="p-4 space-y-3 animate-pulse">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="space-y-1.5 border border-gray-100 rounded-lg p-3">
+                        <div className="h-3 bg-gray-200 rounded w-3/4" />
+                        <div className="h-2 bg-gray-200 rounded w-full" />
+                        <div className="h-2 bg-gray-200 rounded w-2/3" />
+                      </div>
+                    ))}
                   </div>
                 ) : blogs.length === 0 ? (
                   <div className="p-8 text-center">
@@ -1211,9 +1268,16 @@ const Home = () => {
 
                 <div className="space-y-2">
                   {loading ? (
-                    <div className="py-4 text-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-                      <p className="text-xs text-gray-500 mt-2">Loading running contests...</p>
+                    <div className="space-y-2 py-2">
+                      {[1,2].map(i => (
+                        <div key={i} className="animate-pulse flex items-center gap-2 p-2 rounded-lg bg-gray-50">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0" />
+                          <div className="flex-1 space-y-1">
+                            <div className="h-2.5 bg-gray-200 rounded w-3/4" />
+                            <div className="h-2 bg-gray-200 rounded w-1/2" />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : liveContests.length === 0 ? (
                     <div className="py-4 text-center">
@@ -1281,9 +1345,14 @@ const Home = () => {
 
                 <div className="space-y-2 p-2">
                   {loading ? (
-                    <div className="py-4 text-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-                      <p className="text-xs text-gray-500 mt-2">Loading announcements...</p>
+                    <div className="space-y-2 p-2">
+                      {[1,2,3].map(i => (
+                        <div key={i} className="animate-pulse p-3 rounded-lg border border-gray-100">
+                          <div className="h-2.5 bg-gray-200 rounded w-3/4 mb-1.5" />
+                          <div className="h-2 bg-gray-200 rounded w-full mb-1" />
+                          <div className="h-2 bg-gray-200 rounded w-2/3" />
+                        </div>
+                      ))}
                     </div>
                   ) : announcements.length === 0 ? (
                     <div className="py-4 text-center">
@@ -1343,9 +1412,15 @@ const Home = () => {
 
   <div className="p-3">
     {loading ? (
-      <div className="py-4 text-center">
-        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="text-xs text-gray-500 mt-2">Loading contributors...</p>
+      <div className="space-y-2 py-2">
+        {[1,2,3].map(i => (
+          <div key={i} className="animate-pulse flex items-center gap-2 p-2">
+            <div className="w-4 h-2.5 bg-gray-200 rounded" />
+            <div className="w-6 h-6 bg-gray-200 rounded-full" />
+            <div className="flex-1 h-2.5 bg-gray-200 rounded" />
+            <div className="w-8 h-2.5 bg-gray-200 rounded" />
+          </div>
+        ))}
       </div>
     ) : contributions.length === 0 ? (
       <div className="py-4 text-center">
@@ -1411,9 +1486,14 @@ const Home = () => {
                 </div>
                 <div className="overflow-x-auto">
                   {recommendationsLoading ? (
-                    <div className="py-4 text-center text-gray-500 text-xs">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                      Loading AI recommendations...
+                    <div className="space-y-2 py-2 animate-pulse">
+                      {[1,2,3,4,5].map(i => (
+                        <div key={i} className="flex items-center gap-2 py-1.5 border-b border-gray-100">
+                          <div className="flex-1 h-2.5 bg-gray-200 rounded" />
+                          <div className="w-14 h-2.5 bg-gray-200 rounded" />
+                          <div className="w-14 h-2.5 bg-gray-200 rounded" />
+                        </div>
+                      ))}
                     </div>
                   ) : recommendations.length > 0 ? (
                     <table className="w-full text-xs">

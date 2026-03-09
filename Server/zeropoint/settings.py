@@ -253,3 +253,34 @@ JD_API_URL = os.getenv('JD_API_URL', 'https://api.jdoodle.com/v1/execute')
 
 GROQ_API_KEY = os.getenv('groq_api_key')
 
+# ─── Cache Configuration ───────────────────────────────────────────────────────
+# Uses Redis when available, falls back to in-memory (LocMemCache) for development.
+_REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')
+
+try:
+    import redis as _redis_lib
+    _r = _redis_lib.from_url(_REDIS_URL, socket_connect_timeout=1)
+    _r.ping()
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': _REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'SOCKET_CONNECT_TIMEOUT': 1,
+                'SOCKET_TIMEOUT': 1,
+                'IGNORE_EXCEPTIONS': True,   # don't crash if Redis goes down
+            },
+            'KEY_PREFIX': 'zp',
+            'TIMEOUT': 300,                  # default 5 min TTL
+        }
+    }
+    print('Cache backend: Redis')
+except Exception:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'zeropoint-home',
+        }
+    }
+    print('Cache backend: LocMem (Redis not available)')

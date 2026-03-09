@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { Code2, LogOut, User, BarChart2, Video, Users, Copy, Send } from 'lucide-react';
 import NotificationPopup from './NotificationPopup';
 import { BACKEND_URL } from '../utils/api';
+import api from '../utils/api';
 
 const extractEmailFromLink = (link, param) => {
   try {
@@ -53,20 +54,34 @@ const Header = () => {
   // Fetch profile photo when user changes
   useEffect(() => {
     const fetchProfilePhoto = async () => {
-      if (user) {
-        try {
-          const response = await fetch(`${BACKEND_URL}/account/profile/`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setProfilePhoto(data.profile_photo);
-          }
-        } catch (error) {
-          console.error('Error fetching profile photo:', error);
+      if (!user) return;
+
+      const CACHE_KEY    = `header_profile_photo_${user.id || user.email || 'me'}`;
+      const CACHE_TS_KEY = `${CACHE_KEY}_ts`;
+      const MAX_AGE      = 5 * 60 * 1000; // 5 minutes
+
+      // 1. Show cached photo instantly
+      try {
+        const cached   = localStorage.getItem(CACHE_KEY);
+        const cachedAt = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
+        const isFresh  = (Date.now() - cachedAt) < MAX_AGE;
+        if (cached) {
+          setProfilePhoto(cached === 'null' ? null : cached);
+          if (isFresh) return;
         }
+      } catch (_) {}
+
+      // 2. Background refresh
+      try {
+        const response = await api.get('/account/profile/');
+        const photo = response.data?.profile_photo || null;
+        setProfilePhoto(photo);
+        try {
+          localStorage.setItem(CACHE_KEY, String(photo));
+          localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+        } catch (_) {}
+      } catch (error) {
+        console.error('Error fetching profile photo:', error);
       }
     };
     fetchProfilePhoto();
