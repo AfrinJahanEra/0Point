@@ -2795,6 +2795,29 @@ class HomeDashboardAPIView(APIView):
         except Exception:
             pass
 
+        # Contributions (top 5)
+        contributions_data = []
+        try:
+            from account.models import Account as AccountModel
+            from blog.models import Blog as BlogModel
+            contrib_ranking = []
+            for u in AccountModel.objects(is_deleted=False):
+                blogs_count = BlogModel.objects(author=u, is_published=True).count()
+                contests_count = Contest.objects(created_by=u).count()
+                total = blogs_count + contests_count
+                if total > 0:
+                    contrib_ranking.append({
+                        "user_id": str(u.id),
+                        "name": u.name,
+                        "total_contributions": total,
+                    })
+            contrib_ranking.sort(key=lambda x: x['total_contributions'], reverse=True)
+            for idx, entry in enumerate(contrib_ranking[:5], start=1):
+                entry['rank'] = idx
+            contributions_data = contrib_ranking[:5]
+        except Exception as e:
+            print(f"Contributions error: {e}")
+
         return {
             "upcoming_contests":     upcoming_contests[:5],
             "live_contests":         live_contests,
@@ -2802,7 +2825,7 @@ class HomeDashboardAPIView(APIView):
             "blogs":                 blogs_data,
             "announcements":         announcements_data,
             "leaderboard":           leaderboard_data,
-            "contributions":         [],
+            "contributions":         contributions_data,
             "soonest_contest":       soonest_upcoming,
             "registered_contest_ids": list(registered_ids),
         }

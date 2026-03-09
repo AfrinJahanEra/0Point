@@ -8,31 +8,7 @@ import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Code2, 
-  Trophy, 
-  Users, 
-  BookOpen, 
-  ChevronRight,
-  Play,
-  Award,
-  Clock,
-  Calendar,
-  Eye,
-  Plus,
-  BarChart3,
-  Medal,
-  Zap,
-  TrendingUp,
-  Bell,
-  MessageSquare,
-  Settings,
-  Cpu,
-  BarChart,
-  PieChart,
-  LineChart,
-  X
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -496,7 +472,6 @@ const Home = () => {
         </div>
         <div className="bg-gray-100 rounded-lg p-6 text-center">
           <div className="flex items-center justify-center mb-3">
-            <Cpu className="w-10 h-10 text-blue-500 animate-pulse" />
           </div>
           <p className="text-gray-600 mb-2 text-sm">
             {activeVisualization === 'progress' && "Loading your coding progress chart..."}
@@ -525,15 +500,13 @@ const Home = () => {
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
-                    <Trophy className="w-3.5 h-3.5 text-gray-700" />
                     <h2 className="text-xs font-semibold text-gray-900">Upcoming Contests</h2>
                   </div>
                   <Link 
                     to="/contests" 
-                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                    className="text-gray-600 hover:text-blue-700 transition-colors duration-200 flex items-center gap-1 text-xs"
                   >
                     View All
-                    <ChevronRight className="w-2.5 h-2.5" />
                   </Link>
                 </div>
 
@@ -547,7 +520,7 @@ const Home = () => {
                         className={`px-2 py-1 rounded text-xs font-medium transition-colors duration-200 ${
                           activeTab === tab 
                             ? 'bg-white text-gray-900 shadow-sm' 
-                            : 'text-gray-600 hover:text-gray-900'
+                            : 'text-gray-600 hover:text-blue-700'
                         }`}
                       >
                         {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -597,13 +570,11 @@ const Home = () => {
                     return (
                       <div 
                         key={contest.id}
-                        className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                        className="p-2 rounded-lg hover:bg-blue-50 transition-colors duration-200"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-start gap-2 flex-1">
-                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
-                              <Calendar className="w-4 h-4" />
-                            </div>
+
                             <div className="flex-1">
                               <div className="flex items-center gap-1.5">
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${platformBadge.color}`}>
@@ -614,14 +585,8 @@ const Home = () => {
                                 </h3>
                               </div>
                               <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-2.5 h-2.5" />
-                                  {contest.duration}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Users className="w-2.5 h-2.5" />
-                                  {contest.participants || 0}
-                                </span>
+                                <span>{contest.duration}</span>
+                                <span>{contest.participants || 0} participants</span>
                               </div>
                             </div>
                           </div>
@@ -634,9 +599,8 @@ const Home = () => {
                                 href={contest.external_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-gray-500 text-white hover:bg-gray-600 flex items-center gap-1"
+                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-gray-500 text-white hover:bg-gray-600"
                               >
-                                <Eye className="w-2.5 h-2.5" />
                                 Visit
                               </a>
                             ) : isRegistered ? (
@@ -644,14 +608,12 @@ const Home = () => {
                               contestStarted ? (
                                 <button
                                   onClick={() => handleContestEntry(contest, 'upcoming')}
-                                  className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1"
+                                  className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-blue-600 text-white hover:bg-blue-700"
                                 >
-                                  <Play className="w-2.5 h-2.5" />
                                   Enter
                                 </button>
                               ) : (
-                                <span className="px-2 py-1 rounded font-medium text-xs bg-blue-100 text-blue-700 flex items-center gap-1">
-                                  <Clock className="w-2.5 h-2.5" />
+                                <span className="px-2 py-1 rounded font-medium text-xs bg-blue-100 text-blue-700">
                                   Registered
                                 </span>
                               )
@@ -723,8 +685,7 @@ const Home = () => {
                         </button>
                       ) : (
                         // Contest not started - show registered status
-                        <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded font-medium">
-                          <Clock className="w-3 h-3" />
+                        <span className="inline-flex items-center text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded font-medium">
                           Registered
                         </span>
                       )
@@ -751,15 +712,13 @@ const Home = () => {
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-gray-700" />
                     <h2 className="text-xs font-semibold text-gray-900">Recent Contests</h2>
                   </div>
                   <Link 
                     to="/contests" 
-                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                    className="text-gray-600 hover:text-blue-700 transition-colors duration-200 flex items-center gap-1 text-xs"
                   >
                     View All
-                    <ChevronRight className="w-2.5 h-2.5" />
                   </Link>
                 </div>
 
@@ -784,13 +743,10 @@ const Home = () => {
                     pastContests.slice(0, 3).map((contest) => (
                       <div 
                         key={contest.id}
-                        className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                        className="p-2 rounded-lg hover:bg-blue-50 transition-colors duration-200"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-start gap-2 flex-1">
-                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
-                              <Trophy className="w-4 h-4" />
-                            </div>
                             <div className="flex-1">
                               <h3 className="font-medium text-gray-900 text-xs">
                                 {contest.title}
@@ -806,9 +762,8 @@ const Home = () => {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => handleContestEntry(contest, 'past')}
-                              className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-gray-800 text-white hover:bg-gray-900 flex items-center gap-1"
+                              className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-gray-800 text-white hover:bg-gray-900"
                             >
-                              <Eye className="w-2.5 h-2.5" />
                               View
                             </button>
                           </div>
@@ -825,15 +780,13 @@ const Home = () => {
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
-                    <Medal className="w-3.5 h-3.5 text-gray-700" />
                     <h2 className="text-xs font-semibold text-gray-900">Leaderboard</h2>
                   </div>
                   <Link 
                     to="/leaderboard" 
-                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                    className="text-gray-600 hover:text-blue-700 transition-colors duration-200 flex items-center gap-1 text-xs"
                   >
                     View All
-                    <ChevronRight className="w-2.5 h-2.5" />
                   </Link>
                 </div>
               </div>
@@ -865,7 +818,7 @@ const Home = () => {
                     </thead>
                     <tbody>
                       {leaderboardData.map((user) => (
-                        <tr key={user.rank} className="border-b border-gray-100 hover:bg-gray-50">
+                        <tr key={user.rank} className="border-b border-gray-100 hover:bg-blue-50">
                           <td className="py-2">
                             <div className="w-5 h-5 rounded flex items-center justify-center text-xs font-medium text-gray-900">
                               {user.rank}
@@ -900,7 +853,6 @@ const Home = () => {
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
-                    <Bell className="w-3.5 h-3.5 text-gray-700" />
                     <h2 className="text-xs font-semibold text-gray-900">Featured Announcement</h2>
                   </div>
                 </div>
@@ -913,7 +865,6 @@ const Home = () => {
                   </div>
                 ) : announcements.length === 0 ? (
                   <div className="p-8 text-center">
-                    <Bell className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                     <p className="text-xs text-gray-600">No announcements yet</p>
                   </div>
                 ) : (
@@ -969,7 +920,7 @@ const Home = () => {
                     
                     <h3 className="text-xs font-semibold text-gray-900 mb-1.5">{announcements[0]?.topic || 'Announcement'}</h3>
                     
-                    <div className={`prose prose-sm max-w-none text-xs ${!showAnnouncementFullContent[announcements[0]?.id] ? 'line-clamp-4' : ''}`}>
+                    <div className="prose prose-sm max-w-none text-xs line-clamp-4">
                       <ReactMarkdown
                         remarkPlugins={[remarkMath, remarkBreaks]}
                         rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
@@ -978,51 +929,6 @@ const Home = () => {
                       </ReactMarkdown>
                     </div>
                     
-                    {announcements[0]?.text && announcements[0].text.length > 300 && (
-                      <button
-                        onClick={() => toggleAnnouncementContent(announcements[0].id)}
-                        className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
-                      >
-                        {showAnnouncementFullContent[announcements[0]?.id] ? (
-                          <>
-                            <span>Show Less</span>
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                            </svg>
-                          </>
-                        ) : (
-                          <>
-                            <span>Read More</span>
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </>
-                        )}
-                      </button>
-                    )}
-                    
-                    {/* Like/Dislike Buttons */}
-                    <div className="flex items-center gap-4 mt-3 mb-3">
-                      <button 
-                        onClick={() => handleAnnouncementLike(announcements[0]?.id)}
-                        className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600 transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                        </svg>
-                        Like {announcementLikes[announcements[0]?.id] || 0}
-                      </button>
-                      <button 
-                        onClick={() => handleAnnouncementDislike(announcements[0]?.id)}
-                        className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600 transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                        </svg>
-                        Dislike {announcementDislikes[announcements[0]?.id] || 0}
-                      </button>
-                    </div>
-
                     <div className="flex justify-end items-center mt-2">
                       <button 
                         onClick={() => setSelectedAnnouncement(announcements[0])}
@@ -1041,7 +947,6 @@ const Home = () => {
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-gray-700" />
                     <h2 className="text-xs font-semibold text-gray-900">Featured Blog Post</h2>
                   </div>
                   <Link 
@@ -1049,7 +954,6 @@ const Home = () => {
                     className="text-blue-800 hover:text-blue-900 transition-colors duration-200 flex items-center gap-1 text-xs font-medium"
                   >
                     View All
-                    <ChevronRight className="w-2.5 h-2.5" />
                   </Link>
                 </div>
                 
@@ -1065,12 +969,11 @@ const Home = () => {
                   </div>
                 ) : blogs.length === 0 ? (
                   <div className="p-8 text-center">
-                    <BookOpen className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                     <p className="text-xs text-gray-600">No blogs yet</p>
                   </div>
                 ) : (
                   blogs.slice(0, 3).map((post) => (
-                    <div key={post.id} className="mb-2 p-3 border-b border-gray-100 last:border-b-0">
+                    <div key={post.id} className="mb-2 p-3 border-b border-gray-100 last:border-b-0 hover:bg-blue-50 transition-colors duration-200">
                       {/* Profile Avatar and Username Section */}
                       <div className="flex items-center gap-2 mb-3">
                         <div 
@@ -1108,7 +1011,7 @@ const Home = () => {
                       
                       <h3 className="text-xs font-semibold text-gray-900 mb-1.5">{post.title}</h3>
                       
-                      <div className={`prose prose-sm max-w-none text-xs ${!showFullContent[post.id] ? 'line-clamp-4' : ''}`}>
+                      <div className="prose prose-sm max-w-none text-xs line-clamp-4">
                         <ReactMarkdown
                           remarkPlugins={[remarkMath, remarkBreaks]}
                           rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
@@ -1118,116 +1021,6 @@ const Home = () => {
                         </ReactMarkdown>
                       </div>
                       
-                      {post.content && post.content.length > 300 && (
-                        <button
-                          onClick={() => toggleContent(post.id)}
-                          className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
-                        >
-                          {showFullContent[post.id] ? (
-                            <>
-                              <span>Show Less</span>
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                              </svg>
-                            </>
-                          ) : (
-                            <>
-                              <span>Read More</span>
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </>
-                          )}
-                        </button>
-                      )}
-                      
-                      {/* Like/Dislike Buttons */}
-                      <div className="flex items-center gap-4 mt-3 mb-3">
-                        <button 
-                          onClick={() => handleBlogLike(post.id)}
-                          className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                          </svg>
-                          Like {blogLikes[post.id] || 0}
-                        </button>
-                        <button 
-                          onClick={() => handleBlogDislike(post.id)}
-                          className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                          </svg>
-                          Dislike {blogDislikes[post.id] || 0}
-                        </button>
-                        <button 
-                          onClick={() => toggleComments(post.id)}
-                          className="flex items-center gap-1 text-xs text-gray-600 hover:text-blue-600 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                          </svg>
-                          Comments {blogComments[post.id]?.length || 0}
-                        </button>
-                      </div>
-
-                      {/* Comments Section */}
-                      {showComments[post.id] && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <div className="mb-3">
-                            <textarea
-                              value={newComment[post.id] || ''}
-                              onChange={(e) => setNewComment({...newComment, [post.id]: e.target.value})}
-                              placeholder="Write a comment..."
-                              className="w-full p-2 border border-gray-300 rounded text-xs resize-y"
-                              rows="2"
-                            />
-                            <button
-                              onClick={() => handleAddComment(post.id)}
-                              className="mt-2 px-3 py-1 bg-blue-800 text-white text-xs rounded hover:bg-blue-900 transition-colors"
-                            >
-                              Post Comment
-                            </button>
-                          </div>
-
-                          <div className="space-y-3">
-                            {blogComments[post.id]?.map((comment) => (
-                              <div key={comment.id} className="bg-gray-50 p-2 rounded">
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-xs font-medium text-gray-900">{comment.author}</span>
-                                  <span className="text-xs text-gray-500">{comment.date}</span>
-                                </div>
-                                <p className="text-xs text-gray-700 mb-2">{comment.content}</p>
-                                <div className="flex items-center gap-3">
-                                  <button
-                                    onClick={() => handleCommentLike(post.id, comment.id)}
-                                    className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600"
-                                  >
-                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                                    </svg>
-                                    {comment.likes || 0}
-                                  </button>
-                                  <button
-                                    onClick={() => handleCommentDislike(post.id, comment.id)}
-                                    className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600"
-                                  >
-                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                                    </svg>
-                                    {comment.dislikes || 0}
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                            {(!blogComments[post.id] || blogComments[post.id].length === 0) && (
-                              <p className="text-xs text-gray-500 text-center py-2">No comments yet. Be the first to comment!</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
                       <div className="flex justify-end items-center mt-2">
                         <Link 
                           to={`/community?blog=${post.id}`}
@@ -1250,19 +1043,21 @@ const Home = () => {
           <div className="lg:col-span-3 space-y-4">
 
             {/* Live Contests */}
-            <div className="bg-white rounded-lg">
+            <div className="bg-white rounded-lg border-l-4 border-red-500">
               <div className="p-3 border-b border-gray-200">
-                <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-gray-700" />
+                <div className="flex items-center justify-between mb-2 p-3 border-b border-red-100 bg-red-50">
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block"></span>
+                      <span className="text-[10px] font-bold text-red-600 uppercase tracking-wide">LIVE</span>
+                    </span>
                     <h2 className="text-xs font-semibold text-gray-900">Running Contests</h2>
                   </div>
                   <Link 
                     to="/contests" 
-                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                    className="text-gray-600 hover:text-blue-700 transition-colors duration-200 flex items-center gap-1 text-xs"
                   >
                     View All
-                    <ChevronRight className="w-2.5 h-2.5" />
                   </Link>
                 </div>
 
@@ -1287,13 +1082,10 @@ const Home = () => {
                     liveContests.slice(0, 3).map((contest) => (
                       <div 
                         key={contest.id}
-                        className="p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                        className="p-2 rounded-lg hover:bg-red-50 transition-colors duration-200 border-l-2 border-red-300 hover:border-red-400"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-start gap-2 flex-1">
-                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-700">
-                              <Trophy className="w-4 h-4" />
-                            </div>
                             <div className="flex-1">
                               <h3 className="font-medium text-gray-900 text-xs">
                                 {contest.title}
@@ -1310,17 +1102,15 @@ const Home = () => {
                             {registeredContests.has(contest.id) || contest.is_registered ? (
                               <button
                                 onClick={() => handleContestEntry(contest, 'live')}
-                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-red-600 text-white hover:bg-red-700 flex items-center gap-1"
+                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-red-600 text-white hover:bg-red-700"
                               >
-                                <Play className="w-2.5 h-2.5" />
                                 Join
                               </button>
                             ) : (
                               <button
                                 onClick={() => handleRegister(contest.id)}
-                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-orange-600 text-white hover:bg-orange-700 flex items-center gap-1"
+                                className="px-2 py-1 rounded font-medium text-xs transition-all duration-200 bg-blue-800 text-white hover:bg-blue-900"
                               >
-                                <Eye className="w-2.5 h-2.5" />
                                 Register
                               </button>
                             )}
@@ -1338,7 +1128,6 @@ const Home = () => {
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
-                    <Bell className="w-3.5 h-3.5 text-gray-700" />
                     <h2 className="text-xs font-semibold text-gray-900">Announcements</h2>
                   </div>
                 </div>
@@ -1363,7 +1152,7 @@ const Home = () => {
                       <div 
                         key={announcement.id}
                         onClick={() => setSelectedAnnouncement(announcement)}
-                        className="p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-200 cursor-pointer"
+                        className="p-3 rounded-lg border border-gray-100 hover:border-blue-200 hover:bg-blue-50 transition-all duration-200 cursor-pointer"
                       >
                         <div className="flex items-start gap-2">
                           {announcement.is_pinned && (
@@ -1404,7 +1193,6 @@ const Home = () => {
   <div className="p-3 border-b border-gray-200">
     <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-blue-50">
       <div className="flex items-center gap-1.5">
-        <Medal className="w-3.5 h-3.5 text-gray-700" />
         <h2 className="text-xs font-semibold text-gray-900">Top Contributors</h2>
       </div>
     </div>
@@ -1437,7 +1225,7 @@ const Home = () => {
         </thead>
         <tbody>
           {contributions.map((contributor) => (
-            <tr key={contributor.rank} className="border-b border-gray-100 hover:bg-gray-50">
+            <tr key={contributor.rank} className="border-b border-gray-100 hover:bg-blue-50">
               <td className="py-2">
                 <div className={`
                   w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold
@@ -1473,15 +1261,13 @@ const Home = () => {
               <div className="p-3 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-2 p-3 border-b border-gray-200 bg-blue-50">
                   <div className="flex items-center gap-1.5">
-                    <Code2 className="w-3.5 h-3.5 text-gray-700" />
                     <h2 className="text-xs font-semibold text-gray-900">Recommended Problem Sets</h2>
                   </div>
                   <Link 
                     to="/practice" 
-                    className="text-gray-600 hover:text-gray-900 transition-colors duration-200 flex items-center gap-1 text-xs"
+                    className="text-gray-600 hover:text-blue-700 transition-colors duration-200 flex items-center gap-1 text-xs"
                   >
                     View All
-                    <ChevronRight className="w-2.5 h-2.5" />
                   </Link>
                 </div>
                 <div className="overflow-x-auto">
@@ -1506,7 +1292,7 @@ const Home = () => {
                       </thead>
                       <tbody>
                         {recommendations.map((problem, index) => (
-                          <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                          <tr key={index} className="border-b border-gray-100 hover:bg-blue-50">
                             <td className="py-2">
                               <a 
                                 href={problem.link} 
@@ -1556,7 +1342,6 @@ const Home = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-blue-50">
               <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-blue-600" />
                 <h2 className="text-lg font-semibold text-gray-900">
                   {selectedAnnouncement.topic || 'Announcement'}
                 </h2>
