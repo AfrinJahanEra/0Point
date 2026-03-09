@@ -8,7 +8,7 @@ import 'ace-builds/src-noconflict/mode-javascript';
 import 'ace-builds/src-noconflict/theme-monokai';
 import 'ace-builds/src-noconflict/ext-language_tools';
 import { Code2, Play, Download } from 'lucide-react';
-import { Link, useNavigate, useParams} from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation} from 'react-router-dom';
 import { 
   ArrowLeft,
   Trophy,
@@ -47,9 +47,12 @@ import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import { BACKEND_URL } from '../utils/api';
+import { patchCachedContest, expireContestsCache, removeCachedContest } from '../utils/contestsCache';
+import { toast } from 'react-hot-toast';
 
 const CreateContest = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { contestId } = useParams();
   const [activeProblem, setActiveProblem] = useState(null);
   const [compilationStats, setCompilationStats] = useState(null);
@@ -94,6 +97,9 @@ const CreateContest = () => {
   const [testInvites, setTestInvites] = useState('');
   const [publishErrors, setPublishErrors] = useState({});
   const [isRunning, setIsRunning] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [problemsDirty, setProblemsDirty] = useState(false);
   const [predictingDifficulty, setPredictingDifficulty] = useState(false);
   const [predictionResult, setPredictionResult] = useState(null);
   const [showPredictionModal, setShowPredictionModal] = useState(false);
@@ -420,30 +426,14 @@ const CreateContest = () => {
   };
 
   const handleSaveDraft = async () => {
+    if (isSavingDraft) return;
     if (!contestData.title.trim()) {
-      alert("Please enter a contest title before saving draft");
+      toast.error("Please enter a contest title before saving draft");
       return;
     }
 
-    const formattedProblems = problems.map((problem) => ({
-      index: problem.problemIndex || '',
-      title: problem.title,
-      statement: problem.statement,
-      time_limit_seconds: parseFloat(problem.timeLimit) || 2,
-      memory_limit_mb: parseInt(problem.memoryLimit) || 256,
-      tags: problem.tags,
-      difficulty: problem.difficulty || "Medium",
-      tutorial: problem.tutorial || "",
-      points: parseInt(problem.points) || 0,
-      test_cases: problem.testCases.map((tc) => ({
-        input: tc.input,
-        output: tc.output,
-        difficulty: problem.difficulty || null,
-        explanation: tc.explanation || "",
-        sample: true,
-        hidden: tc.hidden || false
-      })),
-    }));
+    // Only include problems in payload if they were modified or it's a new contest
+    const includeProblems = !editMode || problemsDirty;
 
     const payload = {
       title: contestData.title,
@@ -452,11 +442,33 @@ const CreateContest = () => {
       duration: parseFloat(contestData.duration) || 3.0,
       type: contestData.type,
       platform: contestData.platform,
-      problems: formattedProblems,
       status: "draft",
       editorial_published: publishSettings.editorialPublished,
     };
 
+    if (includeProblems) {
+      payload.problems = problems.map((problem) => ({
+        index: problem.problemIndex || '',
+        title: problem.title,
+        statement: problem.statement,
+        time_limit_seconds: parseFloat(problem.timeLimit) || 2,
+        memory_limit_mb: parseInt(problem.memoryLimit) || 256,
+        tags: problem.tags,
+        difficulty: problem.difficulty || "Medium",
+        tutorial: problem.tutorial || "",
+        points: parseInt(problem.points) || 0,
+        test_cases: problem.testCases.map((tc) => ({
+          input: tc.input,
+          output: tc.output,
+          difficulty: problem.difficulty || null,
+          explanation: tc.explanation || "",
+          sample: true,
+          hidden: tc.hidden || false
+        })),
+      }));
+    }
+
+    setIsSavingDraft(true);
     try {
       let url = `${BACKEND_URL}/contests/create-full/`;
       let method = "POST";
@@ -479,23 +491,39 @@ const CreateContest = () => {
 
       if (!response.ok) {
         console.error("Server error:", data);
-        alert("Failed to save draft. Check console.");
+        toast.error("Failed to save draft. Please try again.");
         return;
       }
 
-      alert(editMode ? "Draft updated successfully!" : "Draft saved successfully!");
-      
-      if (!editMode && data.id) {
-        navigate(`/contests/${data.id}/edit/`);
+      toast.success(editMode ? "Draft updated successfully!" : "Draft saved successfully!");
+      setProblemsDirty(false); // reset dirty flag after successful save
+
+      if (editMode && contestId) {
+        // Patch only this contest's title/description in cache — others untouched
+        patchCachedContest(contestId, {
+          title: contestData.title,
+          description: contestData.description || '',
+          start_time: contestData.startTime ? contestData.startTime + ':00Z' : null,
+          duration: parseFloat(contestData.duration) || 0,
+        });
+      } else if (data.id) {
+        // New contest — not in cache yet, just expire so next visit re-fetches
+        expireContestsCache();
+        // Silently update the URL to the edit route without triggering a full reload
+        setEditMode(true);
+        window.history.replaceState(null, '', `/contests/${data.id}/edit/`);
       }
       
     } catch (err) {
       console.error("Request failed:", err);
-      alert("Could not reach server.");
+      toast.error("Could not reach server.");
+    } finally {
+      setIsSavingDraft(false);
     }
   };
 
   const handleProblemChange = (problemInternalId, field, value) => {
+    setProblemsDirty(true);
     if (field === 'problemIndex') {
       const newIndex = value.toUpperCase().trim();
       
@@ -628,22 +656,23 @@ const CreateContest = () => {
   };
 
   const handlePublishContest = async (type) => {
+    if (isPublishing) return;
     let payload;
     let url;
     let method;
 
     if (!contestData.title.trim()) {
-      alert("Please enter a contest title");
+      toast.error("Please enter a contest title");
       return;
     }
 
     if (!contestData.startTime) {
-      alert("Please select a start time");
+      toast.error("Please select a start time");
       return;
     }
 
     if (problems.length === 0) {
-      alert("Please add at least one problem");
+      toast.error("Please add at least one problem");
       return;
     }
 
@@ -652,9 +681,11 @@ const CreateContest = () => {
     );
 
     if (invalidProblems.length > 0) {
-      alert("All problems must have an index, title, and statement");
+      toast.error("All problems must have an index, title, and statement");
       return;
     }
+
+    setIsPublishing(true);
 
     if (type === "test") {
       payload = {
@@ -680,16 +711,22 @@ const CreateContest = () => {
 
         if (!response.ok) {
           console.error("Server error:", data);
-          alert(data.error || "Failed to publish test contest");
+          toast.error(data.error || "Failed to publish test contest");
+          setIsPublishing(false);
           return;
         }
 
-        alert(`Contest published as test successfully!`);
+        toast.success("Contest published as test successfully!");
+        setIsPublishing(false);
+        // Remove the draft from cache; expire so the published version loads fresh
+        if (contestId) removeCachedContest(contestId);
+        expireContestsCache();
         navigate("/contests");
         return;
       } catch (err) {
         console.error("Request failed:", err);
-        alert("Could not reach server.");
+        toast.error("Could not reach server.");
+        setIsPublishing(false);
         return;
       }
     }
@@ -783,19 +820,26 @@ const CreateContest = () => {
 
       if (!response.ok) {
         console.error("Server error:", data);
-        alert(data.error || "Failed to publish contest");
+        toast.error(data.error || "Failed to publish contest");
+        setIsPublishing(false);
         return;
       }
 
-      alert(`Contest ${type === "test" ? "published as test" : "published successfully"}!`);
+      toast.success(`Contest ${type === "test" ? "published as test" : "published successfully"}!`);
+      setIsPublishing(false);
+      // Remove the draft from cache; expire so the published version loads fresh
+      if (contestId) removeCachedContest(contestId);
+      expireContestsCache();
       navigate("/contests");
     } catch (err) {
       console.error("Request failed:", err);
-      alert("Could not reach server.");
+      toast.error("Could not reach server.");
+      setIsPublishing(false);
     }
   };
 
   const addProblem = () => {
+    setProblemsDirty(true);
     const newProblem = {
       id: generateProblemId(),
       problemIndex: '',
@@ -941,6 +985,7 @@ const CreateContest = () => {
   };
 
   const handleDeleteProblem = (problemId) => {
+    setProblemsDirty(true);
     setProblems((prev) => {
       const newList = prev.filter((p) => p.id !== problemId);
       
@@ -1818,14 +1863,16 @@ const CreateContest = () => {
               ← Back to Edit
             </button>
             {publishSettings.testContest && (
-              <button type="button" onClick={() => handlePublishContest('test')} 
-              className="w-full sm:w-auto px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700 flex items-center gap-1 text-xs">
-                Publish as Test
+              <button type="button" onClick={() => handlePublishContest('test')}
+              disabled={isPublishing}
+              className="w-full sm:w-auto px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700 flex items-center gap-1 text-xs disabled:opacity-60 disabled:cursor-not-allowed">
+                {isPublishing ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                {isPublishing ? 'Publishing...' : 'Publish as Test'}
               </button>
             )}
-            <button type="button" onClick={() => handlePublishContest('final')} className="w-full sm:w-auto px-3 py-1.5 bg-blue-800 text-white rounded hover:bg-blue-900 flex items-center gap-1 text-xs">
-              <Check className="w-3 h-3" />
-              Publish Contest
+            <button type="button" onClick={() => handlePublishContest('final')} disabled={isPublishing} className="w-full sm:w-auto px-3 py-1.5 bg-blue-800 text-white rounded hover:bg-blue-900 flex items-center gap-1 text-xs disabled:opacity-60 disabled:cursor-not-allowed">
+              {isPublishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+              {isPublishing ? 'Publishing...' : 'Publish Contest'}
             </button>
           </div>
         </div>
@@ -1916,9 +1963,10 @@ const CreateContest = () => {
                   <button 
                     type="button"
                     onClick={handleSaveDraft}
-                    className="w-full bg-blue-800 text-white py-1.5 rounded text-xs font-medium hover:bg-blue-900 flex items-center justify-center gap-1">
-                    <Save className="w-3 h-3" />
-                    Save Draft
+                    disabled={isSavingDraft}
+                    className="w-full bg-blue-800 text-white py-1.5 rounded text-xs font-medium hover:bg-blue-900 flex items-center justify-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed">
+                    {isSavingDraft ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    {isSavingDraft ? 'Saving...' : 'Save Draft'}
                   </button>
 
                   {currentProblem && (

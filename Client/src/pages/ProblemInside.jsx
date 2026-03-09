@@ -145,7 +145,7 @@ const ProblemInside = () => {
     ),
   };
 
-  // Fetch data - preserving all functionality
+  // Fetch data — parallel requests for speed
   useEffect(() => {
     const fetchAllData = async () => {
       if (!contestId) return;
@@ -154,46 +154,45 @@ const ProblemInside = () => {
       setError(null);
 
       try {
-        // Fetch problems list
-        const problemsRes = await axios.get(
-          `${BACKEND_URL}/contests/${contestId}/problems/`,
-          { headers: { Authorization: `Bearer ${TOKEN}` } }
-        );
-        
-        if (problemsRes.data) {
-          setContestData(problemsRes.data.contest_info || problemsRes.data.contest);
-          setProblemsList(problemsRes.data.problems || []);
-        }
+        const headers = { Authorization: `Bearer ${TOKEN}` };
 
-        // Determine problem to fetch
-        let problemToFetch = problemIndex;
-        if (!problemToFetch && problemsRes.data?.problems?.length > 0) {
-          const firstProblem = problemsRes.data.problems[0];
-          problemToFetch = firstProblem.problem_id || firstProblem.code || firstProblem.index;
-          navigate(`/contests/${contestId}/problems/${problemToFetch}`, { replace: true });
-          return;
-        }
+        if (problemIndex) {
+          // We know which problem — fire all 3 requests in parallel
+          const [problemsRes, problemRes, statsRes] = await Promise.all([
+            axios.get(`${BACKEND_URL}/contests/${contestId}/problems/`, { headers }),
+            axios.get(`${BACKEND_URL}/contests/${contestId}/problems/${problemIndex}/`, { headers }),
+            axios.get(`${BACKEND_URL}/contests/${contestId}/problems/${problemIndex}/stats/`, { headers }).catch(() => null),
+          ]);
 
-        // Fetch specific problem
-        if (problemToFetch) {
-          const problemRes = await axios.get(
-            `${BACKEND_URL}/contests/${contestId}/problems/${problemToFetch}/`,
-            { headers: { Authorization: `Bearer ${TOKEN}` } }
-          );
-          
+          if (problemsRes.data) {
+            setContestData(problemsRes.data.contest_info || problemsRes.data.contest);
+            setProblemsList(problemsRes.data.problems || []);
+          }
           if (problemRes.data) {
             setProblemData(problemRes.data);
           }
-        }
+          if (statsRes?.data) {
+            setProblemStats(statsRes.data);
+          }
+        } else {
+          // No problemIndex yet — fetch problems list first, then redirect
+          const problemsRes = await axios.get(
+            `${BACKEND_URL}/contests/${contestId}/problems/`,
+            { headers }
+          );
 
-        // Fetch problem stats if available
-        const statsRes = await axios.get(
-          `${BACKEND_URL}/contests/${contestId}/problems/${problemToFetch}/stats/`,
-          { headers: { Authorization: `Bearer ${TOKEN}` } }
-        ).catch(() => null);
-        
-        if (statsRes?.data) {
-          setProblemStats(statsRes.data);
+          if (problemsRes.data) {
+            setContestData(problemsRes.data.contest_info || problemsRes.data.contest);
+            const list = problemsRes.data.problems || [];
+            setProblemsList(list);
+
+            if (list.length > 0) {
+              const first = list[0];
+              const firstId = first.problem_id || first.code || first.index;
+              navigate(`/contests/${contestId}/problems/${firstId}`, { replace: true });
+              return;
+            }
+          }
         }
 
         setLoading(false);

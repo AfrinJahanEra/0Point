@@ -44,6 +44,17 @@ const Dashboard = () => {
     }
   }, [user]);
 
+  // Refresh data when dashboard becomes visible (e.g., after editing profile)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        fetchUserData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
+
   // Auto-select the only connected platform for heatmap
   useEffect(() => {
     if (!userProfile?.platform_profiles) return;
@@ -252,8 +263,16 @@ const Dashboard = () => {
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow-sm p-5 sticky top-4">
               <div className="text-center mb-5">
-                <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold">
-                  {user?.name?.charAt(0)?.toUpperCase()}
+                <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
+                  {userProfile?.profile_photo ? (
+                    <img 
+                      src={userProfile.profile_photo} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    user?.name?.charAt(0)?.toUpperCase()
+                  )}
                 </div>
                 <h2 className="text-xl font-bold text-gray-900">{user?.name}</h2>
                 {userProfile?.department && (
@@ -264,28 +283,25 @@ const Dashboard = () => {
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-gray-200 pt-5">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-xs">Total Score</span>
-                  <span className="text-lg font-bold text-blue-600">{userProfile?.total_score || 0}</span>
+              {/* User Info */}
+              <div className="space-y-2 border-t border-gray-200 pt-4 mb-4">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Email</span>
+                  <span className="text-gray-900 font-medium truncate max-w-[150px]">{user?.email}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-xs">Global Rank</span>
-                  <span className="text-lg font-bold text-purple-600">#{userProfile?.global_rank || 'N/A'}</span>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Username</span>
+                  <span className="text-gray-900 font-medium">{user?.name}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-xs">Problems Solved</span>
-                  <span className="text-lg font-bold text-green-600">{userProfile?.problems_solved || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-xs">Contests</span>
-                  <span className="text-lg font-bold text-orange-600">{userProfile?.contests_count || 0}</span>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Rating</span>
+                  <span className="text-blue-600 font-bold">{userProfile?.rating || 0}</span>
                 </div>
               </div>
 
               <button
                 onClick={() => navigate('/profile')}
-                className="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                className="w-full mt-5 bg-blue-800 hover:bg-blue-900 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
               >
                 <Edit2 size={14} />
                 Edit Profile
@@ -327,7 +343,7 @@ const Dashboard = () => {
                     </div>
                     <button
                       onClick={() => setShowAddPlatform(!showAddPlatform)}
-                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5 text-xs"
+                      className="px-3 py-1.5 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition-colors flex items-center gap-1.5 text-xs"
                     >
                       <Plus size={14} />
                       Add Profile

@@ -42,6 +42,7 @@ import ContestHistory from './pages/ContestHistory';
 import PublicDashboard from './pages/PublicDashboard';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
+import Chatbot from './components/ChatBot';
 // Layout component that includes Header and Footer only
 const Layout = ({ children }) => (
   <>
@@ -50,6 +51,7 @@ const Layout = ({ children }) => (
       {children}
     </main>
     <Footer />
+    <Chatbot />
   </>
 );
 // Layout component that includes Header, NavigationBar and Footer
@@ -61,6 +63,7 @@ const NavLayout = ({ children }) => (
       {children}
     </main>
     <Footer />
+    <Chatbot />
   </>
 );
 // Full-screen layout (no header/footer)
@@ -315,6 +318,11 @@ function App() {
             } />
            
            <Route path="/account/profile/:user_id/" element={<Profile />} />
+           <Route path="/profile" element={
+              <Layout>
+                <Profile />
+              </Layout>
+            } />
            
            
             <Route path="/community" element={

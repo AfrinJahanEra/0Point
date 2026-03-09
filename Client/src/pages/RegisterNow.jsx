@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../utils/api';
+import { patchCachedRegistration } from '../utils/contestsCache';
 import { 
   ArrowLeft, 
   FileText, 
@@ -109,10 +110,9 @@ const RegisterNow = () => {
   }
 
   if (registrationSuccess) {
-  // Instead of showing a success page, redirect to contests
+  // Patch only this contest's registration in the cache — other contests stay untouched
+  patchCachedRegistration(contestId);
   window.location.href = '/contests';
-  // Or if you want to use navigate:
-  // navigate('/contests');
   
   // Show a loading message while redirecting
   return (

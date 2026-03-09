@@ -49,15 +49,11 @@ class UserProblemStatusAPIView(APIView):
         
         # If user is logged in, fetch their actual submission data
         if user:
-            print(f"DEBUG: Fetching submissions for user {user.id} in contest {contest_id}")
-            
             # Get all submissions by this user for this contest
             submissions = Submission.objects(
                 contest=contest,
                 user=user
             ).order_by('submitted_at')
-            
-            print(f"DEBUG: Found {len(submissions)} submissions")
             
             # Process each submission
             for submission in submissions:
@@ -84,38 +80,24 @@ class UserProblemStatusAPIView(APIView):
                         if submission.contest_time:
                             status_data["contest_time"] = submission.contest_time
                         else:
-                            # Calculate contest time
                             try:
                                 if contest.start_time and submission.submitted_at:
-                                    # Convert to timezone-aware datetimes
                                     dhaka_tz = pytz.timezone('Asia/Dhaka')
-                                    
-                                    # Ensure contest start_time is timezone aware
                                     if contest.start_time.tzinfo is None:
                                         start_time_dhaka = dhaka_tz.localize(contest.start_time)
                                     else:
                                         start_time_dhaka = contest.start_time.astimezone(dhaka_tz)
-                                    
-                                    # Ensure submission time is timezone aware
                                     if submission.submitted_at.tzinfo is None:
                                         submitted_at_dhaka = dhaka_tz.localize(submission.submitted_at)
                                     else:
                                         submitted_at_dhaka = submission.submitted_at.astimezone(dhaka_tz)
-                                    
-                                    # Calculate time difference in minutes
                                     time_diff = (submitted_at_dhaka - start_time_dhaka).total_seconds() / 60.0
                                     status_data["contest_time"] = time_diff
-                            except Exception as e:
-                                print(f"DEBUG: Error calculating contest time: {e}")
+                            except Exception:
                                 status_data["contest_time"] = None
                 else:
-                    # If not solved yet, mark as attempted
                     if not status_data["solved"] and status_data["status"] == "unsolved":
                         status_data["status"] = "attempted"
-            
-            print(f"DEBUG: Final statuses: {problem_statuses}")
-        else:
-            print(f"DEBUG: User not authenticated, returning default statuses")
 
         payload = {
             "event": "problem_status",
@@ -249,123 +231,292 @@ class ContestProblemTutorialAPIView(APIView):
     def patch(self, request, contest_id, problem_index):
         """Partial update of tutorial"""
         return self.put(request, contest_id, problem_index)  # Same as PUT for now
-    
-class ContestProblemsAPIView(APIView):
+
+
+class ContestInsideAPIView(APIView):
+    """
+    Unified endpoint: returns contest info + problems list + user problem statuses
+    + announcements in a single DB round-trip.
+    Replaces 4 separate requests from ContestInside.jsx.
+    """
+    _TTL = 30  # seconds for shared contest/problems cache
+
     def get(self, request, contest_id):
-        print(f"DEBUG: Starting ContestProblemsAPIView for contest: {contest_id}")
-        
-        try:
-            contest = Contest.objects.get(id=contest_id)
-            print(f"DEBUG: Found contest: {contest.title}, Status: {get_contest_status(contest)}")
-        except Contest.DoesNotExist:
-            print(f"DEBUG: Contest not found")
-            return Response({"error": "Contest not found"}, status=404)
-        except Exception as e:
-            print(f"DEBUG: Error getting contest: {str(e)}")
-            return Response({"error": f"Server error: {str(e)}"}, status=500)
-        
+        from django.core.cache import cache
+        import pytz
+        from datetime import datetime
+
         user = get_user_from_request(request)
-        user_id = user.id if user else None
-        print(f"DEBUG: User ID: {user_id}")
-        
-        can_access = False
-        
-        # Determine access based on contest status
-        if get_contest_status(contest) == "past":
-            # Past contests are accessible to everyone
+
+        # ── 1. Contest + problems (shared, short TTL) ───────────────────────
+        pub_key = f'contest_inside_pub_{contest_id}'
+        pub_data = cache.get(pub_key)
+
+        if pub_data is None:
+            try:
+                contest = Contest.objects.get(id=contest_id)
+            except Contest.DoesNotExist:
+                return Response({"error": "Contest not found"}, status=404)
+
+            contest_status = get_contest_status(contest)
+            dhaka_tz = pytz.timezone('Asia/Dhaka')
+            now = datetime.now(dhaka_tz)
+
+            problems_list = []
+            for idx, p in enumerate(contest.problems):
+                problems_list.append({
+                    "id": idx + 1,
+                    "problem_id": p.index,
+                    "title": p.title,
+                    "slug": f"problem-{p.index.lower()}",
+                    "code": p.index,
+                    "difficulty": p.difficulty or "Medium",
+                    "time_limit": p.time_limit_seconds,
+                    "memory_limit": p.memory_limit_mb,
+                    "tags": list(p.tags or []),
+                    "points": getattr(p, 'points', 0) or 0,
+                })
+
+            announcements = []
+            try:
+                from announcement.models import Announcement
+                for ann in Announcement.objects(contest=contest).order_by('-created_at')[:20]:
+                    announcements.append({
+                        "id": str(ann.id),
+                        "text": ann.text,
+                        "topic": ann.topic or '',
+                        "problem_index": ann.problem_index or '',
+                        "is_important": ann.is_important,
+                        "author": ann.author.username if ann.author else 'Admin',
+                        "created_at": ann.created_at.isoformat() if ann.created_at else None,
+                    })
+            except Exception:
+                pass
+
+            pub_data = {
+                "id": str(contest.id),
+                "title": contest.title,
+                "description": contest.description or '',
+                "start_time": contest.start_time.isoformat() if contest.start_time else None,
+                "duration": contest.duration,
+                "type": contest.type,
+                "platform": contest.platform,
+                "status": contest_status,
+                "visibility": contest.visibility,
+                "registration_required": contest.registration_required,
+                "require_screen_recording": contest.require_screen_recording,
+                "participants": ContestRegistration.objects(contest=contest).count(),
+                "problems": problems_list,
+                "announcements": announcements,
+                "created_by_id": str(contest.created_by.id) if contest.created_by else None,
+            }
+            cache.set(pub_key, pub_data, timeout=self._TTL)
+
+        # ── 2. Access check ─────────────────────────────────────────────────
+        contest_status = pub_data['status']
+        created_by_id  = pub_data.get('created_by_id')
+        user_id        = str(user.id) if user else None
+        is_creator     = user_id and created_by_id == user_id
+        can_access     = False
+
+        is_registered = False
+        if contest_status == 'past':
             can_access = True
-            print("DEBUG: Past contest - access granted to all")
-        elif get_contest_status(contest) == "draft":
-            # Drafts - only accessible to creator
-            if user and contest.created_by and str(contest.created_by.id) == str(user.id):
-                can_access = True
-                print("DEBUG: Draft contest - creator access")
-            else:
-                print("DEBUG: Draft contest - access denied")
-        elif get_contest_status(contest) in ["live", "upcoming", "test"]:
-            # For live/upcoming/test contests, allow access to:
-            # 1. Registered users
-            # 2. Contest creator
+            is_registered = True
+        elif contest_status == 'draft':
+            can_access = bool(is_creator)
+            is_registered = bool(is_creator)
+        elif contest_status in ('live', 'upcoming', 'test'):
             if user:
-                # Check if user is registered
                 try:
-                    registration = ContestRegistration.objects.filter(
-                        user=user, contest=contest
+                    from bson import ObjectId
+                    reg = ContestRegistration.objects(
+                        user=user, contest=ObjectId(contest_id)
                     ).first()
-                    is_registered = registration is not None
-                    print(f"DEBUG: Registration check - found: {is_registered}")
-                    
-                    is_creator = contest.created_by and str(contest.created_by.id) == str(user.id)
-                    print(f"DEBUG: User is creator: {is_creator}")
-                    
-                    can_access = is_registered or is_creator
-                    print(f"DEBUG: Access granted: {can_access}")
-                except Exception as e:
-                    print(f"DEBUG: Error checking registration: {str(e)}")
-                    return Response({"error": f"Error checking access: {str(e)}"}, status=500)
-        
-        # If access denied for non-past contests
-        if not can_access and get_contest_status(contest) != "past":
-            print(f"DEBUG: Access denied for contest status: {get_contest_status(contest)}")
+                    is_registered = bool(reg) or bool(is_creator)
+                    can_access = is_registered
+                except Exception:
+                    can_access = bool(is_creator)
+                    is_registered = bool(is_creator)
+
+        if not can_access:
             return Response({
                 "error": "Access denied",
                 "message": "You don't have access to this contest",
-                "contest_status": get_contest_status(contest),
-                "can_register": get_contest_status(contest) in ["live", "upcoming"]
+                "contest_status": contest_status,
+                "can_register": contest_status in ("live", "upcoming"),
             }, status=403)
-        
-        # Prepare problems list
-        problems_list = []
-        try:
-            for idx, problem in enumerate(contest.problems):
-                problem_data = {
-                    "id": idx + 1,
-                    "problem_id": problem.index,
-                    "title": problem.title,
-                    "slug": f"problem-{problem.index.lower()}",
-                    "code": problem.index,
-                    "difficulty": problem.difficulty or "Medium",
-                    "time_limit": problem.time_limit_seconds,
-                    "memory_limit": problem.memory_limit_mb,
-                    "tags": problem.tags,
-                    "points": getattr(problem, 'points', 0) or 0,  # ADD THIS LINE
-                    "solved_count": 0,
-                    "attempted_count": 0,
-                    "status": "unsolved"
-                }
-                problems_list.append(problem_data)
-            
-            print(f"DEBUG: Prepared {len(problems_list)} problems")
-        except Exception as e:
-            print(f"DEBUG: Error preparing problems: {str(e)}")
-            return Response({"error": f"Error preparing problems: {str(e)}"}, status=500)
-        
-        # Add contest info
-        try:
-            participant_count = ContestRegistration.objects(contest=contest).count()
-            print(f"DEBUG: Participant count: {participant_count}")
-            
-            contest_info = {
-                "id": str(contest.id),
-                "title": contest.title,
-                "status": get_contest_status(contest),
-                "start_time": contest.start_time.isoformat() if contest.start_time else None,
-                "duration": contest.duration,
-                "platform": contest.platform,  # MAKE SURE THIS IS INCLUDED
-                "type": contest.type,  # MAKE SURE THIS IS INCLUDED
-                "description": contest.description,
-                "total_problems": len(contest.problems),
-                "participants": participant_count
-            }
-        except Exception as e:
-            print(f"DEBUG: Error getting contest info: {str(e)}")
-            return Response({"error": f"Error getting contest info: {str(e)}"}, status=500)
-        
-        print(f"DEBUG: Successfully returning response")
+
+        # ── 3. Per-user problem statuses (never cached publicly) ────────────
+        problem_statuses = {p['code']: {
+            "status": "unsolved", "attempts": 0, "solved": False,
+            "submission_count": 0, "accepted_count": 0,
+            "last_submission": None, "first_accepted": None,
+            "points": p['points'],
+        } for p in pub_data['problems']}
+
+        if user:
+            try:
+                contest_obj = Contest.objects.get(id=contest_id)
+                submissions = Submission.objects(
+                    contest=contest_obj, user=user
+                ).only('problem_index', 'verdict', 'submitted_at', 'contest_time').order_by('submitted_at')
+
+                dhaka_tz = pytz.timezone('Asia/Dhaka')
+                for sub in submissions:
+                    pidx = sub.problem_index
+                    if pidx not in problem_statuses:
+                        continue
+                    sd = problem_statuses[pidx]
+                    sd['attempts'] += 1
+                    sd['submission_count'] += 1
+                    sd['last_submission'] = sub.submitted_at.isoformat() if sub.submitted_at else None
+                    if sub.verdict in ('AC', 'ACCEPTED'):
+                        sd['accepted_count'] += 1
+                        if not sd['solved']:
+                            sd['solved'] = True
+                            sd['status'] = 'solved'
+                            sd['first_accepted'] = sub.submitted_at.isoformat() if sub.submitted_at else None
+                            if sub.contest_time:
+                                sd['contest_time'] = sub.contest_time
+                    elif not sd['solved'] and sd['status'] == 'unsolved':
+                        sd['status'] = 'attempted'
+            except Exception:
+                pass
+
+        # ── 4. Virtual contest check (lightweight) ──────────────────────────
+        has_virtual    = False
+        virtual_id     = None
+        if user:
+            try:
+                from virtual.models import VirtualContest
+                from bson import ObjectId
+                vc = VirtualContest.objects(
+                    user=user,
+                    original_contest=ObjectId(contest_id),
+                    is_completed=False
+                ).only('id').first()
+                if vc:
+                    has_virtual = True
+                    virtual_id  = str(vc.id)
+            except Exception:
+                pass
+
         return Response({
-            "problems": problems_list,
-            "contest_info": contest_info,  # Optional: if you need contest info elsewhere
-            "access_granted": can_access   # Optional
+            "contest": {
+                **pub_data,
+                "is_creator": bool(is_creator),
+                "access": {
+                    "can_access": can_access,
+                    "is_registered": is_registered,
+                    "can_register": contest_status in ("live", "upcoming"),
+                }
+            },
+            "problems": pub_data['problems'],
+            "problem_statuses": problem_statuses,
+            "announcements": pub_data['announcements'],
+            "is_creator": bool(is_creator),
+            "has_virtual_contest": has_virtual,
+            "virtual_contest_id": virtual_id,
+            "total_solved": sum(1 for s in problem_statuses.values() if s['solved']),
+            "total_attempted": sum(1 for s in problem_statuses.values() if s['status'] in ('attempted', 'solved')),
+        })
+
+
+class ContestProblemsAPIView(APIView):
+    _TTL = 30  # shared cache for problem list (30s)
+
+    def get(self, request, contest_id):
+        from django.core.cache import cache
+
+        user = get_user_from_request(request)
+
+        # ── 1. Shared cache for problems list + contest info ──────────────────
+        pub_key  = f'contest_problems_pub_{contest_id}'
+        pub_data = cache.get(pub_key)
+
+        if pub_data is None:
+            try:
+                contest = Contest.objects.get(id=contest_id)
+            except Contest.DoesNotExist:
+                return Response({"error": "Contest not found"}, status=404)
+            except Exception as e:
+                return Response({"error": f"Server error: {str(e)}"}, status=500)
+
+            contest_status    = get_contest_status(contest)
+            participant_count = ContestRegistration.objects(contest=contest).count()
+
+            problems_list = []
+            for idx, problem in enumerate(contest.problems):
+                problems_list.append({
+                    "id":            idx + 1,
+                    "problem_id":    problem.index,
+                    "title":         problem.title,
+                    "slug":          f"problem-{problem.index.lower()}",
+                    "code":          problem.index,
+                    "difficulty":    problem.difficulty or "Medium",
+                    "time_limit":    problem.time_limit_seconds,
+                    "memory_limit":  problem.memory_limit_mb,
+                    "tags":          list(problem.tags or []),
+                    "points":        getattr(problem, 'points', 0) or 0,
+                    "solved_count":  0,
+                    "attempted_count": 0,
+                    "status":        "unsolved",
+                })
+
+            pub_data = {
+                "problems": problems_list,
+                "contest_info": {
+                    "id":             str(contest.id),
+                    "title":          contest.title,
+                    "status":         contest_status,
+                    "start_time":     contest.start_time.isoformat() if contest.start_time else None,
+                    "duration":       contest.duration,
+                    "platform":       contest.platform,
+                    "type":           contest.type,
+                    "description":    contest.description,
+                    "total_problems": len(contest.problems),
+                    "participants":   participant_count,
+                },
+                "_created_by_id": str(contest.created_by.id) if contest.created_by else None,
+                "_contest_status": contest_status,
+            }
+            cache.set(pub_key, pub_data, timeout=self._TTL)
+
+        # ── 2. Access check (uses cached data, no extra DB hit) ───────────────
+        contest_status = pub_data['_contest_status']
+        created_by_id  = pub_data['_created_by_id']
+        user_id        = str(user.id) if user else None
+        is_creator     = bool(user_id and created_by_id == user_id)
+        can_access     = False
+
+        if contest_status == 'past':
+            can_access = True
+        elif contest_status == 'draft':
+            can_access = is_creator
+        elif contest_status in ('live', 'upcoming', 'test'):
+            if user:
+                try:
+                    from bson import ObjectId
+                    reg = ContestRegistration.objects(
+                        user=user, contest=ObjectId(contest_id)
+                    ).first()
+                    can_access = bool(reg) or is_creator
+                except Exception:
+                    can_access = is_creator
+
+        if not can_access:
+            return Response({
+                "error": "Access denied",
+                "message": "You don't have access to this contest",
+                "contest_status": contest_status,
+                "can_register": contest_status in ("live", "upcoming"),
+            }, status=403)
+
+        return Response({
+            "problems":      pub_data['problems'],
+            "contest_info":  pub_data['contest_info'],
+            "access_granted": can_access,
         })
     
 def update_contest_schema():
@@ -377,165 +528,147 @@ def update_contest_schema():
     print("Schema updated successfully")
 
 class ContestProblemDetailAPIView(APIView):
+    _TTL = 60  # problem data rarely changes during a contest
+
     def get(self, request, contest_id, problem_index):
-        print(f"DEBUG: ContestProblemDetailAPIView - contest: {contest_id}, problem: {problem_index}")
+        from django.core.cache import cache
 
-        try:
-            contest = Contest.objects.get(id=contest_id)
-        except Contest.DoesNotExist:
-            return Response({"error": "Contest not found"}, status=404)
-        
-        # Find the problem by index (A, B, C, etc.)
-        problem = None
-        for p in contest.problems:
-            if p.index == problem_index.upper():
-                problem = p
-                break
-        
-        if not problem:
-            return Response({"error": "Problem not found"}, status=404)
-        
-        print(f"DEBUG: Found problem: {problem.title}")
-        
-        # Check access (same logic as ContestProblemsAPIView)
         user = get_user_from_request(request)
-        print(f"DEBUG: User: {user.id if user else 'None'}")
+        problem_index_upper = problem_index.upper()
 
-        can_access = False
+        # ── 1. Shared cache: contest meta + problem data (no user info) ────────
+        pub_key  = f'contest_problem_pub_{contest_id}_{problem_index_upper}'
+        pub_data = cache.get(pub_key)
 
-        needs_registration = False
-        
-        if get_contest_status(contest) == "live":
-            if user:
-                is_registered = ContestRegistration.objects.filter(
-                    user=user, contest=contest
-                ).first()
-                can_access = bool(is_registered)
-                if not can_access:
-                    needs_registration = True
-            else:
-                needs_registration = True
-                
-        elif get_contest_status(contest) == "upcoming":
-            if user:
-                is_registered = ContestRegistration.objects.filter(
-                    user=user, contest=contest
-                ).first()
-                can_access = bool(is_registered)
-                if not can_access:
-                    needs_registration = True
-            else:
-                needs_registration = True
-                
-        elif get_contest_status(contest) == "past":
-            can_access = True
-        elif get_contest_status(contest) == "draft":
-            if user and contest.created_by and str(contest.created_by.id) == str(user.id):
-                can_access = True
-        
-        if not can_access:
-            if needs_registration:
-                return Response({
-                    "error": "Registration required",
-                    "message": "You need to register for this contest to access this problem",
-                    "contest_status": get_contest_status(contest),
-                    "can_register": True if get_contest_status(contest) in ["live", "upcoming"] else False
-                }, status=403)
-            else:
-                return Response({
-                    "error": "Access denied",
-                    "message": "You don't have access to this problem"
-                }, status=403)
-        
-        # Prepare problem details
+        if pub_data is None:
+            try:
+                contest = Contest.objects.get(id=contest_id)
+            except Contest.DoesNotExist:
+                return Response({"error": "Contest not found"}, status=404)
 
-        try:
-            problem_data = {
-                "contest_id": str(contest.id),
-                "contest_title": contest.title,
-                "problem_index": problem.index,
-                "problem_code": problem.index,
-                "title": problem.title,
-                "contest_status": get_contest_status(contest),  # Make sure this is included
-                "contest_platform": contest.platform,  # ADD THIS
-                "contest_type": contest.type,  # ADD THIS
-                "statement": problem.statement,
-                "input_format": "",  # You might want to parse this from statement
-                "output_format": "",  # You might want to parse this from statement
-                "constraints": "",  # You might want to parse this from statement
-                "time_limit": problem.time_limit_seconds,
-                "memory_limit": problem.memory_limit_mb,
-                "difficulty": problem.difficulty or "Medium",
-                "tags": problem.tags,
-                "tutorial": problem.tutorial or "",
-                "tutorial_available": False,  # Add this
-                "points": getattr(problem, 'points', 0) or 0,  # ADD THIS LINE
-                "sample_test_cases": [],
-                "test_cases": []  # Only for admins/creators
-            }
+            # Find the problem
+            problem = None
+            for p in contest.problems:
+                if p.index == problem_index_upper:
+                    problem = p
+                    break
 
-            tutorial_available = False
-            if problem.tutorial and problem.tutorial.strip():
-                if get_contest_status(contest) == "past":
-                    tutorial_available = True
-                elif get_contest_status(contest) == "draft":
-                    if user and contest.created_by and str(contest.created_by.id) == str(user.id):
-                        tutorial_available = True
-                elif get_contest_status(contest) in ["live", "upcoming", "test"]:
-                    # During contest, only creator can see tutorial
-                    if user and contest.created_by and str(contest.created_by.id) == str(user.id):
-                        tutorial_available = True
-                    # Or if editorial is published
-                    elif getattr(contest, 'editorial_published', False):
-                        tutorial_available = True
+            if not problem:
+                return Response({"error": "Problem not found"}, status=404)
 
-            problem_data["tutorial_available"] = tutorial_available
-        
-        # Add sample test cases
-            for test_case in problem.test_cases:
-                if test_case.sample and not getattr(test_case, 'hidden', False):  # ADD hidden check
-                    problem_data["sample_test_cases"].append({
-                        "input": test_case.input,
-                        "output": test_case.output,
-                        "explanation": test_case.explanation
-                    })
-            
-        # Add full test cases if user is creator/admin
-            if user and contest.created_by and str(contest.created_by.id) == str(user.id):
-                problem_data["test_cases"] = [
-                    {
-                        "input": tc.input,
-                        "output": tc.output,
+            contest_status   = get_contest_status(contest)
+            created_by_id    = str(contest.created_by.id) if contest.created_by else None
+
+            # Sample test cases (public)
+            sample_cases = []
+            all_cases    = []
+            for tc in problem.test_cases:
+                if tc.sample and not getattr(tc, 'hidden', False):
+                    sample_cases.append({
+                        "input":       tc.input,
+                        "output":      tc.output,
                         "explanation": tc.explanation,
-                        "sample": tc.sample,
-                        "hidden": getattr(tc, 'hidden', False)  # ADD THIS LINE
-                    }
-                    for tc in problem.test_cases
-                ]
-        
-            # Get problem stats (you'll need to implement this)
-            problem_data["solved_count"] = 0  # Implement later
-            problem_data["attempted_count"] = 0  # Implement later
-            problem_data["accuracy"] = "0%"  # Implement later
-        
-            return Response(problem_data)  # MAKE SURE THIS LINE RETURNS A RESPONSE!
-        
-        except Exception as e:
-            print(f"DEBUG: Error preparing problem data: {str(e)}")
-            return Response({"error": f"Error preparing problem data: {str(e)}"}, status=500)
+                    })
+                all_cases.append({
+                    "input":       tc.input,
+                    "output":      tc.output,
+                    "explanation": tc.explanation,
+                    "sample":      tc.sample,
+                    "hidden":      getattr(tc, 'hidden', False),
+                })
+
+            editorial_published = getattr(contest, 'editorial_published', False)
+
+            pub_data = {
+                "contest_id":       str(contest.id),
+                "contest_title":    contest.title,
+                "contest_status":   contest_status,
+                "contest_platform": contest.platform,
+                "contest_type":     contest.type,
+                "problem_index":    problem.index,
+                "problem_code":     problem.index,
+                "title":            problem.title,
+                "statement":        problem.statement,
+                "input_format":     "",
+                "output_format":    "",
+                "constraints":      "",
+                "time_limit":       problem.time_limit_seconds,
+                "memory_limit":     problem.memory_limit_mb,
+                "difficulty":       problem.difficulty or "Medium",
+                "tags":             list(problem.tags or []),
+                "tutorial":         problem.tutorial or "",
+                "points":           getattr(problem, 'points', 0) or 0,
+                "sample_test_cases": sample_cases,
+                "_all_test_cases":   all_cases,  # only sent to creator
+                "_created_by_id":    created_by_id,
+                "_editorial_published": editorial_published,
+                "solved_count":     0,
+                "attempted_count":  0,
+                "accuracy":         "0%",
+            }
+            cache.set(pub_key, pub_data, timeout=self._TTL)
+
+        # ── 2. Access check (uses cached data) ──────────────────────────────
+        contest_status    = pub_data['contest_status']
+        created_by_id     = pub_data['_created_by_id']
+        user_id           = str(user.id) if user else None
+        is_creator        = bool(user_id and created_by_id == user_id)
+        can_access        = False
+        needs_registration = False
+
+        if contest_status == 'past':
+            can_access = True
+        elif contest_status == 'draft':
+            can_access = is_creator
+        elif contest_status in ('live', 'upcoming', 'test'):
+            if user:
+                try:
+                    from bson import ObjectId
+                    reg = ContestRegistration.objects(
+                        user=user, contest=ObjectId(contest_id)
+                    ).first()
+                    can_access = bool(reg) or is_creator
+                    if not can_access:
+                        needs_registration = True
+                except Exception:
+                    can_access = is_creator
+            else:
+                needs_registration = True
+
+        if not can_access:
+            return Response({
+                "error": "Registration required" if needs_registration else "Access denied",
+                "message": "You need to register for this contest to access this problem",
+                "contest_status": contest_status,
+                "can_register": contest_status in ("live", "upcoming"),
+            }, status=403)
+
+        # ── 3. Build response (hide private fields) ────────────────────────
+        editorial_published = pub_data['_editorial_published']
+        tutorial_available  = False
+        if pub_data['tutorial'].strip():
+            if contest_status == 'past':
+                tutorial_available = True
+            elif is_creator:
+                tutorial_available = True
+            elif editorial_published:
+                tutorial_available = True
+
+        result = {k: v for k, v in pub_data.items() if not k.startswith('_')}
+        result['tutorial_available'] = tutorial_available
+        # Only send full test cases to creator
+        result['test_cases'] = pub_data['_all_test_cases'] if is_creator else []
+
+        return Response(result)
 
 class ContestUpdateAPIView(APIView):
     def patch(self, request, contest_id):
-        print(f"DEBUG: ContestUpdateAPIView called for contest: {contest_id}")
-        print(f"DEBUG: Request data: {request.data}")
         user = get_user_from_request(request)
         if not user:
             return Response({"error": "Authentication required"}, status=401)
 
         try:
             contest = Contest.objects.get(id=contest_id, created_by=user)
-            print(f"DEBUG: Found contest. Current status: {contest.status}")
-            print(f"DEBUG: Calculated status: {get_contest_status(contest)}")
         except Contest.DoesNotExist:
             return Response({"error": "Contest not found or access denied"}, status=404)
 
@@ -621,14 +754,20 @@ class ContestUpdateAPIView(APIView):
         except MEValidationError as e:
             return Response({"error": str(e)}, status=400)
 
-        # Return the ACTUAL contest.status, not calculated status
+        # Invalidate user's draft cache so Contests page shows the updated draft
+        try:
+            from django.core.cache import cache
+            cache.delete(f'contests_drafts_v2_{str(user.id)}')
+        except Exception:
+            pass
+
         return Response({
             "message": "Contest updated successfully",
             "id": str(contest.id),
-            "status": contest.status,  # Use the stored status, not calculated
+            "status": contest.status,
             "problems_updated": len(contest.problems)
         })
-    
+
 class ContestPublishAPIView(APIView):
     def post(self, request, contest_id):
         user = get_user_from_request(request)
@@ -744,6 +883,14 @@ class ContestPublishAPIView(APIView):
         
         try:
             contest.save()
+            
+            # Invalidate caches: draft is now published, move it to public list
+            try:
+                from django.core.cache import cache
+                cache.delete(f'contests_drafts_v2_{str(user.id)}')
+                cache.delete('contests_dashboard_public')
+            except Exception:
+                pass
             
             # Get updated status - now it should be "upcoming" or "test"
             updated_status = get_contest_status(contest)
@@ -872,13 +1019,10 @@ def get_contest_status(contest):
         
         if new_order > current_order:
             try:
-                print(f"DEBUG: Updating contest status from '{contest.status}' to '{calculated_status}'")
                 contest.status = calculated_status
                 contest.save()
-                print(f"DEBUG: Contest status updated in database")
-            except Exception as e:
-                print(f"DEBUG: Error updating contest status: {str(e)}")
-                # Don't fail, just continue with calculated status
+            except Exception:
+                pass  # Don't fail, just continue with calculated status
     
     return calculated_status
 
@@ -958,7 +1102,6 @@ class ContestListCreateAPIView(APIView):
             return Response({"contests": data})
         except Exception as e:
             # Return empty contests list if database is unavailable
-            print(f"Database error in ContestListCreateAPIView: {e}")
             return Response({"contests": [], "warning": "Contest data temporarily unavailable"}, status=200)
 
 
@@ -969,8 +1112,6 @@ class UpcomingContestListCreateAPIView(APIView):
         try:
             # Get upcoming contests only - limit for performance
             all_contests = Contest.objects.all().order_by("start_time").limit(50)
-            
-            print(f"🔍 [DEBUG] Total contests in DB: {len(all_contests)}")  # DEBUG
 
             test_contests = []
 
@@ -979,16 +1120,12 @@ class UpcomingContestListCreateAPIView(APIView):
                 test_contests = TestContest.objects.filter(
                     Q(testers__contains=user.email) | Q(created_by=user)
                 ).order_by("test_start_time").limit(20)
-                
-                print(f"🔍 [DEBUG] User test contests: {len(test_contests)}")  # DEBUG
             
             data = []
 
             for c in all_contests:
                 # Calculate status dynamically
                 status_value = get_contest_status(c)
-                
-                print(f"🔍 [DEBUG] Contest: {c.title[:50]}... | Status: {status_value}")  # DEBUG
                 
                 # Only include upcoming contests
                 if status_value != "upcoming":
@@ -1018,8 +1155,6 @@ class UpcomingContestListCreateAPIView(APIView):
                     "participants": participant_count,
                 })
 
-            print(f"🔍 [DEBUG] Final upcoming contests: {len(data)}")  # DEBUG
-
             for tc in test_contests:
                 status_value = get_contest_status(tc)
                 
@@ -1048,8 +1183,6 @@ class UpcomingContestListCreateAPIView(APIView):
 
             return Response({"contests": data})
         except Exception as e:
-            # Return empty contests list if database is unavailable
-            print(f"Database error in UpcomingContestListCreateAPIView: {e}")
             return Response({"contests": [], "warning": "Contest data temporarily unavailable"}, status=200)
 
 
@@ -1060,26 +1193,18 @@ class SoonestUpcomingContestView(APIView):
         
         try:
             # Get all contests
-            all_contests = Contest.objects.all().order_by("start_time")  # Ascending order to get soonest first
-            
-            print(f"Total contests in database: {all_contests.count()}")  # Debug
+            all_contests = Contest.objects.all().order_by("start_time")
             
             # Find the soonest upcoming contest
             soonest_contest = None
             
             for c in all_contests:
-                # Calculate status dynamically
                 status_value = get_contest_status(c)
-                print(f"Contest: {c.title}, Status: {status_value}")  # Debug
-                
-                # Only consider upcoming contests
                 if status_value == "upcoming":
                     soonest_contest = c
-                    print(f"Found upcoming contest: {c.title}")  # Debug
-                    break  # First upcoming contest in ascending order is the soonest
+                    break
             
             if not soonest_contest:
-                print("No upcoming contests found")  # Debug
                 return Response({
                     "has_contest": False,
                     "message": "No upcoming contests"
@@ -1122,11 +1247,7 @@ class SoonestUpcomingContestView(APIView):
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            # Print the full exception details
             import traceback
-            print(f"Database error in SoonestUpcomingContestView: {str(e)}")
-            print(traceback.format_exc())  # This will print the full stack trace
-            
             return Response({
                 "has_contest": False,
                 "error": f"Failed to fetch contest data: {str(e)}"
@@ -1139,8 +1260,6 @@ class PastContestsListCreateView(APIView):
         try:
             # Get past contests only - limit to 50 for performance
             all_contests = Contest.objects.all().order_by("-start_time").limit(50)
-            
-            print(f"🔍 [DEBUG] PastContests - Total contests in DB: {len(all_contests)}")  # DEBUG
 
             test_contests = []
 
@@ -1149,16 +1268,12 @@ class PastContestsListCreateView(APIView):
                 test_contests = TestContest.objects.filter(
                     Q(testers__contains=user.email) | Q(created_by=user)
                 ).order_by("-test_start_time").limit(20)
-                
-                print(f"🔍 [DEBUG] PastContests - User test contests: {len(test_contests)}")  # DEBUG
             
             data = []
 
             for c in all_contests:
                 # Calculate status dynamically
                 status_value = get_contest_status(c)
-                
-                print(f"🔍 [DEBUG] PastContests - Contest: {c.title[:50]}... | Status: {status_value}")  # DEBUG
                 
                 # Only include past/completed contests
                 if status_value != "completed" and status_value != "past":
@@ -1188,8 +1303,6 @@ class PastContestsListCreateView(APIView):
                     "participants": participant_count,
                 })
 
-            print(f"🔍 [DEBUG] PastContests - Final past contests: {len(data)}")  # DEBUG
-
             for tc in test_contests:
                 status_value = get_contest_status(tc)
                 
@@ -1218,8 +1331,6 @@ class PastContestsListCreateView(APIView):
 
             return Response({"contests": data}, status=status.HTTP_200_OK)
         except Exception as e:
-            # Return empty contests list if database is unavailable
-            print(f"Database error in PastContestsView: {e}")
             return Response({"contests": [], "warning": "Contest data temporarily unavailable"}, status=200)
 
 class LiveContestsView(APIView):
@@ -1229,8 +1340,6 @@ class LiveContestsView(APIView):
         try:
             # Get live contests only - limit for performance
             all_contests = Contest.objects.all().order_by("-start_time").limit(50)
-            
-            print(f"🔍 [DEBUG] LiveContests - Total contests in DB: {len(all_contests)}")  # DEBUG
 
             test_contests = []
 
@@ -1239,16 +1348,12 @@ class LiveContestsView(APIView):
                 test_contests = TestContest.objects.filter(
                     Q(testers__contains=user.email) | Q(created_by=user)
                 ).order_by("-test_start_time").limit(20)
-                
-                print(f"🔍 [DEBUG] LiveContests - User test contests: {len(test_contests)}")  # DEBUG
             
             data = []
 
             for c in all_contests:
                 # Calculate status dynamically
                 status_value = get_contest_status(c)
-                
-                print(f"🔍 [DEBUG] LiveContests - Contest: {c.title[:50]}... | Status: {status_value}")  # DEBUG
                 
                 # Only include live/ongoing contests
                 if status_value != "ongoing" and status_value != "live":
@@ -1278,8 +1383,6 @@ class LiveContestsView(APIView):
                     "participants": participant_count,
                 })
 
-            print(f"🔍 [DEBUG] LiveContests - Final live contests: {len(data)}")  # DEBUG
-
             for tc in test_contests:
                 status_value = get_contest_status(tc)
                 
@@ -1308,8 +1411,6 @@ class LiveContestsView(APIView):
 
             return Response({"contests": data}, status=status.HTTP_200_OK)
         except Exception as e:
-            # Return empty contests list if database is unavailable
-            print(f"Database error in LiveContestsView: {e}")
             return Response({"contests": [], "warning": "Contest data temporarily unavailable"}, status=200)
 
 class ContestFullCreateAPIView(APIView):
@@ -1362,15 +1463,19 @@ class ContestFullCreateAPIView(APIView):
         except MEValidationError as e:
             return Response({"error": str(e)}, status=400)
 
-        # Calculate the current status
-        current_status = get_contest_status(contest)
-        
+        # Invalidate user's draft cache so Contests page shows the new draft
+        try:
+            from django.core.cache import cache
+            cache.delete(f'contests_drafts_v2_{str(user.id)}')
+        except Exception:
+            pass
+
         return Response({
             "message": f"Contest created successfully",
             "id": str(contest.id),
-            "status": current_status,  # Calculated status
+            "status": contest.status,
             "editorial_published": contest.editorial_published,
-            "is_draft": current_status == "draft"
+            "is_draft": contest.status == "draft"
         }, status=201)
 
 from rest_framework.views import APIView
@@ -1390,7 +1495,6 @@ class ContestRegisterAPIView(APIView):
         except Contest.DoesNotExist:
             return Response({"error": "Contest not found"}, status=404)
         except Exception as e:
-            print(f"Database error in ContestRegisterAPIView: {e}")
             return Response({"error": "Database temporarily unavailable"}, status=503)
         
         # Check if contest is in a state that allows registration
@@ -1410,90 +1514,104 @@ class ContestRegisterAPIView(APIView):
             except Exception as e:
                 return Response({"error": str(e)}, status=400)
 
+            # Invalidate per-user registration cache so next detail call reflects the new status
+            from django.core.cache import cache
+            cache.delete(f'contest_reg_{str(contest.id)}_{str(user.id)}')
+
             return Response({"message": "Successfully registered"}, status=201)
         except Exception as e:
-            print(f"Database error in ContestRegisterAPIView during processing: {e}")
             return Response({"error": "Database temporarily unavailable"}, status=503)
 
 class ContestDetailAPIView(APIView):
-    def get(self, request, contest_id):
-        try:
-            c = Contest.objects.get(id=contest_id)
-        except Contest.DoesNotExist:
-            return Response({"error": "Contest not found"}, status=404)
-        except Exception as e:
-            print(f"Database error in ContestDetailAPIView retrieving contest: {e}")
-            return Response({"error": "Database temporarily unavailable"}, status=503)
+    _PUBLIC_TTL = 60   # 60 s — shared across all users
+    _USER_TTL   = 30   # 30 s — per-user registration overlay
 
+    def get(self, request, contest_id):
+        from django.core.cache import cache
+
+        user = get_user_from_request(request)
+
+        # ── 1. Public (shared) cache ──────────────────────────────────────────
+        pub_key    = f'contest_detail_{contest_id}'
+        pub_data   = cache.get(pub_key)
+
+        if pub_data is None:
+            try:
+                c = Contest.objects.get(id=contest_id)
+            except Contest.DoesNotExist:
+                return Response({"error": "Contest not found"}, status=404)
+            except Exception as e:
+                return Response({"error": "Database temporarily unavailable"}, status=503)
+
+            try:
+                status_value    = get_contest_status(c)
+                participant_count = ContestRegistration.objects(contest=c).count()
+
+                pub_data = {
+                    "id":               str(c.id),
+                    "title":            c.title,
+                    "description":      c.description or "",
+                    "start_time":       c.start_time.isoformat() if c.start_time else None,
+                    "duration":         c.duration,
+                    "duration_minutes": c.duration * 60 if c.duration else None,
+                    "type":             c.type,
+                    "platform":         c.platform,
+                    "status":           status_value,
+                    "participants":     participant_count,
+                    "problems_count":   len(c.problems) if c.problems else 0,
+                    "created_by": {
+                        "id":    str(c.created_by.id)    if c.created_by else None,
+                        "name":  c.created_by.name       if c.created_by else None,
+                        "email": c.created_by.email      if c.created_by else None,
+                    } if c.created_by else None,
+                    "editorial_published": getattr(c, 'editorial_published', False),
+                    "_created_by_id": str(c.created_by.id) if c.created_by else None,
+                }
+                cache.set(pub_key, pub_data, timeout=self._PUBLIC_TTL)
+            except Exception as e:
+                return Response({"error": "Database temporarily unavailable"}, status=503)
+
+        # ── 2. Per-user overlay (registration + access flags) ─────────────────
         try:
-            user = get_user_from_request(request)
-            
-            # Calculate status dynamically
-            status_value = get_contest_status(c)
-            
-            # Check if user can access
-            can_access = False
-            needs_registration = False
-            is_registered = False
-            
-            # Check registration status
+            status_value   = pub_data["status"]
+            created_by_id  = pub_data.get("_created_by_id")
+            is_creator     = bool(user and created_by_id and str(user.id) == created_by_id)
+            is_registered  = False
+
             if user:
-                registration = ContestRegistration.objects(user=user, contest=c).first()
-                is_registered = bool(registration)
-            
-            # Check access based on calculated contest status
-            if status_value == "live":
-                can_access = is_registered
-                if not can_access:
-                    needs_registration = True
-                    
-            elif status_value == "upcoming":
-                can_access = is_registered
-                if not can_access:
-                    needs_registration = True
-                    
+                reg_key       = f'contest_reg_{contest_id}_{user.id}'
+                cached_reg    = cache.get(reg_key)
+                if cached_reg is None:
+                    try:
+                        from bson import ObjectId
+                        reg = ContestRegistration.objects(user=user, contest=ObjectId(contest_id)).first()
+                    except Exception:
+                        reg = None
+                    cached_reg = bool(reg)
+                    cache.set(reg_key, cached_reg, timeout=self._USER_TTL)
+                is_registered = cached_reg
+
+            can_access        = False
+            needs_registration = False
+            if status_value in ("live", "upcoming"):
+                can_access         = is_registered or is_creator
+                needs_registration = not can_access
             elif status_value == "past":
                 can_access = True
             elif status_value == "draft":
-                if user and c.created_by and str(c.created_by.id) == str(user.id):
-                    can_access = True
-            
-            participant_count = ContestRegistration.objects(contest=c).count()
-            
-            # Check if user is creator
-            is_creator = user and c.created_by and str(c.created_by.id) == str(user.id)
-            
-            # Prepare contest data
-            contest_data = {
-                "id": str(c.id),
-                "title": c.title,
-                "description": c.description or "",
-                "start_time": c.start_time.isoformat() if c.start_time else None,
-                "duration": c.duration,  # This is in hours
-                "duration_minutes": c.duration * 60 if c.duration else None,
-                "type": c.type,
-                "platform": c.platform,
-                "status": status_value,  # Use calculated status
-                "participants": participant_count,
-                "problems_count": len(c.problems) if c.problems else 0,
-                "is_creator": is_creator,
-                "created_by": {
-                    "id": str(c.created_by.id) if c.created_by else None,
-                    "name": c.created_by.name if c.created_by else None,
-                    "email": c.created_by.email if c.created_by else None
-                } if c.created_by else None,
-                "editorial_published": getattr(c, 'editorial_published', False),
-                "access": {
-                    "can_access": can_access,
-                    "needs_registration": needs_registration,
-                    "is_registered": is_registered,
-                    "can_register": status_value in ["live", "upcoming"]
-                }
-            }
+                can_access = is_creator
 
-            return Response(contest_data)
+            # Build final response (strip internal key)
+            response_data = {k: v for k, v in pub_data.items() if not k.startswith('_')}
+            response_data["is_creator"] = is_creator
+            response_data["access"] = {
+                "can_access":        can_access,
+                "needs_registration": needs_registration,
+                "is_registered":     is_registered,
+                "can_register":      status_value in ["live", "upcoming"],
+            }
+            return Response(response_data)
         except Exception as e:
-            print(f"Database error in ContestDetailAPIView processing request: {e}")
             return Response({"error": "Database temporarily unavailable"}, status=503)
         
 class MyContestRegistrationsAPIView(APIView):
@@ -1542,11 +1660,10 @@ class ContestAnnouncementsAPIView(APIView):
                 "announcements": announcements_data
             })
         except Exception as e:
-            print(f"Error fetching announcements: {str(e)}")
             return Response({
                 "contest_id": str(contest.id),
                 "contest_title": contest.title,
-                "announcements": []  # Return empty on error
+                "announcements": []
             })
     
     def post(self, request, contest_id):
@@ -1632,18 +1749,13 @@ class ContestEditorialAPIView(APIView):
     
     def get(self, request, contest_id):
         """Get editorial status and overview for a contest"""
-        print(f"DEBUG: ContestEditorialAPIView - contest: {contest_id}")
-        
         try:
             contest = Contest.objects.get(id=contest_id)
-            print(f"DEBUG: Found contest: {contest.title}, Status: {get_contest_status(contest)}")
         except Contest.DoesNotExist:
-            print("DEBUG: Contest not found")
             return Response({"error": "Contest not found"}, status=404)
         
         user = get_user_from_request(request)
         user_id = user.id if user else None
-        print(f"DEBUG: User ID: {user_id}")
         
         # Determine editorial_published status
         contest_status = get_contest_status(contest)
@@ -1658,30 +1770,19 @@ class ContestEditorialAPIView(APIView):
         access_error = None
         
         if contest_status == "past":
-            # Past contests - editorial is accessible to everyone
             can_access_editorial = True
-            print("DEBUG: Past contest - editorial access granted to all")
         elif contest_status == "draft":
-            # Drafts - only creator can access
             if user and contest.created_by and str(contest.created_by.id) == str(user.id):
                 can_access_editorial = True
-                print("DEBUG: Draft contest - creator can access editorial")
             else:
                 access_error = "Editorial not available in draft contests"
-                print("DEBUG: Draft contest - editorial access denied")
         elif contest_status in ["live", "upcoming", "test"]:
-            # During contest, editorial is restricted
             if editorial_published_status:
-                # If editorial is published, allow access
                 can_access_editorial = True
-                print("DEBUG: Contest in progress - editorial published, access granted")
             elif user and contest.created_by and str(contest.created_by.id) == str(user.id):
-                # Creator can always access
                 can_access_editorial = True
-                print("DEBUG: Contest in progress - creator access to editorial")
             else:
                 access_error = "Editorial will be available after the contest ends"
-                print("DEBUG: Contest in progress - editorial not published yet")
         
         # Prepare response
         try:
@@ -1707,13 +1808,11 @@ class ContestEditorialAPIView(APIView):
                 
                 problems_with_tutorials_list.append(problem_data)
             
-            print(f"DEBUG: Prepared editorial overview - {problems_with_tutorials}/{total_problems} tutorials available")
-            
+
             # Check if user can publish editorial
             can_publish = contest_status in ["past", "live", "test"] and user and contest.created_by and str(contest.created_by.id) == str(user.id)
             
             if not can_access_editorial:
-                print(f"DEBUG: Editorial access denied: {access_error}")
                 return Response({
                     "error": "Access denied",
                     "message": access_error or "You don't have access to the editorial",
@@ -1749,7 +1848,6 @@ class ContestEditorialAPIView(APIView):
             return Response(response_data)
             
         except Exception as e:
-            print(f"DEBUG: Error preparing editorial: {str(e)}")
             return Response({
                 "error": f"Error preparing editorial: {str(e)}",
                 "can_access": False
@@ -1857,7 +1955,6 @@ class ContestPublishTestAPIView(APIView):
             }, status=201)
             
         except Exception as e:
-            print(f"DEBUG: Error creating test contest: {str(e)}")
             return Response({
                 "error": f"Failed to create test contest: {str(e)}"
             }, status=400)
@@ -1926,30 +2023,19 @@ class StartContestRecordingAPIView(APIView):
     """Start screen recording for a contest (marks user as started)"""
     
     def post(self, request, contest_id):
-        print(f"\n=== DEBUG: StartContestRecordingAPIView called ===")
-        print(f"Contest ID: {contest_id}")
-        
         user = get_user_from_request(request)
         if not user:
-            print("DEBUG: No user found")
             return Response({"error": "Authentication required"}, status=401)
-        
-        print(f"DEBUG: User ID: {user.id}, Email: {user.email}")
         
         try:
             contest = Contest.objects.get(id=contest_id)
-            print(f"DEBUG: Contest found: {contest.title}")
-            print(f"DEBUG: Contest require_screen_recording: {getattr(contest, 'require_screen_recording', 'NOT SET')}")
-        except Contest.DoesNotExist as e:
-            print(f"DEBUG: Contest not found error: {e}")
+        except Contest.DoesNotExist:
             return Response({"error": "Contest not found"}, status=404)
         except Exception as e:
-            print(f"DEBUG: Error getting contest: {e}")
             return Response({"error": f"Error getting contest: {str(e)}"}, status=500)
         
         # Check if contest requires recording
         requires_recording = getattr(contest, 'require_screen_recording', False)
-        print(f"DEBUG: Requires recording: {requires_recording}")
         
         if not requires_recording:
             return Response({
@@ -1958,72 +2044,46 @@ class StartContestRecordingAPIView(APIView):
         
         # Check if user has already started recording
         recordings_started = getattr(contest, 'recordings_started', [])
-        print(f"DEBUG: Recordings started list: {recordings_started}")
-        print(f"DEBUG: User ID string: {str(user.id)}")
         
         if str(user.id) in recordings_started:
-            print(f"DEBUG: User already in recordings_started")
             return Response({
                 "error": "Recording already started for this contest"
             }, status=400)
         
         # Check if there's an existing recording record
         try:
-            print(f"DEBUG: Checking for existing ContestScreenRecording records...")
             existing_recordings = ContestScreenRecording.objects.filter(
                 contest=contest,
                 user=user
             )
-            print(f"DEBUG: Found {existing_recordings.count()} existing recordings")
-            
             existing_recording = existing_recordings.filter(
                 recording_status__in=["recording", "stopped"]
             ).first()
             
             if existing_recording:
-                print(f"DEBUG: Found active recording: {existing_recording.id}")
                 return Response({
                     "error": "Recording already in progress or completed"
                 }, status=400)
-        except Exception as e:
-            print(f"DEBUG: Error checking existing recordings: {e}")
-            import traceback
-            traceback.print_exc()
+        except Exception:
+            pass
         
         # Create recording record
         try:
-            print(f"DEBUG: Creating new ContestScreenRecording...")
-            
-            # Create with minimal required fields first
             recording = ContestScreenRecording()
             recording.contest = contest
             recording.user = user
             recording.start_time = datetime.now()
-            
-            # Try to save
-            print(f"DEBUG: Saving recording...")
             recording.save()
-            print(f"DEBUG: Recording saved successfully! ID: {recording.id}")
-            
         except Exception as e:
-            print(f"DEBUG: ERROR saving recording:")
-            import traceback
-            error_traceback = traceback.format_exc()
-            print(error_traceback)
-            
             # Try alternative save method
             try:
-                print(f"DEBUG: Trying alternative save method...")
                 recording = ContestScreenRecording(
                     contest=contest,
                     user=user,
                     start_time=datetime.now()
                 )
-                # Don't set recording_status, use default
                 recording.save()
-                print(f"DEBUG: Alternative save worked! ID: {recording.id}")
             except Exception as e2:
-                print(f"DEBUG: Alternative save also failed: {e2}")
                 return Response({
                     "error": f"Failed to create recording record",
                     "details": str(e),
@@ -2034,21 +2094,16 @@ class StartContestRecordingAPIView(APIView):
         try:
             if not hasattr(contest, 'recordings_started'):
                 contest.recordings_started = []
-            
             if str(user.id) not in contest.recordings_started:
                 contest.recordings_started.append(str(user.id))
-                print(f"DEBUG: Updating contest recordings_started...")
                 contest.save()
-                print(f"DEBUG: Contest updated successfully")
-        except Exception as e:
-            print(f"DEBUG: Warning - Could not update contest: {e}")
+        except Exception:
+            pass
         
         # Prepare response
         try:
             recording_id_str = str(recording.id) if hasattr(recording, 'id') else "unknown"
             start_time_iso = recording.start_time.isoformat() if hasattr(recording.start_time, 'isoformat') else datetime.now().isoformat()
-            
-            print(f"DEBUG: Returning success response")
             return Response({
                 "message": "Recording started successfully",
                 "recording_id": recording_id_str,
@@ -2057,7 +2112,6 @@ class StartContestRecordingAPIView(APIView):
                 "user_id": str(user.id)
             })
         except Exception as e:
-            print(f"DEBUG: Error preparing response: {e}")
             return Response({
                 "message": "Recording started",
                 "recording_id": "check_logs_for_id",
@@ -2658,7 +2712,7 @@ class HomeDashboardAPIView(APIView):
             pipeline = [
                 {"$match": {"status": {"$ne": "draft"}}},
                 {"$sort": {"start_time": 1}},
-                {"$limit": 100},
+                {"$limit": 30},
             ]
             for c in Contest.objects.aggregate(pipeline):
                 cid   = str(c.get('_id'))
@@ -2714,12 +2768,6 @@ class HomeDashboardAPIView(APIView):
                 elif status_val == "live":
                     live_contests.append(contest_data)
                 else:
-                    try:
-                        from bson import ObjectId
-                        contest_data["participants"] = ContestRegistration.objects(
-                            contest=ObjectId(cid)).count()
-                    except Exception:
-                        pass
                     past_contests.append(contest_data)
         except Exception as e:
             print(f"Internal contests error: {e}")
@@ -2795,26 +2843,49 @@ class HomeDashboardAPIView(APIView):
         except Exception:
             pass
 
-        # Contributions (top 5)
+        # Contributions (top 5) — single aggregation pipeline, no N+1 queries
         contributions_data = []
         try:
             from account.models import Account as AccountModel
             from blog.models import Blog as BlogModel
-            contrib_ranking = []
-            for u in AccountModel.objects(is_deleted=False):
-                blogs_count = BlogModel.objects(author=u, is_published=True).count()
-                contests_count = Contest.objects(created_by=u).count()
-                total = blogs_count + contests_count
-                if total > 0:
-                    contrib_ranking.append({
-                        "user_id": str(u.id),
-                        "name": u.name,
-                        "total_contributions": total,
-                    })
-            contrib_ranking.sort(key=lambda x: x['total_contributions'], reverse=True)
-            for idx, entry in enumerate(contrib_ranking[:5], start=1):
-                entry['rank'] = idx
-            contributions_data = contrib_ranking[:5]
+
+            # Count blogs per author in one query
+            blog_pipeline = [
+                {"$match": {"is_published": True}},
+                {"$group": {"_id": "$author", "blogs": {"$sum": 1}}},
+            ]
+            blog_counts = {str(r["_id"]): r["blogs"] for r in BlogModel.objects.aggregate(blog_pipeline)}
+
+            # Count contests per creator in one query
+            contest_pipeline = [
+                {"$group": {"_id": "$created_by", "contests": {"$sum": 1}}},
+            ]
+            contest_counts = {str(r["_id"]): r["contests"] for r in Contest.objects.aggregate(contest_pipeline)}
+
+            # Merge both counts
+            all_ids = set(blog_counts) | set(contest_counts)
+            ranked = [
+                {
+                    "user_id": uid,
+                    "total_contributions": blog_counts.get(uid, 0) + contest_counts.get(uid, 0),
+                }
+                for uid in all_ids
+            ]
+            ranked.sort(key=lambda x: x["total_contributions"], reverse=True)
+            top5_ids = [r["user_id"] for r in ranked[:5]]
+
+            # Fetch names for top-5 users only (5 lookups max)
+            name_map = {}
+            for u in AccountModel.objects(id__in=top5_ids, is_deleted=False).only("id", "name"):
+                name_map[str(u.id)] = u.name
+
+            for idx, entry in enumerate(ranked[:5], start=1):
+                contributions_data.append({
+                    "user_id": entry["user_id"],
+                    "name": name_map.get(entry["user_id"], "Unknown"),
+                    "total_contributions": entry["total_contributions"],
+                    "rank": idx,
+                })
         except Exception as e:
             print(f"Contributions error: {e}")
 
@@ -2901,7 +2972,7 @@ class ContestsDashboardAPIView(APIView):
     from a short-lived user-scoped cache key so the shared payload stays clean.
     """
 
-    _PUBLIC_TTL   = 120   # 2 min  shared contest list
+    _PUBLIC_TTL   = 30    # 30 s shared contest list (status is time-sensitive)
     _USER_REG_TTL = 60    # 1 min  per-user registration set
 
     def _build_contests_payload(self, user_id):
@@ -2923,25 +2994,14 @@ class ContestsDashboardAPIView(APIView):
                 start = c.get('start_time')
                 duration = c.get('duration') or 0
                 contest_status = c.get('status', '')
+                created_by_id = str(c.get('created_by', '')) if c.get('created_by') else None
 
                 if contest_status == 'draft':
-                    # If contest has a start_time, it was published — compute real status
-                    if start:
-                        if start.tzinfo is None:
-                            start = dhaka_tz.localize(start)
-                        end = start + timedelta(hours=duration)
-                        if now < start:
-                            status_val = 'upcoming'
-                        elif now <= end:
-                            status_val = 'live'
-                        else:
-                            status_val = 'past'
+                    # Draft contests are ONLY visible to their creator — never to public cache
+                    if user_id and created_by_id == user_id:
+                        status_val = 'draft'
                     else:
-                        # Truly draft with no start_time — only show to creator
-                        if user_id and str(c.get('created_by')) == user_id:
-                            status_val = 'draft'
-                        else:
-                            continue
+                        continue  # hide from everyone else
                 elif start:
                     if start.tzinfo is None:
                         start = dhaka_tz.localize(start)
@@ -3017,15 +3077,56 @@ class ContestsDashboardAPIView(APIView):
             user = get_user_from_request(request)
             user_id = str(user.id) if user else None
 
-            # --- 1. Shared contest list (public cache) ----------------------
+            # --- 1. Shared public cache (never contains drafts) -------------
             PUBLIC_KEY = 'contests_dashboard_public'
-            all_contests = cache.get(PUBLIC_KEY)
+            public_contests = cache.get(PUBLIC_KEY)
 
-            if all_contests is None:
-                all_contests = self._build_contests_payload(user_id)
-                cache.set(PUBLIC_KEY, all_contests, timeout=self._PUBLIC_TTL)
+            if public_contests is None:
+                # Build without user_id so NO drafts are included in shared cache
+                public_contests = self._build_contests_payload(None)
+                cache.set(PUBLIC_KEY, public_contests, timeout=self._PUBLIC_TTL)
 
-            # --- 2. Per-user registration overlay ---------------------------
+            # Work on a shallow copy so we don't mutate the cached list
+            all_contests = [dict(c) for c in public_contests]
+
+            # --- 2. Inject creator's own drafts (per-user, never cached publicly) ---
+            if user:
+                draft_key = f'contests_drafts_v2_{user.id}'
+                user_drafts = cache.get(draft_key)
+
+                if user_drafts is None:
+                    user_drafts = []
+                    try:
+                        # Use MongoEngine ORM directly — more reliable than raw aggregation
+                        for c in Contest.objects(status='draft', created_by=user).order_by('-id')[:50]:
+                            user_drafts.append({
+                                "id": str(c.id),
+                                "title": c.title or '',
+                                "description": c.description or '',
+                                "start_time": c.start_time.isoformat() if c.start_time else None,
+                                "duration": c.duration or 0,
+                                "type": c.type or 'individual',
+                                "platform": "IUT",
+                                "status": "draft",
+                                "participants": 0,
+                                "is_registered": False,
+                                "is_creator": True,
+                                "external": False,
+                                "is_external": False,
+                                "is_test_contest": False,
+                            })
+                    except Exception as e:
+                        print(f"Draft fetch error: {e}")
+                    # Always cache (including empty list) — use sentinel '__fetched__' flag
+                    cache.set(draft_key, user_drafts if user_drafts else '__empty__', timeout=self._USER_REG_TTL)
+
+                # Normalize sentinel back to empty list
+                if user_drafts == '__empty__':
+                    user_drafts = []
+
+                all_contests = user_drafts + all_contests
+
+            # --- 3. Per-user registration overlay ---------------------------
             registered_ids = set()
             if user:
                 user_key = f'contests_reg_{user.id}'
@@ -3041,7 +3142,6 @@ class ContestsDashboardAPIView(APIView):
                         pass
                     cache.set(user_key, registered_ids, timeout=self._USER_REG_TTL)
 
-                # Patch is_registered on the shared list
                 if registered_ids:
                     for item in all_contests:
                         item['is_registered'] = item['id'] in registered_ids

@@ -20,12 +20,12 @@ from .views import (
     MyContestRegistrationsAPIView,
     ContestFullCreateAPIView,
     ContestPublishAPIView,
-    ContestUpdateAPIView,  # Import the new view
+    ContestUpdateAPIView,
     ContestProblemsAPIView,
     ContestProblemDetailAPIView,
     UserProblemStatusAPIView,
-    ContestProblemTutorialAPIView,  # Import the new view
-    ContestEditorialAPIView,  # Import the new v,
+    ContestProblemTutorialAPIView,
+    ContestEditorialAPIView,
     ContestPublishTestAPIView,
     ContestRecordingStatusAPIView,
     StartContestRecordingAPIView,
@@ -40,6 +40,7 @@ from .views import (
     LiveContestsView,
     HomeDashboardAPIView,
     ContestsDashboardAPIView,
+    ContestInsideAPIView,
 )
 
 from compiler.views import (
@@ -114,6 +115,7 @@ path('contests/registrations/', MyContestRegistrationsAPIView.as_view()),
 path('contests/create-full/', ContestFullCreateAPIView.as_view(), name='create-full'),
 
 # NEXT: Routes with specific action names (like problems/status)
+path('contests/<contest_id>/inside/', ContestInsideAPIView.as_view(), name='contest-inside'),
 path('contests/<contest_id>/problems/status/', UserProblemStatusAPIView.as_view(), name='user-problem-status'),
 path('contests/<contest_id>/problems/list/', ContestProblemsListAPIView.as_view(), name='contest-problems-list'),
 path('contests/<contest_id>/problems/<problem_index>/', ContestProblemDetailAPIView.as_view(), name='contest-problem-detail'),

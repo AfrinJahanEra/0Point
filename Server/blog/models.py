@@ -4,7 +4,14 @@ from datetime import datetime
 from account.models import Account
 
 class Blog(Document):
-    meta = {'collection': 'blogs'}
+    meta = {
+        'collection': 'blogs',
+        'indexes': [
+            {'fields': ['is_published', '-published_at']},  # For list_published_blogs
+            {'fields': ['author', 'is_draft']},  # For list_user_drafts
+            {'fields': ['author', 'is_published', '-published_at']},  # For list_user_published_blogs
+        ]
+    }
 
     title = StringField(required=True, max_length=500)
     content = StringField(required=True)
@@ -25,11 +32,8 @@ class Blog(Document):
             self.published_at = datetime.utcnow()
         return super(Blog, self).save(*args, **kwargs)
 
-    def to_dict(self):
-        # Calculate vote counts
-        upvotes = BlogVote.objects(blog=self, vote_type='upvote').count()
-        downvotes = BlogVote.objects(blog=self, vote_type='downvote').count()
-        
+    def _base_dict(self):
+        """Core fields without vote counts."""
         return {
             "id": str(self.id),
             "title": self.title,
@@ -62,14 +66,23 @@ class Blog(Document):
             "published_at": self.published_at.isoformat() if self.published_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "upvotes": upvotes,
-            "downvotes": downvotes,
-            "score": upvotes - downvotes,
         }
 
+    def to_dict_no_votes(self):
+        """Return dict without vote counts (caller supplies votes via batch query)."""
+        d = self._base_dict()
+        d.update({'upvotes': 0, 'downvotes': 0, 'score': 0})
+        return d
+
+    def to_dict(self):
+        # Calculate vote counts
+        upvotes = BlogVote.objects(blog=self, vote_type='upvote').count()
+        downvotes = BlogVote.objects(blog=self, vote_type='downvote').count()
+        d = self._base_dict()
+        d.update({'upvotes': upvotes, 'downvotes': downvotes, 'score': upvotes - downvotes})
+        return d
+
 class BlogVote(Document):
-    meta = {'collection': 'blog_votes'}
-    
     blog = ReferenceField(Blog, required=True)
     user = ReferenceField(Account, required=True)
     vote_type = StringField(required=True, choices=['upvote', 'downvote'])
@@ -78,8 +91,10 @@ class BlogVote(Document):
     updated_at = DateTimeField(default=datetime.utcnow)
     
     meta = {
+        'collection': 'blog_votes',
         'indexes': [
-            {'fields': ['blog', 'user'], 'unique': True}  # One vote per user per blog
+            {'fields': ['blog', 'user'], 'unique': True},  # One vote per user per blog
+            {'fields': ['blog', 'vote_type']},  # For fast vote counting
         ]
     }
     
@@ -108,7 +123,13 @@ class BlogCommentVote(Document):
         return super(BlogCommentVote, self).save(*args, **kwargs)
 
 class BlogComment(Document):
-    meta = {'collection': 'blog_comments'}
+    meta = {
+        'collection': 'blog_comments',
+        'indexes': [
+            {'fields': ['blog', 'parent_comment', 'is_deleted', 'created_at']},  # For get_blog_comments
+            {'fields': ['author']},  # For user comment lookups
+        ]
+    }
     
     blog = ReferenceField(Blog, required=True)
     author = ReferenceField(Account, required=True)
@@ -124,12 +145,12 @@ class BlogComment(Document):
         self.updated_at = datetime.utcnow()
         return super(BlogComment, self).save(*args, **kwargs)
     
-    def to_dict(self):
+    def to_dict(self, include_replies=False):
         # Calculate vote counts for this comment
         upvotes = BlogCommentVote.objects(comment=self, vote_type='upvote').count()
         downvotes = BlogCommentVote.objects(comment=self, vote_type='downvote').count()
         
-        return {
+        result = {
             "id": str(self.id),
             "blog_id": str(self.blog.id),
             "author": {
@@ -144,7 +165,6 @@ class BlogComment(Document):
             } if self.author else None,
             "content": self.content,
             "parent_comment_id": str(self.parent_comment.id) if self.parent_comment else None,
-            "replies": [reply.to_dict() for reply in self.replies] if self.replies else [],
             "is_deleted": self.is_deleted,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -152,5 +172,8 @@ class BlogComment(Document):
             "downvotes": downvotes,
             "score": upvotes - downvotes,
         }
+        if include_replies:
+            result["replies"] = [reply.to_dict(include_replies=True) for reply in self.replies if not reply.is_deleted] if self.replies else []
+        return result
 
 

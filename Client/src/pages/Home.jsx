@@ -11,6 +11,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { patchCachedRegistration } from '../utils/contestsCache';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -359,6 +360,9 @@ const Home = () => {
       if (soonestContest && soonestContest.contest_id === contestId) {
         setSoonestContest(prev => ({ ...prev, is_registered: true }));
       }
+
+      // Patch only this contest's registration in cache — other contests stay untouched
+      patchCachedRegistration(contestId);
       
       toast.success('Successfully registered for contest!');
       return true;

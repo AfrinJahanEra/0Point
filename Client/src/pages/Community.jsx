@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
@@ -13,6 +13,142 @@ import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const formatCommentDate = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+};
+
+const getRatingColorUtil = (rating) => {
+  if (!rating || rating < 0) return 'text-gray-600';
+  if (rating < 1200) return 'text-gray-700';
+  if (rating < 1400) return 'text-green-600';
+  if (rating < 1600) return 'text-cyan-600';
+  if (rating < 1900) return 'text-blue-600';
+  if (rating < 2100) return 'text-purple-600';
+  if (rating < 2400) return 'text-orange-500';
+  return 'text-red-600';
+};
+
+// ── CommentItem (module-level so React never remounts it on re-render) ────────
+const CommentItem = ({ comment, blogId, currentUserId, replyingTo, replyText,
+  onVote, onDelete, onSetReplyingTo, onSetReplyText, onSubmitReply, depth = 0 }) => {
+
+  const canDelete = currentUserId && currentUserId === comment.author?.id;
+  const isTemp = String(comment.id).startsWith('temp_');
+
+  return (
+    <div className={`${depth > 0 ? 'ml-6 mt-2' : 'mt-3'} border-l-2 border-gray-200 pl-3`}>
+      <div className="flex items-start gap-2">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`text-xs font-medium ${getRatingColorUtil(comment.author?.rating)}`}>
+              {comment.author?.name}
+            </span>
+            <span className="text-xs text-gray-500">{formatCommentDate(comment.created_at)}</span>
+            {isTemp && <span className="text-[10px] text-gray-400">(posting...)</span>}
+            {canDelete && !isTemp && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(blogId, comment.id); }}
+                className="text-xs text-red-600 hover:text-red-800"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-gray-800 mb-2">{comment.content}</p>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onVote(blogId, comment.id, 'upvote'); }}
+              disabled={isTemp}
+              className={`flex items-center gap-1 text-xs ${
+                comment.user_vote === 'upvote' ? 'text-green-600 font-semibold' : 'text-gray-600 hover:text-green-600'
+              } ${isTemp ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+              </svg>
+              {comment.upvotes || 0}
+            </button>
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onVote(blogId, comment.id, 'downvote'); }}
+              disabled={isTemp}
+              className={`flex items-center gap-1 text-xs ${
+                comment.user_vote === 'downvote' ? 'text-red-600 font-semibold' : 'text-gray-600 hover:text-red-600'
+              } ${isTemp ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+              </svg>
+              {comment.downvotes || 0}
+            </button>
+            {currentUserId && !isTemp && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSetReplyingTo(comment.id); }}
+                className="text-xs text-blue-600 hover:text-blue-800"
+              >
+                Reply
+              </button>
+            )}
+          </div>
+
+          {replyingTo === comment.id && (
+            <div className="mt-2">
+              <textarea
+                value={replyText}
+                onChange={(e) => onSetReplyText(e.target.value)}
+                placeholder="Write a reply..."
+                className="w-full p-2 border border-gray-300 rounded text-xs resize-y"
+                rows={2}
+              />
+              <div className="mt-1 flex gap-2">
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSetReplyingTo(null); onSetReplyText(''); }}
+                  className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSubmitReply(blogId, replyText, comment.id); }}
+                  disabled={!replyText.trim()}
+                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Reply
+                </button>
+              </div>
+            </div>
+          )}
+
+          {comment.replies && comment.replies.length > 0 && (
+            <div className="mt-2">
+              {comment.replies.map((reply) => (
+                <CommentItem
+                  key={reply.id}
+                  comment={reply}
+                  blogId={blogId}
+                  depth={depth + 1}
+                  currentUserId={currentUserId}
+                  replyingTo={replyingTo}
+                  replyText={replyText}
+                  onVote={onVote}
+                  onDelete={onDelete}
+                  onSetReplyingTo={onSetReplyingTo}
+                  onSetReplyText={onSetReplyText}
+                  onSubmitReply={onSubmitReply}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Community = () => {
   const { user } = useApp();
@@ -32,147 +168,6 @@ const Community = () => {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportingBlog, setReportingBlog] = useState(null);
   const blogsPerPage = 5;
-
-  // Comment Item Component
-  const CommentItem = ({ comment, blogId, depth = 0 }) => {
-    const formatDate = (dateString) => {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
-    };
-
-    const getRatingColor = (rating) => {
-      if (!rating || rating < 0) return 'text-gray-600';
-      if (rating < 1200) return 'text-gray-700';
-      if (rating < 1400) return 'text-green-600';
-      if (rating < 1600) return 'text-cyan-600';
-      if (rating < 1900) return 'text-blue-600';
-      if (rating < 2100) return 'text-purple-600';
-      if (rating < 2400) return 'text-orange-500';
-      return 'text-red-600';
-    };
-
-    const canDelete = user && (user.id === comment.author.id);
-
-    return (
-      <div className={`${depth > 0 ? 'ml-6 mt-2' : 'mt-3'} border-l-2 border-gray-200 pl-3`}>
-        <div className="flex items-start gap-2">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className={`text-xs font-medium ${getRatingColor(comment.author.rating)}`}>
-                {comment.author.name}
-              </span>
-              <span className="text-xs text-gray-500">{formatDate(comment.created_at)}</span>
-              {canDelete && (
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleDeleteComment(blogId, comment.id);
-                  }}
-                  className="text-xs text-red-600 hover:text-red-800"
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-            <p className="text-xs text-gray-800 mb-2">{comment.content}</p>
-            
-            <div className="flex items-center gap-3">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleCommentVote(blogId, comment.id, 'upvote');
-                }}
-                className="flex items-center gap-1 text-xs text-gray-600 hover:text-green-600"
-              >
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                </svg>
-                {comment.upvotes || 0}
-              </button>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleCommentVote(blogId, comment.id, 'downvote');
-                }}
-                className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600"
-              >
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                </svg>
-                {comment.downvotes || 0}
-              </button>
-              {user && (
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setReplyingTo(comment.id);
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-800"
-                >
-                  Reply
-                </button>
-              )}
-            </div>
-
-            {replyingTo === comment.id && (
-              <div className="mt-2">
-                <textarea
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Write a reply..."
-                  className="w-full p-2 border border-gray-300 rounded text-xs resize-y"
-                  rows={2}
-                />
-                <div className="mt-1 flex gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setReplyingTo(null);
-                      setReplyText('');
-                    }}
-                    className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleComment(blogId, replyText, comment.id);
-                    }}
-                    disabled={!replyText.trim()}
-                    className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Reply
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {comment.replies && comment.replies.length > 0 && (
-              <div className="mt-2">
-                {comment.replies.map((reply) => (
-                  <CommentItem key={reply.id} comment={reply} blogId={blogId} depth={depth + 1} />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   useEffect(() => {
     fetchAllPublishedBlogs();
@@ -276,7 +271,7 @@ const Community = () => {
 
   const toggleExpand = async (blogId) => {
     const wasExpanded = expandedBlogs.has(blogId);
-    
+
     setExpandedBlogs(prev => {
       const newSet = new Set(prev);
       if (newSet.has(blogId)) {
@@ -287,139 +282,219 @@ const Community = () => {
       return newSet;
     });
 
-    // Fetch comments and votes when expanding (only if not already fetched)
+    // Fetch comments and votes in parallel when expanding (only if not already fetched)
     if (!wasExpanded) {
-      if (!blogComments[blogId]) {
-        await fetchBlogComments(blogId);
-      }
-      if (!blogVotes[blogId]) {
-        await fetchBlogVotes(blogId);
+      const comments = blogComments[blogId];
+      const votes = blogVotes[blogId];
+      // Fetch if undefined OR empty array (failed previous fetch or cleared)
+      const needsComments = !comments || comments.length === 0;
+      const needsVotes = !votes;
+      if (needsComments || needsVotes) {
+        console.log(`[Expand] Fetching for blog ${blogId}: comments=${needsComments}, votes=${needsVotes}`);
+        const promises = [];
+        if (needsComments) promises.push(fetchBlogComments(blogId));
+        if (needsVotes) promises.push(fetchBlogVotes(blogId));
+        await Promise.all(promises);
       }
     }
   };
 
-  const fetchBlogComments = async (blogId) => {
+  const fetchBlogComments = useCallback(async (blogId) => {
     try {
       const response = await api.get(`/blog/${blogId}/comments/`);
-      setBlogComments(prev => ({ ...prev, [blogId]: response.data }));
+      console.log(`[Comments] Fetched for blog ${blogId}:`, response.data);
+      setBlogComments(prev => ({ ...prev, [blogId]: response.data || [] }));
     } catch (error) {
-      console.error('Error fetching comments:', error);
+      console.error(`[Comments] Error fetching for blog ${blogId}:`, error);
       toast.error('Failed to load comments');
     }
-  };
+  }, []);
 
-  const fetchBlogVotes = async (blogId) => {
+  const fetchBlogVotes = useCallback(async (blogId) => {
     try {
       const response = await api.get(`/blog/${blogId}/votes/`);
-      console.log(`Votes for blog ${blogId}:`, response.data);
       setBlogVotes(prev => ({ ...prev, [blogId]: response.data }));
     } catch (error) {
       console.error('Error fetching votes:', error);
-      toast.error('Failed to load votes');
     }
-  };
+  }, []);
 
-  const handleVote = async (blogId, voteType) => {
-    if (!user) {
-      toast.error('Please login to vote');
-      return;
-    }
+  // Refresh a single blog's data from server (title, vote counts, etc.)
+  const refreshSingleBlog = useCallback(async (blogId) => {
+    try {
+      const res = await api.get(`/blog/${blogId}/`);
+      const fresh = res.data;
+      setBlogs(prev => {
+        const updated = prev.map(b => b.id === blogId ? { ...b, ...fresh } : b);
+        try { localStorage.setItem(COMMUNITY_CACHE_KEY, JSON.stringify(updated)); } catch (_) {}
+        return updated;
+      });
+    } catch (_) {}
+  }, []);
 
-    console.log(`Voting ${voteType} on blog ${blogId}`);
+  const handleVote = useCallback(async (blogId, voteType) => {
+    if (!user) { toast.error('Please login to vote'); return; }
 
     try {
       const response = await api.post(`/blog/${blogId}/vote/`, { vote_type: voteType });
-      console.log('Vote response:', response.data);
-      
-      // Fetch updated votes for this blog
-      const votesResponse = await api.get(`/blog/${blogId}/votes/`);
-      console.log(`Updated votes for blog ${blogId}:`, votesResponse.data);
-      
-      // Update blogVotes state
-      setBlogVotes(prev => ({ ...prev, [blogId]: votesResponse.data }));
-      
-      // Update the blog in the main blogs list with new vote counts
-      setBlogs(prevBlogs => 
-        prevBlogs.map(blog => {
-          if (blog.id === blogId) {
-            return {
-              ...blog,
-              upvotes: votesResponse.data.upvotes,
-              downvotes: votesResponse.data.downvotes,
-              score: votesResponse.data.score
-            };
-          }
-          return blog;
-        })
-      );
-      
+      const data = response.data;
+
+      setBlogVotes(prev => ({ ...prev, [blogId]: data }));
+
+      setBlogs(prevBlogs => {
+        const updated = prevBlogs.map(blog =>
+          blog.id === blogId
+            ? { ...blog, upvotes: data.upvotes, downvotes: data.downvotes, score: data.score }
+            : blog
+        );
+        try { localStorage.setItem(COMMUNITY_CACHE_KEY, JSON.stringify(updated)); } catch (_) {}
+        return updated;
+      });
+
       toast.success(`Blog ${voteType}d!`);
     } catch (error) {
       console.error('Error voting:', error);
       toast.error('Failed to vote');
     }
-  };
+  }, [user]);
 
-  const handleComment = async (blogId, content, parentCommentId = null) => {
-    if (!user) {
-      toast.error('Please login to comment');
-      return;
+  const handleComment = useCallback(async (blogId, content, parentCommentId = null) => {
+    if (!user) { toast.error('Please login to comment'); return; }
+    if (!content.trim()) { toast.error('Comment cannot be empty'); return; }
+
+    // Optimistic: add comment to state immediately
+    const tempId = `temp_${Date.now()}`;
+    const optimisticComment = {
+      id: tempId,
+      content: content.trim(),
+      author: { id: user.id, name: user.name || user.username, rating: user.rating || 0 },
+      created_at: new Date().toISOString(),
+      upvotes: 0, downvotes: 0, user_vote: null,
+      replies: [],
+    };
+
+    if (parentCommentId) {
+      // Attach as reply optimistically (search at any depth)
+      const attachReply = (comments) =>
+        comments.map(c => {
+          if (c.id === parentCommentId)
+            return { ...c, replies: [...(c.replies || []), optimisticComment] };
+          if (c.replies?.length) return { ...c, replies: attachReply(c.replies) };
+          return c;
+        });
+      setBlogComments(prev => ({ ...prev, [blogId]: attachReply(prev[blogId] || []) }));
+    } else {
+      setBlogComments(prev => ({ ...prev, [blogId]: [...(prev[blogId] || []), optimisticComment] }));
     }
 
-    if (!content.trim()) {
-      toast.error('Comment cannot be empty');
-      return;
-    }
+    setNewComments(prev => ({ ...prev, [blogId]: '' }));
+    setReplyText('');
+    setReplyingTo(null);
 
     try {
-      const commentData = {
+      const response = await api.post(`/blog/${blogId}/comments/create/`, {
         content: content.trim(),
         ...(parentCommentId && { parent_comment_id: parentCommentId })
-      };
+      });
+      const savedComment = response.data; // server returns the real comment with real ID
 
-      await api.post(`/blog/${blogId}/comments/create/`, commentData);
-      await fetchBlogComments(blogId);
-      setNewComments(prev => ({ ...prev, [blogId]: '' }));
-      setReplyText('');
-      setReplyingTo(null);
+      // Replace the temp optimistic entry with the real server comment
+      if (parentCommentId) {
+        const replaceReply = (comments) =>
+          comments.map(c => {
+            if (c.id === parentCommentId)
+              return { ...c, replies: (c.replies || []).map(r => r.id === tempId ? savedComment : r) };
+            if (c.replies?.length) return { ...c, replies: replaceReply(c.replies) };
+            return c;
+          });
+        setBlogComments(prev => ({ ...prev, [blogId]: replaceReply(prev[blogId] || []) }));
+      } else {
+        setBlogComments(prev => ({
+          ...prev,
+          [blogId]: (prev[blogId] || []).map(c => c.id === tempId ? savedComment : c)
+        }));
+      }
+
       toast.success('Comment posted!');
+      // Refresh only this blog's metadata (vote counts, etc.) from server
+      refreshSingleBlog(blogId);
     } catch (error) {
       console.error('Error posting comment:', error);
+      // Rollback: remove the optimistic entry at any depth
+      const removeTemp = (comments) =>
+        comments
+          .filter(c => c.id !== tempId)
+          .map(c => c.replies?.length ? { ...c, replies: removeTemp(c.replies) } : c);
+      setBlogComments(prev => ({ ...prev, [blogId]: removeTemp(prev[blogId] || []) }));
       toast.error('Failed to post comment');
     }
-  };
+  }, [user, refreshSingleBlog]);
 
-  const handleDeleteComment = async (blogId, commentId) => {
-    if (!user) {
-      toast.error('Please login to delete comments');
-      return;
-    }
+  const handleDeleteComment = useCallback(async (blogId, commentId) => {
+    if (!user) { toast.error('Please login to delete comments'); return; }
+
+    // Optimistic: remove immediately at any depth
+    const removeComment = (comments) =>
+      comments
+        .filter(c => c.id !== commentId)
+        .map(c => c.replies?.length ? { ...c, replies: removeComment(c.replies) } : c);
+
+    setBlogComments(prev => ({ ...prev, [blogId]: removeComment(prev[blogId] || []) }));
 
     try {
       await api.delete(`/blog/comments/${commentId}/delete/`);
-      await fetchBlogComments(blogId);
+      // Refetch to sync nested reply counts / ordering from server
+      fetchBlogComments(blogId);
       toast.success('Comment deleted');
     } catch (error) {
       console.error('Error deleting comment:', error);
+      fetchBlogComments(blogId); // Rollback via refetch
       toast.error('Failed to delete comment');
     }
-  };
+  }, [user, fetchBlogComments]);
 
-  const handleCommentVote = async (blogId, commentId, voteType) => {
-    if (!user) {
-      toast.error('Please login to vote');
-      return;
-    }
+  const handleCommentVote = useCallback(async (blogId, commentId, voteType) => {
+    if (!user) { toast.error('Please login to vote'); return; }
+
+    // Optimistic update
+    const optimisticUpdate = (comments) =>
+      comments.map(c => {
+        if (c.id === commentId) {
+          const alreadyVoted = c.user_vote === voteType;
+          return {
+            ...c,
+            user_vote: alreadyVoted ? null : voteType,
+            upvotes: voteType === 'upvote'
+              ? (alreadyVoted ? Math.max(0, (c.upvotes || 0) - 1) : (c.upvotes || 0) + 1)
+              : c.upvotes,
+            downvotes: voteType === 'downvote'
+              ? (alreadyVoted ? Math.max(0, (c.downvotes || 0) - 1) : (c.downvotes || 0) + 1)
+              : c.downvotes,
+          };
+        }
+        if (c.replies?.length) return { ...c, replies: optimisticUpdate(c.replies) };
+        return c;
+      });
+
+    setBlogComments(prev => ({ ...prev, [blogId]: optimisticUpdate(prev[blogId] || []) }));
 
     try {
-      await api.post(`/blog/comments/${commentId}/vote/`, { vote_type: voteType });
-      await fetchBlogComments(blogId);
-      toast.success('Vote recorded!');
+      const response = await api.post(`/blog/comments/${commentId}/vote/`, { vote_type: voteType });
+      const data = response.data; // always has upvotes, downvotes, user_vote
+      const reconcile = (comments) =>
+        comments.map(c => {
+          if (c.id === commentId)
+            return { ...c, upvotes: data.upvotes, downvotes: data.downvotes, user_vote: data.user_vote };
+          if (c.replies?.length) return { ...c, replies: reconcile(c.replies) };
+          return c;
+        });
+      setBlogComments(prev => ({ ...prev, [blogId]: reconcile(prev[blogId] || []) }));
     } catch (error) {
       console.error('Error voting on comment:', error);
+      fetchBlogComments(blogId); // rollback
       toast.error('Failed to vote');
     }
-  };
+  }, [user, fetchBlogComments]);
 
   // Markdown components for rendering
   const customComponents = {
@@ -818,7 +893,19 @@ const Community = () => {
                             <div className="space-y-2">
                               {blogComments[blog.id] && blogComments[blog.id].length > 0 ? (
                                 blogComments[blog.id].map((comment) => (
-                                  <CommentItem key={comment.id} comment={comment} blogId={blog.id} />
+                                  <CommentItem
+                                    key={comment.id}
+                                    comment={comment}
+                                    blogId={blog.id}
+                                    currentUserId={user?.id}
+                                    replyingTo={replyingTo}
+                                    replyText={replyText}
+                                    onVote={handleCommentVote}
+                                    onDelete={handleDeleteComment}
+                                    onSetReplyingTo={setReplyingTo}
+                                    onSetReplyText={setReplyText}
+                                    onSubmitReply={handleComment}
+                                  />
                                 ))
                               ) : (
                                 <div className="text-center py-4 text-gray-500 text-xs">

@@ -10,7 +10,7 @@ from rest_framework.permissions import AllowAny
 from mongoengine.errors import DoesNotExist
 from math import ceil
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from recommendation.models import UserRecommendation
 
@@ -19,7 +19,8 @@ from .calendar import  fetch_codeforces_calendar,fetch_codechef_calendar, fetch_
 from .models import Account, PlatformCalendarCache, PlatformSubmissionCache, UserTagStats, PlatformContestCache, UserVerdictStats
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
 from .platforms import fetch_codechef_contests, fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
-from submission.models import Submission
+# Import submission models inside functions to avoid circular imports
+# from submission.models import Submission
 from leaderboard.models import LeaderboardEntry
 from .platforms.codeforces import fetch_submissions as fetch_cf_submissions
 from .platforms.leetcode import fetch_submissions as fetch_leetcode_submissions
@@ -106,16 +107,67 @@ class UserProfileView(APIView):
             if not user:
                 return Response({"error": "User not found"}, status=404)
             
+            # Calculate actual stats from submissions and contest registrations
+            problems_solved_count = 0
+            contests_count = 0
+            total_score = 0
+            global_rank = None
+            
+            try:
+                from submission.models import Submission
+                from contest.models import ContestRegistration
+                
+                # Get all AC submissions for this user
+                ac_submissions = list(Submission.objects(user=user, verdict='AC'))
+                
+                # Count unique problems solved
+                unique_problems = set()
+                for sub in ac_submissions:
+                    unique_problems.add(sub.problem_code)
+                problems_solved_count = len(unique_problems)
+                
+                # Calculate total score (sum of passed test cases)
+                total_score = sum(sub.passed_test_cases or 0 for sub in ac_submissions)
+                
+                # Count contests participated
+                contests_count = ContestRegistration.objects(user=user).count()
+                
+                # Calculate global rank based on rating
+                higher_rated = Account.objects(
+                    rating__gt=user.rating,
+                    is_deleted=False,
+                    is_inactive=False
+                ).count()
+                global_rank = higher_rated + 1 if user.rating > 0 else None
+                
+                # Update user's account with calculated stats
+                user.problems_solved = problems_solved_count
+                user.contests_count = contests_count
+                user.total_score = total_score
+                user.global_rank = global_rank
+                user.save()
+                
+            except Exception as e:
+                # If calculation fails, use stored values
+                print(f"[Profile Stats Error] Calculation failed: {e}")
+                import traceback
+                print(traceback.format_exc())
+                problems_solved_count = getattr(user, 'problems_solved', 0) or 0
+                contests_count = getattr(user, 'contests_count', 0) or 0
+                total_score = getattr(user, 'total_score', 0) or 0
+                global_rank = getattr(user, 'global_rank', None)
+            
             profile_data = {
                 "id": str(user.id),
                 "name": user.name,
                 "email": user.email,
                 "department": user.department,
                 "year": user.year,
-                "total_score": user.total_score,
-                "global_rank": user.global_rank,
-                "problems_solved": user.problems_solved,
-                "contests_count": user.contests_count,
+                "profile_photo": getattr(user, 'profile_photo', None),
+                "total_score": total_score,
+                "global_rank": global_rank,
+                "problems_solved": problems_solved_count,
+                "contests_count": contests_count,
                 "rating": user.rating,
                 "badge": user.badge,
                 "platform_profiles": [],
@@ -123,21 +175,82 @@ class UserProfileView(APIView):
             }
             
             # Serialize platform profiles
-            for profile in user.platform_profiles:
-                profile_data["platform_profiles"].append({
-                    "platform": profile.platform,
-                    "handle": profile.handle,
-                    "current_rating": profile.current_rating,
-                    "max_rating": profile.max_rating,
-                    "min_rating": profile.min_rating,
-                    "contests_count": profile.contests_count,
-                    "rank": profile.rank,
-                    "badge": profile.badge,
-                    "last_updated": profile.last_updated.isoformat() if profile.last_updated else None,
-                    "rating_history": profile.rating_history
-                })
+            profile_data["platform_profiles"] = []
+            try:
+                for profile in user.platform_profiles:
+                    profile_data["platform_profiles"].append({
+                        "platform": profile.platform,
+                        "handle": profile.handle,
+                        "current_rating": profile.current_rating,
+                        "max_rating": profile.max_rating,
+                        "min_rating": profile.min_rating,
+                        "contests_count": profile.contests_count,
+                        "rank": profile.rank,
+                        "badge": profile.badge,
+                        "last_updated": profile.last_updated.isoformat() if profile.last_updated else None,
+                        "rating_history": profile.rating_history
+                    })
+            except Exception as e:
+                print(f"[Profile Stats Error] Platform profiles: {e}")
             
             return Response(profile_data)
+        except Exception as e:
+            import traceback
+            print(f"[Profile Stats Error] Main exception: {e}")
+            print(traceback.format_exc())
+            return Response({"error": str(e)}, status=400)
+
+    def put(self, request, user_id=None):
+        """Update user profile"""
+        # Get current user from token
+        if not request.user or not hasattr(request.user, 'id'):
+            auth_header = request.headers.get('Authorization', '')
+            if auth_header.startswith('Bearer '):
+                token = auth_header[7:]
+                try:
+                    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+                    user_id = payload.get('user_id')
+                except:
+                    return Response({"error": "Invalid token"}, status=401)
+            else:
+                return Response({"error": "Unauthorized"}, status=401)
+        
+        try:
+            user = Account.objects(id=user_id, is_deleted=False).first()
+            if not user:
+                return Response({"error": "User not found"}, status=404)
+            
+            # Update allowed fields
+            data = request.data
+            if 'name' in data:
+                user.name = data['name']
+            if 'department' in data:
+                user.department = data['department']
+            if 'year' in data:
+                user.year = data['year']
+            if 'profile_photo' in data:
+                user.profile_photo = data['profile_photo']
+            
+            user.save()
+            
+            # Generate new token with updated user data
+            from .serializers import UserProfileSerializer
+            token_payload = {
+                "user_id": str(user.id),
+                "email": user.email,
+                "role": user.role,
+                "exp": datetime.utcnow() + timedelta(days=7)
+            }
+            new_token = jwt.encode(token_payload, settings.SECRET_KEY, algorithm="HS256")
+            
+            # Serialize user data for response
+            user_data = UserProfileSerializer(user).data
+            
+            return Response({
+                "message": "Profile updated successfully",
+                "token": new_token,
+                "user": user_data
+            })
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 

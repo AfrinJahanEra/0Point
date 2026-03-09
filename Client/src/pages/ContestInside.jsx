@@ -115,143 +115,72 @@ const ContestInside = () => {
     }
   };
 
-  // Fetch contest data
+  // Fetch contest data — single unified request
   const fetchContestData = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const contestRes = await axios.get(
-        `${BACKEND_URL}/contests/${contestId}/`,
+      const res = await axios.get(
+        `${BACKEND_URL}/contests/${contestId}/inside/`,
         { headers: getHeaders() }
       );
-      
-      if (!contestRes.data) {
-        throw new Error('No contest data received');
-      }
 
-      const contest = contestRes.data;
-      setContestData(contest);
+      const {
+        contest,
+        problems: problemsList = [],
+        problem_statuses: statuses = {},
+        announcements: annList = [],
+        has_virtual_contest,
+        virtual_contest_id,
+        total_solved,
+        total_attempted,
+      } = res.data;
 
-      let problemsList = [];
-      try {
-        const problemsRes = await axios.get(
-          `${BACKEND_URL}/contests/${contestId}/problems/`,
-          { headers: getHeaders() }
-        );
-        
-        if (problemsRes.data) {
-          if (Array.isArray(problemsRes.data)) {
-            problemsList = problemsRes.data;
-          } else if (problemsRes.data.problems && Array.isArray(problemsRes.data.problems)) {
-            problemsList = problemsRes.data.problems;
-          } else if (problemsRes.data.data && Array.isArray(problemsRes.data.data)) {
-            problemsList = problemsRes.data.data;
-          }
-        }
-        setProblems(problemsList);
-      } catch (problemsError) {
-        setProblems([]);
-      }
+      // Merge is_creator into contest object so templates can read contest.is_creator
+      const mergedContest = { ...contest, is_creator: res.data.is_creator };
 
-      try {
-        const announcementsRes = await axios.get(
-          `${BACKEND_URL}/contests/${contestId}/announcements/`,
-          { headers: getHeaders() }
-        );
-        
-        if (announcementsRes.data && announcementsRes.data.announcements) {
-          setAnnouncements(announcementsRes.data.announcements);
-        }
-      } catch (announcementsError) {
-        console.error('Announcements error:', announcementsError);
-      }
+      setContestData(mergedContest);
+      setProblems(problemsList);
+      setAnnouncements(annList);
+      setProblemStatuses(statuses);
+      setHasAnyVirtualContest(!!has_virtual_contest);
+      setVirtualContestId(virtual_contest_id || null);
 
-      try {
-        const statusRes = await axios.get(
-          `${BACKEND_URL}/contests/${contestId}/problems/status/`,
-          { headers: getHeaders() }
-        );
-        
-        if (statusRes.data && statusRes.data.problem_statuses) {
-          const statuses = statusRes.data.problem_statuses;
-          setProblemStatuses(statuses);
-          
-          let solved = 0;
-          let attempted = 0;
-          
-          Object.values(statuses).forEach(status => {
-            if (status.solved) solved++;
-            if (status.status === 'attempted' || status.status === 'solved') attempted++;
-          });
-          
-          const totalAttempts = solved + (attempted - solved);
-          const accuracy = totalAttempts > 0 ? Math.round((solved / totalAttempts) * 100) : 0;
-          
-          setUserStats({
-            solved,
-            attempted: totalAttempts,
-            total: problemsList.length, 
-            accuracy: `${accuracy}%`
-          });
-          
-          const solvedSet = new Set();
-          Object.entries(statuses).forEach(([problemIndex, status]) => {
-            if (status.solved) {
-              solvedSet.add(problemIndex);
-            }
-          });
-          setSolvedProblems(solvedSet);
-        }
-      } catch (statusError) {
-        console.error('Status error:', statusError);
-      }
+      // Compute user stats from returned totals
+      const solved    = total_solved   ?? 0;
+      const attempted = total_attempted ?? 0;
+      const accuracy  = attempted > 0 ? Math.round((solved / attempted) * 100) : 0;
+      setUserStats({
+        solved,
+        attempted,
+        total: problemsList.length,
+        accuracy: `${accuracy}%`,
+      });
 
+      // Build solved set
+      const solvedSet = new Set(
+        Object.entries(statuses)
+          .filter(([, s]) => s.solved)
+          .map(([idx]) => idx)
+      );
+      setSolvedProblems(solvedSet);
+
+      // Timer
       if (contest.status === 'live' && contest.start_time && contest.duration) {
         try {
           const startTime = new Date(contest.start_time);
-          const endTime = new Date(startTime.getTime() + (contest.duration * 60 * 60 * 1000));
-          const now = new Date();
-          
+          const endTime   = new Date(startTime.getTime() + contest.duration * 60 * 60 * 1000);
+          const now       = new Date();
           if (now >= startTime && now <= endTime) {
-            const remainingSeconds = Math.floor((endTime - now) / 1000);
-            setTimeRemaining(remainingSeconds);
-          } else if (now > endTime) {
+            setTimeRemaining(Math.floor((endTime - now) / 1000));
+          } else {
             setTimeRemaining(0);
           }
-        } catch (timeError) {
-          console.error('Time calculation error:', timeError);
-        }
-      }
-
-      try {
-        const virtualResponse = await axios.get(
-          `${BACKEND_URL}/my-virtual/`,
-          { headers: getHeaders() }
-        );
-        
-        if (virtualResponse.data && virtualResponse.data.virtual_contests) {
-          const virtualContests = virtualResponse.data.virtual_contests;
-          const anyVirtualContest = virtualContests.find(vc => 
-            vc.original_contest_id === contestId
-          );
-          
-          if (anyVirtualContest) {
-            setHasAnyVirtualContest(true);
-            setVirtualContestId(anyVirtualContest.id);
-          } else {
-            setHasAnyVirtualContest(false);
-            setVirtualContestId(null);
-          }
-        }
-      } catch (virtualError) {
-        console.error('Virtual contest check error:', virtualError);
-        setHasAnyVirtualContest(false);
-        setVirtualContestId(null);
+        } catch (_) {}
       }
 
       setLoading(false);
-      
     } catch (err) {
       if (err.response?.status === 404) {
         setError('Contest not found');
@@ -259,12 +188,11 @@ const ContestInside = () => {
         setError('Access denied. You may need to register for this contest.');
       } else if (err.response?.status === 401) {
         setError('Please login to access this contest');
-      } else if (err.message.includes('Network Error')) {
+      } else if (err.message?.includes('Network Error')) {
         setError('Cannot connect to server. Please check your connection.');
       } else {
         setError(err.response?.data?.error || err.message || 'Failed to load contest');
       }
-      
       setLoading(false);
     }
   };

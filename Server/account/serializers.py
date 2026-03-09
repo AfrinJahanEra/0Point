@@ -42,6 +42,7 @@ class UserProfileSerializer(serializers.Serializer):
     email = serializers.EmailField()
     department = serializers.CharField(allow_null=True)
     year = serializers.CharField(allow_null=True)
+    profile_photo = serializers.CharField(allow_null=True, allow_blank=True)
     total_score = serializers.IntegerField()
     global_rank = serializers.IntegerField(allow_null=True)
     problems_solved = serializers.IntegerField()

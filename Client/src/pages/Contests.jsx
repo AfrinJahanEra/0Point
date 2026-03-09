@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api, { BACKEND_URL, WS_URL } from '../utils/api';
+import { toast } from 'react-hot-toast';
+import { expireContestsCache, patchCachedRegistration, removeCachedContest } from '../utils/contestsCache';
 import { 
   Calendar, Clock, Users, Trophy, Search, Play, Eye, Edit, 
   AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, 
@@ -15,6 +17,7 @@ const Contests = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredContests, setFilteredContests] = useState([]);
   const [registeredContests, setRegisteredContests] = useState([]);
+  const [publishingDraftId, setPublishingDraftId] = useState(null);
   const navigate = useNavigate();
   
   // Ref to track fetch ID to prevent stale updates
@@ -76,10 +79,29 @@ const Contests = () => {
   // Stale-while-revalidate: show localStorage cache instantly, refresh in background.
   const CACHE_KEY    = 'contests_dashboard_cache';
   const CACHE_TS_KEY = 'contests_dashboard_cache_ts';
-  const CACHE_MAX_AGE = 2 * 60 * 1000; // 2 minutes
+  const CACHE_MAX_AGE = 30 * 1000; // 30 seconds — keeps status near real-time
+
+  // Recalculate contest status client-side from start_time so it's always accurate
+  // regardless of what the server cached.
+  const recalcStatus = (contest) => {
+    if (contest.is_external || contest.external) return contest.status; // trust server for external
+    const { start_time, duration, status } = contest;
+    if (status === 'draft') return 'draft';
+    if (!start_time) return status;
+    const now = Date.now();
+    const start = new Date(start_time).getTime();
+    const durationMs = (parseFloat(duration) || 0) * 60 * 60 * 1000;
+    const end = start + durationMs;
+    if (now < start) return 'upcoming';
+    if (now <= end) return 'live';
+    return 'past';
+  };
 
   const applyContestsData = (data) => {
-    setContests(data.contests || []);
+    const raw = data.contests || [];
+    // Recalculate status for every internal contest at apply time
+    const updated = raw.map(c => ({ ...c, status: recalcStatus(c) }));
+    setContests(updated);
     setRegisteredContests(data.registered_contests || []);
     setError(null);
   };
@@ -142,6 +164,9 @@ const Contests = () => {
 
   useEffect(() => {
     fetchData();
+    // Auto-refresh every 60 s so live/upcoming transitions happen in near real-time
+    const interval = setInterval(() => fetchData(), 60 * 1000);
+    return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update activeTab when URL parameter changes
@@ -191,8 +216,13 @@ const Contests = () => {
 
   // Sort contests by date - time-sorted across all tabs
   const sortContestsByDate = (contestsArray, status) => {
+    // Internal platform contests always appear before external ones within the same group
+    const isInternal = (c) => !c.is_external && !c.external ? 0 : 1;
+
     if (status === 'upcoming' || status === 'live') {
       return [...contestsArray].sort((a, b) => {
+        const platDiff = isInternal(a) - isInternal(b);
+        if (platDiff !== 0) return platDiff;
         if (!a.start_time && !b.start_time) return 0;
         if (!a.start_time) return 1;
         if (!b.start_time) return -1;
@@ -200,25 +230,38 @@ const Contests = () => {
       });
     } else if (status === 'past') {
       return [...contestsArray].sort((a, b) => {
+        const platDiff = isInternal(a) - isInternal(b);
+        if (platDiff !== 0) return platDiff;
         if (!a.start_time && !b.start_time) return 0;
         if (!a.start_time) return 1;
         if (!b.start_time) return -1;
         return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
       });
     } else if (status === 'all') {
-      // Sort: live first, then upcoming (closest first), then past (most recent first), then draft
+      // Sort: live/ongoing first, then upcoming (closest start first), then past/completed (most recent first), then draft
+      // Within each status group: internal platform contests come before external ones
+      const normalizeStatus = (s) => {
+        if (s === 'ongoing') return 'live';
+        if (s === 'completed') return 'past';
+        return s;
+      };
       const order = { live: 0, upcoming: 1, past: 2, draft: 3 };
       return [...contestsArray].sort((a, b) => {
-        const statusA = order[a.status] ?? 4;
-        const statusB = order[b.status] ?? 4;
+        const sA = normalizeStatus(a.status);
+        const sB = normalizeStatus(b.status);
+        const statusA = order[sA] ?? 4;
+        const statusB = order[sB] ?? 4;
         if (statusA !== statusB) return statusA - statusB;
+        // Within the same status: internal before external
+        const platDiff = isInternal(a) - isInternal(b);
+        if (platDiff !== 0) return platDiff;
         if (!a.start_time && !b.start_time) return 0;
         if (!a.start_time) return 1;
         if (!b.start_time) return -1;
         const tA = new Date(a.start_time).getTime();
         const tB = new Date(b.start_time).getTime();
         // upcoming: closest first; past: most recent first
-        return (a.status === 'past') ? tB - tA : tA - tB;
+        return (sA === 'past') ? tB - tA : tA - tB;
       });
     }
     return contestsArray;
@@ -380,22 +423,28 @@ const Contests = () => {
     }
   };
 
-  // Publish draft function (from third version)
-  const handlePublishDraft = async (contestId) => {
-    if (window.confirm("Publish this draft contest? Once published, it will be visible to users.")) {
-      try {
-        await api.post(`/contests/${contestId}/publish/`, { type: "final" });
-        alert("Contest published successfully!");
-        fetchData(); // Refresh contests list
-      } catch (err) {
-        console.error('Failed to publish contest:', err);
-        alert(err.response?.data?.error || "Failed to publish contest");
-      }
+  // Publish draft function
+  const handlePublishDraft = async (contestId, e) => {
+    e?.stopPropagation?.();
+    if (publishingDraftId) return;
+    setPublishingDraftId(contestId);
+    try {
+      await api.post(`/contests/${contestId}/publish/`, { type: "final" });
+      toast.success("Contest published successfully!");
+      // Remove the draft entry from cache; expire so next fetch loads the published version
+      removeCachedContest(contestId);
+      expireContestsCache();
+      fetchData();
+    } catch (err) {
+      console.error('Failed to publish contest:', err);
+      toast.error(err.response?.data?.error || "Failed to publish contest");
+    } finally {
+      setPublishingDraftId(null);
     }
   };
 
   // Combined contest entry handler
-  const handleContestEntry = async (contest, e) => {
+  const handleContestEntry = (contest, e) => {
     e?.stopPropagation?.();
     const { id, status, external, is_external, external_url } = contest;
 
@@ -424,36 +473,9 @@ const Contests = () => {
       return;
     }
 
-    // Regular contest flow...
+    // Regular contest flow — navigate immediately, ContestInside handles access/problems
     if (status === 'upcoming' || status === 'live' || status === 'past' || status === 'ongoing' || status === 'completed') {
-      try {
-        const res = await api.get(`/contests/${id}/problems/`);
-        
-        if ((res.data.problems || []).length === 0 && status !== 'past' && status !== 'completed') {
-          alert('No problems available yet.');
-          return;
-        }
-        
-        navigate(`/contests/${id}`);
-        
-      } catch (err) {
-        if (err.response?.status === 403 && err.response.data?.can_register) {
-          const ok = window.confirm(`Register for this ${status} contest?`);
-          if (ok) {
-            try {
-              await api.post(`/contests/${id}/register/`, {});
-              await refreshRegisteredContests();
-              alert('Successfully registered!');
-              navigate(`/contests/${id}`);
-            } catch (regErr) {
-              alert('Registration failed.');
-              navigate(`/contests/${id}/register`);
-            }
-          }
-        } else {
-          alert(err.response?.data?.message || 'Cannot access contest.');
-        }
-      }
+      navigate(`/contests/${id}`);
     }
   };
 
@@ -610,15 +632,6 @@ const Contests = () => {
                   </p>
                 </div>
                 <div className="flex items-center space-x-4">
-                  {/* Create Contest Button */}
-                  <button
-                    onClick={() => navigate('/create-contest')}
-                    className="flex items-center space-x-1 bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Create Contest</span>
-                  </button>
-                  
                   {/* Items per page selector */}
                   <div className="flex items-center space-x-2">
                     <label htmlFor="itemsPerPage" className="text-xs text-gray-600">
@@ -755,9 +768,10 @@ const Contests = () => {
                             </button>
                             <button
                               onClick={(e) => handlePublishDraft(c.id, e)}
-                              className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-green-700 transition-colors duration-200"
+                              disabled={publishingDraftId === c.id}
+                              className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-green-700 transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                              Publish
+                              {publishingDraftId === c.id ? 'Publishing...' : 'Publish'}
                             </button>
                           </div>
                         ) : c.visibility === 'test' || c.is_test_contest ? (

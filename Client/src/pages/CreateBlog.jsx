@@ -90,6 +90,14 @@ const CreateBlog = () => {
 
       if (response.status === 201) {
         toast.success(isDraft ? 'Blog saved as draft!' : 'Blog published successfully!');
+        // Clear blog caches so new blog appears immediately
+        try {
+          const userKey = user?.id || user?.email || 'me';
+          localStorage.removeItem(`blog_user_published_${userKey}`);
+          localStorage.removeItem(`blog_user_published_${userKey}_ts`);
+          localStorage.removeItem('community_blogs_cache');
+          localStorage.removeItem('community_blogs_cache_ts');
+        } catch (_) {}
         navigate('/blog');
       }
     } catch (error) {

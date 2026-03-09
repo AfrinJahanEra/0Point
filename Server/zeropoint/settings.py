@@ -54,6 +54,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'django.middleware.gzip.GZipMiddleware',  # compress all responses ~70% smaller
     'corsheaders.middleware.CorsMiddleware',  # must be high up
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -175,7 +176,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
+        # BrowsableAPIRenderer removed — adds significant overhead on every response
     ],
     'UNAUTHENTICATED_USER': None,
 }
