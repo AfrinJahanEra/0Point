@@ -17,6 +17,8 @@ from .serializers import (
 from contest.utils.auth import get_user_from_request
 from contest.models import Contest
 from account.models import Account
+from utils.cache_keys import invalidate_discussions, CK, TTL_DISCUSSION_LIST
+from django.core.cache import cache
 
 
 class DiscussionListCreateAPIView(APIView):
@@ -160,6 +162,9 @@ class DiscussionListCreateAPIView(APIView):
         except Exception as e:
             return Response({"error": f"Failed to create discussion: {str(e)}"}, status=500)
         
+        # Invalidate discussion list cache so the new discussion appears immediately
+        invalidate_discussions(contest_id)
+
         return Response({
             "message": "Discussion created successfully",
             "discussion": self.format_discussion_for_frontend(discussion, user)
@@ -316,6 +321,9 @@ class DiscussionDetailAPIView(APIView):
         except Exception as e:
             return Response({"error": f"Failed to update discussion: {str(e)}"}, status=500)
         
+        # Invalidate discussion list cache so the updated discussion appears immediately
+        invalidate_discussions(contest_id)
+
         # Format for frontend
         list_view = DiscussionListCreateAPIView()
         

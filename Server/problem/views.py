@@ -16,6 +16,7 @@ from .serializers import ProblemCreateSerializer, ProblemUpdateSerializer
 from contest.models import Contest, ContestProblem
 from contest.utils.auth import get_user_from_request
 from account.models import Account
+from utils.cache_keys import invalidate_contest, invalidate_contest_problem
 
 
 MAX_IMAGES = 5
@@ -87,6 +88,12 @@ class ProblemCreateAPIView(APIView):
                 output_data=tc.get("output", ""),
                 explanation=tc.get("explanation", "")
             )
+
+        # Invalidate contest problem caches so the new problem appears immediately
+        try:
+            invalidate_contest(str(contest.id))
+        except Exception:
+            pass
 
         return Response({"message": "Problem created", "problem_id": problem_id}, status=201)
 
@@ -209,6 +216,12 @@ class ProblemUpdateAPIView(APIView):
         except (MEValidationError, ValueError) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Invalidate contest + specific problem caches
+        try:
+            invalidate_contest_problem(str(contest.id), problem.problem_id)
+        except Exception:
+            pass
+
         return Response({"message": "Problem updated", "problem_id": problem.problem_id})
 
 
@@ -248,5 +261,11 @@ class ProblemDeleteAPIView(APIView):
         
         # Delete the problem
         problem.delete()
+
+        # Invalidate contest caches so the deleted problem disappears immediately
+        try:
+            invalidate_contest(str(contest.id))
+        except Exception:
+            pass
         
         return Response({"message": "Problem deleted"})

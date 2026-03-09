@@ -6,39 +6,25 @@
  *
  * Cache shape (stored under CACHE_KEY):
  *   { contests: [...], registered_contests: [...] }
+ *
+ * Internally delegates to the universal pageCache helpers.
  */
 
-const CACHE_KEY    = 'contests_dashboard_cache';
-const CACHE_TS_KEY = 'contests_dashboard_cache_ts';
+import { readStale, writeCache, expireCache, patchCache, removeFromCache } from './pageCache';
+
+export const CACHE_KEY    = 'contests_dashboard_cache';
+export const CACHE_TTL    = 30_000; // 30 seconds (matches backend Redis TTL)
+const CACHE_TS_KEY        = CACHE_KEY + '_ts'; // handled internally by pageCache
 
 /** Read the current cached payload, or null if missing/corrupt. */
-const readCache = () => {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (_) {
-    return null;
-  }
-};
-
-/** Write back a (possibly modified) payload and refresh the timestamp. */
-const writeCache = (payload) => {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-    localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
-  } catch (_) {}
-};
+const readCache = () => readStale(CACHE_KEY);
 
 /**
  * Expire the cache timestamp only — next fetchData() will do a background
  * refresh but still shows stale data instantly (zero flicker).
  * Use this when a new contest was created (not yet in the cache list).
  */
-export const expireContestsCache = () => {
-  try {
-    localStorage.removeItem(CACHE_TS_KEY); // age = Infinity → triggers re-fetch
-  } catch (_) {}
-};
+export const expireContestsCache = () => expireCache(CACHE_KEY);
 
 /**
  * Patch a single contest entry in the cache by ID.
@@ -46,19 +32,7 @@ export const expireContestsCache = () => {
  * If the contest doesn't exist in cache yet, falls back to expireContestsCache.
  */
 export const patchCachedContest = (contestId, updates) => {
-  const data = readCache();
-  if (!data || !Array.isArray(data.contests)) {
-    expireContestsCache();
-    return;
-  }
-  const idx = data.contests.findIndex(c => c.id === contestId);
-  if (idx === -1) {
-    // New contest — not in cache yet, just trigger a fresh fetch
-    expireContestsCache();
-    return;
-  }
-  data.contests[idx] = { ...data.contests[idx], ...updates };
-  writeCache(data);
+  patchCache(CACHE_KEY, 'contests', (c) => c.id === contestId, updates);
 };
 
 /**
@@ -86,7 +60,7 @@ export const patchCachedRegistration = (contestId) => {
     }
   }
 
-  writeCache(data);
+  writeCache(CACHE_KEY, data);
 };
 
 /**
@@ -94,11 +68,5 @@ export const patchCachedRegistration = (contestId) => {
  * Falls back to expireContestsCache if not found.
  */
 export const removeCachedContest = (contestId) => {
-  const data = readCache();
-  if (!data || !Array.isArray(data.contests)) {
-    expireContestsCache();
-    return;
-  }
-  data.contests = data.contests.filter(c => c.id !== contestId);
-  writeCache(data);
+  removeFromCache(CACHE_KEY, 'contests', (c) => c.id === contestId);
 };

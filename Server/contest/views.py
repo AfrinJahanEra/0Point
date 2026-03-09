@@ -757,7 +757,8 @@ class ContestUpdateAPIView(APIView):
         # Invalidate user's draft cache so Contests page shows the updated draft
         try:
             from django.core.cache import cache
-            cache.delete(f'contests_drafts_v2_{str(user.id)}')
+            from utils.cache_keys import invalidate_contest
+            invalidate_contest(str(contest.id), str(user.id))
         except Exception:
             pass
 
@@ -887,8 +888,8 @@ class ContestPublishAPIView(APIView):
             # Invalidate caches: draft is now published, move it to public list
             try:
                 from django.core.cache import cache
-                cache.delete(f'contests_drafts_v2_{str(user.id)}')
-                cache.delete('contests_dashboard_public')
+                from utils.cache_keys import invalidate_contest
+                invalidate_contest(str(contest.id), str(user.id))
             except Exception:
                 pass
             
@@ -1027,9 +1028,18 @@ def get_contest_status(contest):
     return calculated_status
 
 class ContestListCreateAPIView(APIView):
+    _TTL_PUBLIC = 30  # 30 s shared cache for published contests
+
     def get(self, request):
+        from django.core.cache import cache
+        from utils.cache_keys import CK, TTL_CONTEST_LIST
         user = get_user_from_request(request)
-        
+        user_id = str(user.id) if user else None
+
+        # ── Shared public cache (anonymous / all users) ─────────────────────
+        pub_key  = CK.contest_list()
+        pub_data = cache.get(pub_key)
+
         try:
             # Get all contests (no status filter needed now)
             contests = Contest.objects.all().order_by("-start_time").limit(200)
@@ -1098,6 +1108,13 @@ class ContestListCreateAPIView(APIView):
                 "event": "contest_list_update",
                 "contests": data,
             })
+
+            # Cache the public (non-draft) portion for fast subsequent reads
+            try:
+                public_only = [c for c in data if c.get('status') != 'draft']
+                cache.set(pub_key, public_only, timeout=TTL_CONTEST_LIST)
+            except Exception:
+                pass
 
             return Response({"contests": data})
         except Exception as e:
@@ -1466,7 +1483,9 @@ class ContestFullCreateAPIView(APIView):
         # Invalidate user's draft cache so Contests page shows the new draft
         try:
             from django.core.cache import cache
-            cache.delete(f'contests_drafts_v2_{str(user.id)}')
+            from utils.cache_keys import CK
+            cache.delete(CK.contest_drafts(str(user.id)))
+            cache.delete(CK.contest_list())
         except Exception:
             pass
 
@@ -1516,7 +1535,8 @@ class ContestRegisterAPIView(APIView):
 
             # Invalidate per-user registration cache so next detail call reflects the new status
             from django.core.cache import cache
-            cache.delete(f'contest_reg_{str(contest.id)}_{str(user.id)}')
+            from utils.cache_keys import CK
+            cache.delete(CK.contest_registration(str(contest.id), str(user.id)))
 
             return Response({"message": "Successfully registered"}, status=201)
         except Exception as e:

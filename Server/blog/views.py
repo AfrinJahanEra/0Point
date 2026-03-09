@@ -7,6 +7,8 @@ from .serializers import BlogCommentVoteSerializer, BlogSerializer, BlogVoteSeri
 from account.models import Account
 import jwt
 from django.conf import settings
+from django.core.cache import cache
+from utils.cache_keys import invalidate_blog_list, CK
 
 def get_user_from_request(request):
     """
@@ -52,8 +54,12 @@ def create_blog(request):
             blog.author.blog_count += 1
             blog.author.save()
 
+            # Invalidate blog list cache so the new post appears immediately
+            invalidate_blog_list()
+
         return Response(blog.to_dict(), status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['POST'])
 def save_draft(request, blog_id):
@@ -105,8 +111,7 @@ def publish_blog(request, blog_id):
             blog.author.save()
 
             # Invalidate published blog list cache
-            from django.core.cache import cache
-            cache.delete('blog_published_list')
+            invalidate_blog_list()
 
             return Response(blog.to_dict(), status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -135,8 +140,7 @@ def get_blog(request, blog_id):
 @api_view(['GET'])
 def list_published_blogs(request):
     """List all published blogs"""
-    from django.core.cache import cache
-    CACHE_KEY = 'blog_published_list'
+    CACHE_KEY = CK.blog_list()
     CACHE_TTL = 60  # 60 seconds
 
     cached = cache.get(CACHE_KEY)
@@ -246,8 +250,7 @@ def vote_blog(request, blog_id):
         user_vote = current_vote.vote_type if current_vote else None
 
         # Invalidate published list cache so next full-page load reflects new counts
-        from django.core.cache import cache
-        cache.delete('blog_published_list')
+        invalidate_blog_list()
 
         if isinstance(result, dict) and result.get('message') == 'Vote removed':
             return Response({

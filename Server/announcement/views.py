@@ -11,6 +11,8 @@ from .serializers import AnnouncementCreateSerializer, AnnouncementUpdateSeriali
 from contest.models import Contest
 from contest.utils.auth import get_user_from_request
 from account.models import Account
+from utils.cache_keys import invalidate_announcements, CK, TTL_ANNOUNCEMENT
+from django.core.cache import cache
 
 
 class PlatformAnnouncementsAPIView(APIView):
@@ -23,6 +25,11 @@ class PlatformAnnouncementsAPIView(APIView):
             limit = int(request.GET.get('limit', 5))
         except ValueError:
             limit = 5
+
+        cache_key = CK.platform_announcements()
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
         
         # Get platform-wide announcements (where contest is None)
         announcements = Announcement.objects(contest=None).order_by("-is_pinned", "-created_at")[:limit]
@@ -31,10 +38,12 @@ class PlatformAnnouncementsAPIView(APIView):
         for announcement in announcements:
             data.append(announcement.to_dict())
         
-        return Response({
+        result = {
             "announcements": data,
             "total": len(data)
-        })
+        }
+        cache.set(cache_key, result, timeout=TTL_ANNOUNCEMENT)
+        return Response(result)
 
 
 class AnnouncementCreateAPIView(APIView):
@@ -101,6 +110,9 @@ class AnnouncementCreateAPIView(APIView):
         except Exception as e:
             return Response({"error": f"Failed to create announcement: {str(e)}"}, status=500)
 
+        # Invalidate related caches
+        invalidate_announcements(contest_id if contest_id else None)
+
         # Return the created announcement
         return Response({
             "message": "Announcement created successfully",
@@ -118,6 +130,17 @@ class ContestAnnouncementsAPIView(APIView):
             contest = Contest.objects.get(id=contest_id)
         except Contest.DoesNotExist:
             return Response({"error": "Contest not found"}, status=404)
+
+        # Try cache first
+        cache_key = CK.announcements(contest_id)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            # Still do the access check
+            user = get_user_from_request(request)
+            contest_status = cached.get('contest_status', '')
+            if contest_status == 'past':
+                return Response(cached)
+            # For non-past, re-check access (do not skip)
         
         user = get_user_from_request(request)
         
@@ -160,13 +183,19 @@ class ContestAnnouncementsAPIView(APIView):
         for announcement in announcements:
             data.append(announcement.to_dict())
         
-        return Response({
+        result = {
             "contest_id": str(contest.id),
             "contest_title": contest.title,
             "contest_status": contest.status,
             "announcements": data,
             "total": len(data)
-        })
+        }
+        # Cache for all users (short TTL)
+        try:
+            cache.set(cache_key, result, timeout=TTL_ANNOUNCEMENT)
+        except Exception:
+            pass
+        return Response(result)
 
 
 class AnnouncementDetailAPIView(APIView):
@@ -268,6 +297,10 @@ class AnnouncementUpdateAPIView(APIView):
         except Exception as e:
             return Response({"error": f"Failed to update announcement: {str(e)}"}, status=500)
 
+        # Invalidate caches
+        contest_id = str(announcement.contest.id) if announcement.contest else None
+        invalidate_announcements(contest_id)
+
         return Response({
             "message": "Announcement updated successfully",
             "announcement": announcement.to_dict()
@@ -310,6 +343,10 @@ class AnnouncementDeleteAPIView(APIView):
         except Exception as e:
             return Response({"error": f"Failed to delete announcement: {str(e)}"}, status=500)
 
+        # Invalidate caches
+        contest_id = str(announcement.contest.id) if announcement.contest else None
+        invalidate_announcements(contest_id)
+
         return Response({
             "message": "Announcement deleted successfully"
         }, status=200)
@@ -351,6 +388,10 @@ class TogglePinAnnouncementAPIView(APIView):
             announcement.save()
         except Exception as e:
             return Response({"error": f"Failed to update announcement: {str(e)}"}, status=500)
+
+        # Invalidate caches
+        contest_id = str(announcement.contest.id) if announcement.contest else None
+        invalidate_announcements(contest_id)
 
         return Response({
             "message": f"Announcement {'pinned' if announcement.is_pinned else 'unpinned'} successfully",
