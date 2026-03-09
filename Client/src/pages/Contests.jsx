@@ -189,35 +189,39 @@ const Contests = () => {
     };
   }, []);
 
-  // Sort contests by date - closest first for upcoming/live
+  // Sort contests by date - time-sorted across all tabs
   const sortContestsByDate = (contestsArray, status) => {
     if (status === 'upcoming' || status === 'live') {
       return [...contestsArray].sort((a, b) => {
-        // Handle missing start times
         if (!a.start_time && !b.start_time) return 0;
-        if (!a.start_time) return 1; // a with no date goes last
-        if (!b.start_time) return -1; // b with no date goes last
-        
-        const dateA = new Date(a.start_time).getTime();
-        const dateB = new Date(b.start_time).getTime();
-        return dateA - dateB; // Closest date first
+        if (!a.start_time) return 1;
+        if (!b.start_time) return -1;
+        return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
       });
-    } else {
-      // For other tabs (past, draft, all), keep original order
-      // or sort by most recent first for past contests
-      if (status === 'past') {
-        return [...contestsArray].sort((a, b) => {
-          if (!a.start_time && !b.start_time) return 0;
-          if (!a.start_time) return 1;
-          if (!b.start_time) return -1;
-          
-          const dateA = new Date(a.start_time).getTime();
-          const dateB = new Date(b.start_time).getTime();
-          return dateB - dateA; // Most recent first
-        });
-      }
-      return contestsArray; // Keep original order for other tabs
+    } else if (status === 'past') {
+      return [...contestsArray].sort((a, b) => {
+        if (!a.start_time && !b.start_time) return 0;
+        if (!a.start_time) return 1;
+        if (!b.start_time) return -1;
+        return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
+      });
+    } else if (status === 'all') {
+      // Sort: live first, then upcoming (closest first), then past (most recent first), then draft
+      const order = { live: 0, upcoming: 1, past: 2, draft: 3 };
+      return [...contestsArray].sort((a, b) => {
+        const statusA = order[a.status] ?? 4;
+        const statusB = order[b.status] ?? 4;
+        if (statusA !== statusB) return statusA - statusB;
+        if (!a.start_time && !b.start_time) return 0;
+        if (!a.start_time) return 1;
+        if (!b.start_time) return -1;
+        const tA = new Date(a.start_time).getTime();
+        const tB = new Date(b.start_time).getTime();
+        // upcoming: closest first; past: most recent first
+        return (a.status === 'past') ? tB - tA : tA - tB;
+      });
     }
+    return contestsArray;
   };
 
   // Filtering with case-insensitive search (from first version)

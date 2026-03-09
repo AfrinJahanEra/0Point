@@ -2925,10 +2925,23 @@ class ContestsDashboardAPIView(APIView):
                 contest_status = c.get('status', '')
 
                 if contest_status == 'draft':
-                    if user_id and str(c.get('created_by')) == user_id:
-                        status_val = 'draft'
+                    # If contest has a start_time, it was published — compute real status
+                    if start:
+                        if start.tzinfo is None:
+                            start = dhaka_tz.localize(start)
+                        end = start + timedelta(hours=duration)
+                        if now < start:
+                            status_val = 'upcoming'
+                        elif now <= end:
+                            status_val = 'live'
+                        else:
+                            status_val = 'past'
                     else:
-                        continue
+                        # Truly draft with no start_time — only show to creator
+                        if user_id and str(c.get('created_by')) == user_id:
+                            status_val = 'draft'
+                        else:
+                            continue
                 elif start:
                     if start.tzinfo is None:
                         start = dhaka_tz.localize(start)
@@ -2991,6 +3004,9 @@ class ContestsDashboardAPIView(APIView):
                 })
         except Exception as e:
             print(f"ContestsDashboard external error: {e}")
+
+        # Sort all contests cross-platform by start_time (closest first, nulls last)
+        all_contests.sort(key=lambda x: x['start_time'] if x['start_time'] else '9999')
 
         return all_contests
 
