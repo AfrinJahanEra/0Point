@@ -46,7 +46,7 @@ def main():
                 'daphne',
                 '-b', bind_address,
                 '-p', str(port),
-                '--application-close-timeout', '5',
+                '--application-close-timeout', '20',
                 '--ping-interval', '20',
                 '--ping-timeout', '30',
                 'zeropoint.asgi:application'
