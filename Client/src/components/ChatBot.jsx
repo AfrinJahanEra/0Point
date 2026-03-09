@@ -200,9 +200,9 @@ const Chatbot = () => {
 
   /* ---------------- Window Sizes ---------------- */
   const sizeMap = {
-    normal: "w-80 h-[500px]",
+    normal: "w-96 h-[520px]",
     minimized: "w-64 h-12",
-    maximized: "w-[95vw] h-[90vh]",
+    maximized: "w-[88vw] h-[80vh] max-w-6xl",
   };
 
   return (
@@ -213,24 +213,34 @@ const Chatbot = () => {
             setIsOpen(true);
             setWindowMode("normal");
           }}
-          className="fixed bottom-4 left-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg"
+          className="fixed bottom-6 right-6 z-[70] bg-blue-800 hover:bg-blue-900 text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 hover:shadow-blue-900/30"
         >
           <MessageSquare className="w-6 h-6" />
         </button>
       )}
 
+      {/* Backdrop blur overlay for maximized mode */}
+      {isOpen && isMaximized && (
+        <div 
+          className="fixed inset-0 z-[60] bg-white/30 backdrop-blur-lg transition-all"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
       {isOpen && (
         <div
-          className={`fixed bottom-4 left-4 z-50 bg-white border rounded-lg shadow-xl transition-all flex ${
-            isMaximized ? "flex-row" : "flex-col"
+          className={`z-[70] bg-white/95 backdrop-blur-md border border-gray-200/50 rounded-2xl shadow-2xl transition-all flex overflow-hidden ${
+            isMaximized 
+              ? "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex-row" 
+              : "fixed bottom-6 right-6 flex-col"
           } ${sizeMap[windowMode]}`}
         >
           {/* Sidebar */}
           {isMaximized && (
-            <div className="w-64 border-r bg-gray-100 overflow-y-auto p-2">
+            <div className="w-64 border-r border-blue-100 bg-gray-50/90 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-blue-200 scrollbar-track-transparent hover:scrollbar-thumb-blue-300">
               <div className="flex justify-between mb-2">
-                <span className="font-semibold">Chats</span>
-                <button onClick={createNewChat} className="text-blue-600 text-sm">
+                <span className="font-semibold text-gray-800">Chats</span>
+                <button onClick={createNewChat} className="text-blue-800 hover:text-blue-900 text-sm font-medium">
                   + New
                 </button>
               </div>
@@ -252,24 +262,30 @@ const Chatbot = () => {
           {/* Chat */}
           <div className="flex-1 flex flex-col min-h-0">
             {/* Header */}
-            <div className="flex justify-between items-center p-3 bg-blue-600 text-white">
-              <div className="flex items-center gap-2">
-                <Bot size={18} />
-                <span className="font-semibold text-sm">Coding Assistant</span>
+            <div className="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-blue-800 to-blue-900 text-white">
+              <div className="flex items-center gap-3">
+                <div className="bg-white/20 p-1.5 rounded-lg">
+                  <Bot size={18} />
+                </div>
+                <div>
+                  <span className="font-semibold text-sm block">Coding Assistant</span>
+                  <span className="text-xs text-blue-200">Always here to help</span>
+                </div>
               </div>
 
-              <div className="flex gap-2">
-                <button onClick={() => setWindowMode("minimized")}>
+              <div className="flex gap-1">
+                <button onClick={() => setWindowMode("minimized")} className="hover:bg-white/20 p-2 rounded-lg transition-colors">
                   <Minus size={16} />
                 </button>
                 <button
                   onClick={() =>
                     setWindowMode(isMaximized ? "normal" : "maximized")
                   }
+                  className="hover:bg-white/20 p-2 rounded-lg transition-colors"
                 >
                   <Square size={16} />
                 </button>
-                <button onClick={() => setIsOpen(false)}>
+                <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-2 rounded-lg transition-colors">
                   <X size={16} />
                 </button>
               </div>
@@ -278,19 +294,25 @@ const Chatbot = () => {
             {/* Body */}
             {!isMinimized && (
               <>
-                <div className="flex-1 overflow-y-auto p-3 bg-gray-50">
+                <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-gray-50 to-white [&_pre]:!my-2 [&_pre]:!p-3 [&_pre_code]:!text-xs [&_code]:!px-1 [&_code]:!py-0.5 [&_code]:!text-xs scrollbar-thin scrollbar-thumb-blue-200 scrollbar-track-transparent hover:scrollbar-thumb-blue-300">
+                  {messages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Bot size={48} className="mb-4 opacity-30" />
+                      <p className="text-sm">Start a conversation with your coding assistant</p>
+                    </div>
+                  )}
                   {messages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`mb-3 ${
-                        msg.sender === "user" ? "text-right" : ""
+                      className={`mb-4 flex ${
+                        msg.sender === "user" ? "justify-end" : "justify-start"
                       }`}
                     >
                       <div
-                        className={`inline-block max-w-[80%] p-3 rounded-lg text-sm ${
+                        className={`max-w-[85%] p-4 rounded-2xl text-sm shadow-sm ${
                           msg.sender === "user"
-                            ? "bg-blue-600 text-white"
-                            : "bg-white border"
+                            ? "bg-blue-800 text-white rounded-br-md"
+                            : "bg-white border border-gray-100 rounded-bl-md shadow-md"
                         }`}
                       >
                         <ReactMarkdown
@@ -299,7 +321,7 @@ const Chatbot = () => {
                         >
                           {msg.text}
                         </ReactMarkdown>
-                        <div className="text-xs opacity-60 mt-1">
+                        <div className={`text-xs mt-2 ${msg.sender === "user" ? "text-blue-200" : "text-gray-400"}`}>
                           {formatTime(msg.created_at)}
                         </div>
                       </div>
@@ -307,44 +329,51 @@ const Chatbot = () => {
                   ))}
 
                   {isTyping && (
-                    <div className="text-sm text-gray-500">AI is typing…</div>
+                    <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-blue-800 rounded-full animate-bounce"></span>
+                        <span className="w-2 h-2 bg-blue-800 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></span>
+                        <span className="w-2 h-2 bg-blue-800 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
+                      </div>
+                      <span>AI is typing...</span>
+                    </div>
                   )}
                   <div ref={messagesEndRef} />
                 </div>
 
                 <form
                   onSubmit={handleSendMessage}
-                  className="p-3 flex gap-2 border-t"
+                  className="p-4 flex gap-3 border-t bg-white"
                 >
                   <textarea
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={handleInputKeyDown}
-                    className="flex-1 border rounded-lg px-3 py-2 text-sm resize-none"
+                    className="flex-1 border-0 bg-gray-100 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-800/20 focus:bg-white transition-all"
                     placeholder="Ask something about coding..."
-                    rows={3}
+                    rows={2}
                   />
                   <button
                     type="submit"
                     disabled={!inputText.trim()}
-                    className="bg-blue-600 text-white p-2 rounded-lg"
+                    className="bg-blue-800 hover:bg-blue-900 disabled:bg-gray-200 disabled:text-gray-400 text-white px-4 rounded-xl transition-all hover:shadow-lg hover:shadow-blue-900/20"
                   >
-                    <Send size={16} />
+                    <Send size={18} />
                   </button>
                 </form>
 
-                <div className="flex justify-between px-3 pb-3 text-xs">
+                <div className="flex justify-between px-4 pb-4 pt-2 bg-white border-t text-xs">
                   <button
                     onClick={handleClearChat}
-                    className="flex gap-1 text-gray-500"
+                    className="flex items-center gap-1.5 text-gray-500 hover:text-red-600 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
                   >
-                    <Trash2 size={12} /> Clear
+                    <Trash2 size={14} /> Clear chat
                   </button>
                   <button
                     onClick={() => setInputText("Explain binary search")}
-                    className="flex gap-1 text-blue-600"
+                    className="flex items-center gap-1.5 text-blue-800 hover:text-blue-900 transition-colors px-2 py-1 rounded-lg hover:bg-blue-50"
                   >
-                    <History size={12} /> Quick help
+                    <History size={14} /> Quick help
                   </button>
                 </div>
               </>
