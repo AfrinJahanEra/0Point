@@ -1,5 +1,6 @@
 // ContestInside.jsx - Compact Version
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import ScreenRecorder from '../components/ScreenRecorder';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -13,6 +14,7 @@ import {
   BookOpen,
   Shield,
   ChevronRight,
+  ChevronDown,
   Eye,
   BarChart3,
   Medal,
@@ -28,6 +30,7 @@ const ContestInside = () => {
   const [virtualContestId, setVirtualContestId] = useState(null);
   const [user, setUser] = useState(null);
   const [showRecordingModal, setShowRecordingModal] = useState(false);
+  const [expandedProblemIndex, setExpandedProblemIndex] = useState(null);
   const [newAnnouncement, setNewAnnouncement] = useState('');
 
   const { contestId } = useParams();
@@ -748,60 +751,176 @@ const ContestInside = () => {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="text-left p-2 font-medium text-gray-900 w-8"></th>
                       <th className="text-left p-2 font-medium text-gray-900 w-10">Status</th>
                       <th className="text-left p-2 font-medium text-gray-900 w-12">#</th>
                       <th className="text-left p-2 font-medium text-gray-900">Problem</th>
                       <th className="text-left p-2 font-medium text-gray-900 w-20">Difficulty</th>
                       <th className="text-left p-2 font-medium text-gray-900 w-16">Points</th>
-                      <th className="text-left p-2 font-medium text-gray-900 w-20">Action</th> {/* ← ADD THIS */}
+                      <th className="text-left p-2 font-medium text-gray-900 w-20">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {problems.length > 0 ? (
-                      problems.map((problem, index) => (
-                        <tr 
-                          key={problem.id || index} 
-                          className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                        >
-                          <td className="p-2">
-                            {getProblemStatusIcon(problem)}
-                          </td>
-                          <td className="p-2">
-                            <span className="font-semibold text-blue-700">
-                              {problem.problem_id || problem.index || problem.code || String.fromCharCode(65 + index)}
-                            </span>
-                          </td>
-                          <td className="p-2">
-                            <div className="font-medium text-gray-900">{problem.title}</div>
-                            {problem.tags && problem.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-0.5 mt-0.5">
-                                {problem.tags.slice(0, 2).map((tag, i) => (
-                                  <span key={i} className="px-1 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                          <td className="p-2">
-                            <span className={`${getDifficultyColor(problem.difficulty)}`}>
-                              {problem.difficulty?.charAt(0).toUpperCase() + problem.difficulty?.slice(1) || 'Medium'}
-                            </span>
-                          </td>
-                          <td className="p-2 font-medium text-gray-900">
-                            {problem.points || 100}
-                          </td>
-                          <td className="p-2"> {/* ← ADD THIS ACTION COLUMN */}
-                            <button
-                              onClick={() => handleProblemClick(problem)}
-                              className="text-xs bg-blue-800 text-white px-2 py-1 rounded hover:bg-blue-900 transition-colors font-medium flex items-center gap-1"
+                      problems.map((problem, index) => {
+                        const pIdx = problem.problem_id || problem.index || problem.code || String.fromCharCode(65 + index);
+                        const isExpanded = expandedProblemIndex === pIdx;
+                        const sampleCases = (problem.test_cases || []).filter(tc => tc.sample);
+                        return (
+                          <React.Fragment key={problem.id || index}>
+                            <tr
+                              className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                             >
-                              <Play className="w-2.5 h-2.5" />
-                              Solve
-                            </button>
-                          </td>
-                        </tr>
-                      ))
+                              <td className="p-2">
+                                <button
+                                  onClick={() => setExpandedProblemIndex(isExpanded ? null : pIdx)}
+                                  className="text-blue-700 hover:text-blue-900 transition-colors"
+                                  title={isExpanded ? 'Collapse' : 'View question'}
+                                >
+                                  {isExpanded
+                                    ? <ChevronDown className="w-3.5 h-3.5" />
+                                    : <ChevronRight className="w-3.5 h-3.5" />}
+                                </button>
+                              </td>
+                              <td className="p-2">
+                                {getProblemStatusIcon(problem)}
+                              </td>
+                              <td className="p-2">
+                                <span className="font-semibold text-blue-700">{pIdx}</span>
+                              </td>
+                              <td className="p-2">
+                                <div
+                                  className="font-medium text-gray-900 cursor-pointer hover:text-blue-700 transition-colors"
+                                  onClick={() => setExpandedProblemIndex(isExpanded ? null : pIdx)}
+                                >
+                                  {problem.title}
+                                </div>
+                                {problem.tags && problem.tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-0.5 mt-0.5">
+                                    {problem.tags.slice(0, 2).map((tag, i) => (
+                                      <span key={i} className="px-1 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-2">
+                                <span className={`${getDifficultyColor(problem.difficulty)}`}>
+                                  {problem.difficulty?.charAt(0).toUpperCase() + problem.difficulty?.slice(1) || 'Medium'}
+                                </span>
+                              </td>
+                              <td className="p-2 font-medium text-gray-900">
+                                {problem.points || 100}
+                              </td>
+                              <td className="p-2">
+                                <button
+                                  onClick={() => handleProblemClick(problem)}
+                                  className="text-xs bg-blue-800 text-white px-2 py-1 rounded hover:bg-blue-900 transition-colors font-medium flex items-center gap-1"
+                                >
+                                  <Play className="w-2.5 h-2.5" />
+                                  Solve
+                                </button>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan="7" className="px-4 pb-4 pt-0 bg-blue-50">
+                                  <div className="border border-blue-200 rounded-lg bg-white p-4 space-y-4">
+                                    {/* Problem header */}
+                                    <div className="flex items-center justify-between">
+                                      <h3 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                                        <span className="px-2 py-0.5 bg-blue-900 text-white rounded font-bold text-xs">{pIdx}</span>
+                                        {problem.title}
+                                      </h3>
+                                      <button
+                                        onClick={() => handleProblemClick(problem)}
+                                        className="text-xs bg-blue-800 text-white px-3 py-1.5 rounded hover:bg-blue-900 transition-colors font-medium flex items-center gap-1"
+                                      >
+                                        <Play className="w-3 h-3" />
+                                        Solve
+                                      </button>
+                                    </div>
+
+                                    {/* Limits */}
+                                    <div className="flex gap-3">
+                                      <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                                        Time: {problem.time_limit_seconds || problem.time_limit || 1}s
+                                      </span>
+                                      <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                                        Memory: {problem.memory_limit_mb || problem.memory_limit || 256}MB
+                                      </span>
+                                      {(problem.points || 0) > 0 && (
+                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-900 rounded">
+                                          {problem.points} pts
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Statement */}
+                                    {problem.statement ? (
+                                      <div>
+                                        <h4 className="text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Problem Statement</h4>
+                                        <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200 max-h-80 overflow-y-auto">
+                                          {problem.statement}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs text-gray-500 italic">No statement available.</div>
+                                    )}
+
+                                    {/* Sample Test Cases */}
+                                    {sampleCases.length > 0 && (
+                                      <div>
+                                        <h4 className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">
+                                          Sample Test Cases ({sampleCases.length})
+                                        </h4>
+                                        <div className="space-y-2">
+                                          {sampleCases.map((tc, tcIdx) => (
+                                            <div key={tcIdx} className="border border-gray-200 rounded overflow-hidden">
+                                              <div className="px-3 py-1 bg-gray-100 text-xs font-semibold text-gray-600">
+                                                Example {tcIdx + 1}
+                                              </div>
+                                              <div className="grid grid-cols-2 divide-x divide-gray-200">
+                                                <div className="p-3">
+                                                  <div className="text-xs font-semibold text-gray-600 mb-1">Input</div>
+                                                  <pre className="text-xs font-mono whitespace-pre-wrap break-words text-gray-800">{tc.input || '(empty)'}</pre>
+                                                </div>
+                                                <div className="p-3">
+                                                  <div className="text-xs font-semibold text-gray-600 mb-1">Output</div>
+                                                  <pre className="text-xs font-mono whitespace-pre-wrap break-words text-gray-800">{tc.output || '(empty)'}</pre>
+                                                </div>
+                                              </div>
+                                              {tc.explanation && (
+                                                <div className="px-3 pb-3">
+                                                  <div className="text-xs font-semibold text-gray-600 mb-1">Explanation</div>
+                                                  <p className="text-xs text-gray-700">{tc.explanation}</p>
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Tags */}
+                                    {problem.tags && problem.tags.length > 0 && (
+                                      <div>
+                                        <h4 className="text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Tags</h4>
+                                        <div className="flex flex-wrap gap-1">
+                                          {problem.tags.map((tag, i) => (
+                                            <span key={i} className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">{tag}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
                     ) : (
                       <tr>
                         <td colSpan="6" className="p-4 text-center">

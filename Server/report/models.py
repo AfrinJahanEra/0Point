@@ -26,19 +26,36 @@ class BlogReport(Document):
         blog_data = None
         if self.blog:
             try:
-                blog_data = {
-                    "id": str(self.blog.id),
-                    "title": self.blog.title,
-                    "author": {
-                        "id": str(self.blog.author.id),
-                        "name": self.blog.author.name,
-                        "email": self.blog.author.email
-                    } if self.blog.author else None
-                }
+                # Get the raw DBRef id without triggering a full dereference
+                from bson import DBRef
+                raw = self._data.get('blog')
+                raw_id = str(raw.id) if isinstance(raw, DBRef) else str(self.blog.id)
+
+                # Now try to fetch the actual document
+                from blog.models import Blog as BlogModel
+                from mongoengine.errors import DoesNotExist, OperationError
+                blog_doc = BlogModel.objects(id=raw_id).first()
+                if blog_doc:
+                    blog_data = {
+                        "id": raw_id,
+                        "title": blog_doc.title,
+                        "author": {
+                            "id": str(blog_doc.author.id),
+                            "name": blog_doc.author.name,
+                            "email": blog_doc.author.email
+                        } if blog_doc.author else None
+                    }
+                else:
+                    # Blog was hard-deleted; return a placeholder so the report is still visible
+                    blog_data = {
+                        "id": raw_id,
+                        "title": "[Deleted Blog]",
+                        "author": None
+                    }
             except Exception as e:
-                # Blog might be deleted or invalid
+                # Fallback: report exists but blog info unavailable
                 print(f"Error getting blog data: {str(e)}")
-                blog_data = None
+                blog_data = {"id": "unknown", "title": "[Deleted Blog]", "author": None}
         
         reporter_data = None
         if self.reporter:

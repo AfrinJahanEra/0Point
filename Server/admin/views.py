@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 from django.core.mail import send_mail
+from django.core.cache import cache
 import jwt
 import hashlib
 from datetime import datetime, timedelta
@@ -18,6 +19,11 @@ from testcontest.models import TestContest, TestContestSubmission
 from virtual.models import VirtualContest, VirtualContestSubmission
 from tutorial.models import Tutorial
 from compiler.models import CodeSubmission
+
+# Cache TTLs (seconds)
+_ADMIN_STATS_TTL = 60      # stats change frequently, keep short
+_ADMIN_LIST_TTL  = 90      # lists (users, blogs, contests, …)
+_ADMIN_SUBS_TTL  = 30      # submissions refresh faster
 
 
 def send_ban_notification_email(user_email, user_name, ban_reason):
@@ -103,6 +109,10 @@ class AdminLoginView(APIView):
 
 class AdminDashboardView(APIView):
     def get(self, request):
+        cached = cache.get('zp:admin_stats')
+        if cached is not None:
+            return Response(cached)
+
         # Get comprehensive counts for dashboard
         user_count = Account.objects(is_deleted=False).count()
         admin_count = Account.objects(is_deleted=False, role='admin').count()
@@ -149,7 +159,7 @@ class AdminDashboardView(APIView):
         submissions_today = Submission.objects(submitted_at__gte=day_ago).count()
         new_users_today = Account.objects(is_deleted=False, created_at__gte=day_ago).count()
         
-        return Response({
+        result = {
             "stats": {
                 "users": {
                     "total": user_count,
@@ -188,15 +198,22 @@ class AdminDashboardView(APIView):
                 "announcements": announcement_count,
                 "tutorials": tutorial_count
             }
-        })
+        }
+        cache.set('zp:admin_stats', result, _ADMIN_STATS_TTL)
+        return Response(result)
 
 
 class AdminUsersView(APIView):
     def get(self, request):
         search = request.GET.get('search', '')
         limit = int(request.GET.get('limit', 100))  # Default limit
-        
-        if search:
+
+        # Only cache the default (no search) request
+        cache_key = f'zp:admin_users_list_{limit}' if not search else None
+        if cache_key:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
             from mongoengine.queryset.visitor import Q
             users = Account.objects(
                 Q(is_deleted=False) & (Q(name__icontains=search) | Q(email__icontains=search))
@@ -263,6 +280,8 @@ class AdminUsersView(APIView):
                     "error": "Data format issue"
                 })
         
+        if cache_key:
+            cache.set(cache_key, user_data, _ADMIN_LIST_TTL)
         return Response(user_data)
     
     def delete(self, request, user_id):
@@ -324,6 +343,11 @@ class AdminUsersView(APIView):
             
             # Permanently delete the user
             user.delete()
+
+            # Invalidate user/stats caches
+            cache.delete('zp:admin_stats')
+            cache.delete_many([f'zp:admin_users_list_{l}' for l in [50, 100, 200]])
+            cache.delete('zp:admin_banned_list')
             
             return Response({
                 "message": "User permanently banned and deleted",
@@ -348,6 +372,10 @@ class AdminUsersView(APIView):
 class AdminBannedAccountsView(APIView):
     """View to see all banned accounts"""
     def get(self, request):
+        cached = cache.get('zp:admin_banned_list')
+        if cached is not None:
+            return Response(cached)
+
         banned_accounts = BannedAccount.objects.order_by("-banned_at")
         banned_data = []
         
@@ -365,6 +393,7 @@ class AdminBannedAccountsView(APIView):
                 "prevention_summary": f"Prevents registration for {len(banned.ip_addresses)} IPs and {len(banned.device_fingerprints)} devices"
             })
         
+        cache.set('zp:admin_banned_list', banned_data, _ADMIN_LIST_TTL)
         return Response(banned_data)
 
 
@@ -373,9 +402,15 @@ class AdminBlogsView(APIView):
         # Get query params for filtering
         status_filter = request.GET.get('status', 'all')  # all, published, draft
         search = request.GET.get('search', '')
-        limit = int(request.GET.get('limit', 50))  # Default limit
-        
-        # Build query
+        limit = int(request.GET.get('limit', 30))  # Reduced default from 50 to 30
+
+        # Cache only default (no search) requests
+        # v2 suffix busts any old cache that lacked full_content / co_authors
+        cache_key = f'zp:admin_blogs_v3_{status_filter}_{limit}' if not search else None
+        if cache_key:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
         query = {}
         if status_filter == 'published':
             query['is_draft'] = False
@@ -393,20 +428,58 @@ class AdminBlogsView(APIView):
         # Batch get blog IDs for counts
         blog_ids = [blog.id for blog in blogs]
         
-        # Pre-compute counts using aggregation (much faster than N+1)
+        # Pre-compute counts using batch queries (much faster than N+1)
         comment_counts = {}
         upvote_counts = {}
         downvote_counts = {}
         
-        for bid in blog_ids:
-            comment_counts[str(bid)] = BlogComment.objects(blog=bid, is_deleted=False).count()
-            upvote_counts[str(bid)] = BlogVote.objects(blog=bid, vote_type='upvote').count()
-            downvote_counts[str(bid)] = BlogVote.objects(blog=bid, vote_type='downvote').count()
+        if blog_ids:
+            # Use $in operator for batch queries instead of individual counts
+            from mongoengine.queryset.visitor import Q
+            
+            # Batch count comments
+            comment_pipeline = BlogComment.objects(
+                Q(blog__in=blog_ids) & Q(is_deleted=False)
+            ).aggregate([
+                {'$group': {'_id': '$blog', 'count': {'$sum': 1}}}
+            ])
+            for doc in comment_pipeline:
+                comment_counts[str(doc['_id'])] = doc['count']
+            
+            # Batch count upvotes
+            upvote_pipeline = BlogVote.objects(
+                Q(blog__in=blog_ids) & Q(vote_type='upvote')
+            ).aggregate([
+                {'$group': {'_id': '$blog', 'count': {'$sum': 1}}}
+            ])
+            for doc in upvote_pipeline:
+                upvote_counts[str(doc['_id'])] = doc['count']
+            
+            # Batch count downvotes
+            downvote_pipeline = BlogVote.objects(
+                Q(blog__in=blog_ids) & Q(vote_type='downvote')
+            ).aggregate([
+                {'$group': {'_id': '$blog', 'count': {'$sum': 1}}}
+            ])
+            for doc in downvote_pipeline:
+                downvote_counts[str(doc['_id'])] = doc['count']
+        
+        # Pre-fetch all authors to avoid N+1
+        author_ids = set()
+        for blog in blogs:
+            if blog.author:
+                author_ids.add(blog.author.id)
+        
+        authors_map = {}
+        if author_ids:
+            for author in Account.objects(id__in=list(author_ids)).only('id', 'name', 'email', 'role'):
+                authors_map[str(author.id)] = author
         
         blog_data = []
         for blog in blogs:
-            author = blog.author if blog.author else None
             bid_str = str(blog.id)
+            author_id = str(blog.author.id) if blog.author else None
+            author = authors_map.get(author_id) if author_id else None
             
             upvotes = upvote_counts.get(bid_str, 0)
             downvotes = downvote_counts.get(bid_str, 0)
@@ -415,9 +488,15 @@ class AdminBlogsView(APIView):
                 "id": bid_str,
                 "title": blog.title,
                 "content_preview": blog.content[:200] + "..." if len(blog.content) > 200 else blog.content,
+                "full_content": blog.content,
                 "tags": blog.tags,
+                "co_authors": [
+                    {"id": str(ca.id), "name": ca.name, "email": ca.email}
+                    for ca in (blog.co_authors or [])
+                    if ca
+                ],
                 "author": {
-                    "id": str(author.id) if author else None,
+                    "id": author_id,
                     "name": author.name if author else "Unknown",
                     "email": author.email if author else "Unknown",
                     "role": author.role if author else "Unknown",
@@ -432,8 +511,10 @@ class AdminBlogsView(APIView):
                 "score": upvotes - downvotes
             })
         
+        if cache_key:
+            cache.set(cache_key, blog_data, _ADMIN_LIST_TTL)
         return Response(blog_data)
-    
+
     def delete(self, request, blog_id):
         try:
             blog = Blog.objects.get(id=blog_id)
@@ -463,8 +544,15 @@ class AdminContestsView(APIView):
         # Get query params for filtering
         status_filter = request.GET.get('status', 'all')
         search = request.GET.get('search', '')
-        limit = int(request.GET.get('limit', 50))  # Default limit
+        limit = int(request.GET.get('limit', 50))
         
+        # Cache only unsearched requests (v2 = includes statement/test_cases)
+        cache_key = f'zp:admin_contests_v2_{status_filter}_{limit}' if not search else None
+        if cache_key:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+
         # Build query
         query = {}
         if status_filter != 'all':
@@ -477,38 +565,70 @@ class AdminContestsView(APIView):
         else:
             contests = Contest.objects(**query).order_by("-start_time").limit(limit)
         
-        # Batch get all contest IDs
-        contest_ids = [contest.id for contest in contests]
+        # Collect contest IDs once (materialize queryset)
+        contest_list = list(contests)
+        contest_ids = [c.id for c in contest_list]
         
-        # Batch count registrations, submissions, announcements
+        if not contest_ids:
+            return Response([])
+
+        # Batch count registrations, submissions, announcements via aggregation
         from contest.models import ContestRegistration
-        registration_counts = {}
-        submission_counts = {}
-        announcement_counts = {}
-        
-        for cid in contest_ids:
-            registration_counts[str(cid)] = ContestRegistration.objects(contest=cid).count()
-            submission_counts[str(cid)] = Submission.objects(contest=cid).count()
-            announcement_counts[str(cid)] = Announcement.objects(contest=cid).count()
+
+        def _batch_count(qs, group_field):
+            """Run a $group aggregation and return {str(id): count} map."""
+            result = {}
+            pipeline = [{'$group': {'_id': f'${group_field}', 'count': {'$sum': 1}}}]
+            for doc in qs.aggregate(pipeline):
+                result[str(doc['_id'])] = doc['count']
+            return result
+
+        from mongoengine.queryset.visitor import Q as MQ
+        registration_counts = _batch_count(
+            ContestRegistration.objects(contest__in=contest_ids), 'contest'
+        )
+        submission_counts = _batch_count(
+            Submission.objects(contest__in=contest_ids), 'contest'
+        )
+        announcement_counts = _batch_count(
+            Announcement.objects(contest__in=contest_ids), 'contest'
+        )
         
         contest_data = []
         
-        for contest in contests:
+        for contest in contest_list:
             creator = contest.created_by if contest.created_by else None
             cid_str = str(contest.id)
             
             # Get problem count
             problem_count = len(contest.problems) if contest.problems else 0
             
-            # Serialize problems (only basic info for list view)
+            # Serialize problems with full data including statement and test cases
             problems_data = []
             if contest.problems:
                 for problem in contest.problems:
+                    tc_list = []
+                    for tc in (problem.test_cases or []):
+                        tc_list.append({
+                            "input": tc.input,
+                            "output": tc.output,
+                            "explanation": tc.explanation or "",
+                            "sample": tc.sample,
+                            "hidden": tc.hidden,
+                            "difficulty": tc.difficulty or "",
+                        })
                     problems_data.append({
                         "index": problem.index,
                         "title": problem.title,
+                        "statement": problem.statement,
                         "difficulty": problem.difficulty if hasattr(problem, 'difficulty') else '',
                         "points": problem.points if hasattr(problem, 'points') else 0,
+                        "time_limit_seconds": problem.time_limit_seconds,
+                        "memory_limit_mb": problem.memory_limit_mb,
+                        "tags": list(problem.tags) if problem.tags else [],
+                        "tutorial": problem.tutorial or "",
+                        "test_cases": tc_list,
+                        "test_case_count": len(tc_list),
                     })
             
             contest_data.append({
@@ -541,6 +661,8 @@ class AdminContestsView(APIView):
                 "rating_changes": contest.rating_changes
             })
         
+        if cache_key:
+            cache.set(cache_key, contest_data, _ADMIN_LIST_TTL)
         return Response(contest_data)
     
     def delete(self, request, contest_id):
@@ -555,19 +677,55 @@ class AdminContestsView(APIView):
 
 class AdminProblemsView(APIView):
     def get(self, request):
-        problems = Problem.objects.order_by("-created_at")
+        limit = int(request.GET.get('limit', 100))
+        
+        # Fetch problems from all contests (flatten contest.problems embedded documents)
+        # v2 suffix busts cache that lacked statement/test_cases
+        cache_key = f'zp:admin_problems_v2_{limit}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        
+        # Do NOT use .only() here — embedded documents need full fetch to include
+        # statement, test_cases, tutorial, tags, etc.
+        contests = Contest.objects.order_by("-start_time").limit(limit)
+        
         problem_data = []
+        for contest in contests:
+            if not contest.problems:
+                continue
+            for problem in contest.problems:
+                # Serialize test cases fully
+                test_cases = []
+                for tc in (problem.test_cases or []):
+                    test_cases.append({
+                        "input": tc.input,
+                        "output": tc.output,
+                        "explanation": tc.explanation or "",
+                        "sample": tc.sample,
+                        "hidden": tc.hidden,
+                        "difficulty": tc.difficulty or "",
+                    })
+                
+                problem_data.append({
+                    "index": problem.index,
+                    "title": problem.title,
+                    "statement": problem.statement,
+                    "difficulty": problem.difficulty or "",
+                    "points": problem.points if hasattr(problem, 'points') else 0,
+                    "time_limit": problem.time_limit_seconds,
+                    "memory_limit": problem.memory_limit_mb,
+                    "tags": list(problem.tags) if problem.tags else [],
+                    "tutorial": problem.tutorial or "",
+                    "test_cases": test_cases,
+                    "test_case_count": len(test_cases),
+                    "contest_id": str(contest.id),
+                    "contest_title": contest.title,
+                    "contest_type": contest.type,
+                    "contest_status": contest.status,
+                })
         
-        for problem in problems:
-            problem_data.append({
-                "id": str(problem.id),
-                "title": problem.title,
-                "difficulty": problem.difficulty,
-                "created_at": problem.created_at,
-                "time_limit": problem.time_limit,
-                "memory_limit": problem.memory_limit
-            })
-        
+        cache.set(cache_key, problem_data, _ADMIN_LIST_TTL)
         return Response(problem_data)
     
     def delete(self, request, problem_id):
@@ -587,7 +745,7 @@ class AdminSubmissionsView(APIView):
         verdict_filter = request.GET.get('verdict', 'all')  # all, AC, WA, TLE, etc.
         language_filter = request.GET.get('language', 'all')
         search_user = request.GET.get('user', '')
-        limit = int(request.GET.get('limit', 100))
+        limit = int(request.GET.get('limit', 50))  # Reduced default from 100 to 50
         
         # Build query
         query = {}
@@ -599,29 +757,59 @@ class AdminSubmissionsView(APIView):
         # Apply user search
         if search_user:
             from mongoengine.queryset.visitor import Q
-            users = Account.objects(Q(name__icontains=search_user) | Q(email__icontains=search_user))
+            users = Account.objects(Q(name__icontains=search_user) | Q(email__icontains=search_user)).only('id')
             user_ids = [user.id for user in users]
             if user_ids:
                 query['user__in'] = user_ids
         
-        submissions = Submission.objects(**query).order_by("-submitted_at")[:limit]
-        submission_data = []
+        # Use only() to fetch only needed fields - reduces data transfer
+        submissions = Submission.objects(**query).only(
+            'id', 'user', 'contest', 'problem_index', 'problem_code', 'problem_title',
+            'language', 'verdict', 'execution_time', 'memory', 'passed_test_cases',
+            'total_test_cases', 'failed_test_case', 'code', 'error_message',
+            'compile_output', 'submitted_at', 'judged_at', 'contest_time'
+        ).order_by("-submitted_at").limit(limit)
         
+        # Pre-fetch all user and contest data to avoid N+1 queries
+        user_ids = set()
+        contest_ids = set()
+        for sub in submissions:
+            if sub.user:
+                user_ids.add(sub.user.id)
+            if sub.contest:
+                contest_ids.add(sub.contest.id)
+        
+        # Batch fetch users and contests
+        users_map = {}
+        contests_map = {}
+        
+        if user_ids:
+            for user in Account.objects(id__in=list(user_ids)).only('id', 'name', 'email', 'rating', 'badge'):
+                users_map[str(user.id)] = user
+        
+        if contest_ids:
+            for contest in Contest.objects(id__in=list(contest_ids)).only('id', 'title', 'type'):
+                contests_map[str(contest.id)] = contest
+        
+        submission_data = []
         for submission in submissions:
-            user = submission.user if submission.user else None
-            contest = submission.contest if submission.contest else None
+            user_id = str(submission.user.id) if submission.user else None
+            contest_id = str(submission.contest.id) if submission.contest else None
+            
+            user = users_map.get(user_id) if user_id else None
+            contest = contests_map.get(contest_id) if contest_id else None
             
             submission_data.append({
                 "id": str(submission.id),
                 "user": {
-                    "id": str(user.id) if user else None,
+                    "id": user_id,
                     "name": user.name if user else "Unknown",
                     "email": user.email if user else "Unknown",
                     "rating": getattr(user, 'rating', 0) if user else 0,
                     "badge": getattr(user, 'badge', 'none') if user else 'none'
                 },
                 "contest": {
-                    "id": str(contest.id) if contest else None,
+                    "id": contest_id,
                     "title": contest.title if contest else "Unknown",
                     "type": contest.type if contest else None
                 },
@@ -644,9 +832,12 @@ class AdminSubmissionsView(APIView):
                 "contest_time": submission.contest_time
             })
         
+        # Use estimated count for large collections to avoid slow count()
+        total_count = len(submission_data) if len(submission_data) < limit else limit + 1
+        
         return Response({
             "submissions": submission_data,
-            "total": Submission.objects(**query).count(),
+            "total": total_count,
             "showing": len(submission_data)
         })
     

@@ -50,6 +50,7 @@ const AdminDashboard = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [blogReports, setBlogReports] = useState([]);
   const [loading, setLoading] = useState(false);
+    const [tabLoading, setTabLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showBanModal, setShowBanModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -85,11 +86,40 @@ const AdminDashboard = () => {
     loadDashboardData();
   }, [navigate]);
 
-  const loadDashboardData = async () => {
+  // ── cache helpers ──────────────────────────────────────────────
+  const ADMIN_MAX_AGE = 60 * 1000; // 1 minute (matches backend TTL)
+
+  const _readCache = (key) => {
     try {
+      const raw = localStorage.getItem(key);
+      const ts  = parseInt(localStorage.getItem(`${key}_ts`) || '0', 10);
+      if (raw) return { data: JSON.parse(raw), fresh: (Date.now() - ts) < ADMIN_MAX_AGE };
+    } catch (_) {}
+    return null;
+  };
+  const _writeCache = (key, data) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+      localStorage.setItem(`${key}_ts`, String(Date.now()));
+    } catch (_) {}
+  };
+  // ────────────────────────────────────────────────────────────────
+
+  const loadDashboardData = async () => {
+    // 1. Show stale stats instantly
+    const cached = _readCache('admin_stats');
+    if (cached) {
+      setStats(cached.data);
+      setLoading(false);
+      if (cached.fresh) return;
+    } else {
       setLoading(true);
+    }
+    // 2. Background refresh
+    try {
       const response = await api.get('/admin-panel/dashboard/');
       setStats(response.data.stats);
+      _writeCache('admin_stats', response.data.stats);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -97,99 +127,103 @@ const AdminDashboard = () => {
     }
   };
 
-  const loadUsers = async () => {
+  const _loadTab = async (cacheKey, url, setter, transform) => {
+    const cached = _readCache(cacheKey);
+    if (cached) {
+      setter(transform ? transform(cached.data) : cached.data);
+      setTabLoading(false);
+      if (cached.fresh) return;
+    } else {
+      setTabLoading(true);
+    }
     try {
-      const response = await api.get('/admin-panel/users/');
-      setUsers(response.data);
+      const response = await api.get(url);
+      const data = transform ? transform(response.data) : response.data;
+      setter(data);
+      _writeCache(cacheKey, response.data); // cache raw response
     } catch (error) {
-      console.error('Error loading users:', error);
+      console.error(`Error loading ${cacheKey}:`, error);
+    } finally {
+      setTabLoading(false);
     }
   };
 
-  const loadBannedUsers = async () => {
-    try {
-      const response = await api.get('/admin-panel/banned-users/');
-      setBannedUsers(response.data);
-    } catch (error) {
-      console.error('Error loading banned users:', error);
-    }
+  const loadUsers = () => _loadTab('admin_users', '/admin-panel/users/', setUsers);
+
+  const loadBannedUsers = () => _loadTab('admin_banned', '/admin-panel/banned-users/', setBannedUsers);
+
+  const loadBlogs = () => {
+    // Bust old cache key that lacked full_content
+    localStorage.removeItem('admin_blogs');
+    localStorage.removeItem('admin_blogs_ts');
+    return _loadTab('admin_blogs_v2', '/admin-panel/blogs/', setBlogs);
   };
 
-  const loadBlogs = async () => {
-    try {
-      const response = await api.get('/admin-panel/blogs/');
-      setBlogs(response.data);
-    } catch (error) {
-      console.error('Error loading blogs:', error);
-    }
-  };
-  
   const loadBlogReports = async () => {
+    const cached = _readCache('admin_reports');
+    if (cached) {
+      setBlogReports(cached.data);
+      setTabLoading(false);
+      if (cached.fresh) return;
+    } else {
+      setTabLoading(true);
+    }
     try {
       const response = await api.get('/report/all/');
       setBlogReports(response.data);
+      _writeCache('admin_reports', response.data);
     } catch (error) {
       console.error('Error loading blog reports:', error);
       toast.error('Failed to load blog reports');
+    } finally {
+      setTabLoading(false);
     }
   };
 
-  const loadContests = async () => {
-    try {
-      const response = await api.get('/admin-panel/contests/');
-      setContests(response.data);
-    } catch (error) {
-      console.error('Error loading contests:', error);
-    }
+  const loadContests = () => {
+    // Bust old cache keys (v2 had stale data from timed-out requests)
+    localStorage.removeItem('admin_contests');
+    localStorage.removeItem('admin_contests_ts');
+    localStorage.removeItem('admin_contests_v2');
+    localStorage.removeItem('admin_contests_v2_ts');
+    return _loadTab('admin_contests_v3', '/admin-panel/contests/', setContests);
   };
 
   const loadProblems = async () => {
-    try {
-      // Fetch all contests to get their problems
-      const response = await api.get('/admin-panel/contests/');
-      const contests = response.data;
-      
-      // Aggregate all problems from all contests
-      const allProblems = [];
-      contests.forEach(contest => {
-        if (contest.problems && contest.problems.length > 0) {
-          contest.problems.forEach(problem => {
-            allProblems.push({
-              ...problem,
-              contest_id: contest.id,
-              contest_title: contest.title,
-              contest_type: contest.type,
-              contest_status: contest.status
-            });
-          });
-        }
-      });
-      
-      setProblems(allProblems);
-    } catch (error) {
-      console.error('Error loading problems:', error);
-    }
+    // Bust old cache keys
+    localStorage.removeItem('admin_problems');
+    localStorage.removeItem('admin_problems_ts');
+    localStorage.removeItem('admin_problems_v2');
+    localStorage.removeItem('admin_problems_v2_ts');
+    return _loadTab('admin_problems_v3', '/admin-panel/problems/', setProblems);
   };
 
   const loadSubmissions = async () => {
+    // Bust old cache that may have stale empty data
+    localStorage.removeItem('admin_submissions');
+    localStorage.removeItem('admin_submissions_ts');
+    const cached = _readCache('admin_submissions_v2');
+    if (cached) {
+      const data = Array.isArray(cached.data) ? cached.data : (cached.data?.submissions || []);
+      setSubmissions(data);
+      setTabLoading(false);
+      if (cached.fresh) return;
+    } else {
+      setTabLoading(true);
+    }
     try {
       const response = await api.get('/admin-panel/submissions/');
-      // Handle both old format (array) and new format (object with submissions array)
-      const submissionsData = Array.isArray(response.data) ? response.data : response.data.submissions;
-      setSubmissions(submissionsData || []);
+      const submissionsData = Array.isArray(response.data) ? response.data : (response.data?.submissions || []);
+      setSubmissions(submissionsData);
+      _writeCache('admin_submissions_v2', response.data);
     } catch (error) {
       console.error('Error loading submissions:', error);
+    } finally {
+      setTabLoading(false);
     }
   };
 
-  const loadAnnouncements = async () => {
-    try {
-      const response = await api.get('/admin-panel/announcements/');
-      setAnnouncements(response.data || []);
-    } catch (error) {
-      console.error('Error loading announcements:', error);
-    }
-  };
+  const loadAnnouncements = () => _loadTab('admin_announcements', '/admin-panel/announcements/', setAnnouncements, d => d || []);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -1003,8 +1037,32 @@ const AdminDashboard = () => {
                         Refresh
                       </button>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+
+                    {loading ? (
+                      /* ─── Dashboard skeleton ─── */
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 animate-pulse">
+                          {[1,2,3,4,5,6].map(i => (
+                            <div key={i} className="p-5 rounded-lg bg-gray-50">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 space-y-2">
+                                  <div className="h-3 bg-gray-200 rounded w-24" />
+                                  <div className="h-8 bg-gray-200 rounded w-16" />
+                                  <div className="h-2.5 bg-gray-200 rounded w-20" />
+                                </div>
+                                <div className="w-14 h-14 bg-gray-200 rounded-lg" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-8 animate-pulse">
+                          <div className="h-5 bg-gray-200 rounded w-48 mb-4" />
+                          <div className="bg-gray-50 rounded-xl p-8" style={{height:'400px'}} />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                       <div className="p-5 rounded-lg hover:bg-gray-50 transition-colors">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
@@ -1082,25 +1140,27 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                       </div>
-                    </div>
-                    
-                    {/* Activity Graph */}
-                    <div className="mt-8">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h3 className="text-xl font-bold text-gray-900">Platform Activity Overview</h3>
-                          <p className="text-sm text-gray-500 mt-1">Real-time insights into platform engagement</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="px-3 py-1 bg-blue-50 rounded-lg">
-                            <span className="text-xs font-semibold text-blue-900">Live Data</span>
+
+                        {/* Activity Graph */}
+                        <div className="mt-8">
+                          <div className="flex items-center justify-between mb-4">
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900">Platform Activity Overview</h3>
+                              <p className="text-sm text-gray-500 mt-1">Real-time insights into platform engagement</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="px-3 py-1 bg-blue-50 rounded-lg">
+                                <span className="text-xs font-semibold text-blue-900">Live Data</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="bg-gradient-to-br from-white to-blue-50 border-2 border-blue-200 rounded-xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
+                            <div ref={activityChartRef} className="w-full" style={{ height: '400px' }}></div>
                           </div>
                         </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-white to-blue-50 border-2 border-blue-200 rounded-xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
-                        <div ref={activityChartRef} className="w-full" style={{ height: '400px' }}></div>
-                      </div>
-                    </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -1131,6 +1191,24 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
+                    {/* Tab skeleton — shown while tabLoading is true */}
+                    {tabLoading ? (
+                      <div className="animate-pulse space-y-3">
+                        {/* Table header skeleton */}
+                        <div className="flex gap-4 border-b border-gray-200 pb-3">
+                          {[1,2,3,4,5].map(i => <div key={i} className="h-3 bg-gray-200 rounded flex-1" />)}
+                        </div>
+                        {/* Table row skeletons */}
+                        {[1,2,3,4,5,6,7,8].map(i => (
+                          <div key={i} className="flex gap-4 py-3 border-b border-gray-100">
+                            {[1,2,3,4,5].map(j => (
+                              <div key={j} className={`h-3 bg-gray-200 rounded ${j === 2 ? 'flex-[2]' : 'flex-1'}`} />
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                    <div>
                     {activeTab === 'users' && (
                       <div className="overflow-x-auto">
                         <table className="min-w-full">
@@ -2613,6 +2691,8 @@ const AdminDashboard = () => {
                           )}
                         </div>
                       </div>
+                    )}
+                    </div>
                     )}
                   </div>
                 )}

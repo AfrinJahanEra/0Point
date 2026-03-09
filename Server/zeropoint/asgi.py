@@ -10,7 +10,12 @@ django.setup()
 
 from .routing import websocket_urlpatterns
 
+
 class GracefulShutdownMiddleware:
+    """Suppress RuntimeErrors that occur when Daphne reloads while a request
+    or WebSocket handshake is still in flight on Python 3.13.
+    Covers both HTTP and WebSocket scopes.
+    """
     def __init__(self, app):
         self.app = app
 
@@ -18,16 +23,25 @@ class GracefulShutdownMiddleware:
         try:
             return await self.app(scope, receive, send)
         except RuntimeError as e:
-            if 'cannot schedule new futures after interpreter shutdown' in str(e):
-                # Silently ignore shutdown errors
+            msg = str(e).lower()
+            # Catch all shutdown-related futures errors regardless of exact wording
+            if 'cannot schedule new futures' in msg or 'interpreter shutdown' in msg:
+                return
+            raise
+        except Exception as e:
+            # Also suppress asyncio CancelledError noise on reload
+            if isinstance(e, asyncio.CancelledError):
                 return
             raise
 
+
 application = ProtocolTypeRouter({
     "http": GracefulShutdownMiddleware(get_asgi_application()),
-    "websocket": AuthMiddlewareStack(
-        URLRouter(
-            websocket_urlpatterns
+    "websocket": GracefulShutdownMiddleware(
+        AuthMiddlewareStack(
+            URLRouter(
+                websocket_urlpatterns
+            )
         )
     ),
 })
