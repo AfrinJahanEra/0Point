@@ -18,6 +18,7 @@ import {
   Trash2,
   Minus,
   Square,
+  Copy,
 } from "lucide-react";
 
 const Chatbot = () => {
@@ -201,7 +202,7 @@ const Chatbot = () => {
   /* ---------------- Window Sizes ---------------- */
   const sizeMap = {
     normal: "w-96 h-[520px]",
-    minimized: "w-64 h-12",
+    minimized: "w-56 h-auto",
     maximized: "w-[88vw] h-[80vh] max-w-6xl",
   };
 
@@ -262,31 +263,49 @@ const Chatbot = () => {
           {/* Chat */}
           <div className="flex-1 flex flex-col min-h-0">
             {/* Header */}
-            <div className="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-blue-800 to-blue-900 text-white">
-              <div className="flex items-center gap-3">
-                <div className="bg-white/20 p-1.5 rounded-lg">
-                  <Bot size={18} />
+            <div className={`flex justify-between items-center bg-gradient-to-r from-blue-800 to-blue-900 text-white ${isMinimized ? 'px-3 py-2' : 'px-4 py-3'}`}>
+              <div 
+                className="flex items-center gap-2 cursor-pointer flex-1"
+                onClick={() => isMinimized && setWindowMode("normal")}
+              >
+                <div className={`bg-white/20 rounded-lg ${isMinimized ? 'p-1' : 'p-1.5'}`}>
+                  <Bot size={isMinimized ? 14 : 18} />
                 </div>
-                <div>
-                  <span className="font-semibold text-sm block">Coding Assistant</span>
-                  <span className="text-xs text-blue-200">Always here to help</span>
-                </div>
+                {!isMinimized && (
+                  <div>
+                    <span className="font-semibold text-sm block">Coding Assistant</span>
+                    <span className="text-xs text-blue-200">Always here to help</span>
+                  </div>
+                )}
+                {isMinimized && (
+                  <span className="font-medium text-xs truncate">Coding Assistant</span>
+                )}
               </div>
 
-              <div className="flex gap-1">
-                <button onClick={() => setWindowMode("minimized")} className="hover:bg-white/20 p-2 rounded-lg transition-colors">
-                  <Minus size={16} />
+              <div className="flex gap-0.5">
+                <button 
+                  onClick={() => setWindowMode(isMinimized ? "normal" : "minimized")} 
+                  className={`hover:bg-white/20 rounded transition-colors ${isMinimized ? 'p-1.5' : 'p-2'}`}
+                >
+                  <Minus size={isMinimized ? 14 : 16} />
                 </button>
                 <button
                   onClick={() =>
                     setWindowMode(isMaximized ? "normal" : "maximized")
                   }
-                  className="hover:bg-white/20 p-2 rounded-lg transition-colors"
+                  className={`hover:bg-white/20 rounded transition-colors ${isMinimized ? 'p-1.5' : 'p-2'}`}
                 >
-                  <Square size={16} />
+                  {isMaximized ? (
+                    <Copy size={isMinimized ? 14 : 16} />
+                  ) : (
+                    <Square size={isMinimized ? 14 : 16} />
+                  )}
                 </button>
-                <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-2 rounded-lg transition-colors">
-                  <X size={16} />
+                <button 
+                  onClick={() => setIsOpen(false)} 
+                  className={`hover:bg-white/20 rounded transition-colors ${isMinimized ? 'p-1.5' : 'p-2'}`}
+                >
+                  <X size={isMinimized ? 14 : 16} />
                 </button>
               </div>
             </div>

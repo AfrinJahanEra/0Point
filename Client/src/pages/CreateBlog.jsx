@@ -14,6 +14,7 @@ import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { expireHomeCache } from '../utils/homeCache';
 
 const CreateBlog = () => {
   const { user } = useApp();
@@ -97,6 +98,7 @@ const CreateBlog = () => {
           localStorage.removeItem(`blog_user_published_${userKey}_ts`);
           localStorage.removeItem('community_blogs_cache');
           localStorage.removeItem('community_blogs_cache_ts');
+          expireHomeCache(); // Also expire home dashboard cache
         } catch (_) {}
         navigate('/blog');
       }

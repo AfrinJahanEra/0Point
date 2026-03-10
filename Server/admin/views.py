@@ -517,6 +517,8 @@ class AdminBlogsView(APIView):
 
     def delete(self, request, blog_id):
         try:
+            from utils.cache_keys import invalidate_blog_list, invalidate_admin_blogs, invalidate_home_dashboard
+            
             blog = Blog.objects.get(id=blog_id)
             # Option to permanently delete or just unpublish
             permanent = request.data.get('permanent', False)
@@ -528,12 +530,24 @@ class AdminBlogsView(APIView):
                 BlogVote.objects(blog=blog).delete()
                 # Delete blog
                 blog.delete()
+                
+                # Invalidate all related caches
+                invalidate_blog_list()
+                invalidate_admin_blogs()
+                invalidate_home_dashboard()
+                
                 return Response({"message": "Blog permanently deleted with all comments and votes"})
             else:
                 # Just unpublish
                 blog.is_draft = True
                 blog.is_published = False
                 blog.save()
+                
+                # Invalidate all related caches
+                invalidate_blog_list()
+                invalidate_admin_blogs()
+                invalidate_home_dashboard()
+                
                 return Response({"message": "Blog unpublished successfully"})
         except Blog.DoesNotExist:
             return Response({"error": "Blog not found"}, status=404)

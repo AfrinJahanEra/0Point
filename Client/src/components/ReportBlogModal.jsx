@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
+import { expireAdminReports } from '../utils/adminCache';
 
 const ReportBlogModal = ({ isOpen, onClose, blogId, blogTitle }) => {
   const [reason, setReason] = useState('');
@@ -20,6 +21,9 @@ const ReportBlogModal = ({ isOpen, onClose, blogId, blogTitle }) => {
         blog_id: blogId,
         reason: reason.trim()
       });
+      
+      // Expire admin reports cache for real-time update
+      expireAdminReports();
       
       toast.success('Blog reported successfully');
       setReason('');

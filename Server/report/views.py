@@ -6,6 +6,7 @@ from .serializers import BlogReportSerializer, ReviewReportSerializer
 from blog.models import Blog
 from notification.models import Notification
 from account.models import Account
+from utils.cache_keys import invalidate_admin_reports
 from datetime import datetime
 import jwt
 from django.conf import settings
@@ -60,6 +61,9 @@ def create_blog_report(request):
             reason=reason
         )
         report.save()
+        
+        # Invalidate admin reports cache for real-time update
+        invalidate_admin_reports()
         
         return Response({
             "message": "Blog reported successfully",
@@ -165,6 +169,9 @@ def review_report(request, report_id):
             type=f'report_{report.status}',
             related_report_id=str(report.id)
         ).save()
+        
+        # Invalidate admin reports cache for real-time update
+        invalidate_admin_reports()
         
         return Response({
             "message": f"Report {report.status} successfully",

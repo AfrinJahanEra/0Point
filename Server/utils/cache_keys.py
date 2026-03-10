@@ -90,6 +90,36 @@ class CK:
     def leaderboard(contest_id):
         return f'leaderboard_{contest_id}'
 
+    # Home Dashboard
+    @staticmethod
+    def home_dashboard():
+        return 'home_dashboard_public'
+
+    @staticmethod
+    def home_user_registrations(user_id):
+        return f'home_reg_{user_id}'
+
+    # Admin Dashboard
+    @staticmethod
+    def admin_stats():
+        return 'zp:admin_stats'
+
+    @staticmethod
+    def admin_users_list(limit=50):
+        return f'zp:admin_users_list_{limit}'
+
+    @staticmethod
+    def admin_blogs():
+        return 'zp:admin_blogs_v2'
+
+    @staticmethod
+    def admin_banned():
+        return 'zp:admin_banned_list'
+
+    @staticmethod
+    def admin_reports():
+        return 'admin_reports'
+
 
 # ─── Invalidation helpers ─────────────────────────────────────────────────────
 
@@ -171,3 +201,50 @@ def invalidate_leaderboard(contest_id):
         cache.delete(CK.leaderboard(contest_id))
     except Exception:
         pass
+
+
+def invalidate_home_dashboard():
+    """Wipe the home dashboard public cache."""
+    try:
+        cache.delete(CK.home_dashboard())
+    except Exception:
+        pass
+
+
+def invalidate_admin_blogs():
+    """Wipe the admin blogs list cache."""
+    try:
+        # Delete all possible admin blog cache keys
+        keys = [
+            CK.admin_blogs(),
+            'zp:admin_blogs_v2_50',
+            'zp:admin_blogs_v2_100',
+            'zp:admin_blogs_v2_200',
+        ]
+        cache.delete_many(keys)
+    except Exception:
+        pass
+
+
+def invalidate_admin_users():
+    """Wipe the admin users list cache."""
+    try:
+        keys = [
+            CK.admin_stats(),
+            CK.admin_users_list(50),
+            CK.admin_users_list(100),
+            CK.admin_users_list(200),
+            CK.admin_banned(),
+        ]
+        cache.delete_many(keys)
+    except Exception:
+        pass
+
+
+def invalidate_admin_reports():
+    """Wipe the admin reports cache."""
+    try:
+        cache.delete(CK.admin_reports())
+    except Exception:
+        pass
+

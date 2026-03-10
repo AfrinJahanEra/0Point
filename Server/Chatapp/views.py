@@ -170,7 +170,8 @@ def chat_api(request):
                     else:
                         page_data_str = resp.text[:4000]
             except Exception as e:
-                page_data_str = f"Failed to fetch page data: {str(e)}"
+                # Silently ignore fetch errors - don't pass error message to AI
+                page_data_str = None
 
         # Build Gemini context
         messages = [{"role": "user", "parts": [SYSTEM_PROMPT]}]
@@ -178,15 +179,14 @@ def chat_api(request):
         history = ChatMessage.objects(chat=chat).order_by("created_at")
         for msg in history:
             parts = [msg.content]
-            if getattr(msg, "url", None):
-                parts.append(f"[page_url: {msg.url}]")
+            # Don't include page URLs in context - AI can't access them anyway
             messages.append({
                 "role": "user" if msg.role == "user" else "model",
                 "parts": parts
             })
 
-        # Add the fetched page data into the prompt context so the model can use it
-        if page_data_str:
+        # Only add page data context if we successfully fetched useful data
+        if page_data_str and not page_data_str.startswith("<!DOCTYPE") and len(page_data_str) > 50:
             messages.append({
                 "role": "user",
                 "parts": [f"Page data fetched from {current_url}: {page_data_str}"]

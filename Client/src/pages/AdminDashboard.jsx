@@ -28,6 +28,18 @@ import ReactMarkdown from 'react-markdown';
 import * as d3 from 'd3';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { 
+  removeBlogFromCache, 
+  removeUserFromCache, 
+  decrementUserCount, 
+  decrementBlogCount,
+  expireAdminBlogs,
+  expireAdminUsers,
+  expireAdminBanned,
+  expireAdminStats
+} from '../utils/adminCache';
+import { expireHomeCache, removeBlogFromHomeCache } from '../utils/homeCache';
+import { expireCache } from '../utils/pageCache';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -272,6 +284,8 @@ const AdminDashboard = () => {
       await api.delete(`/admin-panel/users/${selectedUser.id}/`, {
         data: { ban_reason: banReason }
       });
+      
+      // Update state immediately
       setUsers(users.filter(user => user.id !== selectedUser.id));
       setStats(prev => ({
         ...prev,
@@ -281,11 +295,17 @@ const AdminDashboard = () => {
           banned: prev.users.banned + 1
         }
       }));
-      alert('User permanently banned and blocked from registration');
+      
+      // Update caches immediately
+      removeUserFromCache(selectedUser.id);
+      decrementUserCount();
+      expireAdminBanned(); // Refresh banned list
+      
+      toast.success('User permanently banned and blocked from registration');
       setShowBanModal(false);
       setSelectedUser(null);
     } catch (error) {
-      alert('Error banning user: ' + (error.response?.data?.error || error.message));
+      toast.error('Error banning user: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -294,10 +314,19 @@ const AdminDashboard = () => {
     
     try {
       await api.delete(`/admin-panel/blogs/${blogId}/`);
+      
+      // Update state immediately
       setBlogs(blogs.filter(blog => blog.id !== blogId));
-      alert('Blog deleted successfully');
+      
+      // Update all related caches immediately
+      removeBlogFromCache(blogId);
+      decrementBlogCount();
+      removeBlogFromHomeCache(blogId);
+      expireCache('community_blogs_cache'); // Expire community cache
+      
+      toast.success('Blog deleted successfully');
     } catch (error) {
-      alert('Error deleting blog: ' + (error.response?.data?.error || error.message));
+      toast.error('Error deleting blog: ' + (error.response?.data?.error || error.message));
     }
   };
   

@@ -13,6 +13,7 @@ import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { expireHomeCache } from '../utils/homeCache';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const formatCommentDate = (dateString) => {
@@ -402,6 +403,9 @@ const Community = () => {
         try { localStorage.setItem(COMMUNITY_CACHE_KEY, JSON.stringify(updated)); } catch (_) {}
         return updated;
       });
+
+      // Expire home cache so blog scores stay in sync
+      expireHomeCache();
 
       toast.success(`Blog ${voteType}d!`);
     } catch (error) {
