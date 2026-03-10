@@ -203,6 +203,31 @@ const Community = () => {
   const COMMUNITY_CACHE_KEY    = 'community_blogs_cache';
   const COMMUNITY_CACHE_TS_KEY  = 'community_blogs_cache_ts';
   const COMMUNITY_CACHE_MAX_AGE = 2 * 60 * 1000; // 2 minutes
+  
+  // Comment cache helpers
+  const COMMENT_CACHE_PREFIX = 'blog_comments_cache_';
+  const COMMENT_CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
+  
+  const getCommentCacheKey = (blogId) => `${COMMENT_CACHE_PREFIX}${blogId}`;
+  const getCommentCacheTsKey = (blogId) => `${COMMENT_CACHE_PREFIX}${blogId}_ts`;
+  
+  const getCachedComments = (blogId) => {
+    try {
+      const cached = localStorage.getItem(getCommentCacheKey(blogId));
+      const cachedAt = parseInt(localStorage.getItem(getCommentCacheTsKey(blogId)) || '0', 10);
+      if (cached) {
+        return { data: JSON.parse(cached), isFresh: (Date.now() - cachedAt) < COMMENT_CACHE_MAX_AGE };
+      }
+    } catch (_) {}
+    return { data: null, isFresh: false };
+  };
+  
+  const setCachedComments = (blogId, comments) => {
+    try {
+      localStorage.setItem(getCommentCacheKey(blogId), JSON.stringify(comments));
+      localStorage.setItem(getCommentCacheTsKey(blogId), String(Date.now()));
+    } catch (_) {}
+  };
 
   const fetchAllPublishedBlogs = async () => {
     // 1. Show stale data instantly
@@ -286,13 +311,22 @@ const Community = () => {
     if (!wasExpanded) {
       const comments = blogComments[blogId];
       const votes = blogVotes[blogId];
-      // Fetch if undefined OR empty array (failed previous fetch or cleared)
-      const needsComments = !comments || comments.length === 0;
+      
+      // Check localStorage cache for comments if not in state
+      let needsComments = !comments || comments.length === 0;
+      if (needsComments) {
+        const { data: cached } = getCachedComments(blogId);
+        if (cached && cached.length > 0) {
+          setBlogComments(prev => ({ ...prev, [blogId]: cached }));
+          needsComments = false; // Have cached data, will refresh in background via fetchBlogComments
+        }
+      }
+      
       const needsVotes = !votes;
       if (needsComments || needsVotes) {
         console.log(`[Expand] Fetching for blog ${blogId}: comments=${needsComments}, votes=${needsVotes}`);
         const promises = [];
-        if (needsComments) promises.push(fetchBlogComments(blogId));
+        promises.push(fetchBlogComments(blogId)); // Always fetch to refresh cache
         if (needsVotes) promises.push(fetchBlogVotes(blogId));
         await Promise.all(promises);
       }
@@ -300,13 +334,31 @@ const Community = () => {
   };
 
   const fetchBlogComments = useCallback(async (blogId) => {
+    // 1. Show cached comments immediately if available
+    const { data: cached, isFresh } = getCachedComments(blogId);
+    if (cached && cached.length > 0) {
+      setBlogComments(prev => ({ ...prev, [blogId]: cached }));
+      // If cache is fresh, skip network request
+      if (isFresh) {
+        console.log(`[Comments] Blog ${blogId}: CACHE HIT (fresh)`);
+        return;
+      }
+      console.log(`[Comments] Blog ${blogId}: CACHE HIT (stale, refreshing...)`);
+    }
+    
+    // 2. Fetch fresh data from server
     try {
       const response = await api.get(`/blog/${blogId}/comments/`);
-      console.log(`[Comments] Fetched for blog ${blogId}:`, response.data);
-      setBlogComments(prev => ({ ...prev, [blogId]: response.data || [] }));
+      const comments = response.data || [];
+      console.log(`[Comments] Fetched ${comments.length} comments for blog ${blogId}`);
+      setBlogComments(prev => ({ ...prev, [blogId]: comments }));
+      setCachedComments(blogId, comments);
     } catch (error) {
       console.error(`[Comments] Error fetching for blog ${blogId}:`, error);
-      toast.error('Failed to load comments');
+      // Only show error if we didn't have cached data
+      if (!cached) {
+        toast.error('Failed to load comments');
+      }
     }
   }, []);
 
@@ -373,6 +425,7 @@ const Community = () => {
       replies: [],
     };
 
+    let newCommentsList;
     if (parentCommentId) {
       // Attach as reply optimistically (search at any depth)
       const attachReply = (comments) =>
@@ -382,9 +435,15 @@ const Community = () => {
           if (c.replies?.length) return { ...c, replies: attachReply(c.replies) };
           return c;
         });
-      setBlogComments(prev => ({ ...prev, [blogId]: attachReply(prev[blogId] || []) }));
+      setBlogComments(prev => {
+        newCommentsList = attachReply(prev[blogId] || []);
+        return { ...prev, [blogId]: newCommentsList };
+      });
     } else {
-      setBlogComments(prev => ({ ...prev, [blogId]: [...(prev[blogId] || []), optimisticComment] }));
+      setBlogComments(prev => {
+        newCommentsList = [...(prev[blogId] || []), optimisticComment];
+        return { ...prev, [blogId]: newCommentsList };
+      });
     }
 
     setNewComments(prev => ({ ...prev, [blogId]: '' }));
@@ -399,6 +458,7 @@ const Community = () => {
       const savedComment = response.data; // server returns the real comment with real ID
 
       // Replace the temp optimistic entry with the real server comment
+      let finalComments;
       if (parentCommentId) {
         const replaceReply = (comments) =>
           comments.map(c => {
@@ -407,12 +467,17 @@ const Community = () => {
             if (c.replies?.length) return { ...c, replies: replaceReply(c.replies) };
             return c;
           });
-        setBlogComments(prev => ({ ...prev, [blogId]: replaceReply(prev[blogId] || []) }));
+        setBlogComments(prev => {
+          finalComments = replaceReply(prev[blogId] || []);
+          setCachedComments(blogId, finalComments); // Update cache
+          return { ...prev, [blogId]: finalComments };
+        });
       } else {
-        setBlogComments(prev => ({
-          ...prev,
-          [blogId]: (prev[blogId] || []).map(c => c.id === tempId ? savedComment : c)
-        }));
+        setBlogComments(prev => {
+          finalComments = (prev[blogId] || []).map(c => c.id === tempId ? savedComment : c);
+          setCachedComments(blogId, finalComments); // Update cache
+          return { ...prev, [blogId]: finalComments };
+        });
       }
 
       toast.success('Comment posted!');
@@ -425,7 +490,11 @@ const Community = () => {
         comments
           .filter(c => c.id !== tempId)
           .map(c => c.replies?.length ? { ...c, replies: removeTemp(c.replies) } : c);
-      setBlogComments(prev => ({ ...prev, [blogId]: removeTemp(prev[blogId] || []) }));
+      setBlogComments(prev => {
+        const rolledBack = removeTemp(prev[blogId] || []);
+        setCachedComments(blogId, rolledBack); // Update cache with rollback
+        return { ...prev, [blogId]: rolledBack };
+      });
       toast.error('Failed to post comment');
     }
   }, [user, refreshSingleBlog]);
@@ -439,11 +508,15 @@ const Community = () => {
         .filter(c => c.id !== commentId)
         .map(c => c.replies?.length ? { ...c, replies: removeComment(c.replies) } : c);
 
-    setBlogComments(prev => ({ ...prev, [blogId]: removeComment(prev[blogId] || []) }));
+    setBlogComments(prev => {
+      const updated = removeComment(prev[blogId] || []);
+      setCachedComments(blogId, updated); // Update cache immediately
+      return { ...prev, [blogId]: updated };
+    });
 
     try {
       await api.delete(`/blog/comments/${commentId}/delete/`);
-      // Refetch to sync nested reply counts / ordering from server
+      // Server invalidated cache, fetch fresh to sync
       fetchBlogComments(blogId);
       toast.success('Comment deleted');
     } catch (error) {
@@ -476,7 +549,11 @@ const Community = () => {
         return c;
       });
 
-    setBlogComments(prev => ({ ...prev, [blogId]: optimisticUpdate(prev[blogId] || []) }));
+    setBlogComments(prev => {
+      const updated = optimisticUpdate(prev[blogId] || []);
+      setCachedComments(blogId, updated); // Update cache immediately
+      return { ...prev, [blogId]: updated };
+    });
 
     try {
       const response = await api.post(`/blog/comments/${commentId}/vote/`, { vote_type: voteType });
@@ -488,7 +565,11 @@ const Community = () => {
           if (c.replies?.length) return { ...c, replies: reconcile(c.replies) };
           return c;
         });
-      setBlogComments(prev => ({ ...prev, [blogId]: reconcile(prev[blogId] || []) }));
+      setBlogComments(prev => {
+        const reconciled = reconcile(prev[blogId] || []);
+        setCachedComments(blogId, reconciled); // Update cache with server data
+        return { ...prev, [blogId]: reconciled };
+      });
     } catch (error) {
       console.error('Error voting on comment:', error);
       fetchBlogComments(blogId); // rollback

@@ -47,7 +47,7 @@ import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import { BACKEND_URL } from '../utils/api';
-import { patchCachedContest, expireContestsCache, removeCachedContest } from '../utils/contestsCache';
+import { patchCachedContest, expireContestsCache, removeCachedContest, prependCachedContest } from '../utils/contestsCache';
 import { toast } from 'react-hot-toast';
 
 const CreateContest = () => {
@@ -507,8 +507,25 @@ const CreateContest = () => {
           duration: parseFloat(contestData.duration) || 0,
         });
       } else if (data.id) {
-        // New contest — not in cache yet, just expire so next visit re-fetches
-        expireContestsCache();
+        // New contest — prepend to cache so it shows immediately
+        const newContest = {
+          id: data.id,
+          title: contestData.title || '',
+          description: contestData.description || '',
+          start_time: contestData.startTime ? contestData.startTime + ':00Z' : null,
+          duration: parseFloat(contestData.duration) || 0,
+          type: contestData.contestType || 'individual',
+          platform: 'IUT',
+          status: 'draft',
+          participants: 0,
+          is_registered: false,
+          is_creator: true,
+          external: false,
+          is_external: false,
+          is_test_contest: false,
+        };
+        prependCachedContest(newContest);
+        
         // Silently update the URL to the edit route without triggering a full reload
         setEditMode(true);
         window.history.replaceState(null, '', `/contests/${data.id}/edit/`);
@@ -827,8 +844,37 @@ const CreateContest = () => {
 
       toast.success(`Contest ${type === "test" ? "published as test" : "published successfully"}!`);
       setIsPublishing(false);
-      // Remove the draft from cache; expire so the published version loads fresh
-      if (contestId) removeCachedContest(contestId);
+      
+      // Update cache: patch the contest status from 'draft' to 'upcoming' for immediate visibility
+      if (contestId) {
+        patchCachedContest(contestId, {
+          status: type === "test" ? "test" : "upcoming",
+          title: contestData.title || '',
+          description: contestData.description || '',
+          start_time: contestData.startTime ? contestData.startTime + ':00Z' : null,
+          duration: parseFloat(contestData.duration) || 0,
+        });
+      } else if (data.id) {
+        // New contest published directly - prepend to cache
+        const publishedContest = {
+          id: data.id,
+          title: contestData.title || '',
+          description: contestData.description || '',
+          start_time: contestData.startTime ? contestData.startTime + ':00Z' : null,
+          duration: parseFloat(contestData.duration) || 0,
+          type: contestData.contestType || 'individual',
+          platform: 'IUT',
+          status: type === "test" ? "test" : "upcoming",
+          participants: 0,
+          is_registered: false,
+          is_creator: true,
+          external: false,
+          is_external: false,
+          is_test_contest: type === "test",
+        };
+        prependCachedContest(publishedContest);
+      }
+      // Expire cache so background refresh syncs with server
       expireContestsCache();
       navigate("/contests");
     } catch (err) {

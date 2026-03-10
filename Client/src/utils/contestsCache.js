@@ -10,7 +10,7 @@
  * Internally delegates to the universal pageCache helpers.
  */
 
-import { readStale, writeCache, expireCache, patchCache, removeFromCache } from './pageCache';
+import { readStale, writeCache, expireCache, clearCache, patchCache, removeFromCache, prependToCache } from './pageCache';
 
 export const CACHE_KEY    = 'contests_dashboard_cache';
 export const CACHE_TTL    = 30_000; // 30 seconds (matches backend Redis TTL)
@@ -25,6 +25,23 @@ const readCache = () => readStale(CACHE_KEY);
  * Use this when a new contest was created (not yet in the cache list).
  */
 export const expireContestsCache = () => expireCache(CACHE_KEY);
+
+/**
+ * Clear the cache entirely — removes both data and timestamp.
+ * Use this when you want to force a fresh fetch with no stale data shown.
+ */
+export const clearContestsCache = () => clearCache(CACHE_KEY);
+
+/**
+ * Prepend a new contest to the front of the contests list in cache.
+ * Use this after creating a new contest so it shows immediately.
+ * Also expires the cache so it refreshes from server in background.
+ */
+export const prependCachedContest = (contest) => {
+  prependToCache(CACHE_KEY, 'contests', contest);
+  // Expire timestamp so next page visit will refresh from server
+  expireCache(CACHE_KEY);
+};
 
 /**
  * Patch a single contest entry in the cache by ID.

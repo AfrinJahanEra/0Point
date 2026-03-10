@@ -19,6 +19,7 @@ TTL_CONTEST_PROBLEMS = 30    # 30 s  - problems list for a contest
 TTL_CONTEST_PROBLEM  = 60    # 60 s  - single problem detail
 TTL_BLOG_LIST        = 60    # 60 s
 TTL_BLOG_DETAIL      = 120   # 2 min
+TTL_BLOG_COMMENTS    = 300   # 5 min - comments don't change often
 TTL_ANNOUNCEMENT     = 30    # 30 s
 TTL_DISCUSSION_LIST  = 30    # 30 s
 TTL_LEADERBOARD      = 20    # 20 s  - leaderboard changes frequently during live
@@ -65,6 +66,10 @@ class CK:
     @staticmethod
     def blog_detail(blog_id):
         return f'blog_detail_{blog_id}'
+
+    @staticmethod
+    def blog_comments(blog_id):
+        return f'blog_comments_{blog_id}'
 
     # Announcements
     @staticmethod
@@ -126,6 +131,14 @@ def invalidate_blog_list():
     """Wipe the published blog list cache."""
     try:
         cache.delete(CK.blog_list())
+    except Exception:
+        pass
+
+
+def invalidate_blog_comments(blog_id):
+    """Wipe the blog comments cache for a specific blog."""
+    try:
+        cache.delete(CK.blog_comments(blog_id))
     except Exception:
         pass
 

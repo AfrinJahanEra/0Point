@@ -8,7 +8,7 @@ from account.models import Account
 import jwt
 from django.conf import settings
 from django.core.cache import cache
-from utils.cache_keys import invalidate_blog_list, CK
+from utils.cache_keys import invalidate_blog_list, invalidate_blog_comments, CK, TTL_BLOG_COMMENTS
 
 def get_user_from_request(request):
     """
@@ -309,6 +309,10 @@ def create_comment(request, blog_id):
     serializer = BlogCommentSerializer(data=data, context={'request': request, 'user': user})
     if serializer.is_valid():
         comment = serializer.save()
+        
+        # Invalidate comments cache so next fetch gets fresh data
+        invalidate_blog_comments(blog_id)
+        
         # Return comment dict with user_vote = None (newly created, no votes yet)
         comment_dict = comment.to_dict()
         comment_dict['user_vote'] = None
@@ -318,32 +322,39 @@ def create_comment(request, blog_id):
 
 @api_view(['GET'])
 def get_blog_comments(request, blog_id):
-    """Get all comments for a blog post"""
+    """Get all comments for a blog post (with Redis caching)"""
     try:
         blog = Blog.objects.get(id=blog_id, is_published=True)
-        
-        # Get top-level comments (no parent)
-        comments = BlogComment.objects(blog=blog, parent_comment=None, is_deleted=False).order_by('created_at')
-        count = comments.count()
-        print(f"[Comments] Blog {blog_id}: found {count} top-level comments")
-        
         user = get_user_from_request(request)
         
-        comment_data = []
-        for comment in comments:
-            comment_dict = comment.to_dict()
-            # Add user vote information if user is authenticated
-            if user:
-                vote = BlogCommentVote.objects(comment=comment, user=user).first()
-                comment_dict['user_vote'] = vote.vote_type if vote else None
-            else:
-                comment_dict['user_vote'] = None
-            
-            # Recursively get replies with vote info
-            comment_dict['replies'] = get_nested_replies_with_votes(comment, user)
-            comment_data.append(comment_dict)
+        # Try to get from cache first
+        cache_key = CK.blog_comments(blog_id)
+        cached_comments = cache.get(cache_key)
         
-        print(f"[Comments] Blog {blog_id}: returning {len(comment_data)} comments with replies")
+        if cached_comments is None:
+            # Cache miss - fetch from database
+            comments = BlogComment.objects(blog=blog, parent_comment=None, is_deleted=False).order_by('created_at')
+            count = comments.count()
+            print(f"[Comments] Blog {blog_id}: CACHE MISS - fetched {count} top-level comments from DB")
+            
+            # Build comment data without user-specific votes
+            comment_data = []
+            for comment in comments:
+                comment_dict = comment.to_dict()
+                comment_dict['user_vote'] = None
+                comment_dict['replies'] = get_nested_replies_base(comment)
+                comment_data.append(comment_dict)
+            
+            # Cache the base data
+            cache.set(cache_key, comment_data, timeout=TTL_BLOG_COMMENTS)
+        else:
+            comment_data = cached_comments
+            print(f"[Comments] Blog {blog_id}: CACHE HIT - returning {len(comment_data)} comments")
+        
+        # Add user-specific vote information if user is authenticated
+        if user:
+            comment_data = add_user_votes_to_comments(comment_data, user)
+        
         return Response(comment_data, status=status.HTTP_200_OK)
     except Blog.DoesNotExist:
         print(f"[Comments] Blog {blog_id}: not found")
@@ -352,24 +363,32 @@ def get_blog_comments(request, blog_id):
         print(f"[Comments] Blog {blog_id}: error - {e}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-def get_nested_replies_with_votes(comment, user):
-    """Helper function to get nested replies recursively with vote information"""
+
+def get_nested_replies_base(comment):
+    """Helper function to get nested replies without user vote info (for caching)"""
     replies = []
     for reply in comment.replies:
         if not reply.is_deleted:
-            reply_dict = reply.to_dict()  # No include_replies, replies added separately
-            
-            # Add user vote information if user is authenticated
-            if user:
-                vote = BlogCommentVote.objects(comment=reply, user=user).first()
-                reply_dict['user_vote'] = vote.vote_type if vote else None
-            else:
-                reply_dict['user_vote'] = None
-            
-            # Recursively get nested replies
-            reply_dict['replies'] = get_nested_replies_with_votes(reply, user)
+            reply_dict = reply.to_dict()
+            reply_dict['user_vote'] = None
+            reply_dict['replies'] = get_nested_replies_base(reply)
             replies.append(reply_dict)
     return replies
+
+
+def add_user_votes_to_comments(comments, user):
+    """Add user-specific vote information to cached comments"""
+    result = []
+    for comment in comments:
+        comment_copy = dict(comment)
+        # Get user vote for this comment
+        vote = BlogCommentVote.objects(comment=comment['id'], user=user).first()
+        comment_copy['user_vote'] = vote.vote_type if vote else None
+        # Recursively add votes to replies
+        if comment.get('replies'):
+            comment_copy['replies'] = add_user_votes_to_comments(comment['replies'], user)
+        result.append(comment_copy)
+    return result
 
 
 @api_view(['GET'])
@@ -418,6 +437,9 @@ def vote_comment(request, comment_id):
     if serializer.is_valid():
         serializer.save()
 
+        # Invalidate comments cache since vote counts changed
+        invalidate_blog_comments(str(comment.blog.id))
+
         # Always return current counts (whether vote was added, changed, or removed)
         upvotes   = BlogCommentVote.objects(comment=comment, vote_type='upvote').count()
         downvotes = BlogCommentVote.objects(comment=comment, vote_type='downvote').count()
@@ -442,6 +464,7 @@ def delete_comment(request, comment_id):
 
     try:
         comment = BlogComment.objects.get(id=comment_id)
+        blog_id = str(comment.blog.id)
         
         # Check if user is the author or blog author
         if comment.author != user and comment.blog.author != user:
@@ -449,6 +472,9 @@ def delete_comment(request, comment_id):
         
         comment.is_deleted = True
         comment.save()
+        
+        # Invalidate comments cache so deleted comment is removed
+        invalidate_blog_comments(blog_id)
         
         return Response({'message': 'Comment deleted'}, status=status.HTTP_200_OK)
     except BlogComment.DoesNotExist:
