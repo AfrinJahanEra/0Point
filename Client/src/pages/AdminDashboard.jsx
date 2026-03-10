@@ -74,6 +74,7 @@ const AdminDashboard = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
   const [adminNote, setAdminNote] = useState('');
+  const [reviewLoading, setReviewLoading] = useState(false);
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
   const [announcementText, setAnnouncementText] = useState('');
   const [announcementTopic, setAnnouncementTopic] = useState('');
@@ -97,6 +98,37 @@ const AdminDashboard = () => {
     setAdminInfo({ name: user.name || 'Admin', email: user.email || '' });
     loadDashboardData();
   }, [navigate]);
+
+  // Listen for real-time report updates (when a new report is submitted from any tab)
+  useEffect(() => {
+    const handleReportUpdate = async () => {
+      // If we're on the reports tab, fetch fresh data immediately from DB
+      if (activeTab === 'reports') {
+        try {
+          const response = await api.get('/report/all/');
+          setBlogReports(response.data);
+        } catch (error) {
+          console.error('Error fetching reports:', error);
+        }
+      }
+    };
+
+    // Listen for custom event (same-tab updates)
+    window.addEventListener('admin-reports-updated', handleReportUpdate);
+    
+    // Listen for storage events (cross-tab updates)
+    const handleStorageChange = (e) => {
+      if (e.key === 'admin_reports_updated') {
+        handleReportUpdate();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('admin-reports-updated', handleReportUpdate);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [activeTab]);
 
   // ── cache helpers ──────────────────────────────────────────────
   const ADMIN_MAX_AGE = 60 * 1000; // 1 minute (matches backend TTL)
@@ -172,18 +204,11 @@ const AdminDashboard = () => {
   };
 
   const loadBlogReports = async () => {
-    const cached = _readCache('admin_reports');
-    if (cached) {
-      setBlogReports(cached.data);
-      setTabLoading(false);
-      if (cached.fresh) return;
-    } else {
-      setTabLoading(true);
-    }
+    // Always fetch fresh from DB - no caching for reports
+    setTabLoading(true);
     try {
       const response = await api.get('/report/all/');
       setBlogReports(response.data);
-      _writeCache('admin_reports', response.data);
     } catch (error) {
       console.error('Error loading blog reports:', error);
       toast.error('Failed to load blog reports');
@@ -333,23 +358,36 @@ const AdminDashboard = () => {
   const handleReviewReport = async (action) => {
     if (!selectedReport) return;
     
+    setReviewLoading(true);
     try {
-      await api.post(`/report/${selectedReport.id}/review/`, {
+      const response = await api.post(`/report/${selectedReport.id}/review/`, {
         action: action,
         admin_note: adminNote
       });
+      
+      // Immediately update the report status in local state
+      const updatedReport = response.data.report;
+      setBlogReports(prevReports => 
+        prevReports.map(report => 
+          report.id === selectedReport.id 
+            ? { ...report, ...updatedReport }
+            : report
+        )
+      );
       
       toast.success(`Report ${action === 'approve' ? 'approved' : 'rejected'} successfully`);
       setShowReviewModal(false);
       setSelectedReport(null);
       setAdminNote('');
-      loadBlogReports();
+      
       if (action === 'approve') {
         loadBlogs();
       }
     } catch (error) {
       console.error('Error reviewing report:', error);
       toast.error('Failed to review report');
+    } finally {
+      setReviewLoading(false);
     }
   };
 
@@ -2855,21 +2893,24 @@ const AdminDashboard = () => {
                     setSelectedReport(null);
                     setAdminNote('');
                   }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={reviewLoading}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleReviewReport('reject')}
-                  className="px-4 py-2 text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 rounded-md"
+                  className="px-4 py-2 text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={reviewLoading}
                 >
-                  Reject Report
+                  {reviewLoading ? 'Processing...' : 'Reject Report'}
                 </button>
                 <button
                   onClick={() => handleReviewReport('approve')}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md"
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={reviewLoading}
                 >
-                  Approve & Delete Blog
+                  {reviewLoading ? 'Processing...' : 'Approve & Delete Blog'}
                 </button>
               </div>
             </div>

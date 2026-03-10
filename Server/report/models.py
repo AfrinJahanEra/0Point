@@ -23,27 +23,35 @@ class BlogReport(Document):
         return super(BlogReport, self).save(*args, **kwargs)
     
     def to_dict(self):
+        from bson import DBRef
+        from blog.models import Blog as BlogModel
+        from account.models import Account as AccountModel
+        
         blog_data = None
-        if self.blog:
+        # Check raw data first to avoid triggering dereference
+        raw_blog = self._data.get('blog')
+        if raw_blog:
             try:
                 # Get the raw DBRef id without triggering a full dereference
-                from bson import DBRef
-                raw = self._data.get('blog')
-                raw_id = str(raw.id) if isinstance(raw, DBRef) else str(self.blog.id)
-
+                raw_id = str(raw_blog.id) if isinstance(raw_blog, DBRef) else str(raw_blog)
+                
                 # Now try to fetch the actual document
-                from blog.models import Blog as BlogModel
-                from mongoengine.errors import DoesNotExist, OperationError
                 blog_doc = BlogModel.objects(id=raw_id).first()
                 if blog_doc:
+                    author_data = None
+                    if blog_doc.author:
+                        try:
+                            author_data = {
+                                "id": str(blog_doc.author.id),
+                                "name": blog_doc.author.name,
+                                "email": blog_doc.author.email
+                            }
+                        except Exception:
+                            author_data = None
                     blog_data = {
                         "id": raw_id,
                         "title": blog_doc.title,
-                        "author": {
-                            "id": str(blog_doc.author.id),
-                            "name": blog_doc.author.name,
-                            "email": blog_doc.author.email
-                        } if blog_doc.author else None
+                        "author": author_data
                     }
                 else:
                     # Blog was hard-deleted; return a placeholder so the report is still visible
@@ -58,24 +66,32 @@ class BlogReport(Document):
                 blog_data = {"id": "unknown", "title": "[Deleted Blog]", "author": None}
         
         reporter_data = None
-        if self.reporter:
+        raw_reporter = self._data.get('reporter')
+        if raw_reporter:
             try:
-                reporter_data = {
-                    "id": str(self.reporter.id),
-                    "name": self.reporter.name,
-                    "email": self.reporter.email
-                }
+                raw_reporter_id = str(raw_reporter.id) if isinstance(raw_reporter, DBRef) else str(raw_reporter)
+                reporter_doc = AccountModel.objects(id=raw_reporter_id).first()
+                if reporter_doc:
+                    reporter_data = {
+                        "id": str(reporter_doc.id),
+                        "name": reporter_doc.name,
+                        "email": reporter_doc.email
+                    }
             except Exception as e:
                 print(f"Error getting reporter data: {str(e)}")
                 reporter_data = None
         
         reviewed_by_data = None
-        if self.reviewed_by:
+        raw_reviewed_by = self._data.get('reviewed_by')
+        if raw_reviewed_by:
             try:
-                reviewed_by_data = {
-                    "id": str(self.reviewed_by.id),
-                    "name": self.reviewed_by.name
-                }
+                raw_reviewed_id = str(raw_reviewed_by.id) if isinstance(raw_reviewed_by, DBRef) else str(raw_reviewed_by)
+                reviewed_doc = AccountModel.objects(id=raw_reviewed_id).first()
+                if reviewed_doc:
+                    reviewed_by_data = {
+                        "id": str(reviewed_doc.id),
+                        "name": reviewed_doc.name
+                    }
             except Exception as e:
                 print(f"Error getting reviewed_by data: {str(e)}")
                 reviewed_by_data = None

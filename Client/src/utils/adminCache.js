@@ -68,6 +68,54 @@ export const expireAdminBanned = () => expireCache(CACHE_KEYS.BANNED);
 export const expireAdminReports = () => expireCache(CACHE_KEYS.REPORTS);
 
 /**
+ * Add a new report to the admin reports cache immediately
+ */
+export const addReportToCache = (newReport) => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEYS.REPORTS);
+    if (!raw) return;
+    const reports = JSON.parse(raw);
+    // Add new report at the beginning (most recent first)
+    reports.unshift(newReport);
+    localStorage.setItem(CACHE_KEYS.REPORTS, JSON.stringify(reports));
+  } catch (_) {
+    expireAdminReports();
+  }
+  
+  // Trigger real-time update for admin dashboard
+  notifyReportsUpdated();
+};
+
+/**
+ * Notify admin dashboard that reports have been updated (real-time)
+ */
+export const notifyReportsUpdated = () => {
+  // Dispatch custom event for same-tab updates
+  window.dispatchEvent(new CustomEvent('admin-reports-updated'));
+  
+  // Trigger storage event for cross-tab updates
+  // (storage events only fire in other tabs, so we use a timestamp key)
+  localStorage.setItem('admin_reports_updated', String(Date.now()));
+};
+
+/**
+ * Update a specific report in the admin reports cache
+ */
+export const updateReportInCache = (reportId, updates) => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEYS.REPORTS);
+    if (!raw) return;
+    const reports = JSON.parse(raw);
+    const updatedReports = reports.map(report => 
+      report.id === reportId ? { ...report, ...updates } : report
+    );
+    localStorage.setItem(CACHE_KEYS.REPORTS, JSON.stringify(updatedReports));
+  } catch (_) {
+    expireAdminReports();
+  }
+};
+
+/**
  * Remove a user from the admin users cache
  */
 export const removeUserFromCache = (userId) => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
-import { expireAdminReports } from '../utils/adminCache';
+import { expireAdminReports, addReportToCache, notifyReportsUpdated } from '../utils/adminCache';
 
 const ReportBlogModal = ({ isOpen, onClose, blogId, blogTitle }) => {
   const [reason, setReason] = useState('');
@@ -17,12 +17,20 @@ const ReportBlogModal = ({ isOpen, onClose, blogId, blogTitle }) => {
 
     setIsSubmitting(true);
     try {
-      await api.post('/report/create/', {
+      const response = await api.post('/report/create/', {
         blog_id: blogId,
         reason: reason.trim()
       });
       
-      // Expire admin reports cache for real-time update
+      // Add new report to cache immediately for real-time update on admin dashboard
+      if (response.data?.report) {
+        addReportToCache(response.data.report);
+      } else {
+        // If no report in response, still notify for refresh
+        notifyReportsUpdated();
+      }
+      
+      // Also expire cache to ensure fresh data on next full load
       expireAdminReports();
       
       toast.success('Blog reported successfully');
