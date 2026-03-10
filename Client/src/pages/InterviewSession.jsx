@@ -40,6 +40,7 @@ const InterviewSession = () => {
   const codeWs = useRef(null);
   const streamRef = useRef(null);
   const connectedParticipantsRef = useRef({});
+  const pendingIceCandidates = useRef([]);
 
   // Media state
   const [localAudioActive, setLocalAudioActive] = useState(false);
@@ -108,6 +109,7 @@ const InterviewSession = () => {
   const [participants, setParticipants] = useState([]);
   const [permissionState, setPermissionState] = useState({ audio: 'prompt', video: 'prompt' });
   const [error, setError] = useState('');
+  const [showClickToPlay, setShowClickToPlay] = useState(false);
 
   const myRoleLabel = role === 'interviewer' ? 'Interviewer' : 'Candidate';
   const remoteRoleLabel = role === 'interviewer' ? 'Candidate' : 'Interviewer';
@@ -382,21 +384,27 @@ const InterviewSession = () => {
             // Google STUN servers
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
-            // Free TURN servers from OpenRelay (for production NAT traversal)
+            { urls: 'stun:stun2.l.google.com:19302' },
+            // Metered.ca free TURN servers (more reliable)
             {
-              urls: 'turn:openrelay.metered.ca:80',
-              username: 'openrelayproject',
-              credential: 'openrelayproject'
+              urls: 'turn:a.relay.metered.ca:80',
+              username: 'e8dd65f92ae98d5b1ac0a164',
+              credential: 'uWdWNmkhvyqTmFRR'
             },
             {
-              urls: 'turn:openrelay.metered.ca:443',
-              username: 'openrelayproject',
-              credential: 'openrelayproject'
+              urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+              username: 'e8dd65f92ae98d5b1ac0a164',
+              credential: 'uWdWNmkhvyqTmFRR'
             },
             {
-              urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-              username: 'openrelayproject',
-              credential: 'openrelayproject'
+              urls: 'turn:a.relay.metered.ca:443',
+              username: 'e8dd65f92ae98d5b1ac0a164',
+              credential: 'uWdWNmkhvyqTmFRR'
+            },
+            {
+              urls: 'turn:a.relay.metered.ca:443?transport=tcp',
+              username: 'e8dd65f92ae98d5b1ac0a164',
+              credential: 'uWdWNmkhvyqTmFRR'
             }
           ],
           iceCandidatePoolSize: 10
@@ -531,6 +539,14 @@ const InterviewSession = () => {
               
               await pc.current.setRemoteDescription(new RTCSessionDescription(data.offer));
               console.log('Remote offer set, creating answer...');
+              
+              // Process any queued ICE candidates
+              while (pendingIceCandidates.current.length > 0) {
+                const candidate = pendingIceCandidates.current.shift();
+                console.log('Processing queued ICE candidate...');
+                await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+              }
+              
               const answer = await pc.current.createAnswer();
               await pc.current.setLocalDescription(answer);
               if (ws.current?.readyState === WebSocket.OPEN) {
@@ -554,14 +570,27 @@ const InterviewSession = () => {
               }
               await pc.current.setRemoteDescription(new RTCSessionDescription(data.answer));
               console.log('Remote description set successfully');
+              
+              // Process any queued ICE candidates
+              while (pendingIceCandidates.current.length > 0) {
+                const candidate = pendingIceCandidates.current.shift();
+                console.log('Processing queued ICE candidate...');
+                await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+              }
             } catch (err) {
               console.error('Error handling answer:', err);
             }
           } else if (data.type === 'ice_candidate') {
             try {
               if (data.ice_candidate && pc.current) {
-                console.log('Adding ICE candidate...');
-                await pc.current.addIceCandidate(new RTCIceCandidate(data.ice_candidate));
+                // Queue ICE candidates if remote description is not set yet
+                if (!pc.current.remoteDescription) {
+                  console.log('Queuing ICE candidate (no remote description yet)');
+                  pendingIceCandidates.current.push(data.ice_candidate);
+                } else {
+                  console.log('Adding ICE candidate...');
+                  await pc.current.addIceCandidate(new RTCIceCandidate(data.ice_candidate));
+                }
               }
             } catch (err) {
               console.error('Error adding ICE candidate:', err);
@@ -648,12 +677,13 @@ const InterviewSession = () => {
                 console.log('Setting remote stream to video element');
                 remoteVideoRef.current.srcObject = remoteStream;
                 
-                // Play the video
-                remoteVideoRef.current.play().catch(e => {
+                // Play the video - don't mute as we need audio
+                remoteVideoRef.current.play().then(() => {
+                  setShowClickToPlay(false);
+                }).catch(e => {
                   console.warn('Auto-play prevented:', e);
-                  // Add click-to-play fallback
-                  remoteVideoRef.current.muted = true;
-                  remoteVideoRef.current.play().catch(() => {});
+                  // Show a message to user to click to enable audio
+                  setShowClickToPlay(true);
                 });
               }
             }
@@ -745,6 +775,9 @@ const InterviewSession = () => {
 
       ws.current?.close();
       codeWs.current?.close();
+      
+      // Clear pending ICE candidates
+      pendingIceCandidates.current = [];
 
       // Close peer connection properly
       if (pc.current) {
@@ -1346,7 +1379,13 @@ const InterviewSession = () => {
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
-                muted
+                onClick={() => {
+                  if (remoteVideoRef.current) {
+                    remoteVideoRef.current.play().then(() => {
+                      setShowClickToPlay(false);
+                    }).catch(e => console.warn('Play failed:', e));
+                  }
+                }}
                 style={
                   {
                     width: '100%',
@@ -1354,10 +1393,40 @@ const InterviewSession = () => {
                     objectFit: 'cover',
                     background: '#0f172a',
                     display: remoteVideoEnabled ? 'block' : 'none',
-                    opacity: remoteVideoEnabled ? 1 : 0
+                    opacity: remoteVideoEnabled ? 1 : 0,
+                    cursor: showClickToPlay ? 'pointer' : 'default'
                   }
                 }
               />
+              {showClickToPlay && remoteVideoEnabled && (
+                <div
+                  onClick={() => {
+                    if (remoteVideoRef.current) {
+                      remoteVideoRef.current.play().then(() => {
+                        setShowClickToPlay(false);
+                      }).catch(e => console.warn('Play failed:', e));
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '220px',
+                    background: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    cursor: 'pointer',
+                    zIndex: 10
+                  }}
+                >
+                  <div style={{ fontSize: '2em', marginBottom: '10px' }}>🔊</div>
+                  <div style={{ fontSize: '0.95em', fontWeight: '600' }}>Click to enable audio</div>
+                </div>
+              )}
               {!remoteVideoEnabled && (
                 <div style={{
                   position: 'absolute',
@@ -1513,6 +1582,35 @@ const InterviewSession = () => {
               }}
             >
               Reconnect
+            </button>
+          )}
+          
+          {(peerConnectionStatus === 'failed' || peerConnectionStatus === 'disconnected') && videoConnectionStatus === 'connected' && (
+            <button
+              onClick={() => {
+                // Trigger ICE restart manually
+                if (pc.current && ws.current?.readyState === WebSocket.OPEN && pc.current.signalingState === 'stable') {
+                  pc.current.createOffer({ iceRestart: true })
+                    .then(offer => pc.current.setLocalDescription(offer))
+                    .then(() => {
+                      ws.current.send(JSON.stringify({ type: 'offer', offer: pc.current.localDescription }));
+                      console.log('Manual ICE restart triggered');
+                    })
+                    .catch(e => console.error('Manual ICE restart failed:', e));
+                }
+              }}
+              style={{
+                marginTop: '12px',
+                padding: '8px 12px',
+                background: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '0.85em',
+                cursor: 'pointer'
+              }}
+            >
+              Retry WebRTC Connection
             </button>
           )}
         </div>
