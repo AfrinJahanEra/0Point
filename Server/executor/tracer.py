@@ -34,9 +34,8 @@ def execute_with_trace(code: str):
                 except:
                     filtered_locals[key] = str(value)
 
-            # For all steps except last, show empty output
-            # Only last step shows final output
-            current_output = "\n".join(output_lines) if len(steps) == 0 else ""
+            # Accumulate output as execution progresses
+            current_output = "\n".join(output_lines)
             
             steps.append({
                 "line": frame.f_lineno,
@@ -81,7 +80,7 @@ def execute_with_trace(code: str):
         exec(code, safe_builtins, {})
         sys.settrace(None)
 
-        # Update last step with final output
+        # Ensure final step has complete output
         if steps:
             steps[-1]["output"] = "\n".join(output_lines)
             steps[-1]["description"] = f"Line {steps[-1]['line']} (final)"
@@ -727,8 +726,8 @@ def execute_cpp_with_trace(code: str):
         line = lines[i].strip()
         original_line = analyzer.line_mapping.get(i + 1, i + 1)
         
-        # Skip empty lines, braces, and comments
-        if not line or line == '{' or line == '}' or line.startswith('//'):
+        # Skip empty lines, opening braces, and comments
+        if not line or line == '{' or line.startswith('//'):
             i += 1
             continue
         
@@ -823,7 +822,7 @@ def execute_cpp_with_trace(code: str):
                 except:
                     pass
         
-        # Handle for loops
+        # Handle for loops - only process if not already in a loop at this line
         for_match = re.match(r'for\s*\(\s*(?:int\s+)?(\w+)\s*=\s*([^;]+);\s*\1\s*([<>=!]+)\s*([^;]+);\s*\1(\+\+|--|\+=\d+|-=\d+)', line)
         if for_match:
             loop_var = for_match.group(1)
@@ -842,16 +841,25 @@ def execute_cpp_with_trace(code: str):
             elif increment.startswith('-='):
                 step = -int(increment[2:])
             
-            variables[loop_var] = start_val
+            # Only initialize loop variable and push to stack on first entry
+            # Check if we're already tracking this loop variable in the current context
+            existing_loop = None
+            for ctx in loop_stack:
+                if ctx['var'] == loop_var and ctx.get('start_line') == i + 1:
+                    existing_loop = ctx
+                    break
             
-            loop_stack.append({
-                'var': loop_var,
-                'start': start_val,
-                'end': end_val,
-                'op': op,
-                'step': step,
-                'start_line': i + 1  # Line after the for statement
-            })
+            if existing_loop is None:
+                variables[loop_var] = start_val
+                
+                loop_stack.append({
+                    'var': loop_var,
+                    'start': start_val,
+                    'end': end_val,
+                    'op': op,
+                    'step': step,
+                    'start_line': i + 1  # Line after the for statement
+                })
         
         # Handle output (cout, printf)
         if 'cout' in line:
@@ -877,13 +885,13 @@ def execute_cpp_with_trace(code: str):
         step_variables = copy.deepcopy(variables)
         description = analyzer.generate_description(line, step_variables)
         
-        # Determine output for this step
+        # Determine output for this step - accumulate output as we go
         current_output = '\n'.join(output_buffer) if output_buffer else ''
         
         steps.append({
             "line": original_line,
             "variables": step_variables,
-            "output": current_output if i == len(lines) - 1 else '',
+            "output": current_output,
             "description": description
         })
         
@@ -893,7 +901,7 @@ def execute_cpp_with_trace(code: str):
     if not steps:
         return execute_cpp_compiled(code)
     
-    # Update final step with complete output
+    # Ensure final step has complete output
     if steps and output_buffer:
         steps[-1]["output"] = '\n'.join(output_buffer)
     
