@@ -16,13 +16,19 @@ import {
   Shield,
   ShieldOff,
   AlertCircle,
+  AlertTriangle,
   Megaphone,
   Eye,
   EyeOff,
   List,
   ListOrdered,
   Link as LinkIcon,
-  Smile
+  Smile,
+  Info,
+  Star,
+  User,
+  Clock,
+  Plus
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import * as d3 from 'd3';
@@ -65,6 +71,7 @@ const AdminDashboard = () => {
     const [tabLoading, setTabLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showBanModal, setShowBanModal] = useState(false);
+  const [banLoading, setBanLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [banReason, setBanReason] = useState('Violation of terms of service');
   const [expandedBlogIds, setExpandedBlogIds] = useState([]);
@@ -76,6 +83,7 @@ const AdminDashboard = () => {
   const [adminNote, setAdminNote] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
+  const [expandedAnnouncementIds, setExpandedAnnouncementIds] = useState([]);
   const [announcementText, setAnnouncementText] = useState('');
   const [announcementTopic, setAnnouncementTopic] = useState('');
   const [announcementType, setAnnouncementType] = useState('info');
@@ -301,13 +309,18 @@ const AdminDashboard = () => {
   };
 
   const handleBanUser = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || banLoading) return;
     
     if (!window.confirm(`Permanently ban ${selectedUser.email}? This will:\n1. Delete their account permanently\n2. Block them from creating new accounts\n3. Block all their IP addresses\n4. Block all their devices\n\nThis action cannot be undone!`)) return;
     
+    setBanLoading(true);
     try {
       await api.delete(`/admin-panel/users/${selectedUser.id}/`, {
-        data: { ban_reason: banReason }
+        data: { 
+          ban_reason: banReason,
+          // Include user's stored IPs to ensure they're banned
+          additional_ips: selectedUser.ip_addresses || []
+        }
       });
       
       // Update state immediately
@@ -331,6 +344,8 @@ const AdminDashboard = () => {
       setSelectedUser(null);
     } catch (error) {
       toast.error('Error banning user: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setBanLoading(false);
     }
   };
 
@@ -2669,67 +2684,74 @@ const AdminDashboard = () => {
                         )}
 
                         {/* Announcements List */}
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full">
-                            <thead>
-                              <tr className="border-b border-gray-200">
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Text</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Topic</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Author</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Created</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white">
-                              {announcements.map((announcement) => (
-                                <tr key={announcement.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                  <td className="px-6 py-4 text-sm text-gray-700 max-w-md">
-                                    <div className="prose prose-sm max-w-none">
-                                      {announcement.text.split(/(\*\*.*?\*\*|\*.*?\*|#+ .*?\n)/g).map((part, idx) => {
-                                        if (part.startsWith('**') && part.endsWith('**')) {
-                                          return <strong key={idx}>{part.slice(2, -2)}</strong>;
-                                        } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
-                                          return <em key={idx}>{part.slice(1, -1)}</em>;
-                                        } else if (part.startsWith('#')) {
-                                          const level = part.match(/^#+/)[0].length;
-                                          const text = part.replace(/^#+\s*/, '').replace(/\n$/, '');
-                                          return level === 1 ? (
-                                            <span key={idx} className="text-lg font-bold">{text}</span>
-                                          ) : (
-                                            <span key={idx} className="text-base font-semibold">{text}</span>
-                                          );
-                                        }
-                                        return <span key={idx}>{part}</span>;
-                                      })}
+                        <div className="space-y-4">
+                          {announcements.length === 0 ? (
+                            <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+                              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Megaphone className="w-8 h-8 text-blue-900" />
+                              </div>
+                              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Announcements Yet</h3>
+                              <p className="text-gray-500 mb-4">Create your first announcement to keep users informed.</p>
+                              <button
+                                onClick={() => setShowAnnouncementForm(true)}
+                                className="px-4 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-950 transition-colors inline-flex items-center gap-2"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Create Announcement
+                              </button>
+                            </div>
+                          ) : (
+                            announcements.map((announcement) => (
+                              <div 
+                                key={announcement.id} 
+                                className={`bg-white border rounded-lg overflow-hidden transition-all hover:shadow-sm ${
+                                  announcement.is_important 
+                                    ? 'border-l-4 border-l-red-500 border-gray-200' 
+                                    : announcement.type === 'warning'
+                                    ? 'border-l-4 border-l-yellow-500 border-gray-200'
+                                    : announcement.type === 'update'
+                                    ? 'border-l-4 border-l-green-500 border-gray-200'
+                                    : 'border-gray-200'
+                                }`}
+                              >
+                                <div className="p-4">
+                                  {/* Header Row */}
+                                  <div className="flex items-center justify-between gap-3 mb-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {/* Type Badge with Icon */}
+                                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
+                                        announcement.type === 'important' 
+                                          ? 'bg-red-100 text-red-700'
+                                          : announcement.type === 'warning'
+                                          ? 'bg-yellow-100 text-yellow-700'
+                                          : announcement.type === 'update'
+                                          ? 'bg-green-100 text-green-700'
+                                          : 'bg-blue-100 text-blue-700'
+                                      }`}>
+                                        {announcement.type === 'important' && <AlertCircle className="w-3 h-3" />}
+                                        {announcement.type === 'warning' && <AlertTriangle className="w-3 h-3" />}
+                                        {announcement.type === 'update' && <RefreshCw className="w-3 h-3" />}
+                                        {announcement.type === 'info' && <Info className="w-3 h-3" />}
+                                        {announcement.type.charAt(0).toUpperCase() + announcement.type.slice(1)}
+                                      </span>
+                                      
+                                      {/* Topic Badge */}
+                                      {announcement.topic && (
+                                        <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">
+                                          {announcement.topic}
+                                        </span>
+                                      )}
+                                      
+                                      {/* Important Indicator */}
+                                      {announcement.is_important && (
+                                        <span className="px-1.5 py-0.5 text-xs font-bold bg-red-600 text-white rounded flex items-center gap-0.5">
+                                          <Star className="w-2.5 h-2.5 fill-current" />
+                                          Priority
+                                        </span>
+                                      )}
                                     </div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                    {announcement.topic || '-'}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded ${
-                                      announcement.type === 'important' 
-                                        ? 'bg-red-100 text-red-900'
-                                        : announcement.type === 'warning'
-                                        ? 'bg-yellow-100 text-yellow-900'
-                                        : announcement.type === 'update'
-                                        ? 'bg-green-100 text-green-900'
-                                        : 'bg-blue-100 text-blue-900'
-                                    }`}>
-                                      {announcement.type}
-                                    </span>
-                                    {announcement.is_important && (
-                                      <span className="ml-2 text-xs text-red-600">!</span>
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                    {announcement.author || 'Admin'}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                    {announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : '-'}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    
+                                    {/* Delete Button */}
                                     <button
                                       onClick={async () => {
                                         if (!window.confirm('Are you sure you want to delete this announcement?')) return;
@@ -2742,19 +2764,135 @@ const AdminDashboard = () => {
                                           toast.error('Failed to delete announcement');
                                         }
                                       }}
-                                      className="text-red-600 hover:text-red-900"
+                                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                      title="Delete announcement"
                                     >
                                       <Trash2 className="w-4 h-4" />
                                     </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          {announcements.length === 0 && (
-                            <div className="text-center py-8 text-gray-500">
-                              No announcements found. Create one to get started!
-                            </div>
+                                  </div>
+                                  
+                                  {/* Announcement Content - Compact with Expand */}
+                                  {(() => {
+                                    const isExpanded = expandedAnnouncementIds.includes(announcement.id);
+                                    const isLong = announcement.text.length > 150 || announcement.text.split('\n').length > 3;
+                                    
+                                    // Compact preview (plain text with basic formatting)
+                                    if (!isExpanded && isLong) {
+                                      const previewText = announcement.text.substring(0, 150) + '...';
+                                      return (
+                                        <>
+                                          <div className="text-sm text-gray-700 line-clamp-2">
+                                            {previewText.split(/(\*\*.*?\*\*)/g).map((part, idx) => {
+                                              if (part.startsWith('**') && part.endsWith('**')) {
+                                                return <strong key={idx} className="font-semibold">{part.slice(2, -2)}</strong>;
+                                              }
+                                              return <span key={idx}>{part}</span>;
+                                            })}
+                                          </div>
+                                          <button
+                                            onClick={() => setExpandedAnnouncementIds(prev => [...prev, announcement.id])}
+                                            className="mt-2 text-xs text-blue-900 hover:text-blue-950 font-medium flex items-center gap-1"
+                                          >
+                                            <ChevronDown className="w-3 h-3" />
+                                            Show More
+                                          </button>
+                                        </>
+                                      );
+                                    }
+                                    
+                                    // Expanded view with full markdown
+                                    return (
+                                      <>
+                                        <div className="prose prose-sm max-w-none text-gray-700">
+                                          {announcement.text.split('\n').map((line, lineIdx) => {
+                                            if (!line.trim()) return <br key={lineIdx} />;
+                                            
+                                            // Handle lists
+                                            if (line.trim().startsWith('- ')) {
+                                              return (
+                                                <div key={lineIdx} className="flex items-start gap-2 my-0.5">
+                                                  <span className="text-blue-900">•</span>
+                                                  <span className="text-sm">{line.substring(line.indexOf('-') + 1).trim()}</span>
+                                                </div>
+                                              );
+                                            }
+                                            if (line.trim().match(/^\d+\.\s/)) {
+                                              const num = line.match(/^\d+/)[0];
+                                              const text = line.substring(line.indexOf('.') + 1).trim();
+                                              return (
+                                                <div key={lineIdx} className="flex items-start gap-2 my-0.5">
+                                                  <span className="text-blue-900 font-medium min-w-[1.2rem] text-sm">{num}.</span>
+                                                  <span className="text-sm">{text}</span>
+                                                </div>
+                                              );
+                                            }
+                                            
+                                            // Handle inline formatting
+                                            const parts = line.split(/(\*\*.*?\*\*|\*.*?\*|~~.*?~~|`.*?`|#+ .*)/g);
+                                            return (
+                                              <div key={lineIdx} className="my-0.5 text-sm">
+                                                {parts.map((part, idx) => {
+                                                  if (part.startsWith('**') && part.endsWith('**')) {
+                                                    return <strong key={idx} className="font-bold text-gray-900">{part.slice(2, -2)}</strong>;
+                                                  } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+                                                    return <em key={idx} className="italic">{part.slice(1, -1)}</em>;
+                                                  } else if (part.startsWith('~~') && part.endsWith('~~')) {
+                                                    return <del key={idx} className="line-through text-gray-500">{part.slice(2, -2)}</del>;
+                                                  } else if (part.startsWith('`') && part.endsWith('`')) {
+                                                    return <code key={idx} className="px-1 py-0.5 bg-gray-100 text-blue-900 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
+                                                  } else if (part.startsWith('#')) {
+                                                    const level = part.match(/^#+/)[0].length;
+                                                    const text = part.replace(/^#+\s*/, '');
+                                                    if (level === 1) {
+                                                      return <span key={idx} className="text-base font-bold text-gray-900 block mt-1">{text}</span>;
+                                                    } else if (level === 2) {
+                                                      return <span key={idx} className="text-sm font-semibold text-gray-900 block mt-1">{text}</span>;
+                                                    }
+                                                    return <span key={idx} className="font-medium">{text}</span>;
+                                                  }
+                                                  return <span key={idx}>{part}</span>;
+                                                })}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                        {isLong && (
+                                          <button
+                                            onClick={() => setExpandedAnnouncementIds(prev => prev.filter(id => id !== announcement.id))}
+                                            className="mt-2 text-xs text-blue-900 hover:text-blue-950 font-medium flex items-center gap-1"
+                                          >
+                                            <ChevronUp className="w-3 h-3" />
+                                            Show Less
+                                          </button>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
+                                  
+                                  {/* Footer - Author and Date */}
+                                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100 text-xs text-gray-500">
+                                    <div className="flex items-center gap-1.5">
+                                      <User className="w-3.5 h-3.5" />
+                                      <span>{announcement.author || 'Admin'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <Clock className="w-3.5 h-3.5" />
+                                      <span>
+                                        {announcement.created_at 
+                                          ? new Date(announcement.created_at).toLocaleDateString('en-US', {
+                                              month: 'short',
+                                              day: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit'
+                                            })
+                                          : '-'
+                                        }
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
                           )}
                         </div>
                       </div>
@@ -2824,16 +2962,18 @@ const AdminDashboard = () => {
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setShowBanModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                  disabled={banLoading}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleBanUser}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md flex items-center gap-2"
+                  disabled={banLoading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ShieldOff className="w-4 h-4" />
-                  Ban Permanently
+                  {banLoading ? 'Banning...' : 'Ban Permanently'}
                 </button>
               </div>
             </div>

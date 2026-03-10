@@ -8,11 +8,13 @@ class SignupSerializer(serializers.Serializer):
     role = serializers.CharField(default="user")
     year = serializers.CharField(required=False)
     department = serializers.CharField(required=False)
+    device_fingerprint = serializers.CharField(required=False, allow_blank=True)
 
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField()
+    device_fingerprint = serializers.CharField(required=False, allow_blank=True)
 
 
 class PlatformProfileSerializer(serializers.Serializer):

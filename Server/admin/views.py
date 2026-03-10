@@ -214,37 +214,36 @@ class AdminUsersView(APIView):
             cached = cache.get(cache_key)
             if cached is not None:
                 return Response(cached)
+        
+        # Use .only() to fetch only needed fields for faster query
+        fields_needed = ['id', 'name', 'email', 'role', 'created_at', 'is_inactive', 
+                         'is_banned', 'blog_count', 'rating', 'badge', 
+                         'ip_address', 'ip_addresses', 'device_fingerprints']
+        
+        if search:
             from mongoengine.queryset.visitor import Q
             users = Account.objects(
                 Q(is_deleted=False) & (Q(name__icontains=search) | Q(email__icontains=search))
-            ).order_by("-created_at").limit(limit)
+            ).only(*fields_needed).order_by("-created_at").limit(limit)
         else:
-            users = Account.objects(is_deleted=False).order_by("-created_at").limit(limit)
+            users = Account.objects(is_deleted=False).only(*fields_needed).order_by("-created_at").limit(limit)
         
+        # Build response data efficiently
         user_data = []
-        
         for user in users:
             try:
                 # Get all IP addresses (including legacy)
                 all_ips = []
-                
-                # Check new ip_addresses field
-                if hasattr(user, 'ip_addresses'):
+                if user.ip_addresses:
                     for ip_obj in user.ip_addresses:
-                        if hasattr(ip_obj, 'address'):
-                            all_ips.append(ip_obj.address)
+                        ip = getattr(ip_obj, 'ip_address', None) or getattr(ip_obj, 'address', None)
+                        if ip and ip not in all_ips:
+                            all_ips.append(ip)
+                if user.ip_address and user.ip_address not in all_ips:
+                    all_ips.append(user.ip_address)
                 
-                # Check old ip_address field
-                if hasattr(user, 'ip_address') and user.ip_address:
-                    if user.ip_address not in all_ips:
-                        all_ips.append(user.ip_address)
-                
-                # Get device fingerprints
-                device_fps = []
-                if hasattr(user, 'device_fingerprints'):
-                    for df_obj in user.device_fingerprints:
-                        if hasattr(df_obj, 'fingerprint'):
-                            device_fps.append(df_obj.fingerprint)
+                # Get device fingerprint count
+                device_count = len(user.device_fingerprints) if user.device_fingerprints else 0
                 
                 user_data.append({
                     "id": str(user.id),
@@ -259,9 +258,9 @@ class AdminUsersView(APIView):
                     "badge": user.badge,
                     "ip_addresses": all_ips,
                     "ip_count": len(all_ips),
-                    "device_count": len(device_fps),
+                    "device_count": device_count,
                 })
-            except Exception as e:
+            except Exception:
                 # Fallback for users with data issues
                 user_data.append({
                     "id": str(user.id),
@@ -269,15 +268,14 @@ class AdminUsersView(APIView):
                     "email": user.email,
                     "role": user.role,
                     "created_at": user.created_at,
-                    "is_inactive": user.is_inactive,
-                    "is_banned": user.is_banned,
-                    "blog_count": user.blog_count,
-                    "rating": user.rating,
-                    "badge": user.badge,
+                    "is_inactive": getattr(user, 'is_inactive', False),
+                    "is_banned": getattr(user, 'is_banned', False),
+                    "blog_count": getattr(user, 'blog_count', 0),
+                    "rating": getattr(user, 'rating', 0),
+                    "badge": getattr(user, 'badge', None),
                     "ip_addresses": [],
                     "ip_count": 0,
                     "device_count": 0,
-                    "error": "Data format issue"
                 })
         
         if cache_key:
@@ -303,6 +301,10 @@ class AdminUsersView(APIView):
             # Get ban reason from request
             ban_reason = request.data.get('ban_reason', 'Violation of terms of service')
             
+            # Get additional IPs and fingerprints from request (admin-provided)
+            additional_ips = request.data.get('additional_ips', [])
+            additional_fingerprints = request.data.get('additional_fingerprints', [])
+            
             # Send email notification BEFORE deleting user
             email_sent = send_ban_notification_email(
                 user_email=user.email,
@@ -310,32 +312,42 @@ class AdminUsersView(APIView):
                 ban_reason=ban_reason
             )
             
-            # Get all IP addresses
+            # Get all IP addresses from user account
             all_ips = []
-            if hasattr(user, 'ip_addresses'):
+            if user.ip_addresses:
                 for ip_obj in user.ip_addresses:
-                    if hasattr(ip_obj, 'address'):
-                        all_ips.append(ip_obj.address)
+                    ip = getattr(ip_obj, 'ip_address', None) or getattr(ip_obj, 'address', None)
+                    if ip and ip not in all_ips:
+                        all_ips.append(ip)
             
-            if hasattr(user, 'ip_address') and user.ip_address:
-                if user.ip_address not in all_ips:
-                    all_ips.append(user.ip_address)
+            if user.ip_address and user.ip_address not in all_ips:
+                all_ips.append(user.ip_address)
             
-            # Get device fingerprints
+            # Add admin-provided IPs
+            for ip in additional_ips:
+                if ip and ip not in all_ips:
+                    all_ips.append(ip)
+            
+            # Get device fingerprints from user account
             device_fps = []
-            if hasattr(user, 'device_fingerprints'):
+            if user.device_fingerprints:
                 for df_obj in user.device_fingerprints:
-                    if hasattr(df_obj, 'fingerprint'):
-                        device_fps.append(df_obj.fingerprint)
+                    fp = getattr(df_obj, 'fingerprint', None)
+                    if fp and fp not in device_fps:
+                        device_fps.append(fp)
+            
+            # Add admin-provided fingerprints
+            for fp in additional_fingerprints:
+                if fp and fp not in device_fps:
+                    device_fps.append(fp)
             
             # Create banned account record BEFORE deleting
             banned_account = BannedAccount(
-                original_user_id=str(user.id),
                 email=user.email,
                 name=user.name,
                 ip_addresses=all_ips,
                 device_fingerprints=device_fps,
-                reason=ban_reason,
+                ban_reason=ban_reason,
                 banned_by=admin_email,
                 banned_at=datetime.utcnow()
             )
@@ -347,7 +359,7 @@ class AdminUsersView(APIView):
             # Invalidate user/stats caches
             cache.delete('zp:admin_stats')
             cache.delete_many([f'zp:admin_users_list_{l}' for l in [50, 100, 200]])
-            cache.delete('zp:admin_banned_list')
+            cache.delete_many([f'zp:admin_banned_list_{l}' for l in [50, 100, 200]])
             
             return Response({
                 "message": "User permanently banned and deleted",
@@ -372,28 +384,46 @@ class AdminUsersView(APIView):
 class AdminBannedAccountsView(APIView):
     """View to see all banned accounts"""
     def get(self, request):
-        cached = cache.get('zp:admin_banned_list')
-        if cached is not None:
-            return Response(cached)
-
-        banned_accounts = BannedAccount.objects.order_by("-banned_at")
-        banned_data = []
+        search = request.GET.get('search', '')
+        limit = int(request.GET.get('limit', 100))
         
-        for banned in banned_accounts:
-            banned_data.append({
+        # Only cache default (no search) requests
+        cache_key = f'zp:admin_banned_list_{limit}' if not search else None
+        if cache_key:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+        
+        # Use .only() to fetch only needed fields for faster query
+        fields_needed = ['id', 'email', 'name', 'ban_reason', 'banned_by', 
+                         'banned_at', 'ip_addresses', 'device_fingerprints']
+        
+        if search:
+            from mongoengine.queryset.visitor import Q
+            banned_accounts = BannedAccount.objects(
+                Q(name__icontains=search) | Q(email__icontains=search)
+            ).only(*fields_needed).order_by("-banned_at").limit(limit)
+        else:
+            banned_accounts = BannedAccount.objects.only(*fields_needed).order_by("-banned_at").limit(limit)
+        
+        # Build response data efficiently
+        banned_data = [
+            {
                 "id": str(banned.id),
-                "original_user_id": banned.original_user_id,
                 "email": banned.email,
                 "name": banned.name,
-                "reason": banned.reason,
+                "reason": banned.ban_reason,
                 "banned_by": banned.banned_by,
                 "banned_at": banned.banned_at,
-                "ip_addresses": banned.ip_addresses,
-                "device_fingerprints_count": len(banned.device_fingerprints),
-                "prevention_summary": f"Prevents registration for {len(banned.ip_addresses)} IPs and {len(banned.device_fingerprints)} devices"
-            })
+                "ip_addresses": banned.ip_addresses or [],
+                "device_fingerprints_count": len(banned.device_fingerprints) if banned.device_fingerprints else 0,
+                "prevention_summary": f"Prevents registration for {len(banned.ip_addresses or [])} IPs and {len(banned.device_fingerprints or [])} devices"
+            }
+            for banned in banned_accounts
+        ]
         
-        cache.set('zp:admin_banned_list', banned_data, _ADMIN_LIST_TTL)
+        if cache_key:
+            cache.set(cache_key, banned_data, _ADMIN_LIST_TTL)
         return Response(banned_data)
 
 
@@ -788,10 +818,16 @@ class AdminSubmissionsView(APIView):
         user_ids = set()
         contest_ids = set()
         for sub in submissions:
-            if sub.user:
-                user_ids.add(sub.user.id)
-            if sub.contest:
-                contest_ids.add(sub.contest.id)
+            try:
+                if sub.user:
+                    user_ids.add(sub.user.id)
+            except:
+                pass
+            try:
+                if sub.contest:
+                    contest_ids.add(sub.contest.id)
+            except:
+                pass  # Contest may have been deleted
         
         # Batch fetch users and contests
         users_map = {}
@@ -807,8 +843,14 @@ class AdminSubmissionsView(APIView):
         
         submission_data = []
         for submission in submissions:
-            user_id = str(submission.user.id) if submission.user else None
-            contest_id = str(submission.contest.id) if submission.contest else None
+            try:
+                user_id = str(submission.user.id) if submission.user else None
+            except:
+                user_id = None
+            try:
+                contest_id = str(submission.contest.id) if submission.contest else None
+            except:
+                contest_id = None  # Contest was deleted
             
             user = users_map.get(user_id) if user_id else None
             contest = contests_map.get(contest_id) if contest_id else None

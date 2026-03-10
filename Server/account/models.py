@@ -126,7 +126,14 @@ class Account(Document):
     device_fingerprints = ListField(EmbeddedDocumentField(DeviceFingerprint), default=list)
 
     meta = {
-        "collection": "accounts"
+        "collection": "accounts",
+        "indexes": [
+            "email",
+            "is_deleted",
+            "-created_at",
+            {"fields": ["is_deleted", "-created_at"]},  # Compound index for admin users list
+            {"fields": ["name"], "sparse": True},
+        ]
     }
 
     def set_password(self, raw_password):
@@ -206,5 +213,13 @@ class BannedAccount(Document):
     ip_addresses = ListField(StringField(), default=list)
     device_fingerprints = ListField(StringField(), default=list)
     
-    meta = {'collection': 'banned_accounts'}
+    meta = {
+        'collection': 'banned_accounts',
+        'indexes': [
+            'email',
+            '-banned_at',
+            'ip_addresses',
+            'device_fingerprints',
+        ]
+    }
 

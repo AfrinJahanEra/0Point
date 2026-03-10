@@ -1,13 +1,35 @@
 // services/authService.js
 import api from '../utils/api';
 
+// Generate a simple device fingerprint from browser characteristics
+const generateDeviceFingerprint = () => {
+  const { userAgent, language, platform } = navigator;
+  const { width, height, colorDepth } = screen;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl');
+  const renderer = gl ? gl.getParameter(gl.RENDERER) : 'unknown';
+  
+  const raw = `${userAgent}|${language}|${platform}|${width}x${height}|${colorDepth}|${timezone}|${renderer}`;
+  
+  // Simple hash function
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const char = raw.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(36);
+};
+
 class AuthService {
   // Login user
   async login(email, password) {
     try {
       const response = await api.post('/account/login/', {
         email,
-        password
+        password,
+        device_fingerprint: generateDeviceFingerprint()
       });
       
       if (response.data.token) {
@@ -32,7 +54,8 @@ class AuthService {
         password,
         role,
         year,
-        department
+        department,
+        device_fingerprint: generateDeviceFingerprint()
       };
       
       // Add secret password if role is admin

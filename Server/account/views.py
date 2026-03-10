@@ -16,7 +16,7 @@ from recommendation.models import UserRecommendation
 
 from .calendar import  fetch_codeforces_calendar,fetch_codechef_calendar, fetch_leetcode_calendar, fetch_atcoder_calendar, get_cached_calendar
 
-from .models import Account, PlatformCalendarCache, PlatformSubmissionCache, UserTagStats, PlatformContestCache, UserVerdictStats
+from .models import Account, PlatformCalendarCache, PlatformSubmissionCache, UserTagStats, PlatformContestCache, UserVerdictStats, BannedAccount, IPAddress, DeviceFingerprint
 from .serializers import SignupSerializer, LoginSerializer, AddPlatformSerializer, UserProfileSerializer, PlatformProfileSerializer
 from .platforms import fetch_codechef_contests, fetch_platform_rating, fetch_codeforces_contests, fetch_atcoder_contests, fetch_leetcode_contests
 # Import submission models inside functions to avoid circular imports
@@ -33,22 +33,60 @@ from .verdict_analysis import get_verdict_counts
 
 
 class SignupView(APIView):
+    def get_client_ip(self, request):
+        """Extract client IP from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0].strip()
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
     def post(self, request):
         serializer = SignupSerializer(data=request.data)
         if serializer.is_valid():
+            email = serializer.validated_data["email"]
+            device_fingerprint = serializer.validated_data.get("device_fingerprint", "")
+            client_ip = self.get_client_ip(request)
+            
+            # Check if email is banned
+            if BannedAccount.objects(email=email).first():
+                return Response({"error": "This email has been permanently banned from registration"}, status=403)
+            
+            # Check if IP is banned
+            if client_ip:
+                banned_by_ip = BannedAccount.objects(ip_addresses=client_ip).first()
+                if banned_by_ip:
+                    return Response({"error": "Registration is not allowed from this location"}, status=403)
+            
+            # Check if device fingerprint is banned
+            if device_fingerprint:
+                banned_by_device = BannedAccount.objects(device_fingerprints=device_fingerprint).first()
+                if banned_by_device:
+                    return Response({"error": "Registration is not allowed from this device"}, status=403)
 
             # Duplicate email check
-            if Account.objects(email=serializer.validated_data["email"], is_deleted=False).first():
+            if Account.objects(email=email, is_deleted=False).first():
                 return Response({"error": "Email already exists"}, status=400)
 
             user = Account(
                 name=serializer.validated_data["name"],
-                email=serializer.validated_data["email"],
+                email=email,
                 role=serializer.validated_data.get("role", "user"),
                 year=serializer.validated_data.get("year"),
                 department=serializer.validated_data.get("department"),
             )
             user.set_password(serializer.validated_data["password"])
+            
+            # Store IP address for security tracking
+            if client_ip:
+                user.ip_address = client_ip
+                user.ip_addresses = [IPAddress(ip_address=client_ip)]
+            
+            # Store device fingerprint for security tracking
+            if device_fingerprint:
+                user.device_fingerprints = [DeviceFingerprint(fingerprint=device_fingerprint)]
+            
             user.save()
 
             return Response({"message": "Account created successfully"}, status=201)
@@ -56,6 +94,15 @@ class SignupView(APIView):
         return Response(serializer.errors, status=400)
 
 class LoginView(APIView):
+    def get_client_ip(self, request):
+        """Extract client IP from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0].strip()
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if not serializer.is_valid():
@@ -63,6 +110,22 @@ class LoginView(APIView):
 
         email = serializer.validated_data["email"]
         password = serializer.validated_data["password"]
+        device_fingerprint = serializer.validated_data.get("device_fingerprint", "")
+        client_ip = self.get_client_ip(request)
+        
+        # Check if email is banned
+        if BannedAccount.objects(email=email).first():
+            return Response({"error": "This account has been permanently banned"}, status=403)
+        
+        # Check if IP is banned
+        if client_ip:
+            if BannedAccount.objects(ip_addresses=client_ip).first():
+                return Response({"error": "Access denied from this location"}, status=403)
+        
+        # Check if device is banned
+        if device_fingerprint:
+            if BannedAccount.objects(device_fingerprints=device_fingerprint).first():
+                return Response({"error": "Access denied from this device"}, status=403)
 
         user = Account.objects(email=email, is_deleted=False).first()
 
@@ -71,6 +134,32 @@ class LoginView(APIView):
 
         if not user.check_password(password):
             return Response({"error": "Invalid email or password"}, status=400)
+        
+        # Update user's IP and device fingerprint for security tracking
+        updated = False
+        if client_ip:
+            if not user.ip_address:
+                user.ip_address = client_ip
+                updated = True
+            # Add to ip_addresses list if not already there
+            existing_ips = [getattr(ip_obj, 'ip_address', None) or getattr(ip_obj, 'address', None) 
+                           for ip_obj in (user.ip_addresses or [])]
+            if client_ip not in existing_ips:
+                if not user.ip_addresses:
+                    user.ip_addresses = []
+                user.ip_addresses.append(IPAddress(ip_address=client_ip))
+                updated = True
+        
+        if device_fingerprint:
+            existing_fps = [getattr(df, 'fingerprint', None) for df in (user.device_fingerprints or [])]
+            if device_fingerprint not in existing_fps:
+                if not user.device_fingerprints:
+                    user.device_fingerprints = []
+                user.device_fingerprints.append(DeviceFingerprint(fingerprint=device_fingerprint))
+                updated = True
+        
+        if updated:
+            user.save()
 
         payload = {
             "user_id": str(user.id),
