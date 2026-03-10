@@ -161,14 +161,43 @@ const Dashboard = () => {
     }
     setSavingPlatform(true);
     try {
-      await api.post('/account/platform/add/', {
+      const response = await api.post('/account/platform/add/', {
         platform: platformForm.platform,
         handle: platformForm.handle
       });
+      
+      // Optimistic UI update - instantly show new platform without refetching
+      const newProfile = response.data.platform_profile;
+      setUserProfile(prev => {
+        if (!prev) return prev;
+        const existingProfiles = prev.platform_profiles || [];
+        // Replace if platform exists, otherwise add
+        const idx = existingProfiles.findIndex(p => p.platform === newProfile.platform);
+        const updatedProfiles = idx >= 0
+          ? existingProfiles.map((p, i) => i === idx ? newProfile : p)
+          : [...existingProfiles, newProfile];
+        
+        const updated = { ...prev, platform_profiles: updatedProfiles };
+        // Update cache with new profile
+        try {
+          const cached = localStorage.getItem(DASH_CACHE_KEY);
+          if (cached) {
+            const data = JSON.parse(cached);
+            data.profile = updated;
+            localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(DASH_CACHE_TS_KEY, String(Date.now()));
+          }
+        } catch (_) {}
+        return updated;
+      });
+      
       toast.success('Platform profile added successfully!');
       setPlatformForm({ platform: 'codeforces', handle: '' });
       setShowAddPlatform(false);
-      fetchUserData();
+      
+      // Background refresh for tag/verdict stats (don't block UI)
+      api.get('/account/tag-stats/').then(r => setCategoryScores(r.data.category_scores || {})).catch(() => {});
+      api.get('/account/verdict-stats/').then(r => setVerdictStats(r.data.verdict_counts || {})).catch(() => {});
     } catch (err) {
       console.error('Error adding platform:', err);
       if (err.response?.status === 401) {

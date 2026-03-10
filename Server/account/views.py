@@ -494,11 +494,21 @@ class AddPlatformProfileView(APIView):
             user.calendar_cache = [c for c in user.calendar_cache if c.platform != platform]
             user.save()
            
+            # Return the full platform profile for optimistic UI update
             return Response({
                 "message": "Platform profile added successfully",
-                "platform": platform,
-                "handle": handle,
-                "rating": rating_data.get('current_rating', 0)
+                "platform_profile": {
+                    "platform": platform,
+                    "handle": handle,
+                    "current_rating": rating_data.get('current_rating', 0),
+                    "max_rating": rating_data.get('max_rating', 0),
+                    "min_rating": rating_data.get('min_rating', 0),
+                    "contests_count": rating_data.get('contests_count', 0),
+                    "rank": rating_data.get('rank', ''),
+                    "badge": rating_data.get('badge', ''),
+                    "last_updated": datetime.utcnow().isoformat(),
+                    "rating_history": rating_data.get('rating_history', [])
+                }
             }, status=201)
         except Exception as e:
             return Response({"error": str(e)}, status=400)

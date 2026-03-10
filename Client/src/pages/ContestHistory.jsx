@@ -1,5 +1,5 @@
 // ContestHistory.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
 import { useApp } from '../context/AppContext';
 import api from '../utils/api';
@@ -13,6 +13,10 @@ const PLATFORM_OPTIONS = [
   { value: 'leetcode', label: 'LeetCode' },
 ];
 
+// Cache config
+const CACHE_KEY = 'contest_history_cache';
+const CACHE_MAX_AGE = 3 * 60 * 1000; // 3 minutes
+
 const ContestHistory = () => {
   const { user } = useApp();
   const [contests, setContests] = useState([]);
@@ -23,6 +27,7 @@ const ContestHistory = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [platformFilter, setPlatformFilter] = useState('all');
+  const isFetching = useRef(false);
 
   // Sorting state
   const [sortConfig, setSortConfig] = useState({
@@ -30,15 +35,43 @@ const ContestHistory = () => {
     direction: 'desc',    // newest first
   });
 
+  // Get cache key for current filter
+  const getCacheKey = (filter) => `${CACHE_KEY}_${filter}`;
+
+  // Apply cached data
+  const applyCachedData = (data) => {
+    const sorted = sortContests(data.contests || [], sortConfig);
+    setContests(sorted);
+    setPage(data.page || 1);
+    setTotalPages(data.total_pages || 1);
+    setTotalContests(data.total_contests || 0);
+  };
+
   const fetchContests = async (pageNum = 1, filter = platformFilter) => {
-    if (!user) {
+    if (!user || isFetching.current) {
       setContests([]);
       setLoading(false);
       return;
     }
 
+    const cacheKey = getCacheKey(filter);
+
+    // 1. Show cached data instantly
     try {
-      setLoading(true);
+      const cached = localStorage.getItem(cacheKey);
+      const cachedAt = parseInt(localStorage.getItem(`${cacheKey}_ts`) || '0', 10);
+      const isFresh = (Date.now() - cachedAt) < CACHE_MAX_AGE;
+      
+      if (cached) {
+        applyCachedData(JSON.parse(cached));
+        setLoading(false);
+        if (isFresh) return; // Cache is fresh, skip fetch
+      }
+    } catch (_) {}
+
+    // 2. Background refresh
+    isFetching.current = true;
+    try {
       setError(null);
 
       const params = new URLSearchParams({
@@ -50,19 +83,31 @@ const ContestHistory = () => {
       const res = await api.get(`/account/contest-history/?${params.toString()}`);
 
       let fetchedContests = res.data.contests || [];
-
-      // Apply client-side sorting immediately after fetch
       const sorted = sortContests(fetchedContests, sortConfig);
 
       setContests(sorted);
       setPage(res.data.page || pageNum);
       setTotalPages(res.data.total_pages || 1);
       setTotalContests(res.data.total_contests || 0);
+
+      // Save to cache
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({
+          contests: fetchedContests,
+          page: res.data.page || pageNum,
+          total_pages: res.data.total_pages || 1,
+          total_contests: res.data.total_contests || 0
+        }));
+        localStorage.setItem(`${cacheKey}_ts`, String(Date.now()));
+      } catch (_) {}
     } catch (err) {
       console.error(err);
-      setError('Failed to load contest history');
+      if (!localStorage.getItem(cacheKey)) {
+        setError('Failed to load contest history');
+      }
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
   };
 
