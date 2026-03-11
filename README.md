@@ -123,7 +123,7 @@ $${\color{#5EEAD4}Practice, \space \color{#FBF3D4}compete \space \color{#D4D4FF}
 <br>
 </ul>
 
-<h3>$\large\textbf{\color{#C084FC}{Community & Collaboration}}$</h3>
+<h3>$\large\textbf{\color{#C084FC}{Community \& Collaboration}}$</h3>
 <ul>
 <li>Blog system for sharing tutorials and insights</li>
 <li>Discussion forums for problems and topics</li>
@@ -149,15 +149,6 @@ $${\color{#5EEAD4}Practice, \space \color{#FBF3D4}compete \space \color{#D4D4FF}
 <li>Announcement broadcasting and report handling</li>
 <br>
 </ul>
-
-
-
-<h1>$\large\textbf{\color{#00D9FF}{Target Users}}$</h1><br>
-
-
-| <img width="100px" src="https://github.com/user-attachments/assets/student-icon.png" /> | <img width="100px" src="https://github.com/user-attachments/assets/coder-icon.png" /> | <img width="100px" src="https://github.com/user-attachments/assets/interview-icon.png" /> | <img width="100px" src="https://github.com/user-attachments/assets/teacher-icon.png" /> |
-|:--:|:--:|:--:|:--:|
-| University Students | Competitive Programmers | Interview Candidates | Educators & Mentors |
 
 
 <details>
@@ -225,11 +216,7 @@ zeropoint/
 
 <h1>$\large\textnormal{\color{#00D9FF}{Installation}}$</h1><br>
 
-Clone the repository
-```console
-https://github.com/AfrinJahanEra/ZeroPoint.git
-```
-Or download the `zip` file, then extract it in a folder.
+Clone the repository or download the `zip` file, then extract it in a folder.
 
 <h1>$\large\textnormal{\color{#00D9FF}{How To Run}}$</h1><br>
 
@@ -399,16 +386,13 @@ $${\color{#00D9FF}You \space can \space change \space the \space port \space (-p
 
 <h1>$\large\textnormal{\color{#EE4B2B}{Things To Consider}}$</h1>
 
-List this in `.env` file inside `Server/` directory:
-
-```console
-MONGO_DB_NAME=zeropoint_db
-MONGO_URI=mongodb+srv://username:password@cluster0.mongodb.net/zeropoint_db
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-SECRET_KEY=your_django_secret_key
-```
+Create a `.env` file inside `Server/` directory with your configuration values for:
+- `MONGO_DB_NAME`
+- `MONGO_URI`
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `SECRET_KEY`
 
 List this in `.env` file inside `Client/` directory:
 

@@ -225,64 +225,38 @@ const CreateContest = () => {
             platform: contestData.platform || 'IUT'
           });
           
-          const problemsResponse = await fetch(`${BACKEND_URL}/contests/${contestId}/problems/`, {
-            headers: { 
-              "Authorization": `Bearer ${localStorage.getItem('token')}`
+          // Fetch all problems with full details in one request (optimized)
+          const problemsResponse = await fetch(
+            `${BACKEND_URL}/contests/${contestId}/problems/?full=true`,
+            {
+              headers: {
+                "Authorization": `Bearer ${localStorage.getItem('token')}`
+              }
             }
-          });
-          
+          );
+
           if (problemsResponse.ok) {
             const problemsData = await problemsResponse.json();
-            
+
             if (problemsData.problems && problemsData.problems.length > 0) {
-              const formattedProblems = await Promise.all(
-                problemsData.problems.map(async (problem, index) => {
-                  const problemDetailResponse = await fetch(
-                    `${BACKEND_URL}/contests/${contestId}/problems/${problem.code}/`,
-                    {
-                      headers: { 
-                        "Authorization": `Bearer ${localStorage.getItem('token')}`
-                      }
-                    }
-                  );
-                  
-                  if (problemDetailResponse.ok) {
-                    const problemDetail = await problemDetailResponse.json();
-                    
-                    return {
-                      id: generateProblemId(),
-                      problemIndex: problem.code,
-                      title: problem.title,
-                      statement: problemDetail.statement || '',
-                      timeLimit: problemDetail.time_limit || 2,
-                      memoryLimit: problemDetail.memory_limit || 256,
-                      tags: problemDetail.tags || [],
-                      tutorial: problemDetail.tutorial || '',
-                      difficulty: problemDetail.difficulty || 'Medium',
-                      testCases: problemDetail.test_cases?.map((tc, tcIndex) => ({
-                        id: Date.now() + tcIndex,
-                        input: tc.input || '',
-                        output: tc.output || '',
-                        explanation: tc.explanation || ''
-                      })) || []
-                    };
-                  }
-                  
-                  return {
-                    id: generateProblemId(),
-                    problemIndex: problem.code,
-                    title: problem.title,
-                    statement: '',
-                    timeLimit: 2,
-                    memoryLimit: 256,
-                    tags: [],
-                    tutorial: '',
-                    difficulty: problem.difficulty || 'Medium',
-                    testCases: []
-                  };
-                })
-              );
-              
+              const formattedProblems = problemsData.problems.map((problem, index) => ({
+                id: generateProblemId(),
+                problemIndex: problem.code || problem.problem_id,
+                title: problem.title,
+                statement: problem.statement || '',
+                timeLimit: problem.time_limit || 2,
+                memoryLimit: problem.memory_limit || 256,
+                tags: problem.tags || [],
+                tutorial: problem.tutorial || '',
+                difficulty: problem.difficulty || 'Medium',
+                testCases: problem.test_cases?.map((tc, tcIndex) => ({
+                  id: Date.now() + tcIndex,
+                  input: tc.input || '',
+                  output: tc.output || '',
+                  explanation: tc.explanation || ''
+                })) || []
+              }));
+
               setProblems(formattedProblems);
               if (formattedProblems.length > 0) {
                 setActiveProblem(formattedProblems[0].id);

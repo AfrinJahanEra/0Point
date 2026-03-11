@@ -1,12 +1,16 @@
 # videoconference/consumers.py
 import json
 import uuid
+import asyncio
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 from urllib.parse import parse_qs
 from .models import VideoSession
 
 connected = {}
+
+# Heartbeat tracking for connection health
+connection_heartbeats = {}
 
 class VideoConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -21,6 +25,10 @@ class VideoConsumer(AsyncWebsocketConsumer):
 
         print(f"[VideoConsumer] Connection attempt - Session: {self.session_id}, Role: {self.role}, Email: {self.email}")
 
+        # Normalize role - accept both 'client' and 'candidate'
+        if self.role == 'candidate':
+            self.role = 'client'
+        
         if self.role not in ['interviewer', 'client']:
             print(f"[VideoConsumer] REJECTED: Invalid role '{self.role}'")
             await self.close()
@@ -56,14 +64,36 @@ class VideoConsumer(AsyncWebsocketConsumer):
         await self.accept()
         
         print(f"[VideoConsumer] ACCEPTED: {self.role} connected to session {self.session_id}")
+        
+        # Start heartbeat for this connection
+        self.heartbeat_active = True
+        asyncio.create_task(self.heartbeat_loop())
 
         await self.broadcast_participant_list()
+        
+        # Notify others that a new participant joined (for WebRTC trigger)
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'participant_joined',
+                'role': self.role,
+                'email': self.email,
+            }
+        )
 
     async def disconnect(self, close_code):
+        print(f"[VideoConsumer] DISCONNECT: {self.role} from session {self.session_id}, code: {close_code}")
+        
+        # Stop heartbeat
+        self.heartbeat_active = False
+        if self.session_id in connection_heartbeats and self.channel_name in connection_heartbeats[self.session_id]:
+            del connection_heartbeats[self.session_id][self.channel_name]
+        
         if self.session_id in connected and self.role in connected[self.session_id]:
             del connected[self.session_id][self.role]
             if not connected[self.session_id]:
                 del connected[self.session_id]
+                print(f"[VideoConsumer] Session {self.session_id} is now empty, cleaned up")
 
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
         await self.channel_layer.group_discard(self.pdf_group_name, self.channel_name)
@@ -73,8 +103,9 @@ class VideoConsumer(AsyncWebsocketConsumer):
         participants = []
         session_data = connected.get(self.session_id, {})
         for role_key, info in session_data.items():
+            # Use lowercase role for frontend consistency
             participants.append({
-                'role': 'Interviewer' if role_key == 'interviewer' else 'Candidate',
+                'role': 'interviewer' if role_key == 'interviewer' else 'candidate',
                 'email': info['email']
             })
 
@@ -94,14 +125,31 @@ class VideoConsumer(AsyncWebsocketConsumer):
             return
 
         msg_type = data.get('type')
+        
+        # Handle heartbeat pong
+        if msg_type == 'pong':
+            if self.session_id not in connection_heartbeats:
+                connection_heartbeats[self.session_id] = {}
+            connection_heartbeats[self.session_id][self.channel_name] = asyncio.get_event_loop().time()
+            return
 
         if msg_type in ['offer', 'answer', 'ice_candidate']:
+            # Extract the appropriate data based on message type
+            if msg_type == 'offer':
+                signal_data = data.get('offer')
+            elif msg_type == 'answer':
+                signal_data = data.get('answer')
+            else:  # ice_candidate
+                signal_data = data.get('ice_candidate')
+            
+            print(f"[VideoConsumer] Relaying {msg_type} from {self.role}")
+            
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'signal',
                     'signal_type': msg_type,
-                    'data': data.get(msg_type) if msg_type != 'ice_candidate' else data.get('ice_candidate'),
+                    'data': signal_data,
                     'sender': self.channel_name
                 }
             )
@@ -139,8 +187,12 @@ class VideoConsumer(AsyncWebsocketConsumer):
             payload = {'type': event['signal_type']}
             if event['signal_type'] == 'ice_candidate':
                 payload['ice_candidate'] = event['data']
-            else:
-                payload[event['signal_type']] = event['data']
+            elif event['signal_type'] == 'offer':
+                payload['offer'] = event['data']
+            elif event['signal_type'] == 'answer':
+                payload['answer'] = event['data']
+            
+            print(f"[VideoConsumer] Sending {event['signal_type']} to {self.role}")
             await self.send(text_data=json.dumps(payload))
 
     async def participant_list_update(self, event):
@@ -151,7 +203,15 @@ class VideoConsumer(AsyncWebsocketConsumer):
         }))
 
     async def media_state_broadcast(self, event):
-        if self.role != event['sender_role']:
+        # Normalize sender_role for comparison (client vs candidate)
+        sender_role = event['sender_role']
+        my_role = self.role
+        if sender_role == 'candidate':
+            sender_role = 'client'
+        if my_role == 'candidate':
+            my_role = 'client'
+        
+        if my_role != sender_role:
             await self.send(text_data=json.dumps({
                 'type': 'media_update',
                 'media_type': event['media_type'],
@@ -173,3 +233,23 @@ class VideoConsumer(AsyncWebsocketConsumer):
             'uploader_email': event['uploader_email'],
             'pdf_id': event['pdf_id'],
         }))
+
+    async def participant_joined(self, event):
+        # Notify about new participant joining (for WebRTC initiation)
+        if self.role != event['role']:
+            await self.send(text_data=json.dumps({
+                'type': 'participant_joined',
+                'role': event['role'],
+                'email': event['email'],
+            }))
+
+    async def heartbeat_loop(self):
+        """Send periodic ping to check connection health"""
+        while self.heartbeat_active:
+            try:
+                if hasattr(self, 'send') and self.heartbeat_active:
+                    await self.send(text_data=json.dumps({'type': 'ping'}))
+                await asyncio.sleep(30)  # Ping every 30 seconds
+            except Exception as e:
+                print(f"[VideoConsumer] Heartbeat error: {e}")
+                break

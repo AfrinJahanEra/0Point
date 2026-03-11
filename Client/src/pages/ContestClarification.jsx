@@ -46,6 +46,8 @@ const ContestClarification = () => {
   const [showOnlyMyQuestions, setShowOnlyMyQuestions] = useState(false);
   const [organizerView, setOrganizerView] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [submittingQuestion, setSubmittingQuestion] = useState(false);
+  const [submittingReply, setSubmittingReply] = useState({});
 
   const TOKEN = localStorage.getItem('token');
 
@@ -168,6 +170,9 @@ const ContestClarification = () => {
       return;
     }
 
+    if (submittingQuestion) return;
+    setSubmittingQuestion(true);
+
     try {
       const response = await fetch(
         `${API_BASE_URL}/contests/${contestId}/clarifications/`,
@@ -194,6 +199,8 @@ const ContestClarification = () => {
       }
     } catch (error) {
       console.error('Error creating question:', error);
+    } finally {
+      setSubmittingQuestion(false);
     }
   };
 
@@ -243,6 +250,9 @@ const ContestClarification = () => {
       return;
     }
 
+    if (submittingReply[clarificationId]) return;
+    setSubmittingReply(prev => ({ ...prev, [clarificationId]: true }));
+
     try {
       const response = await fetch(
         `${API_BASE_URL}/contests/${contestId}/clarifications/${clarificationId}/reply/`,
@@ -280,6 +290,8 @@ const ContestClarification = () => {
       }
     } catch (error) {
       console.error('Error posting reply:', error);
+    } finally {
+      setSubmittingReply(prev => ({ ...prev, [clarificationId]: false }));
     }
   };
 
@@ -536,10 +548,24 @@ const ContestClarification = () => {
                 </select>
                 <button
                   onClick={handleCreateQuestion}
-                  className="px-2 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 flex items-center gap-1"
+                  disabled={submittingQuestion}
+                  className={`px-2 py-1.5 rounded text-xs font-medium flex items-center gap-1 ${
+                    submittingQuestion
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
                 >
-                  <Send className="w-3 h-3" />
-                  Submit
+                  {submittingQuestion ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3 h-3" />
+                      Submit
+                    </>
+                  )}
                 </button>
               </div>
               <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
@@ -706,9 +732,14 @@ const ContestClarification = () => {
                             <div className="flex justify-end">
                               <button
                                 onClick={() => handleSubmitReply(question.id)}
-                                className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700"
+                                disabled={submittingReply[question.id]}
+                                className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                  submittingReply[question.id]
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                }`}
                               >
-                                Post Reply
+                                {submittingReply[question.id] ? 'Posting...' : 'Post Reply'}
                               </button>
                             </div>
                           </div>

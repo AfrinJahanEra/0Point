@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -22,8 +23,13 @@ import {
 } from "lucide-react";
 
 const Chatbot = () => {
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [windowMode, setWindowMode] = useState("normal"); // normal | minimized | maximized
+
+  // Check if user is on a contest or problem page where chat should be disabled
+  const isContestOrProblemRoute = /^\/contests\/[^/]+/.test(location.pathname) ||
+                                   /^\/test-contests\//.test(location.pathname);
 
   const [chatSessions, setChatSessions] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
@@ -211,10 +217,17 @@ const Chatbot = () => {
       {!isOpen && (
         <button
           onClick={() => {
+            if (isContestOrProblemRoute) return;
             setIsOpen(true);
             setWindowMode("normal");
           }}
-          className="fixed bottom-6 right-6 z-[70] bg-blue-800 hover:bg-blue-900 text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 hover:shadow-blue-900/30"
+          disabled={isContestOrProblemRoute}
+          title={isContestOrProblemRoute ? "Chat unavailable during a contest" : "Open chat"}
+          className={`fixed bottom-6 left-6 z-[70] p-4 rounded-full shadow-2xl transition-all ${
+            isContestOrProblemRoute
+              ? "bg-gray-400 cursor-not-allowed opacity-60"
+              : "bg-blue-800 hover:bg-blue-900 text-white hover:scale-110 hover:shadow-blue-900/30"
+          }`}
         >
           <MessageSquare className="w-6 h-6" />
         </button>
@@ -233,7 +246,7 @@ const Chatbot = () => {
           className={`z-[70] bg-white/95 backdrop-blur-md border border-gray-200/50 rounded-2xl shadow-2xl transition-all flex overflow-hidden ${
             isMaximized 
               ? "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex-row" 
-              : "fixed bottom-6 right-6 flex-col"
+              : "fixed bottom-6 left-6 flex-col"
           } ${sizeMap[windowMode]}`}
         >
           {/* Sidebar */}

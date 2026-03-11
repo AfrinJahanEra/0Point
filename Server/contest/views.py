@@ -513,6 +513,44 @@ class ContestProblemsAPIView(APIView):
                 "can_register": contest_status in ("live", "upcoming"),
             }, status=403)
 
+        # ── 3. Check if full details requested (for edit mode) ────────────────
+        full_details = request.query_params.get('full', 'false').lower() == 'true'
+
+        if full_details and is_creator:
+            # Return full problem details for editing
+            try:
+                contest = Contest.objects.get(id=contest_id)
+                full_problems = []
+                for problem in contest.problems:
+                    full_problems.append({
+                        "id": problem.index,
+                        "problem_id": problem.index,
+                        "title": problem.title,
+                        "code": problem.index,
+                        "difficulty": problem.difficulty or "Medium",
+                        "time_limit": problem.time_limit_seconds,
+                        "memory_limit": problem.memory_limit_mb,
+                        "tags": list(problem.tags or []),
+                        "points": getattr(problem, 'points', 0) or 0,
+                        "statement": problem.statement or '',
+                        "tutorial": problem.tutorial or '',
+                        "test_cases": [
+                            {
+                                "input": tc.input or '',
+                                "output": tc.output or '',
+                                "explanation": tc.explanation or ''
+                            }
+                            for tc in (problem.test_cases or [])
+                        ],
+                    })
+                return Response({
+                    "problems": full_problems,
+                    "contest_info": pub_data['contest_info'],
+                    "access_granted": can_access,
+                })
+            except Contest.DoesNotExist:
+                return Response({"error": "Contest not found"}, status=404)
+
         return Response({
             "problems":      pub_data['problems'],
             "contest_info":  pub_data['contest_info'],

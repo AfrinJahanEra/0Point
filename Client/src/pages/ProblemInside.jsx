@@ -968,12 +968,12 @@ const ProblemInside = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button 
+                    <button
                       onClick={handleRun}
-                      disabled={isRunning}
+                      disabled={isRunning || isSubmitting}
                       className={`px-3 py-1.5 border rounded text-xs font-medium transition-colors flex items-center gap-1 ${
-                        isRunning 
-                          ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed' 
+                        isRunning || isSubmitting
+                          ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
                           : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                       }`}
                     >
@@ -984,11 +984,11 @@ const ProblemInside = () => {
                       )}
                       {isRunning ? 'Running...' : 'Run'}
                     </button>
-                    <button 
+                    <button
                       onClick={handleSubmit}
-                      disabled={isSubmitting}
+                      disabled={isRunning || isSubmitting}
                       className={`px-4 py-1.5 rounded text-xs font-medium transition-colors ${
-                        isSubmitting
+                        isRunning || isSubmitting
                           ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                           : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}

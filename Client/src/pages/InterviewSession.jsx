@@ -111,8 +111,11 @@ const InterviewSession = () => {
   const [error, setError] = useState('');
   const [showClickToPlay, setShowClickToPlay] = useState(false);
 
-  const myRoleLabel = role === 'interviewer' ? 'Interviewer' : 'Candidate';
-  const remoteRoleLabel = role === 'interviewer' ? 'Candidate' : 'Interviewer';
+  // Normalize role - 'client' in URL is treated as 'candidate' for WebRTC logic
+  const normalizedRole = role === 'interviewer' ? 'interviewer' : 'candidate';
+  
+  const myRoleLabel = normalizedRole === 'interviewer' ? 'Interviewer' : 'Candidate';
+  const remoteRoleLabel = normalizedRole === 'interviewer' ? 'Candidate' : 'Interviewer';
 
 
   const checkPermissions = useCallback(async () => {
@@ -165,17 +168,24 @@ const InterviewSession = () => {
     }
   }, [sessionId, email, backendUrl]);
 
-  const createAndSendOffer = useCallback(async () => {
+  const createAndSendOffer = useCallback(async (retryCount = 0) => {
+    console.log('createAndSendOffer called, retryCount:', retryCount);
+    
     if (!pc.current) {
       console.log('PeerConnection not initialized');
       return;
     }
     if (pc.current.signalingState !== 'stable') {
       console.log('PeerConnection not ready for offer, state:', pc.current.signalingState);
+      // Retry after a delay if state is not stable
+      if (retryCount < 3) {
+        console.log(`Retrying offer creation in 2s (attempt ${retryCount + 1}/3)...`);
+        setTimeout(() => createAndSendOffer(retryCount + 1), 2000);
+      }
       return;
     }
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
-      console.log('WebSocket not ready');
+      console.log('WebSocket not ready, state:', ws.current?.readyState);
       return;
     }
     
@@ -185,15 +195,26 @@ const InterviewSession = () => {
         offerToReceiveAudio: true,
         offerToReceiveVideo: true
       });
-      await pc.current.setLocalDescription(offer);
+      console.log('Offer created:', offer);
       
-      ws.current.send(JSON.stringify({
+      await pc.current.setLocalDescription(offer);
+      console.log('Local description set:', pc.current.localDescription);
+      
+      const message = JSON.stringify({
         type: 'offer',
         offer: pc.current.localDescription
-      }));
+      });
+      console.log('Sending offer message:', message.substring(0, 200) + '...');
+      
+      ws.current.send(message);
       console.log('Offer sent to remote participant');
     } catch (err) {
       console.error('Failed to create offer:', err);
+      // Retry on failure
+      if (retryCount < 3) {
+        console.log(`Retrying offer creation in 2s (attempt ${retryCount + 1}/3)...`);
+        setTimeout(() => createAndSendOffer(retryCount + 1), 2000);
+      }
     }
   }, []);
 
@@ -433,26 +454,15 @@ const InterviewSession = () => {
           setVideoConnectionStatus('connected');
           videoWsReconnectAttempts = 0; // Reset on successful connection
           
-          // Wait a moment for participant list to sync
-          setTimeout(() => {
-            const participantCount = Object.keys(connectedParticipantsRef.current).length;
-            console.log(`Current participants: ${participantCount}`);
-            
-            // Only interviewer initiates the offer to avoid race conditions
-            if (participantCount >= 2 && role === 'interviewer') {
-              console.log('Both participants detected, interviewer initiating connection...');
-              setTimeout(() => {
-                createAndSendOffer();
-              }, 500);
-            } else if (participantCount >= 2 && role === 'client') {
-              console.log('Both participants detected, waiting for offer from interviewer...');
-            }
-          }, 1000);
+          // Request fresh participant list immediately
+          // The server will send participant_list after connection
+          console.log('Waiting for participant list from server...');
         };
 
         websocket.onclose = (event) => {
           console.log('Video WebSocket disconnected, code:', event.code);
           setVideoConnectionStatus('disconnected');
+          setPeerConnectionStatus('disconnected');
           
           // Auto-reconnect with exponential backoff
           if (videoWsReconnectAttempts < maxReconnectAttempts && !cleanupScheduled) {
@@ -461,13 +471,15 @@ const InterviewSession = () => {
             videoWsReconnectAttempts++;
             setTimeout(() => {
               if (!cleanupScheduled) {
-                const newWs = new WebSocket(`${wsUrl}/ws/video/${sessionId}/?role=${role}&email=${encodeURIComponent(email)}`);
-                ws.current = newWs;
-                // Reattach handlers
-                newWs.onopen = websocket.onopen;
-                newWs.onclose = websocket.onclose;
-                newWs.onerror = websocket.onerror;
-                newWs.onmessage = websocket.onmessage;
+                // Close existing peer connection before reconnecting
+                if (pc.current) {
+                  pc.current.close();
+                  pc.current = null;
+                }
+                // Clear pending ICE candidates
+                pendingIceCandidates.current = [];
+                // Reinitialize by reloading the page for clean state
+                window.location.reload();
               }
             }, delay);
           }
@@ -487,14 +499,29 @@ const InterviewSession = () => {
             return;
           }
 
+          // Handle heartbeat ping from server
+          if (data.type === 'ping') {
+            if (ws.current?.readyState === WebSocket.OPEN) {
+              ws.current.send(JSON.stringify({ type: 'pong' }));
+            }
+            return;
+          }
+
           if (data.type === 'pdf_update') {
             console.log('PDF received:', data.pdf_url);
             setPdfUrl(data.pdf_url);
             setPdfUploader(data.uploader_email);
           }
-          else if (data.type === 'media_update' && data.role !== role) {
-            if (data.media_type === 'audio') setRemoteAudioEnabled(data.enabled);
-            if (data.media_type === 'video') setRemoteVideoEnabled(data.enabled);
+          else if (data.type === 'media_update') {
+            // Normalize role for comparison (backend sends 'client', frontend uses 'candidate')
+            const senderRole = data.role === 'client' ? 'candidate' : data.role;
+            const myRole = normalizedRole;
+            
+            if (senderRole !== myRole) {
+              console.log('Media update from remote:', data.media_type, data.enabled);
+              if (data.media_type === 'audio') setRemoteAudioEnabled(data.enabled);
+              if (data.media_type === 'video') setRemoteVideoEnabled(data.enabled);
+            }
           }
           else if (data.type === 'participant_list') {
             // Update participant tracking
@@ -503,28 +530,100 @@ const InterviewSession = () => {
               return acc;
             }, {});
             
+            const previousCount = participants.length;
             setParticipants(data.participants);
             
+            console.log('Participant list updated:', {
+              count: data.count,
+              participants: data.participants,
+              previousCount,
+              myRole: normalizedRole,
+              signalingState: pc.current?.signalingState
+            });
+            
+            // When participants are present, only interviewer initiates connection
+            // Trigger on any participant list update where count >= 1 and we're the interviewer
+            if (data.count >= 1 && normalizedRole === 'interviewer') {
+              if (pc.current?.signalingState === 'stable') {
+                console.log('Participants detected, interviewer initiating connection...');
+                // Small delay to ensure everything is ready
+                setTimeout(() => {
+                  if (pc.current?.signalingState === 'stable') {
+                    createAndSendOffer();
+                  } else {
+                    console.log('PeerConnection state changed, not initiating offer');
+                  }
+                }, 500);
+              } else if (!pc.current) {
+                console.warn('PeerConnection not initialized yet, will retry...');
+                // Retry after a short delay
+                setTimeout(() => {
+                  if (pc.current?.signalingState === 'stable' && participants.length >= 1) {
+                    console.log('Retrying offer creation after delay...');
+                    createAndSendOffer();
+                  }
+                }, 2000);
+              } else {
+                console.log('PeerConnection not in stable state:', pc.current?.signalingState);
+              }
+            } else if (data.count >= 1 && normalizedRole === 'candidate') {
+              console.log('Candidate: Participants detected, waiting for offer from interviewer...');
+            }
+          }
+          else if (data.type === 'participant_joined') {
+            console.log('Participant joined event received:', { 
+              role: data.role, 
+              email: data.email,
+              myRole: normalizedRole,
+              signalingState: pc.current?.signalingState 
+            });
+            
+            // Normalize role from backend
+            const normalizedJoinedRole = data.role === 'client' ? 'candidate' : data.role;
+            
+            // Add to participants if not already present
+            setParticipants(prev => {
+              const exists = prev.some(p => p.email === data.email);
+              if (!exists) {
+                return [...prev, { role: normalizedJoinedRole, email: data.email }];
+              }
+              return prev;
+            });
+            
+            // Update connected participants ref
+            connectedParticipantsRef.current[data.email] = normalizedJoinedRole;
+            
             // When a new participant joins, only interviewer initiates connection
-            if (data.count === 2 && role === 'interviewer' && pc.current?.signalingState === 'stable') {
-              console.log('New participant joined, interviewer initiating connection...');
-              setTimeout(() => {
-                createAndSendOffer();
-              }, 500);
+            if (normalizedRole === 'interviewer') {
+              if (pc.current?.signalingState === 'stable') {
+                console.log('New participant joined, interviewer initiating WebRTC connection...');
+                setTimeout(() => {
+                  createAndSendOffer();
+                }, 300);
+              } else {
+                console.log('Cannot initiate connection yet, PeerConnection state:', pc.current?.signalingState);
+              }
+            } else {
+              console.log('Candidate: New participant joined, waiting for offer...');
             }
           }
           else if (data.type === 'offer') {
             try {
-              console.log('Received offer, current state:', pc.current?.signalingState);
+              console.log('Received offer, current state:', pc.current?.signalingState, 'data:', data);
               if (!pc.current) {
                 console.error('PeerConnection not initialized');
+                return;
+              }
+              
+              if (!data.offer) {
+                console.error('Received offer message but no offer data:', data);
                 return;
               }
               
               // Handle glare: if we're also trying to send an offer (have-local-offer state)
               // The candidate (non-interviewer) should be "polite" and accept incoming offers
               // The interviewer should be "impolite" and ignore incoming offers when they have pending offers
-              const isPolite = role !== 'interviewer';
+              const isPolite = normalizedRole !== 'interviewer';
               const offerCollision = pc.current.signalingState !== 'stable';
               
               if (offerCollision) {
@@ -538,7 +637,7 @@ const InterviewSession = () => {
               }
               
               await pc.current.setRemoteDescription(new RTCSessionDescription(data.offer));
-              console.log('Remote offer set, creating answer...');
+              console.log('Remote offer set successfully');
               
               // Process any queued ICE candidates
               while (pendingIceCandidates.current.length > 0) {
@@ -547,29 +646,42 @@ const InterviewSession = () => {
                 await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
               }
               
+              console.log('Creating answer...');
               const answer = await pc.current.createAnswer();
+              console.log('Answer created:', answer);
+              
               await pc.current.setLocalDescription(answer);
+              console.log('Local description (answer) set');
+              
               if (ws.current?.readyState === WebSocket.OPEN) {
-                ws.current.send(JSON.stringify({ type: 'answer', answer: pc.current.localDescription }));
-                console.log('Answer sent');
+                const answerMessage = JSON.stringify({ type: 'answer', answer: pc.current.localDescription });
+                console.log('Sending answer:', answerMessage.substring(0, 200) + '...');
+                ws.current.send(answerMessage);
+                console.log('Answer sent successfully');
+              } else {
+                console.error('WebSocket not open, cannot send answer');
               }
             } catch (err) {
               console.error('Error handling offer:', err);
             }
           } else if (data.type === 'answer') {
             try {
-              console.log('Received answer, current state:', pc.current?.signalingState);
+              console.log('Received answer, current state:', pc.current?.signalingState, 'data:', data);
               if (!pc.current) {
                 console.error('PeerConnection not initialized');
                 return;
               }
+              if (!data.answer) {
+                console.error('Received answer message but no answer data:', data);
+                return;
+              }
               // Only set remote description if we're expecting an answer
               if (pc.current.signalingState !== 'have-local-offer') {
-                console.log('Ignoring answer - not in have-local-offer state');
+                console.log('Ignoring answer - not in have-local-offer state, current:', pc.current.signalingState);
                 return;
               }
               await pc.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-              console.log('Remote description set successfully');
+              console.log('Remote description (answer) set successfully');
               
               // Process any queued ICE candidates
               while (pendingIceCandidates.current.length > 0) {
@@ -623,7 +735,7 @@ const InterviewSession = () => {
           } else if (peerConnection.iceConnectionState === 'failed' && !iceRestartInProgress) {
             console.warn('ICE connection failed, attempting ICE restart...');
             // Only interviewer initiates ICE restart to avoid conflicts
-            if (role === 'interviewer' && ws.current?.readyState === WebSocket.OPEN && peerConnection.signalingState === 'stable') {
+            if (normalizedRole === 'interviewer' && ws.current?.readyState === WebSocket.OPEN && peerConnection.signalingState === 'stable') {
               iceRestartInProgress = true;
               setTimeout(async () => {
                 try {
@@ -645,6 +757,26 @@ const InterviewSession = () => {
           } else if (peerConnection.iceConnectionState === 'disconnected') {
             console.warn('ICE connection disconnected, waiting for reconnection...');
             setPeerConnectionStatus('connecting');
+            // Auto-reconnect after 3 seconds if still disconnected
+            setTimeout(() => {
+              if (peerConnection.iceConnectionState === 'disconnected' || peerConnection.iceConnectionState === 'failed') {
+                console.log('Attempting auto-reconnect after disconnect...');
+                if (normalizedRole === 'interviewer' && ws.current?.readyState === WebSocket.OPEN && 
+                    peerConnection.signalingState === 'stable' && !iceRestartInProgress) {
+                  iceRestartInProgress = true;
+                  peerConnection.createOffer({ iceRestart: true })
+                    .then(offer => peerConnection.setLocalDescription(offer))
+                    .then(() => {
+                      ws.current.send(JSON.stringify({ type: 'offer', offer: peerConnection.localDescription }));
+                      console.log('Auto-reconnect offer sent');
+                    })
+                    .catch(e => {
+                      console.error('Auto-reconnect failed:', e);
+                      iceRestartInProgress = false;
+                    });
+                }
+              }
+            }, 3000);
           }
         };
 
@@ -666,10 +798,16 @@ const InterviewSession = () => {
         
         // Handle remote tracks
         peerConnection.ontrack = (event) => {
-          console.log('Received remote track:', event.track.kind, 'streams:', event.streams.length);
+          console.log('Received remote track:', event.track.kind, 'streams:', event.streams.length, 'track id:', event.track.id);
           
           if (event.streams && event.streams[0]) {
             const remoteStream = event.streams[0];
+            console.log('Remote stream info:', {
+              id: remoteStream.id,
+              active: remoteStream.active,
+              videoTracks: remoteStream.getVideoTracks().length,
+              audioTracks: remoteStream.getAudioTracks().length
+            });
             
             if (remoteVideoRef.current) {
               // Always set the stream for both audio and video
@@ -677,16 +815,30 @@ const InterviewSession = () => {
                 console.log('Setting remote stream to video element');
                 remoteVideoRef.current.srcObject = remoteStream;
                 
+                // Ensure video element is properly configured
+                remoteVideoRef.current.autoplay = true;
+                remoteVideoRef.current.playsInline = true;
+                
                 // Play the video - don't mute as we need audio
-                remoteVideoRef.current.play().then(() => {
-                  setShowClickToPlay(false);
-                }).catch(e => {
-                  console.warn('Auto-play prevented:', e);
-                  // Show a message to user to click to enable audio
-                  setShowClickToPlay(true);
-                });
+                const playPromise = remoteVideoRef.current.play();
+                if (playPromise !== undefined) {
+                  playPromise.then(() => {
+                    console.log('Remote video playing successfully');
+                    setShowClickToPlay(false);
+                  }).catch(e => {
+                    console.warn('Auto-play prevented, showing click-to-play:', e);
+                    // Show a message to user to click to enable audio
+                    setShowClickToPlay(true);
+                  });
+                }
+              } else {
+                console.log('Remote stream already set to video element');
               }
+            } else {
+              console.warn('Remote video ref not available yet');
             }
+          } else {
+            console.warn('No streams in track event');
           }
         };
         
@@ -990,6 +1142,64 @@ const InterviewSession = () => {
       }
     }
   }, [localAudioActive]);
+
+  // Periodic connection check - if we've been connected for a while but no remote stream, retry
+  useEffect(() => {
+    const checkInterval = setInterval(() => {
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        const hasRemoteStream = remoteVideoRef.current?.srcObject !== null;
+        
+        console.log('Connection check:', {
+          pcExists: !!pc.current,
+          connectionState: pc.current?.connectionState,
+          iceState: pc.current?.iceConnectionState,
+          signalingState: pc.current?.signalingState,
+          hasRemoteStream,
+          participantCount: participants.length,
+          normalizedRole
+        });
+        
+        // If peer connection doesn't exist but we have participants, create it
+        if (!pc.current && participants.length >= 1 && streamRef.current) {
+          console.log('PeerConnection missing but participants detected, reinitializing...');
+          // This will trigger a page reload via the disconnect handler
+          ws.current.close();
+          return;
+        }
+        
+        // If we're the interviewer, connected to WS, have 1+ participants, but no peer connection
+        if (normalizedRole === 'interviewer' && 
+            participants.length >= 1 && 
+            pc.current?.signalingState === 'stable' &&
+            !hasRemoteStream &&
+            (pc.current?.connectionState === 'new' || pc.current?.connectionState === 'connecting')) {
+          console.log('Connection seems stalled, retrying offer...');
+          createAndSendOffer();
+        }
+        
+        // If we're the interviewer and have participants but no remote stream for 10+ seconds, force reconnect
+        if (normalizedRole === 'interviewer' && 
+            participants.length >= 1 && 
+            !hasRemoteStream &&
+            pc.current?.connectionState === 'connected') {
+          console.log('Connected but no remote stream, ICE may have failed. Attempting restart...');
+          if (pc.current?.signalingState === 'stable') {
+            pc.current.createOffer({ iceRestart: true })
+              .then(offer => pc.current.setLocalDescription(offer))
+              .then(() => {
+                if (ws.current?.readyState === WebSocket.OPEN) {
+                  ws.current.send(JSON.stringify({ type: 'offer', offer: pc.current.localDescription }));
+                  console.log('ICE restart offer sent from periodic check');
+                }
+              })
+              .catch(e => console.error('ICE restart from check failed:', e));
+          }
+        }
+      }
+    }, 3000); // Check every 3 seconds
+    
+    return () => clearInterval(checkInterval);
+  }, [participants.length, normalizedRole, createAndSendOffer]);
 
   const renderPDFViewer = () => {
     const absolutePdfUrl = pdfUrl 
@@ -1515,7 +1725,8 @@ const InterviewSession = () => {
           </strong>
           {participants.map((p, i) => (
             <div key={i} style={{ margin: '8px 0', color: '#475569' }}>
-              <strong>{p.role.charAt(0).toUpperCase() + p.role.slice(1)}:</strong> {p.email.split('@')[0]}
+              <strong>{p.role === 'interviewer' ? 'Interviewer' : 'Candidate'}:</strong> {p.email.split('@')[0]}
+              {p.email === email && <span style={{ marginLeft: '8px', fontSize: '0.8em', color: '#10b981' }}>(You)</span>}
             </div>
           ))}
         </div>
@@ -1585,19 +1796,11 @@ const InterviewSession = () => {
             </button>
           )}
           
-          {(peerConnectionStatus === 'failed' || peerConnectionStatus === 'disconnected') && videoConnectionStatus === 'connected' && (
+          {(peerConnectionStatus === 'failed' || peerConnectionStatus === 'disconnected' || peerConnectionStatus === 'connecting') && videoConnectionStatus === 'connected' && (
             <button
               onClick={() => {
-                // Trigger ICE restart manually
-                if (pc.current && ws.current?.readyState === WebSocket.OPEN && pc.current.signalingState === 'stable') {
-                  pc.current.createOffer({ iceRestart: true })
-                    .then(offer => pc.current.setLocalDescription(offer))
-                    .then(() => {
-                      ws.current.send(JSON.stringify({ type: 'offer', offer: pc.current.localDescription }));
-                      console.log('Manual ICE restart triggered');
-                    })
-                    .catch(e => console.error('Manual ICE restart failed:', e));
-                }
+                // Force reconnection by reloading page
+                window.location.reload();
               }}
               style={{
                 marginTop: '12px',
@@ -1610,7 +1813,33 @@ const InterviewSession = () => {
                 cursor: 'pointer'
               }}
             >
-              Retry WebRTC Connection
+              Reconnect WebRTC
+            </button>
+          )}
+          
+          {normalizedRole === 'interviewer' && participants.length >= 1 && peerConnectionStatus === 'connecting' && (
+            <button
+              onClick={() => {
+                // Manually trigger offer creation
+                console.log('Manual offer trigger clicked');
+                if (pc.current?.signalingState === 'stable') {
+                  createAndSendOffer();
+                } else {
+                  console.log('Cannot create offer, PeerConnection state:', pc.current?.signalingState);
+                }
+              }}
+              style={{
+                marginTop: '12px',
+                padding: '8px 12px',
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '0.85em',
+                cursor: 'pointer'
+              }}
+            >
+              Force Start Connection
             </button>
           )}
         </div>
