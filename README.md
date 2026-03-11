@@ -1,459 +1,423 @@
-# ZeroPoint - Competitive Programming Platform
+<a name="top"></a>
 
-A comprehensive competitive programming and coding practice platform designed to help developers enhance their problem-solving skills, participate in contests, and prepare for technical interviews.
+<h1 align="center" font-style="bold">
+  $\Huge\textbf{\color{#00D9FF}ZEROPOINT}$
+</h1>
 
----
+$${\color{#5EEAD4}Practice, \space \color{#FBF3D4}compete \space \color{#D4D4FF}and \space \color{#5EEAD4}master \space \color{lightblue}algorithms \space \color{#FBF3D4}with \space \color{#D4D4FF}real-time \space \color{#FBF3D4}contests}$$
 
-## Table of Contents
+> <img src="https://github.com/user-attachments/assets/placeholder-logo.png" align="right" width="80px"/>
+> A comprehensive competitive programming platform designed for coders of all levels, featuring live contests, algorithm visualizations, mock interviews, AI assistance, and cross-platform integration.
 
-- [Overview](#overview)
-- [Features](#features)
-  - [Community](#1-community)
-  - [Contest System](#2-contest-system)
-  - [Cross-Platform Integration](#3-cross-platform-integration)
-  - [Mock Interview](#4-mock-interview)
-  - [Algorithm Visualizer & Code I/O Visualizer](#5-algorithm-visualizer--code-io-visualizer)
-  - [Problem Recommendation Engine](#6-problem-recommendation-engine)
-  - [AI Chatbot Assistant](#7-ai-chatbot-assistant)
-  - [Admin Dashboard](#8-admin-dashboard)
-  - [User Dashboard & Analytics](#9-user-dashboard--analytics)
-- [Tech Stack](#tech-stack)
-- [Installation](#installation)
-- [Project Structure](#project-structure)
-- [Contributing](#contributing)
-- [License](#license)
+<br>
 
----
+![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+![WebSocket](https://img.shields.io/badge/Real--Time-WebSocket-6A1B9A?style=for-the-badge)
+![REST API](https://img.shields.io/badge/API-REST--Ful-orange?style=for-the-badge)
+![JWT](https://img.shields.io/badge/Auth-JWT-blueviolet?style=for-the-badge)
+![Docker](https://img.shields.io/badge/Docker-Container-blue?style=for-the-badge&logo=docker)
+![Redis](https://img.shields.io/badge/Cache-Redis-red?style=for-the-badge&logo=redis)
+![ML](https://img.shields.io/badge/ML-Scikit--Learn-green?style=for-the-badge)
+![WebRTC](https://img.shields.io/badge/Video-WebRTC-333333?style=for-the-badge)
 
-## Overview
+<br><br>
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/placeholder-banner.png" width="500px"/>
+</div>
 
-ZeroPoint is an all-in-one competitive programming platform that bridges the gap between learning algorithms and real-world coding interviews. Whether you're a beginner starting your coding journey or an experienced developer preparing for FAANG interviews, ZeroPoint provides the tools and resources you need to succeed.
 
----
+<br>
 
-## Features
-
-### 1. Community
-
-ZeroPoint fosters a vibrant community of competitive programmers and developers.
-
-**Key Features:**
-- **Blog System**: Users can create, publish, and share technical articles, tutorials, and problem-solving approaches
-- **Discussion Forums**: Engage in topic-based discussions with fellow programmers
-- **Problem Discussions**: Dedicated discussion threads for each problem to share solutions and approaches
-- **Clarification System**: Ask and answer clarifications during contests
-- **User Contributions**: Track and recognize valuable community contributions
-- **Announcements**: Stay updated with platform news and important updates
-- **User Profiles**: Comprehensive profiles showcasing achievements, solved problems, and activity
-
-**Community Modules:**
-- Blog posting and management
-- Threaded discussions with upvotes/downvotes
-- Real-time contest clarifications
-- User contribution tracking and leaderboards
-
----
-
-### 2. Contest System
-
-A robust contest management system supporting various competition formats.
-
-**Key Features:**
-- **Contest Creation**: Create custom contests with configurable settings
-- **Multiple Problem Types**: Support for various problem formats and difficulty levels
-- **Real-Time Leaderboard**: Live rankings with WebSocket-based updates
-- **Scoring Systems**: Flexible scoring including ICPC-style and IOI-style scoring
-- **Contest Phases**: Automatic handling of registration, running, and ended phases
-- **Editorial System**: Post-contest editorials and solutions
-- **Virtual Participation**: Practice past contests in a simulated environment
-
-**Contest Types:**
-- Public contests open to all users
-- Private contests with invite-only access
-- Practice contests for self-assessment
-- Virtual contests for past competition replay
-
-**Contest Features:**
-- Automatic time synchronization
-- Penalty calculation
-- Submission tracking and verdict display
-- Contest-wide announcements and clarifications
-- Detailed post-contest statistics
-
----
-
-### 3. Cross-Platform Integration
-
-Seamlessly integrate competitive programming profiles from multiple platforms.
-
-**Supported Platforms:**
-- **Codeforces**: Sync problems, contests, and ratings
-- **LeetCode**: Import problem-solving history
-- **AtCoder**: Track AtCoder performance
-- **CodeChef**: Integrate CodeChef statistics
-- **HackerRank**: Connect HackerRank achievements
-
-**Integration Features:**
-- **Profile Synchronization**: Automatically fetch and update statistics from linked platforms
-- **Unified Analytics**: View combined performance metrics across all platforms
-- **Problem Import**: Access problems from external platforms
-- **Rating Tracking**: Monitor rating changes across platforms
-- **Contest Calendar**: Aggregated contest schedule from all integrated platforms
-- **Cross-Platform Statistics**: Compare performance across different competitive programming sites
-
----
-
-### 4. Mock Interview
-
-Comprehensive interview preparation module designed to simulate real technical interviews.
-
-**Key Features:**
-- **Timed Interview Sessions**: Practice under realistic time constraints
-- **Problem Categories**: Questions organized by topics (Arrays, Trees, Graphs, DP, etc.)
-- **Difficulty Levels**: Problems ranging from Easy to Hard
-- **Video Conferencing**: Built-in video call support for mock interviews with peers or mentors
-- **Interview Feedback**: Receive and provide feedback on interview performance
-- **Company-Specific Prep**: Problems categorized by companies (Google, Amazon, Meta, etc.)
-
-**Interview Modes:**
-- Solo practice with timed challenges
-- Peer-to-peer mock interviews
-- Mentor-guided interview sessions
-- Random problem selection based on preferences
-
-**Features:**
-- Real-time code collaboration
-- Interview recording and playback
-- Performance analytics and improvement tracking
-- Common interview pattern recognition
-
----
-
-### 5. Algorithm Visualizer & Code I/O Visualizer
-
-Interactive visualization tools to understand algorithms and debug code execution.
-
-**Algorithm Visualizer:**
-- **Sorting Algorithms**: Visualize Bubble Sort, Merge Sort, Quick Sort, Heap Sort, and more
-- **Graph Algorithms**: BFS, DFS, Dijkstra's, Bellman-Ford, Floyd-Warshall visualizations
-- **Tree Traversals**: Inorder, Preorder, Postorder, Level-order animations
-- **Dynamic Programming**: Step-by-step DP table construction
-- **Search Algorithms**: Binary Search, Linear Search with visual representation
-- **Data Structures**: Stack, Queue, Linked List, BST operations visualization
-
-**Code I/O Visualizer:**
-- **Step-by-Step Execution**: Trace code execution line by line
-- **Variable Tracking**: Monitor variable values throughout execution
-- **Memory Visualization**: See how memory is allocated and modified
-- **Call Stack Display**: Visualize function calls and recursion
-- **Input/Output Flow**: Track data flow through your program
-- **Breakpoint Support**: Set breakpoints to pause execution at specific lines
-
-**Supported Languages:**
-- C++ with memory tracing
-- Python with variable inspection
-- Java execution visualization
-
-**Visualization Features:**
-- Speed control for animations
-- Step forward/backward navigation
-- Custom input support
-- Export visualizations as images/GIFs
-
----
-
-### 6. Problem Recommendation Engine
-
-AI-powered problem recommendation system tailored to individual learning paths.
-
-**Key Features:**
-- **Personalized Recommendations**: Problems suggested based on your skill level and solving history
-- **Difficulty Prediction**: ML-based difficulty estimation for problems
-- **Weak Area Identification**: Identify topics that need more practice
-- **Progressive Learning Path**: Structured problem sequences for skill development
-- **Tag-Based Analysis**: Detailed breakdown of performance by problem tags
-
-**Recommendation Algorithms:**
-- Collaborative filtering based on similar users
-- Content-based filtering using problem characteristics
-- Hybrid recommendation combining multiple approaches
-- Adaptive difficulty progression
-
-**Analytics Provided:**
-- Skill gap analysis
-- Topic-wise performance metrics
-- Recommended daily practice goals
-- Progress tracking towards targets
-
----
-
-### 7. AI Chatbot Assistant
-
-Intelligent chatbot to assist users with coding queries and platform navigation.
-
-**Key Features:**
-- **Code Assistance**: Get help with debugging and code explanations
-- **Concept Clarification**: Ask questions about algorithms and data structures
-- **Problem Hints**: Request hints without revealing full solutions
-- **Platform Guidance**: Navigate ZeroPoint features with chatbot assistance
-- **Learning Resources**: Get recommended tutorials and resources
-
-**Chatbot Capabilities:**
-- Natural language understanding for coding queries
-- Context-aware responses
-- Code snippet analysis
-- Multi-turn conversations
-- Integration with platform features
-
-**Use Cases:**
-- "Explain how Dijkstra's algorithm works"
-- "Help me debug this recursive function"
-- "What's the time complexity of my solution?"
-- "Recommend problems on dynamic programming"
-
----
-
-### 8. Admin Dashboard
-
-Comprehensive administrative panel for platform management and moderation.
-
-**Key Features:**
-- **User Management**:
-  - View all registered users
-  - Ban/unban users with reason logging
-  - Role assignment (Admin, Moderator, User)
-  - User activity monitoring
+<div align="center">
   
-- **Banned User Management**:
-  - Ban users for policy violations
-  - Temporary and permanent ban options
-  - Ban appeal review system
-  - Ban history and audit logs
+  | $\large\text{\color{#76DCF1}{Layer}}$            | $\large\text{\color{#FD8FAB}{Technology}}$      | $\large\text{\color{#52CCF6}{Version}}$  |
+|----------------------|--------------------|----------|
+| **Frontend Library**         | Vite+React.js           | `19.2.0`   |
+| **Backend Framework**          | Django             | `4.0+`    |
+| **Database**         | MongoDB          | `4.6+`    |
+| **Real-Time**                 | Redis              | `5.0+`      |
+| **Tools & Languages**            | Python             | `3.9+`   |
+
+</div>
+
+<br>
+
+
+<h1>$\large\textbf{\color{#00D9FF}{User Roles}}$</h1><br>
+
+| $\large\text{\color{#76DCF1}{Role}}$ | $\large\text{\color{#FD8FAB}{Description}}$ |
+| ------------- | --------------------------------------------------------------------------- |
+| **User**      | Solve problems, participate in contests, write blogs, and track progress           |
+| **Moderator** | Reviews content, manages discussions, and assists with contest moderation           |
+| **Admin**     | Manages the entire platform, creates contests, approves problems, and user governance |
+
+<br>
+
+
+<br>
+
+<h1>$\large\textbf{\color{#00D9FF}{Features}}$</h1>
+
+<h3>$\large\textbf{\color{#98FB98}{Contest System}}$</h3>
+<ul>
+<li>Create and participate in live coding contests with real-time leaderboards</li>
+<li>Multiple contest formats: public, private, virtual participation</li>
+<li>Automatic time synchronization and penalty calculation</li>
+<li>Contest clarifications and announcements</li>
+<li>Post-contest editorials and solution discussions</li>
+<br>
+</ul>
+
+<h3>$\large\textbf{\color{#AFF4E1}{Problem Solving & Practice}}$</h3>
+<ul>
+<li>Extensive problem library with difficulty-based categorization</li>
+<li>Support for multiple programming languages (C++, Python, Java)</li>
+<li>Real-time code execution with detailed verdicts (AC, WA, TLE, MLE, RE, CE)</li>
+<li>Test case visibility and debugging support</li>
+</ul>
+
+<br>
+<h3>$\large\textbf{\color{#919DF3}{Cross-Platform Integration}}$</h3>
+<ul>
+<li>Sync profiles from Codeforces, LeetCode, AtCoder, CodeChef, HackerRank</li>
+<li>Unified analytics across all competitive programming platforms</li>
+<li>Aggregated contest calendar from multiple sources</li>
+<li>Cross-platform rating tracking and statistics</li>
+</ul>
+
+<h3>$\large\textbf{\color{#00F8FF}{Algorithm Visualizer}}$</h3>
+<ul>
+<li>Interactive visualizations for sorting, graph, and tree algorithms</li>
+<li>Step-by-step execution tracing with variable monitoring</li>
+<li>Memory visualization and call stack display</li>
+<li>Custom input support and animation speed control</li>
+<br>
+</ul>
+
+<h3>$\large\textbf{\color{#FFFFA0}{Mock Interview System}}$</h3>
+<ul>
+<li>Timed interview sessions with company-specific problems</li>
+<li>Built-in video conferencing via WebRTC</li>
+<li>Peer-to-peer and mentor-guided interview practice</li>
+<li>Performance feedback and improvement tracking</li>
+<br>
+</ul>
+
+<h3>$\large\textbf{\color{#00E0FF}{AI Chatbot Assistant}}$</h3>
+<ul>
+<li>Intelligent coding assistance and debugging help</li>
+<li>Algorithm explanations and concept clarification</li>
+<li>Problem hints without revealing full solutions</li>
+<li>Personalized learning resource recommendations</li>
+<br>
+</ul>
+
+<h3>$\large\textbf{\color{#FF6B6B}{Problem Recommendation Engine}}$</h3>
+<ul>
+<li>ML-powered personalized problem suggestions</li>
+<li>Difficulty prediction using trained models</li>
+<li>Weak area identification and skill gap analysis</li>
+<li>Progressive learning paths tailored to your level</li>
+<br>
+</ul>
+
+<h3>$\large\textbf{\color{#C084FC}{Community & Collaboration}}$</h3>
+<ul>
+<li>Blog system for sharing tutorials and insights</li>
+<li>Discussion forums for problems and topics</li>
+<li>User contributions tracking and recognition</li>
+<li>Real-time chat and clarification system</li>
+<br>
+</ul>
+
+<h3>$\large\textbf{\color{#4ADE80}{User Dashboard & Analytics}}$</h3>
+<ul>
+<li>Comprehensive performance analytics with interactive charts</li>
+<li>Problem-solving streaks and activity heatmaps</li>
+<li>Topic-wise strength and weakness analysis</li>
+<li>Verdict distribution and error pattern tracking</li>
+<br>
+</ul>
+
+<h3>$\large\textbf{\color{#F472B6}{Admin Dashboard}}$</h3>
+<ul>
+<li>User management with ban/unban capabilities</li>
+<li>Content moderation and problem approval workflow</li>
+<li>Platform statistics and usage analytics</li>
+<li>Announcement broadcasting and report handling</li>
+<br>
+</ul>
+
+
+
+<h1>$\large\textbf{\color{#00D9FF}{Target Users}}$</h1><br>
+
+
+| <img width="100px" src="https://github.com/user-attachments/assets/student-icon.png" /> | <img width="100px" src="https://github.com/user-attachments/assets/coder-icon.png" /> | <img width="100px" src="https://github.com/user-attachments/assets/interview-icon.png" /> | <img width="100px" src="https://github.com/user-attachments/assets/teacher-icon.png" /> |
+|:--:|:--:|:--:|:--:|
+| University Students | Competitive Programmers | Interview Candidates | Educators & Mentors |
+
+
+<details>
+  <summary>
+    <h1>$\large\textbf{\color{#00D9FF}{File Structure}}$</h1><br>
+  </summary>
   
-- **Content Moderation**:
-  - Review flagged content
-  - Approve/reject problem submissions
-  - Moderate discussions and comments
-  - Contest approval workflow
+  ```console
+zeropoint/
+├── Client/
+│   ├── public/
+│   ├── src/
+│   │   ├── assets/
+│   │   ├── components/
+│   │   ├── context/
+│   │   ├── hooks/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   ├── utils/
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── .env
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+├── Server/
+│   ├── account/
+│   ├── admin/
+│   ├── announcement/
+│   ├── blog/
+│   ├── Chatapp/
+│   ├── clarification/
+│   ├── compiler/
+│   ├── contest/
+│   ├── contribution/
+│   ├── crossPlatform/
+│   ├── difficulty_prediction/
+│   ├── discussion/
+│   ├── docker/
+│   ├── executor/
+│   ├── ide/
+│   ├── leaderboard/
+│   ├── mock_interview/
+│   ├── notification/
+│   ├── pdf/
+│   ├── problem/
+│   ├── public_leaderboard/
+│   ├── recommendation/
+│   ├── report/
+│   ├── submission/
+│   ├── testcase/
+│   ├── testcontest/
+│   ├── tutorial/
+│   ├── utils/
+│   ├── videoconference/
+│   ├── virtual/
+│   ├── zeropoint/
+│   ├── manage.py
+│   └── requirements.txt
+├── .gitignore
+└── README.md
+```
+</details>
 
-- **Platform Statistics**:
-  - Total users and active users
-  - Submission statistics
-  - Contest participation metrics
-  - Platform usage trends
+<h1>$\large\textnormal{\color{#00D9FF}{Installation}}$</h1><br>
 
-**Admin Capabilities:**
-- Problem creation and management
-- Contest administration
-- Announcement broadcasting
-- Report handling and resolution
-- System configuration
+Clone the repository
+```console
+https://github.com/AfrinJahanEra/ZeroPoint.git
+```
+Or download the `zip` file, then extract it in a folder.
 
----
+<h1>$\large\textnormal{\color{#00D9FF}{How To Run}}$</h1><br>
 
-### 9. User Dashboard & Analytics
+## Prerequisites
 
-Personalized dashboard providing comprehensive insights into coding progress.
+- Install `Python` (v3.9+) and `Node.js` (v16+).
+- Open an account at [`MongoDB Atlas`](https://www.mongodb.com/products/platform/atlas-database) and collect the credentials.
+- Open account in [`Cloudinary`](https://cloudinary.com/) and collect credentials from there.
+- Then download Redis from [`redis-release`](https://github.com/tporadowski/redis/releases) (use the latest zip version). Extract the files from `redis-release` zip file. Then click on `redis-server.exe`. To check the server is running or not:
 
-**Dashboard Components:**
+  Open the command prompt, write:
+  ```console
+  cd "path\to\extracted folder"
+  redis-cli
+  ping
+  ```
+  Or directly open `redis-cli.exe`. Then write `ping`. If it results in `PONG`, then the Redis server is connected successfully.
 
-**Performance Analytics:**
-- Problems solved (Easy/Medium/Hard breakdown)
-- Acceptance rate and success metrics
-- Rating progression graphs
-- Streak tracking and consistency metrics
+  Successful connection example:
+  ```console
+  127.0.0.1:6379> ping
+  PONG
+  127.0.0.1:6379>
+  ```
+  <img src="https://github.com/user-attachments/assets/redis-pong.png" width=100px align="right">
 
-**Activity Overview:**
-- Recent submissions with verdicts
-- Contest participation history
-- Problems attempted vs solved ratio
-- Daily/Weekly/Monthly activity heatmap
+  > [!TIP]  
+  > If the `redis-server.exe` isn't running, go to Task Manager (Run as administrator).
+  > - Search for something like `redis`.
+  > - If it's on, click on `end task`.
 
-**Skill Analysis:**
-- Topic-wise problem distribution
-- Strongest and weakest areas
-- Comparative analysis with peers
-- Percentile rankings
+  If it still doesn't work, try checking that port `6379` is already running or not:
+  - Open command prompt.
+  - Run:
+    ```console
+    netstat -aon | findstr :6379
+    ```
+    If you see something like this, means this port is already in use.
 
-**Progress Tracking:**
-- Goal setting and tracking
-- Milestone achievements
-- Badge collection
-- Contest rank history
+  <div align="center"> 
 
-**Verdict Analysis:**
-- Submission verdict distribution (AC, WA, TLE, MLE, RE, CE)
-- Common error patterns
-- Improvement suggestions
+  | $\large\text{\color{#76DCF1}{Proto}}$ | $\large\text{\color{#76DCF1}{Local Address}}$ | $\large\text{\color{#76DCF1}{Foreign Address}}$ | $\large\text{\color{#76DCF1}{State}}$ | $\large\text{\color{#76DCF1}{PID}}$ |
+  |------|------------------|----------------------|--------------------|-----------|
+  | TCP  |  0.0.0.0:6379    |       0.0.0.0:0      |        LISTENING   |    14220  |
+  | TCP  |  [::]:6379       |       [::]:0         |        LISTENING   |    14220  |
+  
+  </div>
+    - Kill this port (change the PID according to the output):
+      ```console
+      taskkill /PID 14220 /F
+      ```
+    - Then try refreshing the PC and run the `redis-server.exe` again.
 
-**Calendar View:**
-- Upcoming contests
-- Practice schedule
-- Activity history
-- Important dates and deadlines
+<h1>$\large\textnormal{\color{#00D9FF}{Server Directory}}$</h1><br>
 
-**Visual Analytics:**
-- Interactive charts and graphs
-- Problem difficulty distribution
-- Time spent analysis
-- Comparison with target metrics
+Then go to the directory path (where the code is):
+```console
+cd "path\to\directory"
+```
+Then open right-click and click `open in Terminal`. Then in terminal run:
+```console
+code .
+```
+This will directly take you to the VS Code interface. In `Server` directory, open terminal and run:
 
----
+For `Linux/MacOS`:
+```console
+python -m venv env
+source env/bin/activate
+```
+For `Windows`:
+```console
+python -m venv env
+.\env\Scripts\activate
+```
 
-## Tech Stack
+Which will create the environment. Inside this, install the dependencies:
+```console
+pip install -r requirements.txt
+```
+This will install all the `pip` dependencies required to run this code. If it doesn't work, run this in `Command Prompt` or in `VS Code Terminal`:
+```console
+pip install Django djangorestframework mongoengine pymongo PyJWT python-dotenv requests pytz cloudinary django-cors-headers channels channels-redis django-redis redis daphne gunicorn beautifulsoup4 lxml google-generativeai numpy scikit-learn pandas joblib
+```
 
-### Frontend (Client)
-- **Framework**: React.js with Vite
-- **Styling**: CSS3 with modern styling
-- **State Management**: React Context API
-- **Routing**: React Router
-- **Build Tool**: Vite
-- **Deployment**: Vercel
+Then run in `Server` directory:
+```console
+daphne zeropoint.asgi:application
+```
 
-### Backend (Server)
-- **Framework**: Django (Python)
-- **API**: Django REST Framework
-- **Database**: SQLite (Development) / PostgreSQL (Production)
-- **Real-time**: Django Channels (WebSockets)
-- **Authentication**: JWT-based authentication
-- **ML/AI**: Scikit-learn for recommendations and predictions
+If it's missing the `static directory` it will give this error:
+```python
+django.core.exceptions.ImproperlyConfigured: 
+You're using the staticfiles app without having set the required STATIC_URL setting.
+```
 
-### Additional Technologies
-- **Code Execution**: Docker-based sandboxed execution
-- **Video Conferencing**: WebRTC integration
-- **Caching**: Redis for performance optimization
-- **Task Queue**: Celery for background tasks
+This happens when:
+- `django.contrib.staticfiles` is in `INSTALLED_APPS`
+- But forgot to define `STATIC_URL` (and optionally `STATICFILES_DIRS`)
 
----
+Add this to `settings.py`:
+```python
+import os
 
-## Installation
+# Required
+STATIC_URL = '/static/'
 
-### Prerequisites
-- Node.js (v16+)
-- Python (v3.9+)
-- pip
-- Docker (for code execution)
+# Optional (for development)
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
-### Client Setup
+# Optional (for production use)
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+```
 
-```bash
-# Navigate to client directory
-cd Client
+Create the static directory (if needed):
+```console
+mkdir static
+```
 
-# Install dependencies
+<h1>$\large\textnormal{\color{#00D9FF}{Client Directory}}$</h1><br>
+
+In `Client` directory, open terminal and run:
+```console
 npm install
-
-# Create environment file
-cp .env.example .env
-
-# Start development server
 npm run dev
 ```
 
-### Server Setup
+Make sure `Vite` is installed as a dev dependency in your project. Check `package.json` inside `Client/`. If something like this is present:
+```json
+"devDependencies": {
+  "vite": "^7.1.2",  // or another version
+  ...
+}
+```
+It means `Vite` is present. If it's missing, install it:
+```console
+npm install vite --save-dev
+```
+> [!TIP]
+> To fix vulnerabilities, run this:
+> ```console
+> npm audit fix
+> ```
 
-```bash
-# Navigate to server directory
-cd Server
-
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# Windows
-venv\Scripts\activate
-# Linux/Mac
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run migrations
-python manage.py migrate
-
-# Start development server
-python manage.py runserver
+Or to fix all issues automatically (including breaking changes):
+```console
+npm audit fix --force
 ```
 
----
+> [!CAUTION] 
+> Be cautious with `--force`. It may upgrade packages that break the project.
 
-## Project Structure
+and serve it with Django or a production web server. Don't deploy with `npm run build`.
 
-```
-zeropoint/
-├── Client/                    # React Frontend
-│   ├── public/               # Static assets
-│   ├── src/
-│   │   ├── assets/          # Images, icons
-│   │   ├── components/      # Reusable components
-│   │   ├── context/         # React Context providers
-│   │   ├── hooks/           # Custom React hooks
-│   │   ├── pages/           # Page components
-│   │   ├── services/        # API services
-│   │   └── utils/           # Utility functions
-│   └── package.json
-│
-├── Server/                    # Django Backend
-│   ├── account/              # User authentication & profiles
-│   ├── admin/                # Admin functionality
-│   ├── announcement/         # Platform announcements
-│   ├── blog/                 # Blog system
-│   ├── Chatapp/              # AI Chatbot
-│   ├── clarification/        # Contest clarifications
-│   ├── compiler/             # Code compilation
-│   ├── contest/              # Contest management
-│   ├── contribution/         # User contributions
-│   ├── crossPlatform/        # Platform integrations
-│   ├── difficulty_prediction/# ML difficulty prediction
-│   ├── discussion/           # Discussion forums
-│   ├── executor/             # Code execution & tracing
-│   ├── leaderboard/          # Ranking system
-│   ├── mock_interview/       # Interview module
-│   ├── notification/         # User notifications
-│   ├── problem/              # Problem management
-│   ├── recommendation/       # Problem recommendations
-│   ├── report/               # Reporting system
-│   ├── submission/           # Code submissions
-│   ├── testcase/             # Test case management
-│   ├── tutorial/             # Learning tutorials
-│   ├── videoconference/      # Video call integration
-│   └── virtual/              # Virtual contest
-│
-└── README.md
+> [!IMPORTANT]  
+> - This project uses `ASGI` (not `WSGI`), and runs via Daphne instead of `python manage.py runserver`.
+> - `Redis` & `MongoDB` must be running before you start the app.
+
+> [!NOTE]  
+> The app runs on `http://localhost:8000` by default. If port is taken, use `daphne -b 127.0.0.1 -p 8080 zeropoint.asgi:application`.
+
+You can change the port (-p) or host (-b) as needed.
+
+$${\color{#00D9FF}You \space can \space change \space the \space port \space (-p) \space or \space host \space (-b) \space as \space needed.}$$
+
+<h1>$\large\textnormal{\color{#EE4B2B}{Things To Consider}}$</h1>
+
+List this in `.env` file inside `Server/` directory:
+
+```console
+MONGO_DB_NAME=zeropoint_db
+MONGO_URI=mongodb+srv://username:password@cluster0.mongodb.net/zeropoint_db
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+SECRET_KEY=your_django_secret_key
 ```
 
----
+List this in `.env` file inside `Client/` directory:
 
-## Contributing
+```console
+VITE_API_URL=http://localhost:8000
+```
 
-We welcome contributions from the community! Here's how you can help:
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Commit your changes**: `git commit -m 'Add amazing feature'`
-4. **Push to the branch**: `git push origin feature/amazing-feature`
-5. **Open a Pull Request**
-
-### Contribution Guidelines
-- Follow the existing code style
-- Write clear commit messages
-- Add tests for new features
-- Update documentation as needed
-
----
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## Support
-
-For support, questions, or feedback:
-- Open an issue on GitHub
-- Join our community discussions
-- Contact the development team
+> [!WARNING]
+> Do not commit `.env` files to GitHub. Add them to `.gitignore`.
 
 ---
 
