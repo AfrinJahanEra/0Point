@@ -6,7 +6,6 @@
 
 $${\color{#5EEAD4}Practice, \space \color{#FBF3D4}compete \space \color{#D4D4FF}and \space \color{#5EEAD4}master \space \color{lightblue}algorithms \space \color{#FBF3D4}with \space \color{#D4D4FF}real-time \space \color{#FBF3D4}contests}$$
 
-> <img src="https://github.com/user-attachments/assets/placeholder-logo.png" align="right" width="80px"/>
 > A comprehensive competitive programming platform designed for coders of all levels, featuring live contests, algorithm visualizations, mock interviews, AI assistance, and cross-platform integration.
 
 <br>
@@ -23,9 +22,6 @@ $${\color{#5EEAD4}Practice, \space \color{#FBF3D4}compete \space \color{#D4D4FF}
 ![WebRTC](https://img.shields.io/badge/Video-WebRTC-333333?style=for-the-badge)
 
 <br><br>
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/placeholder-banner.png" width="500px"/>
-</div>
 
 
 <br>
@@ -50,7 +46,6 @@ $${\color{#5EEAD4}Practice, \space \color{#FBF3D4}compete \space \color{#D4D4FF}
 | $\large\text{\color{#76DCF1}{Role}}$ | $\large\text{\color{#FD8FAB}{Description}}$ |
 | ------------- | --------------------------------------------------------------------------- |
 | **User**      | Solve problems, participate in contests, write blogs, and track progress           |
-| **Moderator** | Reviews content, manages discussions, and assists with contest moderation           |
 | **Admin**     | Manages the entire platform, creates contests, approves problems, and user governance |
 
 <br>
@@ -70,7 +65,7 @@ $${\color{#5EEAD4}Practice, \space \color{#FBF3D4}compete \space \color{#D4D4FF}
 <br>
 </ul>
 
-<h3>$\large\textbf{\color{#AFF4E1}{Problem Solving & Practice}}$</h3>
+<h3>$\large\textbf{\color{#AFF4E1}{Problem Solving \& Practice}}$</h3>
 <ul>
 <li>Extensive problem library with difficulty-based categorization</li>
 <li>Support for multiple programming languages (C++, Python, Java)</li>
@@ -132,7 +127,7 @@ $${\color{#5EEAD4}Practice, \space \color{#FBF3D4}compete \space \color{#D4D4FF}
 <br>
 </ul>
 
-<h3>$\large\textbf{\color{#4ADE80}{User Dashboard & Analytics}}$</h3>
+<h3>$\large\textbf{\color{#4ADE80}{User Dashboard \& Analytics}}$</h3>
 <ul>
 <li>Comprehensive performance analytics with interactive charts</li>
 <li>Problem-solving streaks and activity heatmaps</li>
@@ -241,7 +236,6 @@ Clone the repository or download the `zip` file, then extract it in a folder.
   PONG
   127.0.0.1:6379>
   ```
-  <img src="https://github.com/user-attachments/assets/redis-pong.png" width=100px align="right">
 
   > [!TIP]  
   > If the `redis-server.exe` isn't running, go to Task Manager (Run as administrator).
@@ -378,11 +372,9 @@ and serve it with Django or a production web server. Don't deploy with `npm run 
 > - `Redis` & `MongoDB` must be running before you start the app.
 
 > [!NOTE]  
-> The app runs on `http://localhost:8000` by default. If port is taken, use `daphne -b 127.0.0.1 -p 8080 zeropoint.asgi:application`.
+> The app runs on port `8000` by default. If port is taken, use `daphne -b 127.0.0.1 -p 8080 zeropoint.asgi:application`.
 
 You can change the port (-p) or host (-b) as needed.
-
-$${\color{#00D9FF}You \space can \space change \space the \space port \space (-p) \space or \space host \space (-b) \space as \space needed.}$$
 
 <h1>$\large\textnormal{\color{#EE4B2B}{Things To Consider}}$</h1>
 
@@ -397,7 +389,7 @@ Create a `.env` file inside `Server/` directory with your configuration values f
 List this in `.env` file inside `Client/` directory:
 
 ```console
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=<your_backend_url>
 ```
 
 > [!WARNING]
