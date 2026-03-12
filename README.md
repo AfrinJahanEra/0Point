@@ -407,7 +407,7 @@ VITE_API_URL=<your_backend_url>
 |---|---|---|
 | **Ramisa Anan Rahman** | `220042105` | Cross-Platform Problem Solving, Blogging, Analytic Dashboard, Problem Recommendation |
 | **Ridika Naznin** | `220042115` | Contest Hosting \& Proctoring, Leaderboard, Community \& Discussion, Coding Help Chatbot |
-| **Afrin Jahan Era** | `220042132` | Advanced Visualizer, Mock Interview, Admin (Report and ban user), Problem Difficulty Prediction |
+| **Afrin Jahan Era** | `220042132` | Algorithom,I/o & Code Visualizer, Mock Interview, Admin (Report and ban user), Problem Difficulty Prediction |
 
 </div>
 
