@@ -397,6 +397,22 @@ VITE_API_URL=<your_backend_url>
 
 ---
 
+<h1>$\large\textbf{\color{#00D9FF}{Individual Contribution}}$</h1>
+
+<br>
+
+<div align="center">
+
+| $\large\text{\color{#76DCF1}{Member}}$ | $\large\text{\color{#FD8FAB}{Student ID}}$ | $\large\text{\color{#52CCF6}{Contributions}}$ |
+|---|---|---|
+| **Ramisa Anan Rahman** | `220042105` | Cross-Platform Problem Solving, Blogging, Analytic Dashboard, Problem Recommendation |
+| **Ridika Naznin** | `220042115` | Contest Hosting \& Proctoring, Leaderboard, Community \& Discussion, Coding Help Chatbot |
+| **Afrin Jahan Era** | `220042132` | Advanced Visualizer, Mock Interview, Admin (Report and ban user), Problem Difficulty Prediction |
+
+</div>
+
+---
+
 **Happy Coding!** 
 
 *ZeroPoint - Elevate Your Competitive Programming Journey*
